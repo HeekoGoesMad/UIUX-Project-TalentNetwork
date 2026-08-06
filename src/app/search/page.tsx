@@ -8,6 +8,8 @@ import { CandidateCard } from "@/components/candidates/candidate-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { useApp } from "@/providers/app-provider";
 
 const pageSize = 12;
 const locations = [...new Set(candidates.map((candidate) => candidate.location))].sort();
@@ -28,6 +30,7 @@ function salaryStart(value: string) {
 }
 
 export default function SearchPage() {
+  const { user } = useApp();
   const params = useSearchParams();
   const router = useRouter();
   const filters = readFilters(params);
@@ -60,6 +63,7 @@ export default function SearchPage() {
     <div><p className="text-sm font-medium">Salary range (starting $k)</p><div className="mt-1 grid grid-cols-2 gap-2"><Input type="number" min="0" placeholder="Min" value={draft.salaryMin} onChange={(e) => setDraft({ ...draft, salaryMin: e.target.value })} aria-label="Minimum salary" /><Input type="number" min="0" placeholder="Max" value={draft.salaryMax} onChange={(e) => setDraft({ ...draft, salaryMax: e.target.value })} aria-label="Maximum salary" /></div></div>
     <Button className="w-full" onClick={() => { setFilters(draft); setDrawerOpen(false); }}>Apply filters</Button>
   </div>;
+  if (!user || user.role !== "recruiter") return <ProtectedRoute role="recruiter"><div /></ProtectedRoute>;
   return <div className="container mx-auto px-4 py-8"><div className="flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Talent network</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Find the right signal.</h1><p className="mt-2 text-muted-foreground">{filtered.length} people open to a thoughtful conversation.</p></div><div className="flex gap-2"><Button variant={filters.view === "grid" ? "secondary" : "outline"} size="icon" onClick={() => setFilters({ view: "grid" })} aria-label="Grid view"><Grid2X2 /></Button><Button variant={filters.view === "list" ? "secondary" : "outline"} size="icon" onClick={() => setFilters({ view: "list" })} aria-label="List view"><List /></Button></div></div>
     <div className="mt-6 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><SearchIcon className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input value={filters.q} onChange={(e) => setFilters({ q: e.target.value })} className="pl-9" placeholder="Search role, skill, or city" aria-label="Search talent" /></div><Button variant="outline" onClick={() => { setDraft(filters); setDrawerOpen(true); }}><SlidersHorizontal className="size-4" /> Filters {activeCount > 0 && <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{activeCount}</span>}</Button><select value={filters.sort} onChange={(e) => setFilters({ sort: e.target.value })} className="h-9 rounded-md border bg-background px-3 text-sm" aria-label="Sort results"><option value="relevance">Sort: Relevance</option><option value="experience">Most experience</option><option value="salary-low">Salary: low to high</option><option value="salary-high">Salary: high to low</option></select></div>
     {activeCount > 0 && <div className="mt-4 flex flex-wrap items-center gap-2 text-sm"><span className="text-muted-foreground">Active filters:</span><button className="inline-flex items-center gap-1 text-primary hover:underline" onClick={clear}>Clear all <X className="size-3" /></button></div>}

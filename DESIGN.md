@@ -10,8 +10,8 @@ This document defines the visual design system for the project. All new componen
 - **Styling:** Tailwind CSS v4 (CSS-first config via `@theme inline` in `globals.css` — no `tailwind.config.ts`)
 - **Components:** shadcn/ui (new-york style, neutral base)
 - **Icons:** Lucide React
-- **Fonts:** Inter Tight + Geist Mono (mono) via `next/font/google`
-- **Dark mode:** next-themes (class-based, system default)
+- **Fonts:** Plus Jakarta Sans + JetBrains Mono (mono) via `next/font/google`
+- **Theme:** Light mode first; semantic tokens remain structured for future dark mode
 - **Utilities:** `cn()` from `@/lib/utils` (clsx + tailwind-merge)
 
 ---
@@ -20,13 +20,30 @@ This document defines the visual design system for the project. All new componen
 
 All values use the **oklch** color space. Colors are defined as CSS custom properties in `globals.css` and bridged to Tailwind via `@theme inline`.
 
+### ProofyLink Palette
+
+The merged ProofyLink interface uses a deep navy brand foundation, emerald trust signals, slate neutrals, and a pale blue-gray workspace background.
+
+| Scale | Value | Usage |
+| --- | --- | --- |
+| `navy-950` | `#050d1a` | Deep marketing/auth background |
+| `navy-900` | `#0a1628` | Dark surfaces and token panels |
+| `navy-800` | `#0f2040` | Primary buttons and navigation |
+| `navy-700` | `#1a3460` | Hover and selected navy states |
+| `navy-600` | `#1e4080` | Active controls and links |
+| `navy-500` | `#2563a8` | Secondary brand accents |
+| `navy-300` | `#7aaee0` | Muted brand text on dark surfaces |
+| `navy-100` | `#deeaf8` | Light brand chips and selected surfaces |
+| `navy-50` | `#f0f6fd` | Workspace-tinted surface |
+| `emerald-500` | `#19a974` | Verification, success, and trust accent |
+
 ### Semantic Tokens
 
 | Token                    | Light                          | Dark                           | Usage                         |
 | ------------------------ | ------------------------------ | ------------------------------ | ----------------------------- |
-| `background`           | `oklch(1 0 0)`               | `oklch(0.141 0.005 285.823)` | Page background               |
-| `foreground`           | `oklch(0.141 0.005 285.823)` | `oklch(0.985 0 0)`           | Primary text                  |
-| `primary`              | `oklch(0.21 0.034 270)`      | `oklch(0.92 0.02 270)`       | Buttons, links, accents       |
+| `background`           | `#f0f6fd`                    | Reserved for future theme    | Workspace background          |
+| `foreground`           | `#0f2040`                    | Reserved for future theme    | Primary text                  |
+| `primary`              | `#0f2040`                    | Reserved for future theme    | Buttons, links, accents       |
 | `primary-foreground`   | `oklch(0.985 0 0)`           | `oklch(0.21 0.006 285.885)`  | Text on primary               |
 | `secondary`            | `oklch(0.967 0.001 286.375)` | `oklch(0.274 0.006 286.033)` | Secondary buttons, subtle bg  |
 | `secondary-foreground` | `oklch(0.21 0.006 285.885)`  | `oklch(0.985 0 0)`           | Text on secondary             |
@@ -81,8 +98,8 @@ Use these Tailwind utilities for status indicators — they are not part of the 
 
 | Token                  | Font        | Usage                         |
 | ---------------------- | ----------- | ----------------------------- |
-| `--font-Inter-Tight` | Inter Tight | All UI text (applied to body) |
-| `--font-geist-mono`  | Geist Mono  | Code, monospace content       |
+| `--font-jakarta`   | Plus Jakarta Sans | Brand, interface, forms, headings, and body copy |
+| `--font-jetbrains` | JetBrains Mono   | Token counts, metrics, timestamps, and technical metadata |
 
 Body has `font-feature-settings: "rlig" 1, "calt" 1` and `antialiased` enabled.
 
@@ -432,13 +449,26 @@ hover:shadow-md hover:-translate-y-0.5
 
 ---
 
-## Dark Mode
+## Theme Strategy
 
-- **Method:** Class-based via `next-themes` with `attribute="class"` and `disableTransitionOnChange`
-- **Default:** System preference
-- **Toggle:** 3-way dropdown — Light / Dark / System
-- All semantic color tokens swap automatically via `.dark` CSS selector
-- Use `dark:` prefix for component-specific overrides (e.g., `dark:bg-input/30`)
+- **Current release:** Light mode only, using the ProofyLink semantic token structure.
+- **Deferred:** Dark mode and `next-themes` activation remain a future task.
+- Avoid hard-coding dark-mode assumptions into components so the palette can be extended later.
+
+## Language
+
+- Indonesian is the primary product language.
+- Use English for common technical labels such as `AI Summary`, `Dashboard`, `Token`, `Profile`, `Search`, `Portfolio`, and `Verified Talent` when that is clearer for users.
+
+### AI, CV, and Screening Rules
+
+- Label generated copy as `AI draft` and always show `Source`, `Model version`, `Data coverage`, and `Limitations` near the result.
+- CV import is `PDF only`; extraction is a suggestion. Every imported field must remain editable before `Simpan profile`.
+- Use a single-column, high-contrast ATS preview for export. Show a preview action before download and include generated date and CV version.
+- Screening is a consent-first flow: show the candidate, purpose, state, and one-token cost before the action. Consent states use plain Indonesian copy and are never implied by profile visibility.
+- Screening insight may discuss data quality and role fit only. Never display salary, financial, credit, protected-attribute, or automated hire/reject conclusions.
+- Use navy for structure, emerald for consent/trust/success, amber for review-needed states, and red only for blocking errors. Do not communicate meaning through color alone.
+- Minimum contrast is WCAG AA: 4.5:1 for normal text and 3:1 for large text or UI boundaries. Focus rings remain visible on every interactive control.
 
 ---
 
@@ -457,3 +487,42 @@ w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center
 ```
 
 Hero variant: `w-12 h-12 rounded-xl`
+
+---
+
+## Verified UI/UX QA
+
+The following checks were run against the Next.js development server using Playwright at desktop and mobile viewport sizes.
+
+### Verified flows
+
+- Public landing page renders with ProofyLink navy grid, emerald CTA, responsive network preview, and footer navigation.
+- Recruiter login reaches `/dashboard` and persists the demo session across navigation.
+- Candidate login reaches `/profile` and exposes Profile, Jobs, and Messages navigation.
+- Role-protected routes wait for LocalStorage hydration before redirecting.
+- Search renders 30 candidates, URL-backed filters, mobile filter dialog, sort controls, grid/list controls, and numbered pagination.
+- Candidate profile scan confirmation opens correctly.
+- First profile scan deducts exactly one token and reveals contact details.
+- Repeat visits do not deduct another token.
+- Shortlist toggling persists to LocalStorage.
+- Private shortlist notes save on blur.
+- Jobs and Messages render polished placeholder states without console errors.
+- No console errors were observed during the final smoke pass.
+
+### Accessibility and interaction requirements
+
+- Root layout includes a keyboard-accessible skip link to `#main-content`.
+- Icon-only controls require an accessible `aria-label`.
+- Role selectors expose `aria-pressed` state.
+- Form controls use meaningful `id`, `name`, `autocomplete`, and input types.
+- Email fields disable spellcheck; password fields use the appropriate authentication autocomplete value.
+- Loading regions use `role="status"` and visible loading copy where appropriate.
+- Buttons, links, and selects use visible `focus-visible` styles.
+- Interactive controls use `touch-action: manipulation` for responsive touch behavior.
+- Reduced-motion behavior remains enabled through the global media query.
+
+### Remaining test boundaries
+
+- Authentication, token purchases, jobs, and messaging are demo-only and require backend integration tests when services are added.
+- CSV export should be manually verified in a browser download context when release packaging is tested.
+- Visual regression screenshots should be added once the final production data and copy are available.
