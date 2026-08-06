@@ -450,7 +450,7 @@ hover:shadow-md hover:-translate-y-0.5
 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent
 ```
 
-### Logo Icon Container	
+### Logo Icon Container		
 
 ```
 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center

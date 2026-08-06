@@ -1,0 +1,2 @@
+import { cn } from "@/lib/utils";
+export function CandidateAvatar({ initials, locked = false, className }: { initials: string; locked?: boolean; className?: string }) { return <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 via-accent to-secondary text-sm font-semibold text-primary", locked && "blur-[5px]", className)}>{initials}</div>; }

@@ -1,69 +1,7 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, Check, Search, ScanLine, UsersRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+/* eslint-disable react/no-unescaped-entities */
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
-}
+export default function Home() { return <div><section className="border-b bg-[radial-gradient(circle_at_70%_10%,oklch(0.96_0.012_270),transparent_35%)]"><div className="container mx-auto grid min-h-[590px] items-center gap-12 px-4 py-20 lg:grid-cols-[1.05fr_.95fr]"><div className="animate-fade-up"><p className="mb-5 font-mono text-xs uppercase tracking-[.22em] text-primary">The signal, not the noise</p><h1 className="max-w-2xl text-5xl font-bold leading-[1.02] tracking-tight sm:text-6xl">Meet the people behind your next <span className="text-primary">breakthrough.</span></h1><p className="mt-6 max-w-xl text-lg leading-7 text-muted-foreground">Talent Network gives thoughtful recruiters a faster way to find exceptional, available people, with enough context to make the first message count.</p><div className="mt-8 flex flex-wrap gap-3"><Button size="lg" asChild><Link href="/search">Explore the network <ArrowRight className="size-4" /></Link></Button><Button size="lg" variant="outline" asChild><Link href="/pricing">See token plans</Link></Button></div><div className="mt-8 flex flex-wrap gap-5 text-sm text-muted-foreground"><span className="flex items-center gap-2"><Check className="size-4 text-green-600" /> 30+ curated profiles</span><span className="flex items-center gap-2"><Check className="size-4 text-green-600" /> Private by default</span></div></div><div className="relative"><div className="absolute -inset-4 rounded-[2rem] bg-primary/5 blur-2xl" /><Card className="relative overflow-hidden shadow-lg"><CardContent className="p-0"><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-sm font-semibold">Network pulse</p><p className="text-xs text-muted-foreground">Fresh matches this week</p></div><span className="rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">+18%</span></div><div className="flex flex-col gap-3 p-5">{[["NP","Senior Product Designer","Jakarta","98% match"],["RS","Frontend Engineer","Bandung","94% match"],["CW","Growth Marketing Lead","Bali","91% match"]].map(([initials, role, city, match]) => <div key={role} className="flex items-center gap-3 rounded-lg border bg-background p-3"><div className="flex size-10 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary">{initials}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{role}</p><p className="text-xs text-muted-foreground">{city} · Available now</p></div><span className="font-mono text-xs text-primary">{match}</span></div>)}</div><div className="m-5 rounded-lg bg-primary p-4 text-primary-foreground"><p className="font-mono text-xs uppercase tracking-widest text-primary-foreground/70">One good intro</p><p className="mt-2 text-sm leading-5">"I liked your work on systems that make complexity feel calm."</p></div></CardContent></Card></div></div></section><section className="container mx-auto px-4 py-20"><p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">A better recruiting loop</p><h2 className="mt-3 max-w-xl text-3xl font-bold tracking-tight">Move from vague brief to meaningful conversation.</h2><div className="mt-10 grid gap-5 md:grid-cols-3">{[[Search,"Search with intent","Filter by what matters: craft, experience, location, and timing."],[ScanLine,"Scan for context","Spend one token to see the full story behind a promising profile."],[UsersRound,"Connect with confidence","Save your shortlist and make every outreach more personal."]].map(([Icon, title, text], i) => <Card key={title as string} className="card-interactive"><CardContent className="p-6"><div className="flex size-10 items-center justify-center rounded-lg bg-accent text-primary"><Icon className="size-5" /></div><p className="mt-6 font-mono text-xs text-muted-foreground">0{i + 1}</p><h3 className="mt-2 text-xl font-semibold">{title as string}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text as string}</p></CardContent></Card>)}</div></section><section className="bg-primary text-primary-foreground"><div className="container mx-auto flex flex-col items-start justify-between gap-6 px-4 py-12 sm:flex-row sm:items-center"><div><p className="text-2xl font-semibold">Start with 25 tokens on us.</p><p className="mt-1 text-primary-foreground/70">Explore openly. Scan selectively. Build your next team.</p></div><Button variant="secondary" size="lg" asChild><Link href="/search">Find your next hire <ArrowRight className="size-4" /></Link></Button></div></section><footer className="container mx-auto flex flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>© 2026 Talent Network</span><div className="flex gap-5"><Link href="/pricing">Pricing</Link><Link href="/dashboard">Recruiter workspace</Link></div></footer></div>; }
