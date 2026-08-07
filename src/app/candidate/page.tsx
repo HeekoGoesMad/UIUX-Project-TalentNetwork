@@ -1,5 +1,65 @@
 import Link from "next/link";
-import { ArrowRight, FileText, Map, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowRight, FileText, Map, MessageCircle, Sparkles, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-export default function CandidateHome() { const items = [["/candidate/cv", "CV & Profile", "Import PDF dan review profile", FileText], ["/candidate/career-advisor", "Career Advisor", "Saran berbasis profile", Sparkles], ["/candidate/career-roadmap", "Career Roadmap", "Langkah yang bisa kamu edit", Map], ["/candidate/contact-requests", "Contact requests", "Kelola percakapan recruiter", MessageCircle]] as const; return <ProtectedRoute role="candidate"><main className="container mx-auto max-w-5xl px-4 py-12"><p className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Candidate workspace</p><h1 className="mt-3 text-4xl font-bold">Mulai dari cerita kariermu.</h1><p className="mt-3 max-w-2xl text-muted-foreground">Buat profile yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.</p><div className="mt-10 grid gap-4 sm:grid-cols-2">{items.map(([href, title, text, Icon]) => <Link key={href} href={href}><Card className="card-interactive h-full"><CardContent className="p-5"><Icon className="size-5 text-[#08744f]" /><h2 className="mt-5 font-semibold">{title}</h2><p className="mt-2 text-sm text-muted-foreground">{text}</p><span className="mt-5 inline-flex items-center text-sm font-semibold">Buka <ArrowRight className="ml-1 size-4" /></span></CardContent></Card></Link>)}</div></main></ProtectedRoute>; }
+
+const items = [
+  ["/candidate/cv", "CV & Profile", "Import PDF dan review profile", FileText],
+  ["/candidate/career-advisor", "Career Advisor", "Saran berbasis profile", Sparkles],
+  ["/candidate/career-roadmap", "Career Roadmap", "Langkah yang bisa kamu edit", Map],
+  ["/candidate/contact-requests", "Contact requests", "Kelola percakapan recruiter", MessageCircle],
+] as const;
+
+export default function CandidateHome() {
+  return (
+    <ProtectedRoute role="candidate">
+      <main className="container mx-auto max-w-5xl px-4 py-12">
+        <p className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Candidate workspace</p>
+        <h1 className="mt-3 text-4xl font-bold">Mulai dari cerita kariermu.</h1>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          Buat profile yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
+        </p>
+
+        {/* Back to Profile button */}
+        <div className="mt-8">
+          <Link href="/profile">
+            <Card className="card-interactive border-[#19a974]/30 bg-gradient-to-r from-[#f0fdf9] to-white transition-shadow hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#d7f5e8]">
+                  <User className="size-5 text-[#08744f]" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-[#08744f]">Lihat Profil Kamu</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Review tampilan profil seperti yang dilihat recruiter
+                  </p>
+                </div>
+                <span className="inline-flex items-center text-sm font-semibold text-[#08744f]">
+                  Buka <ArrowRight className="ml-1 size-4" />
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Workspace menu items */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {items.map(([href, title, text, Icon]) => (
+            <Link key={href} href={href}>
+              <Card className="card-interactive h-full">
+                <CardContent className="p-5">
+                  <Icon className="size-5 text-[#08744f]" />
+                  <h2 className="mt-5 font-semibold">{title}</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">{text}</p>
+                  <span className="mt-5 inline-flex items-center text-sm font-semibold">
+                    Buka <ArrowRight className="ml-1 size-4" />
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </main>
+    </ProtectedRoute>
+  );
+}

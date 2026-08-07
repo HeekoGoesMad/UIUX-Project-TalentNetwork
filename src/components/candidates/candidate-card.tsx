@@ -1,10 +1,110 @@
 "use client";
+
 import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, Lock, MapPin } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, Clock3, Lock, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
 import { useApp } from "@/providers/app-provider";
+import { maskName } from "@/data/candidates";
 import { CandidateAvatar } from "./avatar";
+import { CandidateStatusBadge } from "./candidate-status-badge";
+import { CandidateCategoryBadge } from "./candidate-category-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-export function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) { const { shortlisted, toggleShortlist, scans } = useApp(); const unlocked = scans.some((scan) => scan.candidateId === candidate.id); return <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}><CardContent className={list ? "flex flex-wrap items-center gap-4 p-5" : "flex flex-1 flex-col gap-4 p-5"}><CandidateAvatar initials={candidate.initials} locked={!unlocked} /><div className="min-w-0 flex-1"><div className="mb-1 flex items-start justify-between gap-2"><div><p className={unlocked ? "font-semibold" : "font-semibold blur-sm select-none"}>{unlocked ? candidate.name : "Private candidate"}</p><p className="text-sm text-muted-foreground">{candidate.role}</p></div><Button variant="ghost" size="icon" onClick={() => toggleShortlist(candidate.id)} aria-label="Toggle shortlist"><Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary text-primary" : ""} /></Button></div><div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin className="size-3" />{candidate.location}</span><span className="flex items-center gap-1"><BriefcaseBusiness className="size-3" />{candidate.experience} yrs</span><span className="flex items-center gap-1"><Clock3 className="size-3" />{candidate.availability}</span></div></div><div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}><p className="text-xs text-muted-foreground">Expected range</p><p className="font-mono text-sm font-medium">{candidate.salary}</p></div><div className={list ? "ml-auto" : "mt-auto flex items-center justify-between gap-2"}><div className="flex flex-wrap gap-1">{candidate.skills.map((skill) => <Badge key={skill} variant="outline">{skill}</Badge>)}</div><Button asChild size="sm"><Link href={`/talent/${candidate.id}`}>{unlocked ? "View profile" : <><Lock className="size-3" /> Preview</>}</Link></Button></div></CardContent></Card>; }
+
+export function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
+  const { shortlisted, toggleShortlist, scans } = useApp();
+  const unlocked = scans.some((scan) => scan.candidateId === candidate.id);
+  const displayName = unlocked ? candidate.name : maskName(candidate.name);
+
+  return (
+    <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}>
+      <CardContent className={list ? "flex flex-wrap items-center gap-4 p-5" : "flex flex-1 flex-col gap-4 p-5"}>
+        <CandidateAvatar initials={candidate.initials} locked={!unlocked} />
+
+        <div className="min-w-0 flex-1">
+          {/* Category + shortlist row */}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <CandidateCategoryBadge category={candidate.talentCategory} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-2 -mt-1 shrink-0"
+              onClick={() => toggleShortlist(candidate.id)}
+              aria-label="Toggle shortlist"
+            >
+              <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary text-primary" : ""} />
+            </Button>
+          </div>
+
+          {/* Name + preview badge */}
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-foreground">{displayName}</p>
+            {!unlocked && (
+              <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                <Lock className="size-2.5" /> Preview
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">{candidate.role}</p>
+
+          {/* Career status */}
+          {candidate.careerStatus && (
+            <div className="mt-2">
+              <CandidateStatusBadge status={candidate.careerStatus} />
+            </div>
+          )}
+
+          {/* Meta info */}
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <MapPin className="size-3" />
+              {candidate.location}
+            </span>
+            <span className="flex items-center gap-1">
+              <BriefcaseBusiness className="size-3" />
+              {candidate.experience} thn
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock3 className="size-3" />
+              {candidate.availability}
+            </span>
+          </div>
+        </div>
+
+        <div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}>
+          <p className="text-xs text-muted-foreground">Expected range</p>
+          <p className="font-mono text-sm font-medium">{candidate.salary}</p>
+        </div>
+
+        <div className={list ? "ml-auto flex items-center gap-3" : "mt-auto flex flex-col gap-3 pt-2"}>
+          {/* Skills & Tools */}
+          <div className="flex flex-wrap gap-1">
+            {candidate.skills.slice(0, 3).map((skill) => (
+              <Badge key={skill} variant="outline" className="text-xs">
+                {skill}
+              </Badge>
+            ))}
+            {candidate.tools?.slice(0, 2).map((tool) => (
+              <Badge key={tool} variant="secondary" className="border-purple-100 bg-purple-50 text-xs text-purple-700">
+                <Wrench className="mr-0.5 size-2.5" /> {tool}
+              </Badge>
+            ))}
+          </div>
+
+          <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className={list ? "" : "w-full justify-center"}>
+            <Link href={`/talent/${candidate.id}`}>
+              {unlocked ? (
+                "Lihat Detail"
+              ) : (
+                <>
+                  <Lock className="mr-1.5 size-3.5" /> Unlock Talent
+                </>
+              )}
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

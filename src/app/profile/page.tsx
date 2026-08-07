@@ -1,6 +1,17 @@
 "use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { BriefcaseBusiness, GraduationCap, MapPin, Pencil, Plus, Wrench } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Check,
+  ChevronDown,
+  ExternalLink,
+  GraduationCap,
+  MapPin,
+  Pencil,
+  Wrench,
+} from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { CandidateStatusBadge } from "@/components/candidates/candidate-status-badge";
 import { VerifiedBadge } from "@/components/candidates/verified-badge";
@@ -9,4 +20,333 @@ import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-export default function ProfilePage() { const { user } = useApp(); return <ProtectedRoute role="candidate"><div className="container mx-auto max-w-6xl px-4 py-8"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-[#19a974]">Candidate profile</p><h1 className="mt-2 text-3xl font-bold">Profil kamu</h1><p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p></div><Button variant="outline"><Pencil className="size-4" /> Edit profile</Button></div><div className="mt-8 grid gap-5 lg:grid-cols-[1fr_320px]"><div className="space-y-5"><section className="overflow-hidden rounded-2xl border bg-white"><div className="h-36 bg-gradient-to-r from-[#0b2342] via-[#124673] to-[#19a974]" /><div className="-mt-12 px-6 pb-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-end"><div className="flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-[#d7f5e8] text-3xl font-bold text-[#08744f]">NP</div><div className="flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-2xl font-bold">{user?.name ?? "Nadia Putri"}</h2><VerifiedBadge /></div><p className="mt-1 text-muted-foreground">Senior Product Designer · <MapPin className="inline size-3.5" /> Jakarta</p><div className="mt-3"><CandidateStatusBadge /></div></div></div><p className="mt-6 max-w-2xl leading-7 text-slate-600">Product designer yang senang mengubah masalah kompleks menjadi pengalaman digital yang jelas, berguna, dan terasa manusiawi.</p></div></section><ProfileSection title="AI Summary"><AiSummaryCard>Experienced product designer with a systems mindset. Strong at aligning product strategy, research, and thoughtful interaction design to create measurable outcomes.</AiSummaryCard></ProfileSection><ProfileSection title="Work experience"><div className="space-y-6 border-l-2 border-[#d7f5e8] pl-5"><div><p className="font-semibold">Senior Product Designer · Tokopedia</p><p className="mt-1 font-mono text-xs text-muted-foreground">2021 — Present</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Memimpin design system dan discovery untuk produk commerce.</p></div><div><p className="font-semibold">Product Designer · Independent Studio</p><p className="mt-1 font-mono text-xs text-muted-foreground">2019 — 2021</p></div></div></ProfileSection><ProfileSection title="Education"><p className="flex items-center gap-2 font-semibold"><GraduationCap className="size-5 text-[#19a974]" /> Institut Teknologi Bandung</p><p className="mt-1 text-sm text-muted-foreground">Design and Technology · 2015 — 2019</p></ProfileSection></div><aside className="space-y-5"><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Profile completeness</p><p className="mt-2 text-3xl font-bold">82%</p><div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full w-[82%] rounded-full bg-[#19a974]" /></div><p className="mt-3 text-sm text-muted-foreground">Tambahkan portfolio untuk melengkapi profil.</p></CardContent></Card><ProfileSection title="Skills & tools"><div className="flex flex-wrap gap-2">{["Figma", "Product strategy", "User research", "Design systems", "Prototyping", "Notion"].map((skill) => <span key={skill} className="rounded-full bg-[#edf3f7] px-3 py-1.5 text-xs font-semibold text-[#31516e]"><Wrench className="mr-1 inline size-3" />{skill}</span>)}</div><Button variant="outline" size="sm" className="mt-5" asChild><Link href="/profile"><Plus className="size-4" /> Add skill</Link></Button></ProfileSection><ProfileSection title="Portfolio"><div className="rounded-xl border border-dashed p-5 text-center"><BriefcaseBusiness className="mx-auto size-6 text-[#19a974]" /><p className="mt-2 text-sm font-semibold">Showcase your work</p><p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p></div></ProfileSection></aside></div></div></ProtectedRoute>; }
+import { CAREER_STATUS_CONFIG, CareerStatus } from "@/types";
+import { cn } from "@/lib/utils";
+
+const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
+  "open-to-work": "Aktif mencari pekerjaan.",
+  "open-for-opportunities": "Tidak aktif melamar tetapi terbuka terhadap peluang baru.",
+  "freelance-available": "Tersedia untuk project freelance.",
+  "internship-available": "Tersedia untuk program magang.",
+  "not-available": "Tidak sedang mencari peluang kerja.",
+};
+
+// Demo fallback data agar halaman tidak kosong jika belum pernah scan CV
+const DEMO = {
+  fullName: "Nadia Putri",
+  headline: "Senior Product Designer | UX Research | Design Systems",
+  location: "Jakarta",
+  about:
+    "Product designer yang senang mengubah masalah kompleks menjadi pengalaman digital yang jelas, berguna, dan terasa manusiawi.",
+  experience: [
+    {
+      company: "Tokopedia",
+      role: "Senior Product Designer",
+      dates: "2021 — Present",
+      achievements: ["Memimpin design system dan discovery untuk produk commerce."],
+    },
+    {
+      company: "Independent Studio",
+      role: "Product Designer",
+      dates: "2019 — 2021",
+      achievements: [],
+    },
+  ],
+  education: [
+    { school: "Institut Teknologi Bandung", program: "Desain Komunikasi Visual", dates: "2015 — 2019" },
+  ],
+  skills: ["Figma", "Product strategy", "User research", "Design systems", "Prototyping"],
+  tools: ["Notion", "Miro", "Jira", "Google Workspace"],
+  portfolio: [] as string[],
+};
+
+// Completeness calculator
+function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: number; missing: string[] } {
+  const missing: string[] = [];
+  if (!p.about) missing.push("Tentang Saya");
+  if (!p.headline) missing.push("Headline");
+  if (!p.experience.length) missing.push("Pengalaman Kerja");
+  if (!p.education.length) missing.push("Pendidikan");
+  if (!p.skills.length) missing.push("Skills");
+  if (!p.tools.length) missing.push("Tools");
+  if (!p.portfolio.length) missing.push("Portfolio");
+  const total = 7;
+  const filled = total - missing.length;
+  return { pct: Math.round((filled / total) * 100), missing };
+}
+
+export default function ProfilePage() {
+  const { user, cvProfile, careerStatus, saveCareerStatus } = useApp();
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  // Merge cvProfile over demo data so each field gracefully falls back
+  const p = {
+    fullName: cvProfile?.fullName || DEMO.fullName,
+    headline: cvProfile?.headline || DEMO.headline,
+    location: cvProfile?.location || DEMO.location,
+    about: cvProfile?.about || DEMO.about,
+    experience: cvProfile?.experience?.length ? cvProfile.experience : DEMO.experience,
+    education: cvProfile?.education?.length ? cvProfile.education : DEMO.education,
+    skills: cvProfile?.skills?.length ? cvProfile.skills : DEMO.skills,
+    tools: cvProfile?.tools?.length ? cvProfile.tools : DEMO.tools,
+    portfolio: cvProfile?.portfolio?.length ? cvProfile.portfolio : DEMO.portfolio,
+  };
+
+  const { pct, missing } = calcCompleteness(p);
+
+  const initials = p.fullName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <ProtectedRoute role="candidate">
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        {/* Page header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-widest text-[#19a974]">Candidate profile</p>
+            <h1 className="mt-2 text-3xl font-bold">Profil kamu</h1>
+            <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/candidate">
+              <Pencil className="size-4" />
+              Edit profile
+            </Link>
+          </Button>
+        </div>
+
+        <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_300px]">
+          {/* ── Main column ── */}
+          <div className="space-y-5">
+
+            {/* Hero card */}
+            <section className="rounded-2xl border bg-white">
+              <div className="h-36 overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#0b2342] via-[#124673] to-[#19a974]" />
+              <div className="px-6 pb-6">
+                {/* Avatar */}
+                <div className="-mt-12 flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-[#d7f5e8] text-3xl font-bold text-[#08744f]">
+                  {initials}
+                </div>
+
+                {/* Name + headline + location + status */}
+                <div className="mt-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-2xl font-bold">{user?.name ?? p.fullName}</h2>
+                    <VerifiedBadge />
+                  </div>
+
+                  {/* Headline */}
+                  {p.headline && (
+                    <p className="mt-1 font-medium text-[#31516e]">{p.headline}</p>
+                  )}
+
+                  {/* Location */}
+                  <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="size-3.5" />
+                    {p.location}
+                  </p>
+
+                  {/* Career Status Selector */}
+                  <div className="relative mt-3">
+                    <button
+                      id="career-status-btn"
+                      onClick={() => setStatusOpen((prev) => !prev)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[#19a974] focus:ring-offset-1"
+                      aria-haspopup="listbox"
+                      aria-expanded={statusOpen}
+                    >
+                      <CandidateStatusBadge status={careerStatus} />
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 text-muted-foreground transition-transform",
+                          statusOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    {statusOpen && (
+                      <div
+                        role="listbox"
+                        aria-label="Pilih status karier"
+                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border bg-white p-1.5 shadow-xl"
+                      >
+                        <p className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          Career Status
+                        </p>
+                        {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
+                          const cfg = CAREER_STATUS_CONFIG[key];
+                          const isActive = careerStatus === key;
+                          return (
+                            <button
+                              key={key}
+                              role="option"
+                              aria-selected={isActive}
+                              onClick={() => { saveCareerStatus(key); setStatusOpen(false); }}
+                              className={cn(
+                                "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-slate-50",
+                                isActive && "bg-slate-50",
+                              )}
+                            >
+                              <span className="mt-0.5 text-base leading-none">{cfg.emoji}</span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold">{cfg.label}</p>
+                                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                                  {CAREER_STATUS_DESCRIPTIONS[key]}
+                                </p>
+                              </div>
+                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-[#19a974]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Tentang Saya */}
+            {p.about && (
+              <ProfileSection title="Tentang Saya">
+                <p className="max-w-2xl leading-7 text-slate-600">{p.about}</p>
+                <AiSummaryCard className="mt-4">
+                  AI-generated summary based on your CV and experience profile.
+                </AiSummaryCard>
+              </ProfileSection>
+            )}
+
+            {/* Pengalaman Kerja */}
+            {p.experience.length > 0 && (
+              <ProfileSection title="Pengalaman Kerja">
+                <div className="space-y-6 border-l-2 border-[#d7f5e8] pl-5">
+                  {p.experience.map((exp, i) => (
+                    <div key={i}>
+                      <p className="font-semibold">
+                        {exp.role} · {exp.company}
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">{exp.dates}</p>
+                      {exp.achievements?.map((a, j) => (
+                        <p key={j} className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {a}
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </ProfileSection>
+            )}
+
+            {/* Pendidikan */}
+            {p.education.length > 0 && (
+              <ProfileSection title="Pendidikan">
+                <div className="space-y-4">
+                  {p.education.map((edu, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#19a974]" />
+                      <div>
+                        <p className="font-semibold">{edu.school}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {edu.program}
+                          {edu.dates && ` · ${edu.dates}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ProfileSection>
+            )}
+          </div>
+
+          {/* ── Sidebar ── */}
+          <aside className="space-y-5">
+            {/* Profile completeness */}
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm text-muted-foreground">Profile completeness</p>
+                <p className="mt-2 text-3xl font-bold">{pct}%</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-[#19a974] transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                {missing.length > 0 && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Tambahkan <span className="font-medium text-[#08744f]">{missing[0]}</span> untuk melengkapi profil.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Skills */}
+            {p.skills.length > 0 && (
+              <ProfileSection title="Skills">
+                <div className="flex flex-wrap gap-2">
+                  {p.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-full bg-[#edf3f7] px-3 py-1.5 text-xs font-semibold text-[#31516e]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </ProfileSection>
+            )}
+
+            {/* Tools */}
+            {p.tools.length > 0 && (
+              <ProfileSection title="Tools">
+                <div className="flex flex-wrap gap-2">
+                  {p.tools.map((tool) => (
+                    <span
+                      key={tool}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#f3f0ff] px-3 py-1.5 text-xs font-semibold text-[#5b38d4]"
+                    >
+                      <Wrench className="size-3" />
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              </ProfileSection>
+            )}
+
+            {/* Portfolio */}
+            <ProfileSection title="Portfolio">
+              {p.portfolio.length > 0 ? (
+                <div className="space-y-2">
+                  {p.portfolio.map((item, i) => (
+                    <a
+                      key={i}
+                      href={item.startsWith("http") ? item : `https://${item}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-[#19a974] transition-colors hover:bg-[#f7fffb]"
+                    >
+                      <BriefcaseBusiness className="size-4 shrink-0" />
+                      <span className="min-w-0 truncate">{item}</span>
+                      <ExternalLink className="ml-auto size-3 shrink-0 text-muted-foreground" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-5 text-center">
+                  <BriefcaseBusiness className="mx-auto size-6 text-[#19a974]" />
+                  <p className="mt-2 text-sm font-semibold">Showcase your work</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p>
+                  <Button variant="outline" size="sm" className="mt-3" asChild>
+                    <Link href="/candidate">Tambah portfolio</Link>
+                  </Button>
+                </div>
+              )}
+            </ProfileSection>
+          </aside>
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
+}

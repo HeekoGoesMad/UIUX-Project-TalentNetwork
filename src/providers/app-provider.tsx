@@ -2,11 +2,11 @@
 
 import { createContext, startTransition, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, ConsentState, CvProfile, DemoUser, ScreeningResult, UserRole } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ScreeningResult, UserRole } from "@/types";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
-const initial: AppState = { tokens: 25, scans: [], shortlisted: [], notes: {}, recentlyViewed: [], screeningTokens: 1, previewsUsed: 0, screeningConsents: {}, screeningResults: {}, cvProfile: null };
+const initial: AppState = { tokens: 25, scans: [], shortlisted: [], notes: {}, recentlyViewed: [], screeningTokens: 1, previewsUsed: 0, screeningConsents: {}, screeningResults: {}, cvProfile: null, careerStatus: "open-to-work" };
 
 type Context = AppState & {
   hydrated: boolean;
@@ -18,6 +18,7 @@ type Context = AppState & {
   saveNote: (id: string, note: string) => void;
   viewed: (id: string) => void;
   saveCvProfile: (profile: CvProfile) => void;
+  saveCareerStatus: (status: CareerStatus) => void;
   saveScreeningResult: (candidateId: string, result: ScreeningResult) => void;
   requestConsent: (candidateId: string) => void;
   respondToConsent: (candidateId: string, state: Extract<ConsentState, "consented" | "declined">) => void;
@@ -44,6 +45,7 @@ function parseState(value: string | null): AppState {
       screeningConsents: parsed.screeningConsents && typeof parsed.screeningConsents === "object" ? parsed.screeningConsents : {},
       screeningResults: parsed.screeningResults && typeof parsed.screeningResults === "object" ? parsed.screeningResults : {},
       cvProfile: parsed.cvProfile && typeof parsed.cvProfile === "object" ? parsed.cvProfile : null,
+      careerStatus: parsed.careerStatus ?? "open-to-work",
     };
   } catch {
     return initial;
@@ -106,6 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveNote = (id: string, note: string) => setState((current) => ({ ...current, notes: { ...current.notes, [id]: note } }));
   const viewed = (id: string) => setState((current) => ({ ...current, recentlyViewed: [id, ...current.recentlyViewed.filter((item) => item !== id)].slice(0, 5) }));
   const saveCvProfile = (profile: CvProfile) => { setState((current) => ({ ...current, cvProfile: { ...profile, updatedAt: new Date().toISOString() } })); toast.success("Profile CV tersimpan"); };
+  const saveCareerStatus = (status: CareerStatus) => { setState((current) => ({ ...current, careerStatus: status })); toast.success("Status karier diperbarui"); };
   const saveScreeningResult = (candidateId: string, result: ScreeningResult) => setState((current) => ({ ...current, screeningResults: { ...current.screeningResults, [candidateId]: result } }));
   const requestConsent = (candidateId: string) => setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, [candidateId]: "pending-candidate-consent" } }));
   const respondToConsent = (candidateId: string, consent: Extract<ConsentState, "consented" | "declined">) => setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, [candidateId]: consent } }));
@@ -126,7 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, user, login, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveScreeningResult, requestConsent, respondToConsent, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, user, login, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, respondToConsent, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
