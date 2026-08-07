@@ -1,24 +1,261 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut } from "lucide-react";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const { tokens, user, hydrated, logout } = useApp();
   const visibleUser = hydrated ? user : null;
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const links = visibleUser?.role === "candidate"
-    ? [{ href: "/candidate", label: "Workspace" }, { href: "/candidate/cv", label: "CV & Profile" }, { href: "/candidate/career-advisor", label: "Career Advisor" }]
-    : [{ href: "/search", label: "Search talent" }, { href: "/shortlist", label: "Shortlist" }, { href: "/dashboard", label: "Dashboard" }];
-  return <header className="sticky top-0 z-40 border-b bg-white/90 backdrop-blur"><div className="container mx-auto flex h-16 items-center gap-5 px-4">
-    <Link href="/" className="flex items-center gap-2 font-bold tracking-tight"><span className="flex size-9 items-center justify-center rounded-xl bg-[#d7f5e8] text-[#08744f]"><ShieldCheck className="size-5" /></span><span className="text-lg">Proofy<span className="text-[#19a974]">Link</span></span></Link>
-    <nav className="hidden items-center gap-1 text-sm md:flex">{links.map((link) => <Link key={link.href} className="rounded-xl px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground" href={link.href}>{link.label}</Link>)}</nav>
-    <div className="ml-auto flex items-center gap-2"><Button variant="outline" size="sm" className="hidden sm:inline-flex" asChild><Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"}><Search className="size-4" /> {visibleUser?.role === "candidate" ? "Explore jobs" : "Search talent"}</Link></Button>
-      {visibleUser?.role === "recruiter" && <Link href="/dashboard" className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-semibold"><WalletCards className="size-4 text-[#19a974]" /><span className="font-mono">{tokens}</span><span className="hidden text-muted-foreground sm:inline">tokens</span></Link>}
-      {visibleUser ? <Button variant="ghost" size="icon" aria-label="Log out" onClick={logout}><LogOut className="size-4" /></Button> : <Link className="hidden text-sm font-semibold md:inline" href="/login"><UserRound className="mr-1 inline size-4" /> Log in</Link>}
-      <Button variant="ghost" size="icon" className="md:hidden" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</Button>
-     </div></div>{open && <nav className="border-t bg-white px-4 py-3 md:hidden"><div className="container mx-auto flex flex-col">{links.map((link) => <Link key={link.href} className="rounded-xl px-3 py-3 text-sm" href={link.href} onClick={() => setOpen(false)}>{link.label}</Link>)}{!visibleUser && <Link className="rounded-xl px-3 py-3 text-sm font-semibold" href="/login">Log in</Link>}</div></nav>}</header>;
+  const [scrolled, setScrolled] = useState(false);
+
+  const isLanding = pathname === "/";
+  const isAuth = pathname === "/login" || pathname === "/register";
+  const isPublicHeader = (isLanding || isAuth) && !visibleUser;
+  const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Navigation links based on route and auth state
+  const links = isPublicHeader
+    ? [
+        { href: isLanding ? "#features" : "/#features", label: "Fitur Utuh" },
+        { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
+        { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
+        { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
+      ]
+    : visibleUser?.role === "candidate"
+    ? [
+        { href: "/candidate", label: "Workspace" },
+        { href: "/candidate/cv", label: "CV & Profile" },
+        { href: "/candidate/career-advisor", label: "Career Advisor" },
+      ]
+    : [
+        { href: "/search", label: "Search talent" },
+        { href: "/shortlist", label: "Shortlist" },
+        { href: "/dashboard", label: "Dashboard" },
+      ];
+
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full transition-all duration-500 ease-in-out px-3 sm:px-6 pt-2 sm:pt-3 pointer-events-none",
+        isLanding && "-mb-16 sm:-mb-20"
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto flex items-center justify-between transition-all duration-500 ease-in-out pointer-events-auto",
+          scrolled
+            ? "max-w-4xl sm:max-w-5xl rounded-full px-4 sm:px-6 py-2.5 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
+            : isOverDarkHeader
+            ? "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-dark-top text-white"
+            : "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-top text-[#0a1628]"
+        )}
+      >
+        {/* Logo */}
+        <Link
+          href={
+            visibleUser
+              ? visibleUser.role === "candidate"
+                ? "/profile"
+                : "/dashboard"
+              : "/"
+          }
+          className="flex items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
+        >
+          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#d7f5e8] to-[#bcebd8] text-[#08744f] shadow-sm transition-transform duration-300 group-hover:rotate-3">
+            <ShieldCheck className="size-5" />
+          </span>
+          <span className={cn("text-lg font-bold", isOverDarkHeader ? "text-white" : "text-[#0a1628]")}>
+            Proofy<span className="text-[#19a974]">Link</span>
+          </span>
+        </Link>
+
+        {/* Desktop Nav Links */}
+        <nav className="hidden items-center gap-1 text-sm font-medium md:flex">
+          {links.map((link) => {
+            const isAnchor = link.href.startsWith("#") || link.href.includes("#");
+            return isAnchor ? (
+              <a
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-full px-4 py-2 transition-colors duration-200",
+                  isOverDarkHeader
+                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
+                    : "text-muted-foreground hover:bg-[#e3f5ed]/60 hover:text-[#08744f]"
+                )}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-full px-4 py-2 transition-colors duration-200",
+                  isOverDarkHeader
+                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-muted font-semibold text-foreground")
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
+          {!isPublicHeader && (
+            <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex" asChild>
+              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"}>
+                <Search className="size-4" />
+                {visibleUser?.role === "candidate" ? "Explore jobs" : "Search talent"}
+              </Link>
+            </Button>
+          )}
+
+          {visibleUser?.role === "recruiter" && (
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
+            >
+              <WalletCards className="size-4 text-[#19a974]" />
+              <span className="font-mono">{tokens}</span>
+              <span className="hidden text-muted-foreground sm:inline">tokens</span>
+            </Link>
+          )}
+
+          {visibleUser ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("rounded-full", isOverDarkHeader && "text-white hover:bg-white/10")}
+              aria-label="Log out"
+              onClick={logout}
+            >
+              <LogOut className="size-4" />
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              {pathname === "/login" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full font-medium transition-all border-white/20 bg-white/10 text-slate-800 hover:bg-slate-100 px-4"
+                  asChild
+                >
+                  <Link href="/register">
+                    <UserPlus className="mr-1.5 size-4 inline text-[#19a974]" />
+                    Daftar akun
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className={cn(
+                    "rounded-full font-medium transition-all shadow-sm px-4",
+                    isOverDarkHeader
+                      ? "bg-[#19a974] text-white hover:bg-[#158f62]"
+                      : "bg-[#0b2342] text-white hover:bg-[#102c52]"
+                  )}
+                  asChild
+                >
+                  <Link href="/login">
+                    <UserRound className="mr-1.5 size-4 inline" />
+                    Masuk ke workspace
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Mobile Menu Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("rounded-full md:hidden", isOverDarkHeader && "text-white hover:bg-white/10")}
+            aria-label={open ? "Close menu" : "Open menu"}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X /> : <Menu />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {open && (
+        <nav className="mt-2 rounded-2xl border bg-white/95 backdrop-blur-xl p-4 shadow-2xl md:hidden pointer-events-auto animate-fade-up">
+          <div className="flex flex-col gap-1">
+            {links.map((link) => {
+              const isAnchor = link.href.startsWith("#") || link.href.includes("#");
+              return isAnchor ? (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-[#e3f5ed] hover:text-[#08744f]"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+            {!visibleUser && (
+              <div className="mt-2 border-t pt-3 flex flex-col gap-2">
+                {pathname !== "/login" && (
+                  <Link
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#0b2342] py-3 text-sm font-semibold text-white shadow-sm"
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                  >
+                    <UserRound className="size-4" /> Masuk ke workspace
+                  </Link>
+                )}
+                {pathname !== "/register" && (
+                  <Link
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-xs"
+                    href="/register"
+                    onClick={() => setOpen(false)}
+                  >
+                    <UserPlus className="size-4 text-[#19a974]" /> Daftar akun baru
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </nav>
+      )}
+    </header>
+  );
 }

@@ -413,19 +413,6 @@ Radix-based. Content: `rounded-md border p-1 shadow-md min-w-[8rem]`. Items supp
 ### Spinner
 
 Sizes: `sm` (h-4 w-4), `md` (h-6 w-6), `lg` (h-8 w-8). Uses `Loader2` with `animate-spin`.
-
-### Toast (Sonner)
-
-Custom icons per state (success, info, warning, error, loading). Themed via CSS variable overrides.
-
----
-
-## Focus & Interaction States
-
-### Focus Ring (Global)
-
-```css
-outline-2 outline-offset-2 outline-ring/70
 ```
 
 Component-level override:

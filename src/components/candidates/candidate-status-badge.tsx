@@ -16,7 +16,6 @@ export function CandidateStatusBadge({ status = "open-to-work", className }: Can
         className,
       )}
     >
-      <span className={cn("size-1.5 rounded-full", config.dot)} />
       {config.label}
     </span>
   );

@@ -23,7 +23,6 @@ import {
   TALENT_CATEGORY_CONFIG,
   TalentCategory,
 } from "@/types";
-import { cn } from "@/lib/utils";
 
 const pageSize = 12;
 
@@ -145,12 +144,7 @@ function FilterPanel({
               id={`cs-${key}`}
               checked={active}
               onChange={() => set({ careerStatuses: toggle(filters.careerStatuses, key) })}
-              label={
-                <span className="flex items-center gap-2">
-                  <span className={cn("inline-block size-2 rounded-full", cfg.dot)} />
-                  {cfg.label}
-                </span>
-              }
+              label={cfg.label}
             />
           );
         })}
