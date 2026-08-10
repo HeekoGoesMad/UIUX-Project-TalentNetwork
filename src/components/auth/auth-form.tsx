@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
 import { UserRole } from "@/types";
@@ -12,17 +12,23 @@ import { RoleSelector } from "./role-selector";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const { login } = useApp();
+  const { user, hydrated, login } = useApp();
   const [role, setRole] = useState<UserRole>("recruiter");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (hydrated && user) {
+      router.replace(user.role === "candidate" ? "/candidate" : "/dashboard");
+    }
+  }, [hydrated, user, router]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     window.setTimeout(() => {
       login(role);
-      router.push(role === "candidate" ? "/profile" : "/dashboard");
+      router.push(role === "candidate" ? "/candidate" : "/dashboard");
     }, 400);
   };
 

@@ -76,7 +76,7 @@ export function SiteHeader() {
           href={
             visibleUser
               ? visibleUser.role === "candidate"
-                ? "/profile"
+                ? "/candidate"
                 : "/dashboard"
               : "/"
           }
@@ -176,7 +176,7 @@ export function SiteHeader() {
                   variant="default"
                   size="sm"
                   className={cn(
-                    "rounded-full font-medium transition-all shadow-sm px-4",
+                    "rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9",
                     isOverDarkHeader
                       ? "bg-[#19a974] text-white hover:bg-[#158f62]"
                       : "bg-[#0b2342] text-white hover:bg-[#102c52]"
@@ -184,8 +184,8 @@ export function SiteHeader() {
                   asChild
                 >
                   <Link href="/login">
-                    <UserRound className="mr-1.5 size-4 inline" />
-                    Masuk ke workspace
+                    <UserRound className="mr-1 sm:mr-1.5 size-3.5 sm:size-4 inline" />
+                    <span>Masuk</span>
                   </Link>
                 </Button>
               )}

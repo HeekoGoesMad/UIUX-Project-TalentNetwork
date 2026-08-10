@@ -29,28 +29,42 @@ export function InteractiveMarquee({
 
   useEffect(() => {
     let animationFrameId: number;
+    let isVisible = true;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+      },
+      { threshold: 0.05 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
 
     const animate = () => {
-      const singleWidth = singleContentRef.current?.offsetWidth || 0;
+      if (isVisible) {
+        const singleWidth = singleContentRef.current?.offsetWidth || 0;
 
-      if (!isDraggingRef.current) {
-        // Smoothly interpolate speed on hover / unhover to prevent any visual jumps
-        const targetSpeed = isHoveredRef.current ? hoverSpeed : speed;
-        currentSpeedRef.current += (targetSpeed - currentSpeedRef.current) * 0.08;
-        offsetRef.current -= currentSpeedRef.current;
-      }
-
-      // Infinite loop wrap math (seamless wrapping with zero offset)
-      if (singleWidth > 0) {
-        if (offsetRef.current <= -singleWidth) {
-          offsetRef.current += singleWidth;
-        } else if (offsetRef.current > 0) {
-          offsetRef.current -= singleWidth;
+        if (!isDraggingRef.current) {
+          // Smoothly interpolate speed on hover / unhover to prevent any visual jumps
+          const targetSpeed = isHoveredRef.current ? hoverSpeed : speed;
+          currentSpeedRef.current += (targetSpeed - currentSpeedRef.current) * 0.08;
+          offsetRef.current -= currentSpeedRef.current;
         }
-      }
 
-      if (trackRef.current) {
-        trackRef.current.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
+        // Infinite loop wrap math (seamless wrapping with zero offset)
+        if (singleWidth > 0) {
+          if (offsetRef.current <= -singleWidth) {
+            offsetRef.current += singleWidth;
+          } else if (offsetRef.current > 0) {
+            offsetRef.current -= singleWidth;
+          }
+        }
+
+        if (trackRef.current) {
+          trackRef.current.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
+        }
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -58,7 +72,10 @@ export function InteractiveMarquee({
 
     animationFrameId = requestAnimationFrame(animate);
 
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+    };
   }, [speed, hoverSpeed]);
 
   const handleMouseDown = (e: React.MouseEvent) => {

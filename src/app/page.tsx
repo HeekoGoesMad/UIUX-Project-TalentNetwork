@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useApp } from "@/providers/app-provider";
 import {
   ArrowRight,
   Check,
@@ -29,11 +31,20 @@ import { InteractiveMarquee } from "@/components/ui/interactive-marquee";
 import { AnimatedWord } from "@/components/ui/animated-word";
 
 export default function Home() {
+  const { user, hydrated } = useApp();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<"search" | "privacy" | "tokens" | "ai">("search");
   const [candidateFilter, setCandidateFilter] = useState<string>("all");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [tokenCalculatorCount, setTokenCalculatorCount] = useState<number>(10);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    if (hydrated && user) {
+      router.replace(user.role === "candidate" ? "/candidate" : "/dashboard");
+    }
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -107,13 +118,13 @@ export default function Home() {
               ProofyLink membantu recruiter menemukan kandidat terverifikasi dengan konteks tinggi tanpa noise spam, privasi by default, dan akses hemat berbasis token.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3.5">
-              <Button size="lg" className="rounded-xl bg-[#19a974] text-white hover:bg-[#158f62] shadow-lg shadow-[#19a974]/20 px-6 font-semibold" asChild>
+            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+              <Button size="lg" className="rounded-xl bg-[#19a974] text-white hover:bg-[#158f62] shadow-lg shadow-[#19a974]/20 px-6 font-semibold w-full sm:w-auto h-12 text-sm sm:text-base justify-center" asChild>
                 <Link href="/search">
                   Mulai eksplorasi <ArrowRight className="ml-1.5 size-4" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white backdrop-blur-md px-6" asChild>
+              <Button size="lg" variant="outline" className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white backdrop-blur-md px-6 w-full sm:w-auto h-12 text-sm sm:text-base justify-center" asChild>
                 <Link href="/login">Masuk ke workspace</Link>
               </Button>
             </div>
