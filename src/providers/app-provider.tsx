@@ -8,6 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
 const initial: AppState = { tokens: 25, scans: [], shortlisted: [], notes: {}, recentlyViewed: [], screeningTokens: 1, previewsUsed: 0, screeningConsents: {}, screeningResults: {}, contactRequests: {}, cvProfile: null, careerStatus: "open-to-work" };
+const demoNotifications: BootstrapNotification[] = [
+  { id: "demo-notification-1", type: "system", title: "Selamat datang di ProofyLink", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
+  { id: "demo-notification-2", type: "message_received", title: "Pesan baru tersedia", body: "Anda memiliki percakapan demo yang siap ditinjau.", data: {}, readAt: "2026-08-13T08:00:00Z", createdAt: "2026-08-13T08:00:00Z" },
+];
 export type RemoteShortlistItem = { id: string; candidateProfileId: string; status: string; notes: string | null; candidate?: { name: string | null; role: string | null; location: string | null } };
 export type RemoteConsentRequest = { itemId: string; candidateProfileId: string; consentState: ConsentState; recruiterName: string | null; recruiterEmail: string | null; organizationName: string | null; purpose: string; createdAt: string; respondedAt: string | null; history: { type: string; createdAt: string }[] };
 
@@ -23,6 +27,8 @@ type Context = AppState & {
   shortlists: BootstrapShortlist[];
   consentRequests: Record<string, unknown>[];
   databaseError: string | null;
+  markNotificationRead: (id: string) => Promise<boolean>;
+  markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
@@ -187,7 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       setProfile(payload.profile ?? null);
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
-      setNotifications(payload.notifications ?? []);
+       setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
        setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
        const remoteProfile = remoteCvProfile(payload);
@@ -210,7 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState({ ...initial, tokens: 0 });
       setProfile(null);
       setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
-      setNotifications([]);
+       setNotifications([]);
       setShortlists([]);
       setConsentRequests([]);
       setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
@@ -269,6 +275,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       else window.localStorage.removeItem(sessionKey);
     }
   }, [hydrated, user, supabaseConfigured]);
+
+  const markNotificationRead = async (id: string) => {
+    if (!supabaseConfigured) {
+      setNotifications((current) => (current.length ? current : demoNotifications).map((notification) => notification.id === id ? { ...notification, readAt: new Date().toISOString() } : notification));
+      return true;
+    }
+    const response = await fetch("/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationId: id }) });
+    if (!response.ok) return false;
+    setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, readAt: new Date().toISOString() } : notification));
+    return true;
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!supabaseConfigured) {
+      setNotifications((current) => (current.length ? current : demoNotifications).map((notification) => ({ ...notification, readAt: notification.readAt ?? new Date().toISOString() })));
+      return true;
+    }
+    const response = await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) });
+    if (!response.ok) return false;
+    setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt ?? new Date().toISOString() })));
+    return true;
+  };
 
   const login = async (role: UserRole, email: string, password: string): Promise<AuthResult> => {
     if (!supabaseConfigured) {
@@ -502,7 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const resultData = (await resultResponse.json()) as { error?: string };
         if (!resultResponse.ok) throw new Error(resultData.error ?? "Hasil screening belum dapat disimpan.");
         setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, [candidateId]: "screening-completed" } }));
-        toast.success("Screening selesai", { description: "Charge token dan skor tersimpan di database." });
+         toast.success("Screening selesai", { description: "Token dan skor tersimpan di database." });
         return true;
       } catch (error) {
         toast.error("Screening belum dapat dimulai", { description: error instanceof Error ? error.message : "Coba lagi." });
@@ -525,7 +553,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications, shortlists, consentRequests, databaseError, login, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

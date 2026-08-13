@@ -6,7 +6,7 @@ import { z } from "zod";
 import { cvBuilderSchema, cvImportSchema, gapsSchema, advisorSchema, profileContextSchema, questionsSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
 
 const version = "proofylink-screening-v1";
-const source = process.env.AI_PROVIDER === "azure" ? "azure" : "mock";
+const source = process.env.AI_PROVIDER === "mock" && process.env.NODE_ENV !== "production" ? "mock" : "azure";
 
 type AiOptions = { strict?: boolean };
 
@@ -16,7 +16,6 @@ function label(score: number) {
 
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
   if (source === "mock") {
-    if (options.strict) throw new Error("Provider AI untuk database belum dikonfigurasi.");
     return fallback;
   }
 

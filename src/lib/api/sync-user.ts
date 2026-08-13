@@ -3,6 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { getDb, schema } from "@/db";
+import { ensureDefaultShortlist } from "@/lib/api/shortlists";
 
 export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string }) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
@@ -41,6 +42,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     if (role === "recruiter" && user.recruiterProvisioningStatus === "active") {
       const membership = await tx.select({ organizationId: schema.organizationMembers.organizationId })
         .from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, user.id)).limit(1);
+      let organizationId = membership[0]?.organizationId;
       if (membership.length === 0) {
         const slug = `org-${authUser.id}`;
         const [organization] = await tx.insert(schema.organizations).values({
@@ -51,9 +53,11 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           target: schema.organizations.slug,
           set: { updatedAt: new Date() },
         }).returning({ id: schema.organizations.id });
+        organizationId = organization.id;
         await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
         await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
       }
+      if (organizationId) await ensureDefaultShortlist(tx, organizationId, user.id);
     }
 
     return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus };

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { schema, type Database } from "@/db";
 import { getCurrentAppUser, getRecruiterScope, type AppUser } from "@/lib/api/auth";
+import { ensureDefaultShortlist } from "@/lib/api/shortlists";
 
 type ShortlistScope = Extract<Awaited<ReturnType<typeof getRecruiterScope>>, { membership: unknown }>;
 type ShortlistContext = { db: Database; user: AppUser; scope: ShortlistScope } | { error: string; status: number };
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return NextResponse.json({ error: "Candidate profile ID tidak valid." }, { status: 400 });
     const current = await getShortlistContext();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    await ensureDefaultShortlist(current.db, current.scope.membership.organizationId, current.user.id);
     const shortlist = (await current.db.select({ id: schema.shortlists.id }).from(schema.shortlists).where(and(
       eq(schema.shortlists.organizationId, current.scope.membership.organizationId),
       parsed.data.shortlistId ? eq(schema.shortlists.id, parsed.data.shortlistId) : eq(schema.shortlists.organizationId, current.scope.membership.organizationId),

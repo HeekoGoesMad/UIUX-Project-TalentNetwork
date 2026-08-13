@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
@@ -14,7 +14,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     const scope = await getRecruiterScope(current.db, current.user);
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
-    const result = await current.db.transaction(async (tx) => {
+    try {
+      const result = await current.db.transaction(async (tx) => {
       const [run] = await tx.select({
         id: schema.screeningRuns.id,
         status: schema.screeningRuns.status,
@@ -43,11 +44,70 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       const [score] = await tx.insert(schema.screeningScores).values({ screeningRunId: run.id, score: insight.score, label: insight.label, coverage: insight.coverage, evidence: insight.evidence, limitations: insight.limitations, source: insight.source, modelVersion: insight.modelVersion }).returning();
       await tx.update(schema.screeningRuns).set({ status: "completed", completedAt: new Date(), errorMessage: null }).where(eq(schema.screeningRuns.id, run.id));
       return { run: { ...run, status: "completed" as const }, score, aiSummary };
-    });
-    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
-    return NextResponse.json(result);
+      });
+      if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("Gagal menghasilkan hasil screening", error);
+
+      let refunded = false;
+      try {
+        refunded = (await current.db.transaction(async (tx) => {
+          const [run] = await tx.select({
+            id: schema.screeningRuns.id,
+            organizationId: schema.screeningRuns.organizationId,
+            tokenCost: schema.screeningRuns.tokenCost,
+            status: schema.screeningRuns.status,
+          }).from(schema.screeningRuns).where(and(
+            eq(schema.screeningRuns.id, runId),
+            eq(schema.screeningRuns.organizationId, scope.membership.organizationId),
+          )).limit(1);
+
+          if (!run || run.status === "completed" || run.status === "failed") return { refunded: false };
+
+          await tx.update(schema.screeningRuns).set({
+            status: "failed",
+            errorMessage: "Hasil screening gagal dibuat.",
+          }).where(and(
+            eq(schema.screeningRuns.id, run.id),
+            sql`${schema.screeningRuns.status} in ('pending', 'in_progress')`,
+          ));
+
+          const [account] = await tx.select({ id: schema.tokenAccounts.id })
+            .from(schema.tokenAccounts)
+            .where(eq(schema.tokenAccounts.organizationId, run.organizationId))
+            .limit(1);
+          if (!account) throw new Error("Akun token organisasi tidak ditemukan saat refund.");
+
+          const [refund] = await tx.insert(schema.tokenLedgerEntries).values({
+            tokenAccountId: account.id,
+            type: "refund",
+            amount: run.tokenCost,
+            idempotencyKey: `screening-refund:${run.id}`,
+            metadata: { screeningRunId: run.id, reason: "screening_result_failed" },
+          }).onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey }).returning({ id: schema.tokenLedgerEntries.id });
+
+          if (refund) {
+            await tx.update(schema.tokenAccounts).set({
+              balance: sql`${schema.tokenAccounts.balance} + ${run.tokenCost}`,
+              updatedAt: new Date(),
+            }).where(eq(schema.tokenAccounts.id, account.id));
+          }
+          return { refunded: true };
+        })).refunded;
+      } catch (refundError) {
+        console.error("Gagal mengembalikan token screening", refundError);
+        return NextResponse.json({ error: "Screening gagal dan token belum dapat dikembalikan. Silakan coba lagi." }, { status: 503 });
+      }
+
+      return NextResponse.json({
+        error: refunded
+          ? "Screening gagal diproses. Token telah dikembalikan."
+          : "Hasil screening belum dapat disiapkan. Silakan coba lagi.",
+      }, { status: 503 });
+    }
   } catch (error) {
     console.error("Gagal menyimpan hasil screening", error);
-    return NextResponse.json({ error: "Hasil screening belum dapat disimpan." }, { status: 503 });
+    return NextResponse.json({ error: "Hasil screening belum dapat disimpan. Silakan coba lagi." }, { status: 503 });
   }
 }

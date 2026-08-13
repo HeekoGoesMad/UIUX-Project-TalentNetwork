@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
-  const { tokens, user, hydrated, screeningConsents, devBypass, logout } = useApp();
+  const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
   const visibleUser = hydrated ? user : null;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -152,12 +152,11 @@ export function SiteHeader() {
           )}
 
           {visibleUser && (() => {
-            const pendingCount = Object.values(screeningConsents).filter((state) => state === "pending-candidate-consent").length;
-            const href = visibleUser.role === "candidate" ? "/candidate/contact-requests" : "/recruiter/screenings/new";
+            const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href={href} className="relative flex size-9 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={pendingCount ? `${pendingCount} notifikasi baru` : "Notifikasi"}>
+              <Link href="/notifications" className="relative flex size-9 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
                 <Bell className="size-4" />
-                {pendingCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#19a974] text-[10px] font-bold text-white">{pendingCount > 9 ? "9+" : pendingCount}</span>}
+                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#19a974] text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
             );
           })()}

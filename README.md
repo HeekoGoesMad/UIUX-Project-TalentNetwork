@@ -144,6 +144,26 @@ Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations commit
 
 ---
 
+# Development token grant
+
+Database mode keeps token balances in `token_accounts` and every change in
+`token_ledger_entries`. For local development only, set
+`DEV_TOKEN_GRANT_ENABLED=true` while running with `NODE_ENV=development`.
+
+After signing in as an active recruiter, run this in the browser console to
+grant 25 tokens once:
+
+```js
+fetch("/api/dev/token-grant", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ amount: 25, idempotencyKey: "local-recruiter-seed" }),
+}).then((response) => response.json()).then(console.log);
+```
+
+Repeating the same `idempotencyKey` is safe and does not change the balance a
+second time. The route never uses or exposes a Supabase service-role key.
+
 <div align="center">
 
 Made with ❤️ by the **ProofyLink Team**

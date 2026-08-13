@@ -1,0 +1,73 @@
+- generic [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=e3]:
+      - link "ProofyLink" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e10]:
+        - link "Fitur Utuh" [ref=e11] [cursor=pointer]:
+          - /url: /#features
+        - link "Cara Kerja" [ref=e12] [cursor=pointer]:
+          - /url: /#how-it-works
+        - link "Harga & Token" [ref=e13] [cursor=pointer]:
+          - /url: /#pricing
+        - link "FAQ" [ref=e14] [cursor=pointer]:
+          - /url: /#faq
+      - link "Daftar akun" [ref=e17] [cursor=pointer]:
+        - /url: /register
+  - main [ref=e21]:
+    - generic [ref=e24]:
+      - complementary [ref=e25]:
+        - generic [ref=e26]:
+          - link "ProofyLink" [ref=e27] [cursor=pointer]:
+            - /url: /
+          - generic [ref=e33]:
+            - generic [ref=e34]: Verified Talent Intelligence
+            - heading "Bangun koneksi dari sinyal yang tepat." [level=2] [ref=e38]
+            - paragraph [ref=e39]: Sistem rekrutmen berbasis sinyal terverifikasi. Privasi kandidat terjaga by default, tanpa spam inbox, dan akses efisien berbasis token.
+          - generic [ref=e40]:
+            - generic [ref=e41]: 30+ Profil Talent Terverifikasi Siap Diskusi
+            - generic [ref=e46]: Consent-first & Garansi 100% Bebas Spam
+            - generic [ref=e52]: Model Token Transparan Tanpa Biaya Tersembunyi
+        - generic [ref=e58]:
+          - generic [ref=e59]: ProofyLink Talent Network © 2026
+          - generic [ref=e60]: v1.0 Demo
+      - main [ref=e61]:
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - text: Welcome back
+            - heading "Masuk untuk melanjutkan perjalananmu." [level=1] [ref=e64]
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - generic [ref=e67]: Peran Akun
+              - generic [ref=e68]:
+                - button "Recruiter / Hiring Unlock kandidat terverifikasi" [ref=e69]:
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: Recruiter / Hiring
+                    - generic [ref=e78]: Unlock kandidat terverifikasi
+                - button "Talent / Candidate Terima tawaran karir privat" [active] [pressed] [ref=e79]:
+                  - generic [ref=e85]:
+                    - generic [ref=e86]: Talent / Candidate
+                    - generic [ref=e87]: Terima tawaran karir privat
+            - generic [ref=e88]:
+              - generic [ref=e89]: Alamat Email
+              - textbox "Alamat Email" [ref=e94]:
+                - /placeholder: nama@perusahaan.com
+                - text: candidate@example.com
+            - generic [ref=e95]:
+              - generic [ref=e96]: Kata Sandi
+              - generic [ref=e97]:
+                - textbox "Kata Sandi" [ref=e101]:
+                  - /placeholder: Minimal 6 karakter
+                  - text: password123
+                - button "Tampilkan password" [ref=e102]
+            - button "Masuk ke Workspace" [ref=e106]
+            - paragraph [ref=e109]:
+              - text: Belum memiliki akun?
+              - link "Daftar di sini" [ref=e110] [cursor=pointer]:
+                - /url: /register
+            - generic [ref=e111]: Autentikasi Supabase aktif
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e121] [cursor=pointer]
+  - alert [ref=e125]

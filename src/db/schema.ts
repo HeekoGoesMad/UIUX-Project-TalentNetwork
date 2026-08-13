@@ -116,6 +116,7 @@ export const shortlists = pgTable("shortlists", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [
+  unique("shortlists_organization_name_unique").on(table.organizationId, table.name),
   index("shortlists_organization_idx").on(table.organizationId),
   index("shortlists_created_by_idx").on(table.createdBy),
 ]);
