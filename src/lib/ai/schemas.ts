@@ -15,7 +15,34 @@ export const screeningSchema = z.object({
   score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure"]),
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const advisorSchema = z.object({ answer: z.string(), nextSteps: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
+export const advisorSchema = z.object({
+  focus: z.string().default("general"),
+  summary: z.string(),
+  headlineSuggestions: z.array(z.string()).default([]),
+  starBullets: z.array(z.object({
+    before: z.string(),
+    after: z.string(),
+    impactReason: z.string(),
+  })).default([]),
+  pillars: z.array(z.object({
+    name: z.string(),
+    score: z.number().min(0).max(100),
+    status: z.enum(["excellent", "good", "needs_improvement"]),
+    recommendation: z.string(),
+    actionables: z.array(z.string()),
+  })).default([]),
+  structuredAdvice: z.object({
+    opening: z.string(),
+    whatGood: z.array(z.string()),
+    whatNotGood: z.array(z.string()),
+    conclusion: z.string(),
+  }).optional(),
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+  modelVersion: z.string(),
+  source: z.enum(["mock", "azure"]),
+});
 export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
 export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
 export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });

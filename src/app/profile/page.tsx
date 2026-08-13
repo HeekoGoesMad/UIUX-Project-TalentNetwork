@@ -76,20 +76,21 @@ function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: numb
 }
 
 export default function ProfilePage() {
-  const { user, cvProfile, careerStatus, saveCareerStatus } = useApp();
+  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
 
   // Merge cvProfile over demo data so each field gracefully falls back
+  const source = cvProfile ?? (dbMode ? null : DEMO);
   const p = {
-    fullName: cvProfile?.fullName || DEMO.fullName,
-    headline: cvProfile?.headline || DEMO.headline,
-    location: cvProfile?.location || DEMO.location,
-    about: cvProfile?.about || DEMO.about,
-    experience: cvProfile?.experience?.length ? cvProfile.experience : DEMO.experience,
-    education: cvProfile?.education?.length ? cvProfile.education : DEMO.education,
-    skills: cvProfile?.skills?.length ? cvProfile.skills : DEMO.skills,
-    tools: cvProfile?.tools?.length ? cvProfile.tools : DEMO.tools,
-    portfolio: cvProfile?.portfolio?.length ? cvProfile.portfolio : DEMO.portfolio,
+    fullName: source?.fullName ?? "",
+    headline: source?.headline ?? "",
+    location: source?.location ?? "",
+    about: source?.about ?? "",
+    experience: source?.experience ?? [],
+    education: source?.education ?? [],
+    skills: source?.skills ?? [],
+    tools: source?.tools ?? [],
+    portfolio: source?.portfolio ?? [],
   };
 
   const { pct, missing } = calcCompleteness(p);
@@ -135,7 +136,7 @@ export default function ProfilePage() {
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-bold">{user?.name ?? p.fullName}</h2>
+                    <h2 className="text-2xl font-bold">{p.fullName || user?.name || "Profil kamu"}</h2>
                     <VerifiedBadge />
                   </div>
 
@@ -208,6 +209,10 @@ export default function ProfilePage() {
                 </div>
               </div>
             </section>
+
+            {!cvProfile && dbMode && (
+              <Card><CardContent className="p-6"><h2 className="text-lg font-semibold">Profil belum tersedia</h2><p className="mt-2 text-sm text-muted-foreground">Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu.</p><Button className="mt-4" asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button></CardContent></Card>
+            )}
 
             {/* Tentang Saya */}
             {p.about && (

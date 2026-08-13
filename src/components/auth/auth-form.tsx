@@ -5,31 +5,61 @@ import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2 } from
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
-import { UserRole } from "@/types";
+import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleSelector } from "./role-selector";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const { user, hydrated, login } = useApp();
+  const { user, hydrated, login, register } = useApp();
   const [role, setRole] = useState<UserRole>("recruiter");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (hydrated && user) {
-      router.replace(user.role === "candidate" ? "/candidate" : "/dashboard");
+    if (hydrated && user && !loading) {
+      router.replace(destination(user.role, getNext(), mode === "register"));
     }
-  }, [hydrated, user, router]);
+  }, [hydrated, user, loading, router, mode]);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get("error");
+    if (!error) return;
+    const timer = window.setTimeout(() => setErrorMessage(error), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    window.setTimeout(() => {
-      login(role);
-      router.push(role === "candidate" ? "/candidate" : "/dashboard");
-    }, 400);
+    setErrorMessage(null);
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const companyName = String(form.get("companyName") ?? "").trim();
+    const result = mode === "login" ? await login(role, email, password) : await register(name, role, email, password, companyName);
+    if (result.error) {
+      setLoading(false);
+      setErrorMessage(`Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${result.error}`);
+      return;
+    }
+    if (result.needsConfirmation) {
+      setLoading(false);
+      setErrorMessage("Akun dibuat. Periksa email untuk mengonfirmasi akun sebelum masuk melalui tautan di email.");
+      return;
+    }
+    let synced: { role?: UserRole; provisioningStatus?: ProvisioningStatus } | null = null;
+    if (supabaseConfigured) {
+      synced = await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name || email.split("@")[0], companyName: companyName || undefined }),
+      }).then((response) => response.ok ? response.json() : null).catch(() => null);
+    }
+    router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
   };
 
   return (
@@ -40,6 +70,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </label>
         <RoleSelector role={role} onChange={setRole} />
       </div>
+
+      {errorMessage && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">{errorMessage}</div>}
 
       {mode === "register" && (
         <div>
@@ -54,9 +86,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               className="pl-9 h-9 text-xs rounded-xl"
               required
               autoComplete="name"
-              placeholder="Alex Wijaya"
+              placeholder="Nama lengkap"
             />
           </div>
+        </div>
+      )}
+
+      {mode === "register" && role === "recruiter" && (
+        <div>
+          <label htmlFor="company-name" className="block text-xs font-bold text-slate-700 mb-1">
+            Nama Perusahaan
+          </label>
+          <Input id="company-name" name="companyName" className="h-9 rounded-xl text-xs" autoComplete="organization" placeholder="Nama perusahaan" required />
         </div>
       )}
 
@@ -74,7 +115,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             type="email"
             autoComplete="email"
             spellCheck={false}
-            placeholder="alex@perusahaan.com"
+            placeholder="nama@perusahaan.com"
           />
         </div>
       </div>
@@ -149,8 +190,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
         <CheckCircle2 className="size-3 text-[#19a974]" />
-        <span>Lingkungan Demo Terverifikasi</span>
+        <span>{supabaseConfigured ? "Autentikasi Supabase aktif" : "Lingkungan demo lokal"}</span>
       </div>
     </form>
   );
+}
+
+const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== "true";
+
+function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus) {
+  if (role === "candidate") {
+    if (next?.startsWith("/candidate") || (next !== null && ["/profile", "/jobs", "/messages"].includes(next))) return next;
+    return isRegistration ? "/candidate/onboarding" : "/candidate";
+  }
+  if (provisioningStatus !== "active") return "/recruiter/pending";
+  if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
+  return "/dashboard";
+}
+
+function getNext() {
+  return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
 }

@@ -1,0 +1,72 @@
+- generic [active] [ref=f20e1]:
+  - link "Lewati ke konten utama" [ref=f20e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f20e3]:
+      - link "ProofyLink" [ref=f20e4] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=f20e10]:
+        - link "Search talent" [ref=f20e126] [cursor=pointer]:
+          - /url: /search
+        - link "Shortlist" [ref=f20e127] [cursor=pointer]:
+          - /url: /shortlist
+        - link "Screening" [ref=f20e128] [cursor=pointer]:
+          - /url: /recruiter/screenings/new
+        - link "Pesan" [ref=f20e129] [cursor=pointer]:
+          - /url: /messages
+        - link "Dashboard" [ref=f20e130] [cursor=pointer]:
+          - /url: /dashboard
+      - generic [ref=f20e15]:
+        - link "Search talent" [ref=f20e131] [cursor=pointer]:
+          - /url: /search
+        - link "25 tokens" [ref=f20e135] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=f20e139]: "25"
+          - generic [ref=f20e140]: tokens
+        - link "Notifikasi" [ref=f20e141] [cursor=pointer]:
+          - /url: /recruiter/screenings/new
+        - button "Log out" [ref=f20e145]
+  - main [ref=f20e21]:
+    - generic [ref=f20e151]:
+      - complementary [ref=f20e152]:
+        - generic [ref=f20e153]:
+          - link "ProofyLink" [ref=f20e154] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f20e160]:
+            - generic [ref=f20e161]: Verified Talent Intelligence
+            - heading "Bangun koneksi dari sinyal yang tepat." [level=2] [ref=f20e165]
+            - paragraph [ref=f20e166]: Sistem rekrutmen berbasis sinyal terverifikasi. Privasi kandidat terjaga by default, tanpa spam inbox, dan akses efisien berbasis token.
+          - generic [ref=f20e167]:
+            - generic [ref=f20e168]: 30+ Profil Talent Terverifikasi Siap Diskusi
+            - generic [ref=f20e173]: Consent-first & Garansi 100% Bebas Spam
+            - generic [ref=f20e179]: Model Token Transparan Tanpa Biaya Tersembunyi
+        - generic [ref=f20e185]:
+          - generic [ref=f20e186]: ProofyLink Talent Network © 2026
+          - generic [ref=f20e187]: v1.0 Demo
+      - main [ref=f20e188]:
+        - generic [ref=f20e189]:
+          - generic [ref=f20e190]:
+            - text: Akun sedang ditinjau
+            - heading "Provisioning recruiter belum selesai." [level=1] [ref=f20e191]
+          - generic [ref=f20e192]:
+            - paragraph [ref=f20e197]: Terima kasih sudah mendaftar. Tim kami sedang menyiapkan akses organisasi untuk akun recruiter ini. Fitur recruiter akan tersedia setelah status akun menjadi aktif.
+            - link "Kembali ke beranda" [ref=f20e198] [cursor=pointer]:
+              - /url: /
+  - contentinfo [ref=f20e199]:
+    - generic [ref=f20e200]:
+      - generic [ref=f20e201]:
+        - link "ProofyLink" [ref=f20e202] [cursor=pointer]:
+          - /url: /dashboard
+        - paragraph [ref=f20e206]: Verified talent. Trusted connections.
+      - navigation [ref=f20e207]:
+        - link "Search talent" [ref=f20e208] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f20e209] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f20e210] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f20e211] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f20e121] [cursor=pointer]
+  - alert [ref=f20e125]: Provisioning recruiter belum selesai.
