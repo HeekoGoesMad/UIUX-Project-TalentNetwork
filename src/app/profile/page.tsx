@@ -107,8 +107,8 @@ export default function ProfilePage() {
         {/* Page header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#19a974]">Candidate profile</p>
-            <h1 className="mt-2 text-3xl font-bold">Profil kamu</h1>
+            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Candidate profile</p>
+            <h1 className="mt-2 text-3xl font-bold text-[#111827]">Profil kamu</h1>
             <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
           </div>
           <Button variant="outline" asChild>
@@ -125,23 +125,23 @@ export default function ProfilePage() {
 
             {/* Hero card */}
             <section className="rounded-2xl border bg-white">
-              <div className="h-36 overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#0b2342] via-[#124673] to-[#19a974]" />
+              <div className="h-36 overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#201C45] via-[#4C1D95] to-[#7C3AED]" />
               <div className="px-6 pb-6">
                 {/* Avatar */}
-                <div className="-mt-12 flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-[#d7f5e8] text-3xl font-bold text-[#08744f]">
+                <div className="-mt-12 flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-slate-50 text-3xl font-bold text-[#7C3AED]">
                   {initials}
                 </div>
 
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-bold">{user?.name ?? p.fullName}</h2>
+                    <h2 className="text-2xl font-bold text-[#111827]">{user?.name ?? p.fullName}</h2>
                     <VerifiedBadge />
                   </div>
 
                   {/* Headline */}
                   {p.headline && (
-                    <p className="mt-1 font-medium text-[#31516e]">{p.headline}</p>
+                    <p className="mt-1 font-medium text-[#7C3AED]">{p.headline}</p>
                   )}
 
                   {/* Location */}
@@ -155,7 +155,7 @@ export default function ProfilePage() {
                     <button
                       id="career-status-btn"
                       onClick={() => setStatusOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[#19a974] focus:ring-offset-1"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:ring-offset-1"
                       aria-haspopup="listbox"
                       aria-expanded={statusOpen}
                     >
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                                   {CAREER_STATUS_DESCRIPTIONS[key]}
                                 </p>
                               </div>
-                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-[#19a974]" />}
+                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-[#7C3AED]" />}
                             </button>
                           );
                         })}
@@ -222,10 +222,10 @@ export default function ProfilePage() {
             {/* Pengalaman Kerja */}
             {p.experience.length > 0 && (
               <ProfileSection title="Pengalaman Kerja">
-                <div className="space-y-6 border-l-2 border-[#d7f5e8] pl-5">
+                <div className="space-y-6 border-l-2 border-slate-200 pl-5">
                   {p.experience.map((exp, i) => (
                     <div key={i}>
-                      <p className="font-semibold">
+                      <p className="font-semibold text-[#111827]">
                         {exp.role} · {exp.company}
                       </p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{exp.dates}</p>
@@ -246,9 +246,9 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {p.education.map((edu, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#19a974]" />
+                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#7C3AED]" />
                       <div>
-                        <p className="font-semibold">{edu.school}</p>
+                        <p className="font-semibold text-[#111827]">{edu.school}</p>
                         <p className="mt-0.5 text-sm text-muted-foreground">
                           {edu.program}
                           {edu.dates && ` · ${edu.dates}`}
@@ -267,16 +267,16 @@ export default function ProfilePage() {
             <Card>
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground">Profile completeness</p>
-                <p className="mt-2 text-3xl font-bold">{pct}%</p>
+                <p className="mt-2 text-3xl font-bold text-[#111827]">{pct}%</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-[#19a974] transition-all"
+                    className="h-full rounded-full bg-[#7C3AED] transition-all"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
                 {missing.length > 0 && (
                   <p className="mt-3 text-sm text-muted-foreground">
-                    Tambahkan <span className="font-medium text-[#08744f]">{missing[0]}</span> untuk melengkapi profil.
+                    Tambahkan <span className="font-medium text-[#7C3AED]">{missing[0]}</span> untuk melengkapi profil.
                   </p>
                 )}
               </CardContent>
@@ -289,7 +289,7 @@ export default function ProfilePage() {
                   {p.skills.map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-full bg-[#edf3f7] px-3 py-1.5 text-xs font-semibold text-[#31516e]"
+                      className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
                     >
                       {skill}
                     </span>
@@ -305,7 +305,7 @@ export default function ProfilePage() {
                   {p.tools.map((tool) => (
                     <span
                       key={tool}
-                      className="inline-flex items-center gap-1 rounded-full bg-[#f3f0ff] px-3 py-1.5 text-xs font-semibold text-[#5b38d4]"
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
                     >
                       <Wrench className="size-3" />
                       {tool}
@@ -325,7 +325,7 @@ export default function ProfilePage() {
                       href={item.startsWith("http") ? item : `https://${item}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-[#19a974] transition-colors hover:bg-[#f7fffb]"
+                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-[#7C3AED] transition-colors hover:bg-slate-50"
                     >
                       <BriefcaseBusiness className="size-4 shrink-0" />
                       <span className="min-w-0 truncate">{item}</span>
@@ -335,7 +335,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed p-5 text-center">
-                  <BriefcaseBusiness className="mx-auto size-6 text-[#19a974]" />
+                  <BriefcaseBusiness className="mx-auto size-6 text-[#7C3AED]" />
                   <p className="mt-2 text-sm font-semibold">Showcase your work</p>
                   <p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p>
                   <Button variant="outline" size="sm" className="mt-3" asChild>

@@ -23,7 +23,7 @@ export function AnimatedWord() {
   return (
     <span className="relative inline-flex items-center align-baseline min-w-[170px] sm:min-w-[310px] pb-1">
       <span
-        className={`bg-gradient-to-r from-[#58d99e] via-[#79e6b2] to-[#19a974] bg-clip-text text-transparent transition-all duration-300 transform ${
+        className={`bg-gradient-to-r from-[#A78BFA] via-[#C084FC] to-[#EC4899] bg-clip-text text-transparent transition-all duration-300 transform ${
           fade ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-2 scale-95"
         }`}
       >

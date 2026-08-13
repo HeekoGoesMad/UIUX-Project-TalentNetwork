@@ -22,43 +22,46 @@ All values use the **oklch** color space. Colors are defined as CSS custom prope
 
 ### ProofyLink Palette
 
-The merged ProofyLink interface uses a deep navy brand foundation, emerald trust signals, slate neutrals, and a pale blue-gray workspace background.
+The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink accent (`#EC4899`), clean light grayscale neutrals (`#F9FAFB` → `#111827`), and semantic status colors (`#10B981`, `#F59E0B`, `#EF4444`).
 
 | Scale | Value | Usage |
 | --- | --- | --- |
-| `navy-950` | `#050d1a` | Deep marketing/auth background |
-| `navy-900` | `#0a1628` | Dark surfaces and token panels |
-| `navy-800` | `#0f2040` | Primary buttons and navigation |
-| `navy-700` | `#1a3460` | Hover and selected navy states |
-| `navy-600` | `#1e4080` | Active controls and links |
-| `navy-500` | `#2563a8` | Secondary brand accents |
-| `navy-300` | `#7aaee0` | Muted brand text on dark surfaces |
-| `navy-100` | `#deeaf8` | Light brand chips and selected surfaces |
-| `navy-50` | `#f0f6fd` | Workspace-tinted surface |
-| `emerald-500` | `#19a974` | Verification, success, and trust accent |
+| `primary-purple` | `#7C3AED` | Ungu Primer - Main CTA buttons, active tabs, bullet points, active links |
+| `pink-primary` | `#EC4899` | Pink Primer - Brand secondary accent, gradient highlights |
+| `logo-gradient` | `#7C3AED` → `#EC4899` | Shield logo icon gradient (purple to pink) |
+| `dark-navy` | `#201C45` | CTA banner background (footer section) |
+| `page-bg` | `#F9FAFB` | Main page background (Grayscale 50) |
+| `card-surface` | `#FFFFFF` | Card backgrounds and content containers |
+| `border-hairline` | `#E5E7EB` | Hairline borders and dividers (Grayscale 200) |
+| `heading-text` | `#111827` | Page headings and primary text (Grayscale 900) |
+| `body-text` | `#4B5563` | Paragraphs, descriptions, secondary copy (Grayscale 600) |
+| `danger-red` | `#EF4444` | Merah Kesalahan - Error states, critical warnings, "Risiko Tinggi" badge |
+| `amber-warning` | `#F59E0B` | Kuning Peringatan - Warning states, "Sensitif", "Perlu Klarifikasi" badges |
+| `success-green` | `#10B981` | Hijau Sukses - Success states, verified badges, "Low" risk indicators |
+| `info-blue-tint` | `#EFF6FF` | Financial profile & info highlight background |
 
 ### Semantic Tokens
 
-| Token                    | Light                          | Dark                           | Usage                         |
-| ------------------------ | ------------------------------ | ------------------------------ | ----------------------------- |
-| `background`           | `#f0f6fd`                    | Reserved for future theme    | Workspace background          |
-| `foreground`           | `#0f2040`                    | Reserved for future theme    | Primary text                  |
-| `primary`              | `#0f2040`                    | Reserved for future theme    | Buttons, links, accents       |
-| `primary-foreground`   | `oklch(0.985 0 0)`           | `oklch(0.21 0.006 285.885)`  | Text on primary               |
-| `secondary`            | `oklch(0.967 0.001 286.375)` | `oklch(0.274 0.006 286.033)` | Secondary buttons, subtle bg  |
-| `secondary-foreground` | `oklch(0.21 0.006 285.885)`  | `oklch(0.985 0 0)`           | Text on secondary             |
-| `muted`                | `oklch(0.967 0.001 286.375)` | `oklch(0.274 0.006 286.033)` | Subdued backgrounds           |
-| `muted-foreground`     | `oklch(0.552 0.016 285.938)` | `oklch(0.705 0.015 286.067)` | Subdued text, placeholders    |
-| `accent`               | `oklch(0.96 0.012 270)`      | `oklch(0.28 0.018 270)`      | Hover backgrounds, highlights |
-| `accent-foreground`    | `oklch(0.21 0.006 285.885)`  | `oklch(0.985 0 0)`           | Text on accent                |
-| `destructive`          | `oklch(0.577 0.245 27.325)`  | `oklch(0.704 0.191 22.216)`  | Error states, delete actions  |
-| `card`                 | `oklch(1 0 0)`               | `oklch(0.21 0.006 285.885)`  | Card backgrounds              |
-| `card-foreground`      | `oklch(0.141 0.005 285.823)` | `oklch(0.985 0 0)`           | Card text                     |
-| `popover`              | `oklch(1 0 0)`               | `oklch(0.21 0.006 285.885)`  | Popover/dropdown bg           |
-| `popover-foreground`   | `oklch(0.141 0.005 285.823)` | `oklch(0.985 0 0)`           | Popover/dropdown text         |
-| `border`               | `oklch(0.92 0.004 286.32)`   | `oklch(1 0 0 / 10%)`         | Borders, dividers             |
-| `input`                | `oklch(0.92 0.004 286.32)`   | `oklch(1 0 0 / 15%)`         | Input borders                 |
-| `ring`                 | `oklch(0.705 0.06 270)`      | `oklch(0.552 0.05 270)`      | Focus rings                   |
+| Token                    | Light                          | Usage                         |
+| ------------------------ | ------------------------------ | ----------------------------- |
+| `background`           | `#F9FAFB`                    | Workspace background          |
+| `foreground`           | `#111827`                    | Primary text                  |
+| `primary`              | `#7C3AED`                    | Buttons, links, accents       |
+| `primary-foreground`   | `#FFFFFF`                    | Text on primary               |
+| `secondary`            | `#F3E8FF`                    | Secondary buttons, subtle bg  |
+| `secondary-foreground` | `#7C3AED`                    | Text on secondary             |
+| `muted`                | `#F3F4F6`                    | Subdued backgrounds           |
+| `muted-foreground`     | `#4B5563`                    | Subdued text, placeholders    |
+| `accent`               | `#F3E8FF`                    | Hover backgrounds, highlights |
+| `accent-foreground`    | `#7C3AED`                    | Text on accent                |
+| `destructive`          | `#EF4444`                    | Error states, delete actions  |
+| `card`                 | `#FFFFFF`                    | Card backgrounds              |
+| `card-foreground`      | `#111827`                    | Card text                     |
+| `popover`              | `#FFFFFF`                    | Popover/dropdown bg           |
+| `popover-foreground`   | `#111827`                    | Popover/dropdown text         |
+| `border`               | `#E5E7EB`                    | Borders, dividers             |
+| `input`                | `#E5E7EB`                    | Input borders                 |
+| `ring`                 | `#7C3AED`                    | Focus rings                   |
 
 ### Chart Colors
 
@@ -85,10 +88,11 @@ The merged ProofyLink interface uses a deep navy brand foundation, emerald trust
 
 ### Ad-hoc Status Colors
 
-Use these Tailwind utilities for status indicators — they are not part of the token system but are used consistently:
+Use these Tailwind utilities or CSS tokens for status indicators:
 
-- **Success:** `text-green-600` / `dark:text-green-400`, `bg-green-500`
-- **Error:** `text-red-600`, `text-destructive`
+- **Success:** `text-emerald-500` / `#10B981`, `bg-emerald-50`
+- **Warning:** `text-amber-500` / `#F59E0B`, `bg-amber-50`
+- **Error:** `text-red-500` / `#EF4444`, `bg-red-50`, `text-destructive`
 
 ---
 

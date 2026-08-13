@@ -81,7 +81,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else window.localStorage.removeItem(sessionKey);
   }, [hydrated, user]);
 
-  const login = (role: UserRole, email = "demo@proofylink.id") => setUser({ role, email, name: role === "candidate" ? "Nadia Putri" : "Alex Morgan" });
+  const login = (role: UserRole, email = "demo@proofylink.id") =>
+    setUser({
+      role,
+      email,
+      name:
+        role === "candidate"
+          ? "Nadia Putri"
+          : role === "partner"
+          ? "Mitra Kampus / Lembaga"
+          : "Alex Morgan",
+    });
   const logout = () => setUser(null);
 
   const scan = (id: string) => {

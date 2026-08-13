@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, Lock, MapPin, Wrench } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, Clock3, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
 import { useApp } from "@/providers/app-provider";
 import { maskName } from "@/data/candidates";
@@ -42,7 +42,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
             <p className="font-semibold text-foreground">{displayName}</p>
             {!unlocked && (
               <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                <Lock className="size-2.5" /> Preview
+                Preview
               </span>
             )}
           </div>
@@ -86,7 +86,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
               </Badge>
             ))}
             {candidate.tools?.slice(0, 2).map((tool) => (
-              <Badge key={tool} variant="secondary" className="border-purple-100 bg-purple-50 text-xs text-purple-700">
+              <Badge key={tool} variant="secondary" className="border-slate-200 bg-slate-100 text-xs text-slate-600">
                 <Wrench className="mr-0.5 size-2.5" /> {tool}
               </Badge>
             ))}
@@ -94,13 +94,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
 
           <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className={list ? "" : "w-full justify-center"}>
             <Link href={`/talent/${candidate.id}`}>
-              {unlocked ? (
-                "Lihat Detail"
-              ) : (
-                <>
-                  <Lock className="mr-1.5 size-3.5" /> Unlock Talent
-                </>
-              )}
+              {unlocked ? "Lihat Detail" : "Buka Profil"}
             </Link>
           </Button>
         </div>

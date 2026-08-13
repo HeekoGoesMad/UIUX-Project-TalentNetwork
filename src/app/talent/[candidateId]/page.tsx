@@ -15,7 +15,6 @@ import {
   FileText,
   Globe,
   Loader2,
-  Lock,
   Mail,
   Phone,
   RefreshCw,
@@ -49,7 +48,7 @@ function List({ items }: { items: string[] }) {
     <ul className="space-y-2 text-sm text-muted-foreground">
       {items.map((item) => (
         <li key={item} className="flex gap-2">
-          <Check className="mt-0.5 size-4 shrink-0 text-[#19a974]" />
+          <Check className="mt-0.5 size-4 shrink-0 text-slate-700" />
           {item}
         </li>
       ))}
@@ -121,10 +120,10 @@ function ScreeningResults({
     <section className="mt-10 border-t pt-10" aria-labelledby="screening-results-title">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#08744f]">
+          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
             <ShieldCheck className="size-4" /> Recruiter insight
           </p>
-          <h2 id="screening-results-title" className="mt-2 text-2xl font-bold">
+          <h2 id="screening-results-title" className="mt-2 text-2xl font-bold text-[#111827]">
             Hasil screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -132,7 +131,7 @@ function ScreeningResults({
           </p>
         </div>
         {completed && (
-          <Badge variant="outline" className="w-fit border-[#b9e6d0] bg-[#f7fffb] text-[#08744f]">
+          <Badge variant="outline" className="w-fit border-slate-200 bg-slate-50 text-[#7C3AED]">
             <FileCheck2 className="mr-1 size-3" /> Screening selesai
           </Badge>
         )}
@@ -143,7 +142,7 @@ function ScreeningResults({
           <CardContent className="flex gap-3 p-5">
             <CircleHelp className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
             <div>
-              <p className="font-semibold">Hasil belum tersedia</p>
+              <p className="font-semibold text-[#111827]">Hasil belum tersedia</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profile sudah dibuka.
               </p>
@@ -155,7 +154,7 @@ function ScreeningResults({
       {completed && state === "loading" && (
         <Card className="mt-5">
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground" role="status">
-            <Loader2 className="size-5 animate-spin text-[#19a974]" /> Menyiapkan hasil screening dan AI Summary...
+            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Menyiapkan hasil screening dan AI Summary...
           </CardContent>
         </Card>
       )}
@@ -186,15 +185,15 @@ function ScreeningResults({
 
       {completed && result && (
         <div className="mt-5 space-y-4">
-          <Card className="overflow-hidden border-[#b9e6d0]">
-            <CardContent className="grid gap-6 bg-[#f7fffb] p-6 sm:grid-cols-[auto_1fr] sm:items-center">
-              <div className="flex size-28 flex-col items-center justify-center rounded-full border-8 border-[#19a974]/20 bg-white">
-                <span className="font-mono text-4xl font-bold text-[#08744f]">{result.insight.score}</span>
+          <Card className="overflow-hidden border-slate-200">
+            <CardContent className="grid gap-6 bg-slate-50/50 p-6 sm:grid-cols-[auto_1fr] sm:items-center">
+              <div className="flex size-28 flex-col items-center justify-center rounded-full border-8 border-slate-200 bg-white">
+                <span className="font-mono text-4xl font-bold text-[#7C3AED]">{result.insight.score}</span>
                 <span className="text-xs text-muted-foreground">dari 100</span>
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-[#08744f]">{result.insight.label}</Badge>
+                  <Badge className="bg-[#7C3AED] text-white">{result.insight.label}</Badge>
                   <span className="text-sm text-muted-foreground">
                     Rekomendasi berbasis data, bukan keputusan otomatis
                   </span>
@@ -202,11 +201,11 @@ function ScreeningResults({
                 <div className="mt-5">
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold">Data coverage</span>
-                    <span className="font-mono text-[#08744f]">{result.insight.coverage}%</span>
+                    <span className="font-mono text-[#7C3AED]">{result.insight.coverage}%</span>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-[#b9e6d0]">
+                  <div className="mt-2 h-2 rounded-full bg-[#7C3AED]/20">
                     <div
-                      className="h-2 rounded-full bg-[#19a974]"
+                      className="h-2 rounded-full bg-[#7C3AED]"
                       style={{ width: `${result.insight.coverage}%` }}
                     />
                   </div>
@@ -244,10 +243,10 @@ function ScreeningResults({
             </Card>
           </div>
 
-          <Card className="border-[#c9d9ee] bg-[#f0f6fd]">
+          <Card className="border-slate-200 bg-slate-50/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="size-5 text-[#08744f]" /> AI Summary <Badge variant="outline">AI draft</Badge>
+                <Sparkles className="size-5 text-[#7C3AED]" /> AI Summary <Badge variant="outline">AI draft</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -434,7 +433,7 @@ export default function TalentProfile() {
                 <p className="mb-2 text-sm font-semibold">Tools</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.tools.map((tool) => (
-                    <Badge key={tool} variant="secondary" className="bg-purple-50 text-purple-700 border-purple-100">
+                    <Badge key={tool} variant="secondary" className="bg-slate-100 text-slate-700 border-purple-100">
                       <Wrench className="mr-1 size-3" />
                       {tool}
                     </Badge>
@@ -447,12 +446,12 @@ export default function TalentProfile() {
             <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-6">
               <div className="flex items-start gap-4">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-                  <Lock className="size-5" />
+                  <ScanLine className="size-5" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-amber-950">Talent Unlock Required</h4>
+                  <h4 className="font-bold text-amber-950">Pembukaan Profil Diperlukan</h4>
                   <p className="mt-1 text-sm text-amber-900/80">
-                    Untuk melihat data lengkap dan menghubungi kandidat ini, lakukan <strong>Talent Unlock</strong>.
+                    Untuk melihat data lengkap dan menghubungi kandidat ini, lakukan <strong>Buka Profil</strong>.
                   </p>
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-2 text-xs font-medium text-amber-900">
@@ -486,7 +485,7 @@ export default function TalentProfile() {
                       onClick={() => setConfirmOpen(true)}
                       className="bg-amber-600 text-white hover:bg-amber-700"
                     >
-                      <ScanLine className="mr-2 size-4" /> Unlock Talent · 1 Token
+                      <ScanLine className="mr-2 size-4" /> Buka Profil · 1 Token
                     </Button>
                   </div>
                 </div>
@@ -560,7 +559,7 @@ export default function TalentProfile() {
                 <p className="mb-2 text-sm font-semibold">Tools</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.tools.map((tool) => (
-                    <Badge key={tool} variant="secondary" className="bg-purple-50 text-purple-700 border-purple-100">
+                    <Badge key={tool} variant="secondary" className="bg-slate-100 text-slate-700 border-purple-100">
                       <Wrench className="mr-1 size-3" />
                       {tool}
                     </Badge>
@@ -604,7 +603,7 @@ export default function TalentProfile() {
       <Dialog open={confirmOpen} onOpenChange={(open) => !scanning && setConfirmOpen(open)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Unlock Candidate Profile?</DialogTitle>
+            <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
               Tindakan ini akan menggunakan 1 token dan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio.
               Sisa token Anda: {tokens} token.
@@ -616,7 +615,7 @@ export default function TalentProfile() {
             </Button>
             <Button disabled={scanning || tokens <= 0} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
-              {scanning ? "Unlocking profile..." : "Konfirmasi Unlock · 1 Token"}
+              {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
             </Button>
           </DialogFooter>
         </DialogContent>

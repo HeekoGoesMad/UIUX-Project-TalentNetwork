@@ -26,7 +26,7 @@ export function SiteFooter() {
       <div className="container mx-auto flex flex-col gap-5 px-4 py-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link href={logoHref} className="flex items-center gap-2 font-bold">
-            <ShieldCheck className="size-5 text-[#19a974]" /> ProofyLink
+            <ShieldCheck className="size-5 text-[#7C3AED]" /> ProofyLink
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">
             Verified talent. Trusted connections.
