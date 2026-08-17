@@ -4,11 +4,9 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  BarChart3,
   Briefcase,
   Building2,
   ExternalLink,
-  GraduationCap,
   MapPin,
   TrendingUp,
 } from "lucide-react";

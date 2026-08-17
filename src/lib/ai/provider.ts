@@ -46,7 +46,11 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
       } as z.infer<T>;
     } catch (error) {
       console.error("[AI local] Error:", error);
-      if (options.strict) throw error;
+      if (options.strict) {
+        throw new Error(
+          `Gagal terhubung ke Local AI server (${model}) di ${baseURL}. Pastikan Ollama atau LM Studio sedang berjalan (misal: 'ollama run ${model}').`
+        );
+      }
       return {
         ...(fallback as Record<string, unknown>),
         source: "mock",
@@ -94,7 +98,28 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
 
 export async function summary(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
-  return aiResult(summarySchema, JSON.stringify(context), { summary: `${context.headline || "Kandidat"} dengan fokus pada hasil kerja yang dapat dibuktikan dan kolaborasi lintas fungsi.`, strengths: context.skills.slice(0, 3), evidence: ["Ringkasan berasal dari profile yang kandidat setujui."], limitations: ["AI tidak memverifikasi klaim dari sumber eksternal."], modelVersion: defaultVersion, source: getSource() }, options);
+  const prompt =
+    `Anda adalah asisten AI rekrutmen profesional. Buatkan ringkasan profil kandidat dalam Bahasa Indonesia berdasarkan data berikut:\n` +
+    `- Headline: ${context.headline || "Kandidat Profesional"}\n` +
+    `- Target Role: ${context.targetRole || "Belum ditentukan"}\n` +
+    `- Deskripsi: ${context.about || "Tidak ada deskripsi tentang saya."}\n` +
+    `- Lokasi: ${context.location || "Indonesia"}\n` +
+    `- Skills: ${context.skills.join(", ") || "General skills"}\n\n` +
+    `Tulis ringkasan naratif yang objektif, berorientasi pada pencapaian terukur dan kolaborasi.`;
+
+  return aiResult(
+    summarySchema,
+    prompt,
+    {
+      summary: `${context.headline || "Kandidat"} dengan fokus pada hasil kerja terbukti dan kolaborasi tim.`,
+      strengths: context.skills.length > 0 ? context.skills.slice(0, 3) : ["Pengalaman profesional terbukti", "Komunikasi & kolaborasi tim"],
+      evidence: ["Ringkasan bersumber langsung dari data profil kandidat yang valid."],
+      limitations: ["AI tidak melakukan verifikasi independen ke pihak eksternal."],
+      modelVersion: defaultVersion,
+      source: getSource(),
+    },
+    options,
+  );
 }
 
 export async function screening(input: unknown, options?: AiOptions) {

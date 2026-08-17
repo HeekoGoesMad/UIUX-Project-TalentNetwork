@@ -60,8 +60,8 @@ export type Candidate = {
   industry: IndustryCategory;
 };
 export type Scan = { candidateId: string; scannedAt: string };
-export type ScreeningInsight = { score: number; label: string; coverage: number; evidence: string[]; limitations: string[]; followUp: string; modelVersion: string; source: "mock" | "azure" };
-export type AiSummary = { summary: string; strengths: string[]; evidence: string[]; limitations: string[]; modelVersion: string; source: "mock" | "azure" };
+export type ScreeningInsight = { score: number; label: string; coverage: number; evidence: string[]; limitations: string[]; followUp: string; modelVersion: string; source: "mock" | "azure" | "local" };
+export type AiSummary = { summary: string; strengths: string[]; evidence: string[]; limitations: string[]; modelVersion: string; source: "mock" | "azure" | "local" };
 export type ScreeningResult = { insight: ScreeningInsight; summary: AiSummary; fetchedAt: string };
 export type ContactRequestHistory = { state: ConsentState; at: string };
 export type ContactRequest = {

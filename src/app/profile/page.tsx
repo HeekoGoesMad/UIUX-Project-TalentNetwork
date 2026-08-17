@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BriefcaseBusiness,
@@ -20,7 +20,7 @@ import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-import { CAREER_STATUS_CONFIG, CareerStatus } from "@/types";
+import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
 import { cn } from "@/lib/utils";
 
 const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
@@ -79,6 +79,11 @@ export default function ProfilePage() {
   const { user, cvProfile, careerStatus, saveCareerStatus, dbMode } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
 
+  // AI Summary state
+  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
+  const [aiLoading, setAiLoading] = useState(true);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
   const p = {
@@ -92,6 +97,73 @@ export default function ProfilePage() {
     tools: source?.tools ?? [],
     portfolio: source?.portfolio ?? [],
   };
+
+  const regenerateAiSummary = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const targetRole = source && "targetRole" in source ? source.targetRole : p.headline;
+      const profileContext = {
+        headline: p.headline,
+        about: p.about,
+        skills: p.skills,
+        targetRole: targetRole || "Talent",
+        location: p.location,
+      };
+      const response = await fetch("/api/ai/summary?strict=true", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...profileContext, strict: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Gagal memuat AI Summary.");
+      }
+      setAiSummary(payload as AiSummary);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Gagal memuat AI Summary.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [p.headline, p.about, p.skills, p.location, source]);
+
+  useEffect(() => {
+    let active = true;
+    const targetRole = source && "targetRole" in source ? source.targetRole : p.headline;
+    const profileContext = {
+      headline: p.headline,
+      about: p.about,
+      skills: p.skills,
+      targetRole: targetRole || "Talent",
+      location: p.location,
+    };
+
+    fetch("/api/ai/summary?strict=true", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...profileContext, strict: true }),
+    })
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error || "Gagal memuat AI Summary.");
+        if (active) {
+          setAiSummary(payload as AiSummary);
+          setAiError(null);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setAiError(err instanceof Error ? err.message : "Gagal memuat AI Summary.");
+        }
+      })
+      .finally(() => {
+        if (active) setAiLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [p.headline, p.about, p.skills, p.location, source]);
 
   const { pct, missing } = calcCompleteness(p);
 
@@ -214,15 +286,16 @@ export default function ProfilePage() {
               <Card><CardContent className="p-6"><h2 className="text-lg font-semibold">Profil belum tersedia</h2><p className="mt-2 text-sm text-muted-foreground">Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu.</p><Button className="mt-4" asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button></CardContent></Card>
             )}
 
-            {/* Tentang Saya */}
-            {p.about && (
-              <ProfileSection title="Tentang Saya">
-                <p className="max-w-2xl leading-7 text-slate-600">{p.about}</p>
-                <AiSummaryCard className="mt-4">
-                  AI-generated summary based on your CV and experience profile.
-                </AiSummaryCard>
-              </ProfileSection>
-            )}
+            {/* Tentang Saya & AI Summary */}
+            <ProfileSection title="Tentang Saya & AI Summary">
+              {p.about && <p className="max-w-2xl leading-7 text-slate-600 mb-4">{p.about}</p>}
+              <AiSummaryCard
+                data={aiSummary}
+                loading={aiLoading}
+                error={aiError}
+                onRegenerate={() => void regenerateAiSummary()}
+              />
+            </ProfileSection>
 
             {/* Pengalaman Kerja */}
             {p.experience.length > 0 && (
