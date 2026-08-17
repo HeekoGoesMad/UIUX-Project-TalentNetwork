@@ -1,0 +1,340 @@
+- generic [active] [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=e3]:
+      - link "ProofyLink" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e10]:
+        - link "Fitur Utuh" [ref=e11] [cursor=pointer]:
+          - /url: "#features"
+        - link "Cara Kerja" [ref=e12] [cursor=pointer]:
+          - /url: "#how-it-works"
+        - link "Harga & Token" [ref=e13] [cursor=pointer]:
+          - /url: "#pricing"
+        - link "FAQ" [ref=e14] [cursor=pointer]:
+          - /url: "#faq"
+      - link "Masuk" [ref=e17] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Verified Talent Network
+          - heading "Temukan talent yang tepat." [level=1] [ref=e32]:
+            - text: Temukan talent yang
+            - generic [ref=e33]: tepat.
+          - paragraph [ref=e35]: ProofyLink membantu recruiter menemukan kandidat terverifikasi dengan konteks tinggi tanpa noise spam, privasi by default, dan akses hemat berbasis token.
+          - generic [ref=e36]:
+            - link "Mulai eksplorasi" [ref=e37] [cursor=pointer]:
+              - /url: /search
+            - link "Masuk ke workspace" [ref=e40] [cursor=pointer]:
+              - /url: /login
+          - generic [ref=e41]:
+            - generic [ref=e42]: 30+ profil terkurasi
+            - generic [ref=e45]: Privacy by default
+            - generic [ref=e48]: AI Matching Signal
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - paragraph [ref=e56]: Network pulse
+              - paragraph [ref=e57]: Verified profiles open to conversation
+            - generic [ref=e58]: Live signal
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - generic [ref=e61]:
+                - generic [ref=e62]: NP
+                - generic [ref=e63]:
+                  - paragraph [ref=e64]: Private candidate
+                  - paragraph [ref=e65]: Senior Product Designer · Jakarta
+                  - generic [ref=e66]: Design Systems
+              - generic [ref=e67]: 98% match
+            - generic [ref=e68]:
+              - generic [ref=e69]:
+                - generic [ref=e70]: RS
+                - generic [ref=e71]:
+                  - paragraph [ref=e72]: Private candidate
+                  - paragraph [ref=e73]: Frontend Engineer · Bandung
+                  - generic [ref=e74]: Next.js & React
+              - generic [ref=e75]: 94% match
+            - generic [ref=e76]:
+              - generic [ref=e77]:
+                - generic [ref=e78]: CW
+                - generic [ref=e79]:
+                  - paragraph [ref=e80]: Private candidate
+                  - paragraph [ref=e81]: Growth Marketing Lead · Surabaya
+                  - generic [ref=e82]: B2B SaaS
+              - generic [ref=e83]: 91% match
+            - generic [ref=e84]:
+              - generic [ref=e85]: AI Summary & Sinyal Recruiter
+              - paragraph [ref=e89]: Sinyal terverifikasi otomatis mencocokkan stack, domain expertise, dan ekspektasi gaji tanpa perlu menyaring ratusan CV manual.
+      - generic [ref=e92]:
+        - generic [ref=e94]:
+          - generic [ref=e96]:
+            - paragraph [ref=e97]: 30+
+            - paragraph [ref=e98]: Verified Talent Profiles
+          - generic [ref=e101]:
+            - paragraph [ref=e102]: 98%
+            - paragraph [ref=e103]: Match Accuracy Signal
+          - generic [ref=e106]:
+            - paragraph [ref=e107]: 3x
+            - paragraph [ref=e108]: Faster Recruiter Screening
+          - generic [ref=e111]:
+            - paragraph [ref=e112]: 1 Token
+            - paragraph [ref=e113]: Transparent Cost per Unlock
+          - generic [ref=e116]:
+            - paragraph [ref=e117]: 100%
+            - paragraph [ref=e118]: Consent-First Privacy
+          - generic [ref=e121]:
+            - paragraph [ref=e122]: 0 Spam
+            - paragraph [ref=e123]: Direct Verified Contacts
+        - generic [ref=e126]:
+          - generic [ref=e128]:
+            - paragraph [ref=e129]: 30+
+            - paragraph [ref=e130]: Verified Talent Profiles
+          - generic [ref=e133]:
+            - paragraph [ref=e134]: 98%
+            - paragraph [ref=e135]: Match Accuracy Signal
+          - generic [ref=e138]:
+            - paragraph [ref=e139]: 3x
+            - paragraph [ref=e140]: Faster Recruiter Screening
+          - generic [ref=e143]:
+            - paragraph [ref=e144]: 1 Token
+            - paragraph [ref=e145]: Transparent Cost per Unlock
+          - generic [ref=e148]:
+            - paragraph [ref=e149]: 100%
+            - paragraph [ref=e150]: Consent-First Privacy
+          - generic [ref=e153]:
+            - paragraph [ref=e154]: 0 Spam
+            - paragraph [ref=e155]: Direct Verified Contacts
+        - generic [ref=e158]:
+          - generic [ref=e160]:
+            - paragraph [ref=e161]: 30+
+            - paragraph [ref=e162]: Verified Talent Profiles
+          - generic [ref=e165]:
+            - paragraph [ref=e166]: 98%
+            - paragraph [ref=e167]: Match Accuracy Signal
+          - generic [ref=e170]:
+            - paragraph [ref=e171]: 3x
+            - paragraph [ref=e172]: Faster Recruiter Screening
+          - generic [ref=e175]:
+            - paragraph [ref=e176]: 1 Token
+            - paragraph [ref=e177]: Transparent Cost per Unlock
+          - generic [ref=e180]:
+            - paragraph [ref=e181]: 100%
+            - paragraph [ref=e182]: Consent-First Privacy
+          - generic [ref=e185]:
+            - paragraph [ref=e186]: 0 Spam
+            - paragraph [ref=e187]: Direct Verified Contacts
+      - generic [ref=e190]:
+        - generic [ref=e191]:
+          - generic [ref=e192]: Fitur Unggulan Platform
+          - heading "Dirancang untuk Ekosistem Rekrutmen Masa Depan" [level=2] [ref=e195]
+          - paragraph [ref=e196]: Jelajahi bagaimana ProofyLink memadukan kecerdasan AI, perlindungan privasi kandidat, dan efisiensi biaya berbasis token.
+        - generic [ref=e197]:
+          - button "Signal Search & AI Match" [ref=e198]
+          - button "Privacy Context Unlock" [ref=e202]
+          - button "Token ROI Estimator" [ref=e206]
+          - button "AI Career Advisor" [ref=e210]
+        - generic [ref=e220]:
+          - generic [ref=e221]:
+            - text: Smart Filter & Matching
+            - heading "Cari Berdasarkan Sinyal Konkrit, Bukan Sekadar Resume Text" [level=3] [ref=e222]
+            - paragraph [ref=e223]: Filter kandidat berdasarkan keahlian terverifikasi, riwayat proyek nyata, ketersediaan karir, serta ekspektasi gaji. AI scoring mencocokkan kandidat terbaik dalam hitungan detik.
+            - list [ref=e224]:
+              - listitem [ref=e225]:
+                - generic [ref=e228]: Skor kecocokan AI hingga 98% presisi
+              - listitem [ref=e229]:
+                - generic [ref=e232]: "Filter fleksibel: Remote, Onsite, Seniority, Stack"
+              - listitem [ref=e233]:
+                - generic [ref=e236]: Tanpa resume palsu atau informasi yang membingungkan
+            - link "Coba Search Simulator" [ref=e237] [cursor=pointer]:
+              - /url: /search
+          - generic [ref=e240]:
+            - generic [ref=e241]:
+              - generic [ref=e242]: Live Search Query
+              - generic [ref=e243]: 12 Results Found
+            - generic [ref=e244]:
+              - generic [ref=e245]:
+                - generic [ref=e246]:
+                  - generic [ref=e247]: Senior Frontend Developer
+                  - generic [ref=e248]: 96% match
+                - paragraph [ref=e249]: React, Next.js, TypeScript · Jakarta (Remote)
+              - generic [ref=e250]:
+                - generic [ref=e251]:
+                  - generic [ref=e252]: Lead Product Designer
+                  - generic [ref=e253]: 93% match
+                - paragraph [ref=e254]: Figma, Design Systems, Mobile App · Bandung
+      - generic [ref=e256]:
+        - generic [ref=e257]:
+          - generic [ref=e258]: Alur Kerja Sederhana
+          - heading "Bagaimana ProofyLink Bekerja" [level=2] [ref=e263]
+          - paragraph [ref=e264]: 3 langkah cepat menghubungkan perusahaan hebat dengan talent terbaik.
+        - generic [ref=e265]:
+          - generic [ref=e266]:
+            - generic [ref=e267]: "01"
+            - heading "Filter Sinyal Kebutuhan" [level=3] [ref=e273]
+            - paragraph [ref=e274]: Gunakan filter spesifik role, pengalaman, lokasi, dan ekspektasi gaji tanpa harus membaca ratusan resume mentah.
+          - generic [ref=e275]:
+            - generic [ref=e276]: "02"
+            - heading "Unlock Dengan 1 Token" [level=3] [ref=e282]
+            - paragraph [ref=e283]: Saat menemukan profil yang cocok, gunakan 1 token untuk membuka kontak lengkap dan resume terverifikasi.
+          - generic [ref=e284]:
+            - generic [ref=e285]: "03"
+            - heading "Percakapan Berarti" [level=3] [ref=e290]
+            - paragraph [ref=e291]: Hubungi kandidat secara langsung dengan konteks relevan. Dapatkan tingkat respon hingga 3x lebih tinggi.
+      - generic [ref=e293]:
+        - generic [ref=e294]:
+          - generic [ref=e295]: Eksplorasi Kandidat
+          - heading "Preview Talent Network Terbuka" [level=2] [ref=e300]
+          - paragraph [ref=e301]: Intip profil anonim yang siap diajak berdiskusi.
+          - generic [ref=e302]:
+            - button "Semua Role" [ref=e303]
+            - button "Engineering & Tech" [ref=e304]
+            - button "Product & Design" [ref=e305]
+            - button "Growth & Marketing" [ref=e306]
+        - generic [ref=e307]:
+          - generic [ref=e309]:
+            - generic [ref=e310]:
+              - generic [ref=e311]:
+                - generic [ref=e312]: Verified Signal
+                - generic [ref=e313]: Jakarta
+              - heading "Senior Product Designer" [level=4] [ref=e314]
+              - paragraph [ref=e315]: 3 Pengalaman
+              - generic [ref=e316]:
+                - generic [ref=e317]: Figma
+                - generic [ref=e318]: TypeScript
+                - generic [ref=e319]: Research
+            - generic [ref=e320]:
+              - generic [ref=e321]: 1 Token to unlock
+              - link "Lihat Sinyal" [ref=e322] [cursor=pointer]:
+                - /url: /talent/candidate-1
+          - generic [ref=e326]:
+            - generic [ref=e327]:
+              - generic [ref=e328]:
+                - generic [ref=e329]: Verified Signal
+                - generic [ref=e330]: Bandung
+              - heading "Frontend Engineer" [level=4] [ref=e331]
+              - paragraph [ref=e332]: 4 Pengalaman
+              - generic [ref=e333]:
+                - generic [ref=e334]: React
+                - generic [ref=e335]: SQL
+                - generic [ref=e336]: Python
+            - generic [ref=e337]:
+              - generic [ref=e338]: 1 Token to unlock
+              - link "Lihat Sinyal" [ref=e339] [cursor=pointer]:
+                - /url: /talent/candidate-2
+          - generic [ref=e343]:
+            - generic [ref=e344]:
+              - generic [ref=e345]:
+                - generic [ref=e346]: Verified Signal
+                - generic [ref=e347]: Surabaya
+              - heading "Growth Marketing Lead" [level=4] [ref=e348]
+              - paragraph [ref=e349]: 5 Pengalaman
+              - generic [ref=e350]:
+                - generic [ref=e351]: TypeScript
+                - generic [ref=e352]: Product strategy
+                - generic [ref=e353]: Go
+            - generic [ref=e354]:
+              - generic [ref=e355]: 1 Token to unlock
+              - link "Lihat Sinyal" [ref=e356] [cursor=pointer]:
+                - /url: /talent/candidate-3
+          - generic [ref=e360]:
+            - generic [ref=e361]:
+              - generic [ref=e362]:
+                - generic [ref=e363]: Verified Signal
+                - generic [ref=e364]: Yogyakarta
+              - heading "Data Scientist" [level=4] [ref=e365]
+              - paragraph [ref=e366]: 6 Pengalaman
+              - generic [ref=e367]:
+                - generic [ref=e368]: SQL
+                - generic [ref=e369]: Research
+                - generic [ref=e370]: Brand systems
+            - generic [ref=e371]:
+              - generic [ref=e372]: 1 Token to unlock
+              - link "Lihat Sinyal" [ref=e373] [cursor=pointer]:
+                - /url: /talent/candidate-4
+        - link "Lihat Semua 30+ Talent Network" [ref=e377] [cursor=pointer]:
+          - /url: /search
+      - generic [ref=e381]:
+        - generic [ref=e382]:
+          - generic [ref=e383]: Transparan & Tanpa Langganan
+          - heading "Pilihan Token Sesuai Kebutuhan" [level=2] [ref=e387]
+          - paragraph [ref=e388]: Token tidak pernah kadaluarsa. Gunakan kapan pun Anda membuka rekrutmen baru.
+        - generic [ref=e389]:
+          - generic [ref=e390]:
+            - generic [ref=e391]:
+              - text: Starter Pack
+              - heading "10 Tokens" [level=3] [ref=e392]
+              - paragraph [ref=e393]: Rp 250.000
+              - paragraph [ref=e394]: Rp 25.000 / candidate unlock
+              - list [ref=e395]:
+                - listitem [ref=e396]: Unlock 10 Kontak & Resume
+                - listitem [ref=e399]: AI Talent Match Scoring
+                - listitem [ref=e402]: Fitur Shortlist & Catatan
+            - link "Beli Starter Token" [ref=e405] [cursor=pointer]:
+              - /url: /login
+          - generic [ref=e406]:
+            - generic [ref=e407]: MOST POPULAR
+            - generic [ref=e408]:
+              - text: Growth Pack
+              - heading "50 Tokens" [level=3] [ref=e409]
+              - paragraph [ref=e410]: Rp 990.000
+              - paragraph [ref=e411]: Rp 19.800 / candidate unlock (Hemat 20%)
+              - list [ref=e412]:
+                - listitem [ref=e413]: Unlock 50 Kontak & Resume
+                - listitem [ref=e416]: Prioritas Support Rekrutmen
+                - listitem [ref=e419]: AI Custom Query Search
+                - listitem [ref=e422]: Token Tidak Pernah Kadaluarsa
+            - link "Beli Growth Pack" [ref=e425] [cursor=pointer]:
+              - /url: /login
+          - generic [ref=e426]:
+            - generic [ref=e427]:
+              - text: Enterprise
+              - heading "Custom Tokens" [level=3] [ref=e428]
+              - paragraph [ref=e429]: Hubungi Kami
+              - paragraph [ref=e430]: Untuk tim HR skala besar
+              - list [ref=e431]:
+                - listitem [ref=e432]: Multi-recruiter team seats
+                - listitem [ref=e435]: Integrasi ATS kustom
+                - listitem [ref=e438]: Dedicated Talent Specialist
+            - link "Konsultasi Enterprise" [ref=e441] [cursor=pointer]:
+              - /url: /login
+      - generic [ref=e443]:
+        - generic [ref=e444]:
+          - generic [ref=e445]: Pertanyaan Umum
+          - heading "Sering Ditanyakan (FAQ)" [level=2] [ref=e449]
+        - generic [ref=e450]:
+          - generic [ref=e451]:
+            - button "Bagaimana sistem Token di ProofyLink bekerja?" [ref=e452]
+            - generic [ref=e456]: Pencarian dan pemantauan profil kandidat 100% gratis. Anda hanya menggunakan 1 token saat ingin meng-unlock kontak langsung dan resume lengkap kandidat yang sesuai dengan kriteria rekomendasi Anda.
+          - button "Bagaimana ProofyLink menjaga privasi kandidat?" [ref=e458]
+          - button "Apa perbedaan ProofyLink dibanding platform rekrutmen biasa?" [ref=e463]
+          - button "Apakah kandidat dikenakan biaya untuk menggunakan ProofyLink?" [ref=e468]
+      - generic [ref=e475]:
+        - generic [ref=e476]: ProofyLink Talent Intelligence
+        - heading "Siap menemukan talent terbaik tanpa noise?" [level=2] [ref=e480]
+        - paragraph [ref=e481]: Bergabunglah dengan recruiter & kandidat yang telah merasakan efisiensi pencarian berbasis sinyal terverifikasi.
+        - generic [ref=e482]:
+          - link "Daftar Bebas Biaya" [ref=e483] [cursor=pointer]:
+            - /url: /register
+          - link "Masuk Workspace" [ref=e486] [cursor=pointer]:
+            - /url: /login
+      - button "Kembali ke atas"
+  - contentinfo [ref=e487]:
+    - generic [ref=e488]:
+      - generic [ref=e489]:
+        - link "ProofyLink" [ref=e490] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=e494]: Verified talent. Trusted connections.
+      - navigation [ref=e495]:
+        - link "Search talent" [ref=e496] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=e497] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=e498] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=e499] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e505] [cursor=pointer]
