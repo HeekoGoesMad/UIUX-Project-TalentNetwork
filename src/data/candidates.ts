@@ -31,13 +31,6 @@ const industries: IndustryCategory[] = [
 
 const toolsList = ["Figma", "Excel", "Notion", "Looker Studio", "Jira", "Meta Ads", "Google Workspace", "HRIS"];
 
-export function maskName(fullName: string): string {
-  return fullName
-    .split(" ")
-    .map((word) => (word.length > 0 ? word[0] + "*****" : ""))
-    .join(" ");
-}
-
 export const candidates: Candidate[] = names.map((name, i) => ({
   id: `candidate-${i + 1}`,
   name,

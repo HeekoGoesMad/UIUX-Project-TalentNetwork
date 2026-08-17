@@ -1,26 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ScanLine, Search, ShieldCheck, Users, WalletCards } from "lucide-react";
-import { candidates } from "@/data/candidates";
+import { ArrowRight, Search, ShieldCheck, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
+import { candidates as demoCandidates } from "@/data/candidates";
 import { useApp } from "@/providers/app-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Candidate } from "@/types";
 
 export default function Dashboard() {
-  const { tokens, scans, shortlisted, recentlyViewed } = useApp();
+  const { tokens, scans, shortlisted, recentlyViewed, user, dbMode, bootstrapped, databaseError } = useApp();
+  const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
+
+  useEffect(() => {
+    if (!dbMode || !bootstrapped) return;
+    void fetch("/api/candidates", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { candidates?: Candidate[] };
+        if (response.ok) setRemoteCandidates(payload.candidates ?? []);
+      })
+      .catch(() => setRemoteCandidates([]));
+  }, [dbMode, bootstrapped]);
+
+  const candidatesList = dbMode && remoteCandidates.length > 0 ? remoteCandidates : demoCandidates;
+
   const recent = recentlyViewed
-    .map((id) => candidates.find((candidate) => candidate.id === id))
-    .filter(Boolean)
+    .map((id) => candidatesList.find((candidate) => candidate.id === id))
+    .filter((candidate): candidate is Candidate => Boolean(candidate))
     .slice(0, 3);
   const scanned = scans
     .slice()
     .reverse()
-    .map((scan) => candidates.find((candidate) => candidate.id === scan.candidateId))
-    .filter(Boolean)
+    .map((scan) => candidatesList.find((candidate) => candidate.id === scan.candidateId))
+    .filter((candidate): candidate is Candidate => Boolean(candidate))
     .slice(0, 3);
-  const shortlist = candidates
+  const shortlist = candidatesList
     .filter((candidate) => shortlisted.includes(candidate.id))
     .slice(0, 3);
 
@@ -32,7 +48,9 @@ export default function Dashboard() {
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-slate-500">
               <ShieldCheck className="size-4" /> Recruiter workspace
             </p>
-            <h1 className="mt-3 text-3xl font-bold text-[#1A1A2E]">Selamat datang kembali, Alex.</h1>
+            <h1 className="mt-3 text-3xl font-bold text-[#1A1A2E]">
+              Selamat datang kembali, {user?.name || "Recruiter"}.
+            </h1>
             <p className="mt-2 text-muted-foreground">Pick up the thread with the right talent.</p>
           </div>
           <Button asChild>
@@ -56,50 +74,52 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Token balance</p>
-              <p className="mt-2 flex items-center gap-2 font-mono text-4xl font-bold">
-                <WalletCards className="size-7 text-slate-700" />
-                {tokens}
-              </p>
-              <Link href="/pricing" className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">
-                Get more tokens <ArrowRight className="ml-1 size-4" />
-              </Link>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Profiles unlocked</p>
-              <p className="mt-2 text-4xl font-bold">{scans.length}</p>
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <ScanLine className="size-3" /> full context unlocked
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Shortlisted</p>
-              <p className="mt-2 text-4xl font-bold">{shortlisted.length}</p>
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="size-3" /> people to revisit
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {dbMode && !bootstrapped ? (
+          <div className="mt-8 rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground" role="status">
+            Memuat data database...
+          </div>
+        ) : dbMode && databaseError ? (
+          <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">
+            Data dashboard belum dapat dimuat. {databaseError}
+          </div>
+        ) : (
+          <>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">Token balance</p>
+                  <p className="mt-2 flex items-center gap-2 font-mono text-4xl font-bold">
+                    <WalletCards className="size-7 text-[#7C3AED]" />
+                    {tokens}
+                  </p>
+                  <Link href="/pricing" className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">
+                    Get more tokens <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">Profiles unlocked</p>
+                  <p className="mt-2 text-4xl font-bold">{scans.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">Shortlisted</p>
+                  <p className="mt-2 text-4xl font-bold">{shortlisted.length}</p>
+                </CardContent>
+              </Card>
+            </div>
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_.8fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Continue where you left off</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recent.length ? (
-                <div className="flex flex-col gap-3">
-                  {recent.map(
-                    (candidate) =>
-                      candidate && (
+            <section className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_.8fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Continue where you left off</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recent.length ? (
+                    <div className="flex flex-col gap-3">
+                      {recent.map((candidate) => (
                         <Link
                           key={candidate.id}
                           href={`/talent/${candidate.id}`}
@@ -113,79 +133,69 @@ export default function Dashboard() {
                           </span>
                           <ArrowRight className="size-4 text-muted-foreground" />
                         </Link>
-                      )
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-slate-50 p-5">
+                      <p className="font-medium">Your workspace is ready.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Search the network to find candidates, then come back here to continue.
+                      </p>
+                      <Button className="mt-4" size="sm" asChild>
+                        <Link href="/search">Start searching</Link>
+                      </Button>
+                    </div>
                   )}
-                </div>
-              ) : (
-                <div className="rounded-xl bg-slate-50 p-5">
-                  <p className="font-medium">Your workspace is ready.</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Search the network to find candidates, then come back here to continue.
-                  </p>
-                  <Button className="mt-4" size="sm" asChild>
-                    <Link href="/search">Start searching</Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent scans</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {scanned.length ? (
-                <div className="space-y-3">
-                  {scanned.map(
-                    (candidate) =>
-                      candidate && (
-                        <Link
-                          key={candidate.id}
-                          href={`/talent/${candidate.id}`}
-                          className="block text-sm hover:text-slate-900"
-                        >
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent scans</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {scanned.length ? (
+                    <div className="space-y-3">
+                      {scanned.map((candidate) => (
+                        <Link key={candidate.id} href={`/talent/${candidate.id}`} className="block text-sm hover:text-slate-900">
                           <span className="font-medium">{candidate.name}</span>
                           <span className="block text-muted-foreground">{candidate.role}</span>
                         </Link>
-                      )
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
+                      No scans yet. A preview is free; scan only when you need the full context.
+                    </p>
                   )}
-                </div>
-              ) : (
-                <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
-                  No scans yet. A preview is free; scan only when you need the full context.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+                </CardContent>
+              </Card>
+            </section>
 
-        <section className="mt-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent shortlist</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {shortlist.length ? (
-                <div className="grid gap-3 md:grid-cols-3">
-                  {shortlist.map((candidate) => (
-                    <Link
-                      key={candidate.id}
-                      href={`/talent/${candidate.id}`}
-                      className="rounded-xl border p-3 hover:bg-slate-50"
-                    >
-                      <p className="font-medium">{candidate.name}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{candidate.role}</p>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
-                  Nothing shortlisted yet. Save a promising preview or unlocked profile to build your working set.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+            <section className="mt-5">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent shortlist</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {shortlist.length ? (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {shortlist.map((candidate) => (
+                        <Link key={candidate.id} href={`/talent/${candidate.id}`} className="rounded-xl border p-3 hover:bg-slate-50">
+                          <p className="font-medium">{candidate.name}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{candidate.role}</p>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
+                      Nothing shortlisted yet. Save a promising preview or unlocked profile to build your working set.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+          </>
+        )}
       </div>
     </ProtectedRoute>
   );

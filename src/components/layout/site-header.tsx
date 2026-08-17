@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
+import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
-  const { tokens, user, hydrated, logout } = useApp();
+  const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
   const visibleUser = hydrated ? user : null;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -46,7 +46,9 @@ export function SiteHeader() {
     ? [
         { href: "/candidate", label: "Workspace" },
         { href: "/candidate/cv", label: "CV & Profile" },
-        { href: "/candidate/career-advisor", label: "Career Advisor" },
+         { href: "/candidate/career-advisor", label: "Career Advisor" },
+         { href: "/candidate/contact-requests", label: "Permintaan kontak" },
+         { href: "/messages", label: "Pesan" },
       ]
     : visibleUser?.role === "partner"
     ? [
@@ -57,8 +59,10 @@ export function SiteHeader() {
       ]
     : [
         { href: "/search", label: "Search talent" },
-        { href: "/shortlist", label: "Shortlist" },
-        { href: "/dashboard", label: "Dashboard" },
+         { href: "/shortlist", label: "Shortlist" },
+         { href: "/recruiter/screenings/new", label: "Screening" },
+         { href: "/messages", label: "Pesan" },
+         { href: "/dashboard", label: "Dashboard" },
       ];
 
   return (
@@ -161,10 +165,20 @@ export function SiteHeader() {
               className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
               <WalletCards className="size-4 text-[#7C3AED]" />
-              <span className="font-mono">{tokens}</span>
+              <span className="font-mono">{devBypass ? "∞" : tokens}</span>
               <span className="hidden text-muted-foreground sm:inline">tokens</span>
             </Link>
           )}
+
+          {visibleUser && (() => {
+            const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+            return (
+              <Link href="/notifications" className="relative flex size-9 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+                <Bell className="size-4" />
+                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#19a974] text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+              </Link>
+            );
+          })()}
 
           {visibleUser ? (
             <Button

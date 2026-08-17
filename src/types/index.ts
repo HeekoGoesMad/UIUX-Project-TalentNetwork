@@ -63,9 +63,19 @@ export type Scan = { candidateId: string; scannedAt: string };
 export type ScreeningInsight = { score: number; label: string; coverage: number; evidence: string[]; limitations: string[]; followUp: string; modelVersion: string; source: "mock" | "azure" };
 export type AiSummary = { summary: string; strengths: string[]; evidence: string[]; limitations: string[]; modelVersion: string; source: "mock" | "azure" };
 export type ScreeningResult = { insight: ScreeningInsight; summary: AiSummary; fetchedAt: string };
-export type AppState = { tokens: number; scans: Scan[]; shortlisted: string[]; notes: Record<string, string>; recentlyViewed: string[]; screeningTokens: number; previewsUsed: number; screeningConsents: Record<string, ConsentState>; screeningResults: Record<string, ScreeningResult>; cvProfile: CvProfile | null; careerStatus: CareerStatus };
+export type ContactRequestHistory = { state: ConsentState; at: string };
+export type ContactRequest = {
+  candidateId: string;
+  recruiterName?: string;
+  company?: string;
+  email?: string;
+  requestedAt?: string;
+  history?: ContactRequestHistory[];
+};
+export type AppState = { tokens: number; scans: Scan[]; shortlisted: string[]; notes: Record<string, string>; recentlyViewed: string[]; screeningTokens: number; previewsUsed: number; screeningConsents: Record<string, ConsentState>; screeningResults: Record<string, ScreeningResult>; contactRequests?: Record<string, ContactRequest>; cvProfile: CvProfile | null; careerStatus: CareerStatus };
 export type UserRole = "candidate" | "recruiter" | "partner";
-export type DemoUser = { name: string; email: string; role: UserRole };
+export type ProvisioningStatus = "pending" | "active" | "rejected";
+export type DemoUser = { name: string; email: string; role: UserRole; provisioningStatus?: ProvisioningStatus; companyName?: string };
 
 export type CvProfile = {
   id: string;

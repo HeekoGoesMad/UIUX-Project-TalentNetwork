@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -24,7 +24,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
-import { findCandidate, maskName } from "@/data/candidates";
+import { findCandidate } from "@/data/candidates";
+import { maskName } from "@/lib/candidate-display";
 import { useApp } from "@/providers/app-provider";
 import { CandidateAvatar } from "@/components/candidates/avatar";
 import { CandidateCategoryBadge } from "@/components/candidates/candidate-category-badge";
@@ -41,7 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import type { AiSummary, ScreeningInsight, ScreeningResult } from "@/types";
+import type { AiSummary, Candidate, ScreeningInsight, ScreeningResult } from "@/types";
 
 function List({ items }: { items: string[] }) {
   return (
@@ -58,11 +59,13 @@ function List({ items }: { items: string[] }) {
 
 function ScreeningResults({
   candidateId,
+  candidate,
   completed,
   result,
   saveResult,
 }: {
   candidateId: string;
+  candidate: Candidate;
   completed: boolean;
   result?: ScreeningResult;
   saveResult: (candidateId: string, result: ScreeningResult) => void;
@@ -77,15 +80,44 @@ function ScreeningResults({
     setState("loading");
     setError("");
     try {
-      const candidate = findCandidate(candidateId);
-      if (!candidate) throw new Error("Profile kandidat tidak ditemukan.");
-      const profile = {
+       const profile = {
         headline: candidate.role,
         about: candidate.summary,
         skills: candidate.skills,
         targetRole: candidate.role,
         location: candidate.location,
       };
+       const isDatabaseCandidate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId);
+      if (isDatabaseCandidate) {
+        const runResponse = await fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`);
+        const runData = (await runResponse.json()) as { run?: { id: string; status: string; score?: { score: number; label: string; coverage: number; evidence: unknown; limitations: unknown; source: "mock" | "azure"; modelVersion: string } | null }; error?: string };
+        if (!runResponse.ok) throw new Error(runData.error ?? "Status screening belum dapat dimuat.");
+        if (!runData.run || runData.run.status !== "completed") return;
+        const resultResponse = await fetch(`/api/screening-runs/${runData.run.id}/result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skills: candidate.skills }),
+        });
+        const resultData = (await resultResponse.json()) as { score?: NonNullable<typeof runData.run.score>; aiSummary?: AiSummary; error?: string };
+        if (!resultResponse.ok || !resultData.score) throw new Error(resultData.error ?? "Hasil screening belum dapat dimuat.");
+        const savedSummary = resultData.aiSummary ?? (await (await fetch("/api/ai/summary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profile) })).json() as AiSummary);
+        saveResult(candidateId, {
+          insight: {
+            score: resultData.score.score,
+            label: resultData.score.label,
+            coverage: resultData.score.coverage,
+            evidence: Array.isArray(resultData.score.evidence) ? resultData.score.evidence.map(String) : [],
+            limitations: Array.isArray(resultData.score.limitations) ? resultData.score.limitations.map(String) : [],
+            followUp: "Lakukan interview berbasis bukti dan beri kandidat kesempatan klarifikasi.",
+            modelVersion: resultData.score.modelVersion,
+            source: resultData.score.source,
+          },
+          summary: savedSummary,
+          fetchedAt: new Date().toISOString(),
+        });
+        setState("idle");
+        return;
+      }
       const [insightResponse, summaryResponse] = await Promise.all([
         fetch("/api/ai/screening-insight", {
           method: "POST",
@@ -110,11 +142,12 @@ function ScreeningResults({
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timer = window.setTimeout(() => void loadResults(), 0);
     return () => window.clearTimeout(timer);
-  }, [candidateId, completed, result]);
+    // The loader is recreated with the profile state; these inputs are the intended reload boundary.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId, candidate, completed, result]);
 
   return (
     <section className="mt-10 border-t pt-10" aria-labelledby="screening-results-title">
@@ -286,7 +319,7 @@ function ScreeningResults({
 
 export default function TalentProfile() {
   const { candidateId } = useParams<{ candidateId: string }>();
-  const candidate = findCandidate(candidateId);
+  const router = useRouter();
   const {
     tokens,
     scans,
@@ -299,14 +332,45 @@ export default function TalentProfile() {
     screeningConsents,
     screeningResults,
     saveScreeningResult,
+    devBypass,
+    dbMode,
+    bootstrapped,
+    databaseError,
   } = useApp();
 
+  const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
+  const [loadedCandidateId, setLoadedCandidateId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
+  const [openingConversation, setOpeningConversation] = useState(false);
+  const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!dbMode || !bootstrapped) return;
+    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { candidate?: Candidate };
+        setRemoteCandidate(response.ok ? payload.candidate ?? null : null);
+      })
+      .catch(() => setRemoteCandidate(null))
+      .finally(() => setLoadedCandidateId(candidateId));
+  }, [candidateId, dbMode, bootstrapped]);
+
+  useEffect(() => {
+    if (!dbMode || !bootstrapped || !/^[0-9a-f-]{36}$/i.test(candidateId)) return;
+    void fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { run?: { status?: string } | null };
+        if (response.ok) setRemoteScreeningCompleted(payload.run?.status === "completed");
+      })
+      .catch(() => setRemoteScreeningCompleted(false));
+  }, [candidateId, dbMode, bootstrapped]);
+
   useEffect(() => {
     if (candidate) viewed(candidate.id);
+    // Tracking is intentionally keyed by the route, not by provider function identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
   if (!user || user.role !== "recruiter")
@@ -315,6 +379,12 @@ export default function TalentProfile() {
         <div />
       </ProtectedRoute>
     );
+
+  if (dbMode && (!bootstrapped || loadedCandidateId !== candidateId))
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-muted-foreground" role="status">Memuat profile kandidat dari database...</p></div>;
+
+  if (dbMode && databaseError)
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-red-700" role="alert">Profile kandidat belum dapat dimuat. {databaseError}</p><Button className="mt-6" asChild><Link href="/search">Kembali ke pencarian</Link></Button></div>;
 
   if (!candidate)
     return (
@@ -329,10 +399,10 @@ export default function TalentProfile() {
     );
 
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
-  const completed = hydrated && screeningConsents[candidate.id] === "screening-completed";
+  const completed = hydrated && (dbMode ? remoteScreeningCompleted : screeningConsents[candidate.id] === "screening-completed");
 
   const startScan = () => {
-    if (tokens <= 0) {
+    if (tokens <= 0 && !devBypass) {
       toast.error("No tokens available", {
         description: "Add tokens before scanning a new profile.",
       });
@@ -481,7 +551,7 @@ export default function TalentProfile() {
                     </span>
                     <Button
                       size="lg"
-                      disabled={tokens <= 0}
+                       disabled={tokens <= 0 && !devBypass}
                       onClick={() => setConfirmOpen(true)}
                       className="bg-amber-600 text-white hover:bg-amber-700"
                     >
@@ -590,13 +660,45 @@ export default function TalentProfile() {
         )}
       </Card>
 
-      {unlocked && (
-        <ScreeningResults
-          candidateId={candidate.id}
-          completed={completed}
-          result={screeningResults[candidate.id]}
-          saveResult={saveScreeningResult}
-        />
+      {(unlocked || (dbMode && completed)) && (
+        <>
+          {dbMode && completed && (
+            <Card className="mt-6 border-[#b9e6d0] bg-[#f7fffb]">
+              <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+                <div>
+                  <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, charge token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                </div>
+                <Button
+                  disabled={openingConversation}
+                  onClick={async () => {
+                    setOpeningConversation(true);
+                    try {
+                      const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
+                      const payload = await response.json() as { conversationId?: string; error?: string };
+                      if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
+                      router.push(`/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
+                    } catch (error) {
+                      toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
+                    } finally {
+                      setOpeningConversation(false);
+                    }
+                  }}
+                >
+                  {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                  {openingConversation ? "Membuka..." : "Mulai percakapan"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          <ScreeningResults
+            candidateId={candidate.id}
+            candidate={candidate}
+            completed={completed}
+            result={screeningResults[candidate.id]}
+            saveResult={saveScreeningResult}
+          />
+        </>
       )}
 
       {/* Confirmation Dialog */}
@@ -605,15 +707,15 @@ export default function TalentProfile() {
           <DialogHeader>
             <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
-              Tindakan ini akan menggunakan 1 token dan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio.
-              Sisa token Anda: {tokens} token.
+               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio.
+               {devBypass ? " Mode development: token scan tidak digunakan." : ` Sisa token Anda: ${tokens} token.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" disabled={scanning} onClick={() => setConfirmOpen(false)}>
               Batal
             </Button>
-            <Button disabled={scanning || tokens <= 0} onClick={startScan}>
+            <Button disabled={scanning || (tokens <= 0 && !devBypass)} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
               {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
             </Button>

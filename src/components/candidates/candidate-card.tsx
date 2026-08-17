@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, MapPin, Wrench } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, Clock3, Lock, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
 import { useApp } from "@/providers/app-provider";
-import { maskName } from "@/data/candidates";
+import { maskName } from "@/lib/candidate-display";
 import { CandidateAvatar } from "./avatar";
 import { CandidateStatusBadge } from "./candidate-status-badge";
 import { CandidateCategoryBadge } from "./candidate-category-badge";
@@ -94,7 +94,13 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
 
           <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className={list ? "" : "w-full justify-center"}>
             <Link href={`/talent/${candidate.id}`}>
-              {unlocked ? "Lihat Detail" : "Buka Profil"}
+              {unlocked ? (
+                "Lihat Detail"
+              ) : (
+                <>
+                  <Lock className="mr-1.5 size-3.5" /> Lihat Detail
+                </>
+              )}
             </Link>
           </Button>
         </div>

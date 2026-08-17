@@ -1,0 +1,1 @@
+ALTER TABLE "shortlists" ADD CONSTRAINT "shortlists_organization_name_unique" UNIQUE("organization_id","name");

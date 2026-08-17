@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
 import { candidates } from "@/data/candidates";
 import { CandidateCard } from "@/components/candidates/candidate-card";
@@ -22,6 +22,7 @@ import {
   IndustryCategory,
   TALENT_CATEGORY_CONFIG,
   TalentCategory,
+  Candidate,
 } from "@/types";
 
 const pageSize = 12;
@@ -48,8 +49,6 @@ const EXPERIENCE_BANDS = [
   { value: "5-10", label: "5 – 10 tahun", min: 5, max: 10 },
   { value: "gt10", label: "> 10 tahun", min: 10, max: Infinity },
 ];
-
-const ALL_LOCATIONS = [...new Set(candidates.map((c) => c.location))].sort();
 
 const initialFilters: Filters = {
   q: "",
@@ -83,10 +82,12 @@ function FilterPanel({
   filters,
   onChange,
   onReset,
+  locations,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
   onReset: () => void;
+  locations: string[];
 }) {
   const set = (partial: Partial<Filters>) => onChange({ ...filters, ...partial, page: 1 });
 
@@ -185,7 +186,7 @@ function FilterPanel({
 
       {/* ── LOKASI ── */}
       <FilterSection label="Lokasi">
-        {ALL_LOCATIONS.map((loc) => {
+        {locations.map((loc) => {
           const active = filters.locations.includes(loc);
           return (
             <CheckRow
@@ -243,15 +244,32 @@ function CheckRow({
 // Main page
 // ────────────────────────────────────────────────────────────────
 export default function SearchPage() {
-  const { user } = useApp();
+  const { user, dbMode, bootstrapped, databaseError } = useApp();
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!dbMode || !bootstrapped) return;
+    void fetch("/api/candidates", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { candidates?: Candidate[]; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Data kandidat belum dapat dimuat.");
+        setRemoteCandidates(payload.candidates ?? []);
+      })
+      .catch(() => setRemoteCandidates([]))
+      .finally(() => setRemoteLoaded(true));
+  }, [dbMode, bootstrapped]);
+
+  const source = dbMode ? remoteCandidates : candidates;
+  const allLocations = useMemo(() => [...new Set(source.map((candidate) => candidate.location))].sort(), [source]);
 
   const filtered = useMemo(() => {
-    const haystack = (c: (typeof candidates)[number]) =>
+    const haystack = (c: Candidate) =>
       `${c.name} ${c.role} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase();
 
-    return candidates
+    return source
       .filter((c) => {
         const qMatch = !filters.q || haystack(c).includes(filters.q.toLowerCase());
         const catMatch = !filters.talentCategories.length || filters.talentCategories.includes(c.talentCategory);
@@ -270,7 +288,7 @@ export default function SearchPage() {
         }
         return 0;
       });
-  }, [filters]);
+  }, [filters, source]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(filters.page, totalPages);
@@ -288,6 +306,16 @@ export default function SearchPage() {
   if (!user || user.role !== "recruiter") {
     return <ProtectedRoute role="recruiter"><div /></ProtectedRoute>;
   }
+
+  if (dbMode && !bootstrapped) {
+    return <div className="container mx-auto px-4 py-8"><div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground" role="status">Memuat kandidat dari database...</div></div>;
+  }
+
+  if (dbMode && databaseError) {
+    return <div className="container mx-auto px-4 py-8"><div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">Data kandidat belum dapat dimuat. {databaseError}</div></div>;
+  }
+
+  const databaseEmpty = dbMode && remoteLoaded && remoteCandidates.length === 0;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -372,13 +400,19 @@ export default function SearchPage() {
               filters={filters}
               onChange={setFilters}
               onReset={resetFilters}
+              locations={allLocations}
             />
           </div>
         </aside>
 
         {/* Results */}
         <div className="min-w-0 flex-1">
-          {results.length > 0 ? (
+          {databaseEmpty ? (
+            <div className="rounded-lg border border-dashed p-10 text-center">
+              <h2 className="text-xl font-semibold">Belum ada kandidat di database.</h2>
+              <p className="mt-2 text-muted-foreground">Belum ada profile kandidat yang dipublikasikan untuk recruiter.</p>
+            </div>
+          ) : results.length > 0 ? (
             <div
               className={
                 filters.view === "grid"
@@ -441,6 +475,7 @@ export default function SearchPage() {
             filters={filters}
             onChange={(f) => { setFilters(f); }}
             onReset={() => { resetFilters(); setMobileOpen(false); }}
+            locations={allLocations}
           />
           <Button className="mt-2 w-full" onClick={() => setMobileOpen(false)}>
             Lihat {filtered.length} kandidat

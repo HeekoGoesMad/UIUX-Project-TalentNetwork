@@ -1,3 +1,20 @@
-import { AiTool } from "@/components/candidate/ai-tool";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-export default function Page() { return <ProtectedRoute role="candidate"><AiTool title="Career Advisor" description="Tanya langkah karier berdasarkan profile yang kamu pilih untuk dibagikan." endpoint="/api/ai/career-advisor" /></ProtectedRoute>; }
+import { CareerAdvisorWorkspace } from "@/components/candidate/career-advisor-workspace";
+import { Sparkles } from "lucide-react";
+
+export default function Page() {
+  return (
+    <ProtectedRoute role="candidate">
+      <main className="container mx-auto max-w-5xl px-4 py-8">
+        <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#08744f]">
+          <Sparkles className="size-4" /> Candidate Workspace
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-[#0f2040]">Career Profile Advisor</h1>
+        <p className="mt-2 mb-8 text-muted-foreground">
+          Panduan interaktif & evaluasi 5 pilar untuk membangun serta memperkuat profil kariermu sesuai standar HR & ATS.
+        </p>
+        <CareerAdvisorWorkspace />
+      </main>
+    </ProtectedRoute>
+  );
+}

@@ -9,16 +9,43 @@ export const profileContextSchema = z.object({
 });
 
 export const summarySchema = z.object({
-  summary: z.string(), strengths: z.array(z.string()), evidence: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]),
+  summary: z.string(), strengths: z.array(z.string()), evidence: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
 export const screeningSchema = z.object({
-  score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure"]),
+  score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
-export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const advisorSchema = z.object({ answer: z.string(), nextSteps: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure"]), });
+export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const advisorSchema = z.object({
+  focus: z.string().default("general"),
+  summary: z.string(),
+  headlineSuggestions: z.array(z.string()).default([]),
+  starBullets: z.array(z.object({
+    before: z.string(),
+    after: z.string(),
+    impactReason: z.string(),
+  })).default([]),
+  pillars: z.array(z.object({
+    name: z.string(),
+    score: z.number().min(0).max(100),
+    status: z.enum(["excellent", "good", "needs_improvement"]),
+    recommendation: z.string(),
+    actionables: z.array(z.string()),
+  })).default([]),
+  structuredAdvice: z.object({
+    opening: z.string(),
+    whatGood: z.array(z.string()),
+    whatNotGood: z.array(z.string()),
+    conclusion: z.string(),
+  }).optional(),
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+  modelVersion: z.string(),
+  source: z.enum(["mock", "azure", "local"]),
+});
+export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure", "local"]), });
 
 export type ProfileContext = z.infer<typeof profileContextSchema>;

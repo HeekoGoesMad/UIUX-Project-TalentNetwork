@@ -97,6 +97,18 @@ AZURE_OPENAI_API_VERSION=2024-08-01-preview
 
 > **Note:** If `AI_PROVIDER` is set to `mock` or credentials are missing, the system gracefully falls back to structured mock data powered by Zod schemas.
 
+## Database and Authentication
+
+The first database phase uses Supabase Auth and PostgreSQL with Drizzle ORM.
+
+1. Create a Supabase project and enable email/password authentication.
+2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the pooled `DATABASE_URL`.
+3. Generate migrations with `npm run db:generate`.
+4. Apply migrations with `npm run db:migrate`.
+5. Validate the schema with `npm run db:check`.
+
+Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations committed. The application can still run in local demo fallback mode when Supabase variables are absent, but real registration, persistent profiles, and database consent requests require Supabase configuration.
+
 ---
 
 ## 📁 Project Structure
@@ -131,6 +143,26 @@ AZURE_OPENAI_API_VERSION=2024-08-01-preview
 | `npm run lint` | Runs ESLint code quality checks |
 
 ---
+
+# Development token grant
+
+Database mode keeps token balances in `token_accounts` and every change in
+`token_ledger_entries`. For local development only, set
+`DEV_TOKEN_GRANT_ENABLED=true` while running with `NODE_ENV=development`.
+
+After signing in as an active recruiter, run this in the browser console to
+grant 25 tokens once:
+
+```js
+fetch("/api/dev/token-grant", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ amount: 25, idempotencyKey: "local-recruiter-seed" }),
+}).then((response) => response.json()).then(console.log);
+```
+
+Repeating the same `idempotencyKey` is safe and does not change the balance a
+second time. The route never uses or exposes a Supabase service-role key.
 
 <div align="center">
 

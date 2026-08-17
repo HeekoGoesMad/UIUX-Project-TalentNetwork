@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FileUp,
   GraduationCap,
@@ -17,13 +17,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CvProfile } from "@/types";
 import { CvDownload } from "./cv-download";
 
-const blank: CvProfile = {
-  id: "demo-cv",
-  fullName: "Nadia Putri",
+function blank(email = "", fullName = ""): CvProfile {
+ return {
+   id: "new-cv",
+  fullName,
   headline: "",
   about: "",
-  location: "Jakarta",
-  email: "nadia@example.com",
+  location: "",
+  email,
   phone: "",
   skills: [],
   tools: [],
@@ -37,7 +38,8 @@ const blank: CvProfile = {
   openToWork: true,
   careerStatus: "open-to-work",
   updatedAt: new Date().toISOString(),
-};
+ };
+}
 
 // ─── Helpers ────────────────────────────────────────────────────
 function Field({
@@ -80,9 +82,15 @@ function FormSection({ title, icon, children }: { title: string; icon?: React.Re
 
 // ─── Main Component ──────────────────────────────────────────────
 export function CvWorkspace() {
-  const { cvProfile, saveCvProfile } = useApp();
-  const [profile, setProfile] = useState<CvProfile>(cvProfile ?? blank);
+  const { cvProfile, user, dbMode, saveCvProfile } = useApp();
+  const [profile, setProfile] = useState<CvProfile>(cvProfile ?? blank(dbMode ? user?.email : "", dbMode ? user?.name : ""));
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!cvProfile) return;
+    const timer = window.setTimeout(() => setProfile(cvProfile), 0);
+    return () => window.clearTimeout(timer);
+  }, [cvProfile]);
 
   // Generic scalar updater
   const update = <K extends keyof CvProfile>(key: K, value: CvProfile[K]) =>
@@ -158,21 +166,6 @@ export function CvWorkspace() {
     setMessage("Draft berhasil dibuat. Review semua field sebelum menyimpan.");
   }
 
-  async function exportPdf() {
-    // Legacy fallback – superseded by CvDownload below
-    const response = await fetch(`/api/cv/${profile.id}/export`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile),
-    });
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "proofylink-cv.pdf";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div className="space-y-6">
@@ -462,7 +455,7 @@ export function CvWorkspace() {
 
           {/* ── Action buttons ── */}
           <div className="flex flex-wrap gap-3 border-t pt-4">
-            <Button onClick={() => { saveCvProfile(profile); setMessage("Profil berhasil disimpan!"); }}>
+            <Button onClick={() => { void saveCvProfile(profile).then(() => setMessage("Profil berhasil disimpan dan disinkronkan.")); }}>
               <Save className="size-4" /> Simpan Profile
             </Button>
           </div>
