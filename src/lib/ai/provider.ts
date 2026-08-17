@@ -31,7 +31,7 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
     const apiKey = process.env.LOCAL_AI_API_KEY?.trim() ?? "ollama";
     try {
       const localAi = createOpenAI({ baseURL, apiKey });
-      const result = await generateObject({ model: localAi(model), schema, prompt });
+      const result = await generateObject({ model: localAi.chat(model), schema, prompt });
       return result.object as z.infer<T>;
     } catch (error) {
       console.error("[AI local] Error:", error);

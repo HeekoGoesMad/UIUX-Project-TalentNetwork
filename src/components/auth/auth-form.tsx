@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Send } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Send, Sparkles } from "lucide-react";
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
@@ -12,7 +12,7 @@ import { RoleSelector } from "./role-selector";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const { user, hydrated, login, register } = useApp();
+  const { user, hydrated, login, register, loginAsDemoCandidate } = useApp();
   const [role, setRole] = useState<UserRole>("recruiter");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -285,6 +285,34 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               </>
             )}
           </Button>
+
+          {!supabaseConfigured && role === "candidate" && (
+            <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
+                  <Sparkles className="size-4 text-[#7C3AED]" /> Quick Demo Login
+                </span>
+                <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
+                  Profil Lengkap
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Masuk sebagai <strong>Nadia Putri Rahayu</strong> (Senior Product Designer). Terisi penuh dengan riwayat Tokopedia & OVO untuk pengujian Career Advisor & Roadmap.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+                onClick={() => {
+                  loginAsDemoCandidate();
+                  router.push("/candidate");
+                }}
+              >
+                <User className="size-3.5" /> Masuk Akun Demo Kandidat (Nadia)
+              </Button>
+            </div>
+          )}
         </>
       )}
 

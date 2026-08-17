@@ -4,6 +4,7 @@ import { createContext, startTransition, useContext, useEffect, useRef, useState
 import { toast } from "sonner";
 import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
@@ -30,6 +31,7 @@ type Context = AppState & {
   markNotificationRead: (id: string) => Promise<boolean>;
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
+  loginAsDemoCandidate: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   scan: (id: string) => boolean;
@@ -300,8 +302,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const login = async (role: UserRole, email: string, password?: string): Promise<AuthResult> => {
     if (!supabaseConfigured) {
-      const defaultName = role === "candidate" ? "Nadia Putri" : role === "partner" ? "Mitra Kampus / Lembaga" : "Alex Morgan";
-      setUser({ role, provisioningStatus: "active", email: email || "demo@proofylink.id", name: email ? email.split("@")[0] : defaultName });
+      const isDemoCandidate = role === "candidate";
+      const defaultName = isDemoCandidate ? DEMO_CANDIDATE_USER.name : role === "partner" ? "Mitra Kampus / Lembaga" : "Alex Morgan";
+      setUser({ role, provisioningStatus: "active", email: email || (isDemoCandidate ? DEMO_CANDIDATE_USER.email : "demo@proofylink.id"), name: email && email !== DEMO_CANDIDATE_USER.email ? email.split("@")[0] : defaultName });
+      if (isDemoCandidate && (!state.cvProfile || state.cvProfile.fullName === "")) {
+        setState((current) => ({ ...current, cvProfile: DEMO_CANDIDATE_CV, careerStatus: "open-to-work" }));
+      }
       return { role, provisioningStatus: "active" };
     }
     pendingRole.current = role;
@@ -311,6 +317,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const metadataRole = data.user?.user_metadata?.role;
     const actualRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" ? metadataRole : undefined;
     return { role: actualRole };
+  };
+
+  const loginAsDemoCandidate = () => {
+    setUser(DEMO_CANDIDATE_USER);
+    setState((current) => ({
+      ...current,
+      cvProfile: DEMO_CANDIDATE_CV,
+      careerStatus: "open-to-work",
+    }));
+    toast.success("Masuk sebagai Kandidat Demo (Nadia)", {
+      description: "Profil lengkap dengan riwayat Tokopedia & OVO berhasil dimuat.",
+    });
   };
 
   const register = async (name: string, role: UserRole, email: string, password: string, companyName = ""): Promise<AuthResult> => {
@@ -554,7 +572,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
