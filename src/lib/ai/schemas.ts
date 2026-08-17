@@ -9,12 +9,12 @@ export const profileContextSchema = z.object({
 });
 
 export const summarySchema = z.object({
-  summary: z.string(), strengths: z.array(z.string()), evidence: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]),
+  summary: z.string(), strengths: z.array(z.string()), evidence: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
 export const screeningSchema = z.object({
-  score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure"]),
+  score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
-export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
+export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const advisorSchema = z.object({
   focus: z.string().default("general"),
   summary: z.string(),
@@ -41,11 +41,11 @@ export const advisorSchema = z.object({
   nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
   modelVersion: z.string(),
-  source: z.enum(["mock", "azure"]),
+  source: z.enum(["mock", "azure", "local"]),
 });
-export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure"]), });
-export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure"]), });
+export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure", "local"]), });
 
 export type ProfileContext = z.infer<typeof profileContextSchema>;

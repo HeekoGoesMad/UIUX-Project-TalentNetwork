@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bell, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
+import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,13 @@ export function SiteHeader() {
          { href: "/candidate/contact-requests", label: "Permintaan kontak" },
          { href: "/messages", label: "Pesan" },
       ]
+    : visibleUser?.role === "partner"
+    ? [
+        { href: "/partner", label: "Dashboard" },
+        { href: "/partner/talent", label: "Campus Talent" },
+        { href: "/partner/employers", label: "Employer Access" },
+        { href: "/partner/analytics", label: "Analytics" },
+      ]
     : [
         { href: "/search", label: "Search talent" },
          { href: "/shortlist", label: "Shortlist" },
@@ -81,16 +88,18 @@ export function SiteHeader() {
             visibleUser
               ? visibleUser.role === "candidate"
                 ? "/candidate"
+                : visibleUser.role === "partner"
+                ? "/partner"
                 : "/dashboard"
               : "/"
           }
           className="flex items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#d7f5e8] to-[#bcebd8] text-[#08744f] shadow-sm transition-transform duration-300 group-hover:rotate-3">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
             <ShieldCheck className="size-5" />
           </span>
-          <span className={cn("text-lg font-bold", isOverDarkHeader ? "text-white" : "text-[#0a1628]")}>
-            Proofy<span className="text-[#19a974]">Link</span>
+          <span className={cn("text-lg font-bold", isOverDarkHeader ? "text-white" : "text-[#111827]")}>
+            Proofy<span className="text-[#7C3AED]">Link</span>
           </span>
         </Link>
 
@@ -106,7 +115,7 @@ export function SiteHeader() {
                   "rounded-full px-4 py-2 transition-colors duration-200",
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                    : "text-muted-foreground hover:bg-[#e3f5ed]/60 hover:text-[#08744f]"
+                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
                 )}
               >
                 {link.label}
@@ -118,9 +127,9 @@ export function SiteHeader() {
                 className={cn(
                   "rounded-full px-4 py-2 transition-colors duration-200",
                   isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-muted font-semibold text-foreground")
+                    ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
+                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
+                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
                 )}
               >
                 {link.label}
@@ -140,12 +149,22 @@ export function SiteHeader() {
             </Button>
           )}
 
+          {visibleUser?.role === "partner" && (
+            <Link
+              href="/partner"
+              className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
+            >
+              <GraduationCap className="size-4 text-[#7C3AED]" />
+              <span className="hidden text-muted-foreground sm:inline text-xs">Career Center</span>
+            </Link>
+          )}
+
           {visibleUser?.role === "recruiter" && (
             <Link
               href="/dashboard"
               className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
-              <WalletCards className="size-4 text-[#19a974]" />
+              <WalletCards className="size-4 text-[#7C3AED]" />
               <span className="font-mono">{devBypass ? "∞" : tokens}</span>
               <span className="hidden text-muted-foreground sm:inline">tokens</span>
             </Link>
@@ -181,7 +200,7 @@ export function SiteHeader() {
                   asChild
                 >
                   <Link href="/register">
-                    <UserPlus className="mr-1.5 size-4 inline text-[#19a974]" />
+                    <UserPlus className="mr-1.5 size-4 inline text-[#7C3AED]" />
                     Daftar akun
                   </Link>
                 </Button>
@@ -192,8 +211,8 @@ export function SiteHeader() {
                   className={cn(
                     "rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9",
                     isOverDarkHeader
-                      ? "bg-[#19a974] text-white hover:bg-[#158f62]"
-                      : "bg-[#0b2342] text-white hover:bg-[#102c52]"
+                      ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
+                      : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
                   )}
                   asChild
                 >
@@ -229,7 +248,7 @@ export function SiteHeader() {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-[#e3f5ed] hover:text-[#08744f]"
+                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-slate-50 hover:text-foreground"
                   onClick={() => setOpen(false)}
                 >
                   {link.label}
@@ -249,7 +268,7 @@ export function SiteHeader() {
               <div className="mt-2 border-t pt-3 flex flex-col gap-2">
                 {pathname !== "/login" && (
                   <Link
-                    className="flex items-center justify-center gap-2 rounded-xl bg-[#0b2342] py-3 text-sm font-semibold text-white shadow-sm"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#7C3AED] py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#6D28D9]"
                     href="/login"
                     onClick={() => setOpen(false)}
                   >
@@ -262,7 +281,7 @@ export function SiteHeader() {
                     href="/register"
                     onClick={() => setOpen(false)}
                   >
-                    <UserPlus className="size-4 text-[#19a974]" /> Daftar akun baru
+                    <UserPlus className="size-4 text-[#7C3AED]" /> Daftar akun baru
                   </Link>
                 )}
               </div>

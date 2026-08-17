@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Download,
   FileUp,
   GraduationCap,
   Plus,
@@ -16,6 +15,7 @@ import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CvProfile } from "@/types";
+import { CvDownload } from "./cv-download";
 
 function blank(email = "", fullName = ""): CvProfile {
  return {
@@ -63,9 +63,9 @@ function Field({
 }
 
 const inputCls =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#19a974]";
+  "h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]";
 const textareaCls =
-  "min-h-24 w-full rounded-md border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#19a974]";
+  "min-h-24 w-full rounded-md border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]";
 
 // ─── Section wrapper ─────────────────────────────────────────────
 function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
@@ -73,7 +73,7 @@ function FormSection({ title, icon, children }: { title: string; icon?: React.Re
     <div className="space-y-4">
       <div className="flex items-center gap-2 border-b pb-2">
         {icon}
-        <h3 className="font-semibold text-[#0b2342]">{title}</h3>
+        <h3 className="font-semibold text-[#111827]">{title}</h3>
       </div>
       {children}
     </div>
@@ -166,36 +166,22 @@ export function CvWorkspace() {
     setMessage("Draft berhasil dibuat. Review semua field sebelum menyimpan.");
   }
 
-  async function exportPdf() {
-    const response = await fetch(`/api/cv/${profile.id}/export`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile),
-    });
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "proofylink-cv.pdf";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div className="space-y-6">
       {/* Import banner */}
-      <Card className="border-[#b9e6d0] bg-[#f7fffb]">
+      <Card className="border-slate-200 bg-slate-50">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 font-semibold">
-              <FileUp className="size-4 text-[#08744f]" />
+            <p className="flex items-center gap-2 font-semibold text-[#111827]">
+              <FileUp className="size-4 text-[#7C3AED]" />
               Import CV PDF
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               PDF only, maksimal 5 MB. Hasil AI adalah saran yang bisa kamu edit.
             </p>
           </div>
-          <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-5 text-sm font-semibold text-white hover:bg-[#6D28D9]">
             <input
               className="sr-only"
               type="file"
@@ -210,7 +196,7 @@ export function CvWorkspace() {
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Review CV &amp; Profile</CardTitle>
+          <CardTitle className="text-[#111827]">Review CV &amp; Profile</CardTitle>
           <p className="text-sm text-muted-foreground">
             Isi semua field agar recruiter mendapatkan gambaran lengkap tentang kamu.
           </p>
@@ -263,7 +249,7 @@ export function CvWorkspace() {
           {/* ── Pengalaman Kerja ── */}
           <FormSection
             title="Pengalaman Kerja"
-            icon={<BriefcaseBusiness className="size-4 text-[#19a974]" />}
+            icon={<BriefcaseBusiness className="size-4 text-[#7C3AED]" />}
           >
             <div className="space-y-4">
               {profile.experience.map((exp, i) => (
@@ -326,7 +312,7 @@ export function CvWorkspace() {
           {/* ── Pendidikan ── */}
           <FormSection
             title="Pendidikan"
-            icon={<GraduationCap className="size-4 text-[#19a974]" />}
+            icon={<GraduationCap className="size-4 text-[#7C3AED]" />}
           >
             <div className="space-y-4">
               {profile.education.map((edu, i) => (
@@ -397,7 +383,7 @@ export function CvWorkspace() {
             {profile.skills.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {profile.skills.map((s) => (
-                  <span key={s} className="rounded-full bg-[#edf3f7] px-3 py-1.5 text-xs font-semibold text-[#31516e]">
+                  <span key={s} className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]">
                     {s}
                   </span>
                 ))}
@@ -428,7 +414,7 @@ export function CvWorkspace() {
                 {profile.tools.map((t) => (
                   <span
                     key={t}
-                    className="rounded-full bg-[#f3f0ff] px-3 py-1.5 text-xs font-semibold text-[#5b38d4]"
+                    className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
                   >
                     🔧 {t}
                   </span>
@@ -440,7 +426,7 @@ export function CvWorkspace() {
           {/* ── Portfolio ── */}
           <FormSection
             title="Portfolio"
-            icon={<ExternalLink className="size-4 text-[#19a974]" />}
+            icon={<ExternalLink className="size-4 text-[#7C3AED]" />}
           >
             <div className="space-y-3">
               {profile.portfolio.map((item, i) => (
@@ -472,13 +458,10 @@ export function CvWorkspace() {
             <Button onClick={() => { void saveCvProfile(profile).then(() => setMessage("Profil berhasil disimpan dan disinkronkan.")); }}>
               <Save className="size-4" /> Simpan Profile
             </Button>
-            <Button variant="outline" onClick={() => void exportPdf()}>
-              <Download className="size-4" /> Preview / Download PDF
-            </Button>
           </div>
 
           {message && (
-            <p className="rounded-lg bg-[#f7fffb] px-4 py-3 text-sm text-[#08744f]" role="status">
+            <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-[#7C3AED]" role="status">
               {message}
             </p>
           )}
@@ -486,9 +469,20 @@ export function CvWorkspace() {
       </Card>
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <ShieldCheck className="size-3.5 text-[#19a974]" />
+        <ShieldCheck className="size-3.5 text-[#7C3AED]" />
         Kamu mengontrol field yang dipublikasikan. Screening recruiter tidak memakai financial atau credit data.
       </p>
+
+      {/* ── Download / Template Picker ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-[#111827]">Preview & Download CV</CardTitle>
+          <p className="text-sm text-muted-foreground">Pilih template dan unduh CV-mu sebagai PDF. Simpan profile terlebih dahulu agar data terbaru digunakan.</p>
+        </CardHeader>
+        <CardContent>
+          <CvDownload profile={profile} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

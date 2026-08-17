@@ -4,6 +4,7 @@ import { createContext, startTransition, useContext, useEffect, useRef, useState
 import { toast } from "sonner";
 import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
@@ -30,6 +31,7 @@ type Context = AppState & {
   markNotificationRead: (id: string) => Promise<boolean>;
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
+  loginAsDemoCandidate: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   scan: (id: string) => boolean;
@@ -298,23 +300,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const login = async (role: UserRole, email: string, password: string): Promise<AuthResult> => {
+  const login = async (role: UserRole, email: string, password?: string): Promise<AuthResult> => {
     if (!supabaseConfigured) {
-      setUser({ role, provisioningStatus: "active", email, name: email.split("@")[0] || "Pengguna demo" });
+      const isDemoCandidate = role === "candidate";
+      const defaultName = isDemoCandidate ? DEMO_CANDIDATE_USER.name : role === "partner" ? "Mitra Kampus / Lembaga" : "Alex Morgan";
+      setUser({ role, provisioningStatus: "active", email: email || (isDemoCandidate ? DEMO_CANDIDATE_USER.email : "demo@proofylink.id"), name: email && email !== DEMO_CANDIDATE_USER.email ? email.split("@")[0] : defaultName });
+      if (isDemoCandidate && (!state.cvProfile || state.cvProfile.fullName === "")) {
+        setState((current) => ({ ...current, cvProfile: DEMO_CANDIDATE_CV, careerStatus: "open-to-work" }));
+      }
       return { role, provisioningStatus: "active" };
     }
     pendingRole.current = role;
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || "" });
     if (error) return { error: error.message };
     const metadataRole = data.user?.user_metadata?.role;
-    const actualRole = metadataRole === "candidate" || metadataRole === "recruiter" ? metadataRole : undefined;
+    const actualRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" ? metadataRole : undefined;
     return { role: actualRole };
+  };
+
+  const loginAsDemoCandidate = () => {
+    setUser(DEMO_CANDIDATE_USER);
+    setState((current) => ({
+      ...current,
+      cvProfile: DEMO_CANDIDATE_CV,
+      careerStatus: "open-to-work",
+    }));
+    toast.success("Masuk sebagai Kandidat Demo (Nadia)", {
+      description: "Profil lengkap dengan riwayat Tokopedia & OVO berhasil dimuat.",
+    });
   };
 
   const register = async (name: string, role: UserRole, email: string, password: string, companyName = ""): Promise<AuthResult> => {
     if (!supabaseConfigured) {
-      const provisioningStatus: ProvisioningStatus = role === "candidate" || devBypass ? "active" : "pending";
+      const provisioningStatus: ProvisioningStatus = role === "candidate" || role === "partner" || devBypass ? "active" : "pending";
       setUser({ role, provisioningStatus, email, name, companyName: companyName || undefined });
       return { role, provisioningStatus };
     }
@@ -435,9 +454,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     uniqueIds.forEach((id) => setState((current) => {
       const now = new Date().toISOString();
-      const existing = current.contactRequests[id];
+      const existing = (current.contactRequests ?? {})[id];
       const request: ContactRequest = existing ?? { candidateId: id, recruiterName: user?.name, company: user?.companyName || "Perusahaan recruiter", email: user?.email, requestedAt: now, history: [] };
-      return { ...current, screeningConsents: { ...current.screeningConsents, [id]: "pending-candidate-consent" }, contactRequests: { ...current.contactRequests, [id]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } } };
+      return { ...current, screeningConsents: { ...current.screeningConsents, [id]: "pending-candidate-consent" }, contactRequests: { ...(current.contactRequests ?? {}), [id]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } } };
     }));
     return true;
   };
@@ -448,11 +467,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setState((current) => {
     const now = new Date().toISOString();
-    const existing = current.contactRequests[candidateId];
+    const existing = (current.contactRequests ?? {})[candidateId];
     const request: ContactRequest = existing ?? {
       candidateId,
       recruiterName: user?.name,
-       company: user?.companyName || "Perusahaan recruiter",
+      company: user?.companyName || "Perusahaan recruiter",
       email: user?.email,
       requestedAt: now,
       history: [],
@@ -460,7 +479,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       ...current,
       screeningConsents: { ...current.screeningConsents, [candidateId]: "pending-candidate-consent" },
-      contactRequests: { ...current.contactRequests, [candidateId]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } },
+      contactRequests: { ...(current.contactRequests ?? {}), [candidateId]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } },
     };
     });
     return true;
@@ -475,11 +494,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setState((current) => {
     const now = new Date().toISOString();
-    const request = current.contactRequests[candidateId];
+    const request = (current.contactRequests ?? {})[candidateId];
     return {
       ...current,
       screeningConsents: { ...current.screeningConsents, [candidateId]: consent },
-      contactRequests: request ? { ...current.contactRequests, [candidateId]: { ...request, history: [...(request.history ?? []), { state: consent, at: now }] } } : current.contactRequests,
+      contactRequests: request ? { ...(current.contactRequests ?? {}), [candidateId]: { ...request, history: [...(request.history ?? []), { state: consent, at: now }] } } : (current.contactRequests ?? {}),
     };
     });
     return true;
@@ -553,7 +572,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

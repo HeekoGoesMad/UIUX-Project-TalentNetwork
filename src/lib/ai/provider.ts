@@ -1,12 +1,19 @@
 import "server-only";
 
 import { createAzure } from "@ai-sdk/azure";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { cvBuilderSchema, cvImportSchema, gapsSchema, advisorSchema, profileContextSchema, questionsSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
 
-const version = "proofylink-screening-v1";
-const source = process.env.AI_PROVIDER === "mock" && process.env.NODE_ENV !== "production" ? "mock" : "azure";
+const defaultVersion = "proofylink-screening-v1";
+
+export function getSource(): "mock" | "local" | "azure" {
+  const provider = process.env.AI_PROVIDER?.trim();
+  if (provider === "mock" && process.env.NODE_ENV !== "production") return "mock";
+  if (provider === "local") return "local";
+  return "azure";
+}
 
 type AiOptions = { strict?: boolean };
 
@@ -15,16 +22,54 @@ function label(score: number) {
 }
 
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
-  if (source === "mock") {
-    return fallback;
+  const currentSource = getSource();
+
+  if (currentSource === "mock") {
+    return {
+      ...(fallback as Record<string, unknown>),
+      source: "mock",
+      modelVersion: defaultVersion,
+    } as z.infer<T>;
   }
 
+  if (currentSource === "local") {
+    const baseURL = process.env.LOCAL_AI_BASE_URL?.trim() ?? "http://localhost:11434/v1";
+    const model = process.env.LOCAL_AI_MODEL?.trim() ?? "llama3.2";
+    const apiKey = process.env.LOCAL_AI_API_KEY?.trim() ?? "ollama";
+    try {
+      const localAi = createOpenAI({ baseURL, apiKey });
+      const result = await generateObject({ model: localAi.chat(model), schema, prompt });
+      return {
+        ...(result.object as Record<string, unknown>),
+        source: "local",
+        modelVersion: model,
+      } as z.infer<T>;
+    } catch (error) {
+      console.error("[AI local] Error:", error);
+      if (options.strict) {
+        throw new Error(
+          `Gagal terhubung ke Local AI server (${model}) di ${baseURL}. Pastikan Ollama atau LM Studio sedang berjalan (misal: 'ollama run ${model}').`
+        );
+      }
+      return {
+        ...(fallback as Record<string, unknown>),
+        source: "mock",
+        modelVersion: `${model} (fallback)`,
+      } as z.infer<T>;
+    }
+  }
+
+  // Azure mode
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT?.trim();
   const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
   if (!endpoint || !deployment || !apiKey || apiKey.startsWith("<")) {
     if (options.strict) throw new Error("Konfigurasi Azure AI belum lengkap.");
-    return fallback;
+    return {
+      ...(fallback as Record<string, unknown>),
+      source: "mock",
+      modelVersion: `${defaultVersion} (azure-unconfigured)`,
+    } as z.infer<T>;
   }
 
   try {
@@ -35,28 +80,57 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
       useDeploymentBasedUrls: true,
     });
     const result = await generateObject({ model: azure.chat(deployment), schema, prompt });
-    return result.object as z.infer<T>;
+    return {
+      ...(result.object as Record<string, unknown>),
+      source: "azure",
+      modelVersion: deployment || defaultVersion,
+    } as z.infer<T>;
   } catch (error) {
     console.error("AI provider error:", error);
     if (options.strict) throw error;
-    return fallback;
+    return {
+      ...(fallback as Record<string, unknown>),
+      source: "mock",
+      modelVersion: `${defaultVersion} (azure-error)`,
+    } as z.infer<T>;
   }
 }
 
 export async function summary(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
-  return aiResult(summarySchema, JSON.stringify(context), { summary: `${context.headline || "Kandidat"} dengan fokus pada hasil kerja yang dapat dibuktikan dan kolaborasi lintas fungsi.`, strengths: context.skills.slice(0, 3), evidence: ["Ringkasan berasal dari profile yang kandidat setujui."], limitations: ["AI tidak memverifikasi klaim dari sumber eksternal."], modelVersion: version, source }, options);
+  const prompt =
+    `Anda adalah asisten AI rekrutmen profesional. Buatkan ringkasan profil kandidat dalam Bahasa Indonesia berdasarkan data berikut:\n` +
+    `- Headline: ${context.headline || "Kandidat Profesional"}\n` +
+    `- Target Role: ${context.targetRole || "Belum ditentukan"}\n` +
+    `- Deskripsi: ${context.about || "Tidak ada deskripsi tentang saya."}\n` +
+    `- Lokasi: ${context.location || "Indonesia"}\n` +
+    `- Skills: ${context.skills.join(", ") || "General skills"}\n\n` +
+    `Tulis ringkasan naratif yang objektif, berorientasi pada pencapaian terukur dan kolaborasi.`;
+
+  return aiResult(
+    summarySchema,
+    prompt,
+    {
+      summary: `${context.headline || "Kandidat"} dengan fokus pada hasil kerja terbukti dan kolaborasi tim.`,
+      strengths: context.skills.length > 0 ? context.skills.slice(0, 3) : ["Pengalaman profesional terbukti", "Komunikasi & kolaborasi tim"],
+      evidence: ["Ringkasan bersumber langsung dari data profil kandidat yang valid."],
+      limitations: ["AI tidak melakukan verifikasi independen ke pihak eksternal."],
+      modelVersion: defaultVersion,
+      source: getSource(),
+    },
+    options,
+  );
 }
 
 export async function screening(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
   const score = Math.min(100, 48 + context.skills.length * 8 + (context.targetRole ? 12 : 0));
-  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Skill dan target role tersedia di profile.", "Penilaian berfokus pada data quality dan role fit."], limitations: ["Bukan keputusan hire/reject.", "Financial, credit, dan atribut sensitif tidak dianalisis."], followUp: "Lakukan interview berbasis bukti dan beri kandidat kesempatan klarifikasi.", modelVersion: version, source }, options);
+  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Skill dan target role tersedia di profile.", "Penilaian berfokus pada data quality dan role fit."], limitations: ["Bukan keputusan hire/reject.", "Financial, credit, dan atribut sensitif tidak dianalisis."], followUp: "Lakukan interview berbasis bukti dan beri kandidat kesempatan klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
 }
 
 export async function interviewQuestions(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(questionsSchema, JSON.stringify(context), { questions: [`Ceritakan proyek paling relevan dengan ${context.targetRole || "role ini"}.`, "Bukti apa yang menunjukkan dampak pekerjaan tersebut?", "Bagaimana kamu berkolaborasi saat requirement berubah?"], limitations: ["Pertanyaan adalah draft dan perlu ditinjau manusia."], modelVersion: version, source });
+  return aiResult(questionsSchema, JSON.stringify(context), { questions: [`Ceritakan proyek paling relevan dengan ${context.targetRole || "role ini"}.`, "Bukti apa yang menunjukkan dampak pekerjaan tersebut?", "Bagaimana kamu berkolaborasi saat requirement berubah?"], limitations: ["Pertanyaan adalah draft dan perlu ditinjau manusia."], modelVersion: defaultVersion, source: getSource() });
 }
 
 export async function careerAdvisor(input: unknown) {
@@ -189,26 +263,26 @@ export async function careerAdvisor(input: unknown) {
       "Rekomendasi berasal dari analisis profil internal dan standar industri ATS.",
       "Hasil AI merupakan panduan review untuk membantu keputusan personalmu.",
     ],
-    modelVersion: version,
-    source,
+    modelVersion: defaultVersion,
+    source: getSource(),
   });
 }
 
 export async function gapAnalysis(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(gapsSchema, JSON.stringify(context), { missing: context.skills.length ? ["Contoh portfolio yang relevan"] : ["Skill inti dan bukti proyek"], unevidenced: context.skills.slice(0, 2), transferable: ["Problem solving", "Kolaborasi"], irrelevant: [], limitations: ["Gap bukan penilaian kelayakan final."], modelVersion: version, source });
+  return aiResult(gapsSchema, JSON.stringify(context), { missing: context.skills.length ? ["Contoh portfolio yang relevan"] : ["Skill inti dan bukti proyek"], unevidenced: context.skills.slice(0, 2), transferable: ["Problem solving", "Kolaborasi"], irrelevant: [], limitations: ["Gap bukan penilaian kelayakan final."], modelVersion: defaultVersion, source: getSource() });
 }
 
 export async function roadmap(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(roadmapSchema, JSON.stringify(context), { phases: [{ title: "Fondasi", outcome: `Memahami ekspektasi ${context.targetRole || "role tujuan"}`, actions: ["Petakan 3 requirement lowongan", "Pilih satu materi belajar"] }, { title: "Bukti kerja", outcome: "Memiliki portfolio yang bisa dibahas", actions: ["Bangun mini project", "Tulis outcome dan batasan"] }, { title: "Percakapan", outcome: "Siap menjelaskan keputusan kerja", actions: ["Latihan interview", "Minta feedback"] }], limitations: ["Roadmap dapat diedit dan disesuaikan kandidat."], modelVersion: version, source });
+  return aiResult(roadmapSchema, JSON.stringify(context), { phases: [{ title: "Fondasi", outcome: `Memahami ekspektasi ${context.targetRole || "role tujuan"}`, actions: ["Petakan 3 requirement lowongan", "Pilih satu materi belajar"] }, { title: "Bukti kerja", outcome: "Memiliki portfolio yang bisa dibahas", actions: ["Bangun mini project", "Tulis outcome dan batasan"] }, { title: "Percakapan", outcome: "Siap menjelaskan keputusan kerja", actions: ["Latihan interview", "Minta feedback"] }], limitations: ["Roadmap dapat diedit dan disesuaikan kandidat."], modelVersion: defaultVersion, source: getSource() });
 }
 
 export async function cvBuilder(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(cvBuilderSchema, JSON.stringify(context), { headline: context.headline || context.targetRole || "Professional", about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.", bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`), limitations: ["Draft harus disetujui kandidat sebelum disimpan."], modelVersion: version, source });
+  return aiResult(cvBuilderSchema, JSON.stringify(context), { headline: context.headline || context.targetRole || "Professional", about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.", bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`), limitations: ["Draft harus disetujui kandidat sebelum disimpan."], modelVersion: defaultVersion, source: getSource() });
 }
 
 export function importCv(fileName: string) {
-  return cvImportSchema.parse({ fullName: "Nadia Putri", headline: "Senior Product Designer", about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.", skills: ["Product design", "User research", "Figma"], experience: [{ company: "Studio Nusantara", role: "Senior Product Designer", dates: "2021 - sekarang", achievements: ["Meningkatkan kejelasan workflow produk."] }], education: [{ school: "Universitas Indonesia", program: "Desain Komunikasi Visual", dates: "2015 - 2019" }], suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`], source: "mock" });
+  return cvImportSchema.parse({ fullName: "Nadia Putri", headline: "Senior Product Designer", about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.", skills: ["Product design", "User research", "Figma"], experience: [{ company: "Studio Nusantara", role: "Senior Product Designer", dates: "2021 - sekarang", achievements: ["Meningkatkan kejelasan workflow produk."] }], education: [{ school: "Universitas Indonesia", program: "Desain Komunikasi Visual", dates: "2015 - 2019" }], suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`], source: getSource() });
 }

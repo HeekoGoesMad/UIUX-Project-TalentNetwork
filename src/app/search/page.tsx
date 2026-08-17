@@ -105,7 +105,7 @@ function FilterPanel({
         {hasActive && (
           <button
             onClick={onReset}
-            className="text-xs text-[#19a974] hover:underline"
+            className="text-xs text-slate-700 hover:underline"
           >
             Reset semua
           </button>
@@ -233,7 +233,7 @@ function CheckRow({
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="size-4 rounded accent-[#19a974]"
+        className="size-4 rounded accent-slate-900"
       />
       <span className="text-sm text-foreground">{label}</span>
     </label>
@@ -322,8 +322,8 @@ export default function SearchPage() {
       {/* ── Header ── */}
       <div className="flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">Talent network</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Find the right signal.</h1>
+          <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Talent network</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#111827]">Find the right signal.</h1>
           <p className="mt-2 text-muted-foreground">
             {filtered.length} kandidat ditemukan.
           </p>
@@ -383,7 +383,7 @@ export default function SearchPage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{activeFilterCount} filter aktif</span>
           <button
-            className="inline-flex items-center gap-1 text-xs text-[#19a974] hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-[#7C3AED] hover:underline"
             onClick={resetFilters}
           >
             Hapus semua <X className="size-3" />

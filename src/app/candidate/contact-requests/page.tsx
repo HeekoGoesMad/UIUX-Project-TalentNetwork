@@ -29,7 +29,7 @@ export default function ContactRequestsPage() {
     state: statusLabels[request.consentState as ConsentState] ? request.consentState as ConsentState : (screeningConsents[String(request.candidateProfileId)] ?? "not-requested"),
     request: { recruiterName: typeof request.recruiterName === "string" ? request.recruiterName : undefined, company: typeof request.organizationName === "string" ? request.organizationName : undefined, email: typeof request.recruiterEmail === "string" ? request.recruiterEmail : undefined, requestedAt: typeof request.createdAt === "string" ? request.createdAt : undefined, history: [] },
   })).filter((request) => request.candidateId && request.state !== "not-requested");
-  const localRequests = Object.entries(screeningConsents).filter(([, state]) => state !== "not-requested").map(([candidateId, state]) => ({ candidateId, state, request: contactRequests[candidateId] }));
+  const localRequests = Object.entries(screeningConsents).filter(([, state]) => state !== "not-requested").map(([candidateId, state]) => ({ candidateId, state, request: contactRequests ? contactRequests[candidateId] : undefined }));
   const requests = dbMode ? remoteRequests : localRequests;
   const requestIds = requests.map(({ candidateId }) => candidateId).join(",");
   const [remoteCandidates, setRemoteCandidates] = useState<Record<string, { role: string | null; location: string | null }>>({});
