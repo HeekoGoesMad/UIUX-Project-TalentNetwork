@@ -18,8 +18,18 @@ export function SiteFooter() {
   const logoHref = visibleUser
     ? visibleUser.role === "candidate"
       ? "/candidate"
-      : "/dashboard"
+      : visibleUser.role === "partner"
+      ? "/partner"
+      : "/recruiter/dashboard"
     : "/";
+
+  const messageHref = visibleUser?.role === "candidate"
+    ? "/candidate/messages"
+    : visibleUser?.role === "recruiter"
+    ? "/recruiter/messages"
+    : "/messages";
+
+  const discoveryHref = visibleUser?.role === "candidate" ? "/candidate/profile" : visibleUser?.role === "recruiter" ? "/recruiter/discover" : "/search";
 
   return (
     <footer className="border-t bg-white">
@@ -33,10 +43,10 @@ export function SiteFooter() {
           </p>
         </div>
         <nav className="flex flex-wrap gap-5 text-sm text-muted-foreground">
-          <Link href="/search">Search talent</Link>
+          <Link href={discoveryHref}>{visibleUser?.role === "candidate" ? "Profile" : "Search talent"}</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/jobs">Jobs</Link>
-          <Link href="/messages">Messages</Link>
+          <Link href={messageHref}>Messages</Link>
         </nav>
       </div>
     </footer>

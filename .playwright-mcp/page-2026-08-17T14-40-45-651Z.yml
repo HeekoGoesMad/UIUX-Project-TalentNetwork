@@ -1,0 +1,105 @@
+- generic [active] [ref=f27e1]:
+  - link "Lewati ke konten utama" [ref=f27e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f27e3]:
+      - link "ProofyLink" [ref=f27e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - navigation [ref=f27e10]:
+        - link "Search talent" [ref=f27e11] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Shortlist" [ref=f27e12] [cursor=pointer]:
+          - /url: /recruiter/shortlists
+        - link "Screening" [ref=f27e13] [cursor=pointer]:
+          - /url: /recruiter/screenings
+        - link "Pesan" [ref=f27e14] [cursor=pointer]:
+          - /url: /recruiter/messages
+        - link "Dashboard" [ref=f27e15] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+      - generic [ref=f27e16]:
+        - link "Search talent" [ref=f27e17] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "∞ tokens" [ref=f27e74] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+          - generic [ref=f27e78]: ∞
+          - generic [ref=f27e79]: tokens
+        - link "1 notifikasi baru" [ref=f27e80] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f27e84]: "1"
+        - button "Log out" [ref=f27e85]
+  - main [ref=f27e27]:
+    - main [ref=f27e28]:
+      - generic [ref=f27e29]:
+        - generic [ref=f27e30]:
+          - paragraph [ref=f27e31]: Peluang terkurasi
+          - heading "Cari pekerjaan yang terasa tepat." [level=1] [ref=f27e35]
+          - paragraph [ref=f27e36]: Temukan peran dari organisasi yang membangun produk berdampak, dengan detail yang jelas sejak awal.
+        - generic [ref=f27e37]:
+          - generic [ref=f27e38]:
+            - generic [ref=f27e42]: Cari job
+            - textbox "Cari job" [ref=f27e43]:
+              - /placeholder: Cari title, company, atau keyword
+          - combobox "Filter work arrangement" [ref=f27e44]:
+            - option "Semua arrangement" [selected]
+            - option "Remote"
+            - option "Hybrid"
+            - option "On-site"
+      - generic [ref=f27e45]:
+        - generic [ref=f27e46]:
+          - paragraph [ref=f27e47]: Job discovery
+          - heading "Lowongan tersedia" [level=2] [ref=f27e48]
+        - generic [ref=f27e49]: 2 lowongan
+      - generic [ref=f27e89]:
+        - generic [ref=f27e90]:
+          - generic [ref=f27e91]:
+            - generic [ref=f27e92]: Published
+            - generic [ref=f27e99]:
+              - heading "Product Designer" [level=3] [ref=f27e100]
+              - paragraph [ref=f27e101]: Nusantara Labs
+          - generic [ref=f27e102]:
+            - paragraph [ref=f27e103]: Rancang pengalaman produk end-to-end bersama product dan engineering team untuk pengguna di Indonesia.
+            - generic [ref=f27e104]:
+              - generic [ref=f27e105]: Full-time
+              - generic [ref=f27e106]: Hybrid
+              - generic [ref=f27e107]: Jakarta Selatan
+            - generic [ref=f27e111]:
+              - generic [ref=f27e112]: Product Design
+              - generic [ref=f27e113]: Figma
+              - generic [ref=f27e114]: UX Research
+            - paragraph [ref=f27e115]: Application flow akan tersedia pada slice berikutnya.
+        - generic [ref=f27e116]:
+          - generic [ref=f27e117]:
+            - generic [ref=f27e118]: Published
+            - generic [ref=f27e125]:
+              - heading "Frontend Engineer" [level=3] [ref=f27e126]
+              - paragraph [ref=f27e127]: Karya Digital
+          - generic [ref=f27e128]:
+            - paragraph [ref=f27e129]: Bangun interface yang cepat dan accessible untuk platform karier generasi berikutnya.
+            - generic [ref=f27e130]:
+              - generic [ref=f27e131]: Contract
+              - generic [ref=f27e132]: Remote
+              - generic [ref=f27e133]: Indonesia
+            - generic [ref=f27e137]:
+              - generic [ref=f27e138]: React
+              - generic [ref=f27e139]: TypeScript
+              - generic [ref=f27e140]: Next.js
+            - paragraph [ref=f27e141]: Application flow akan tersedia pada slice berikutnya.
+      - paragraph [ref=f27e51]: "Mode demo: data lowongan di atas adalah fixture lokal dan tidak membuat application palsu."
+  - contentinfo [ref=f27e52]:
+    - generic [ref=f27e53]:
+      - generic [ref=f27e54]:
+        - link "ProofyLink" [ref=f27e55] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f27e59]: Verified talent. Trusted connections.
+      - navigation [ref=f27e60]:
+        - link "Search talent" [ref=f27e61] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f27e62] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f27e63] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f27e64] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f27e70] [cursor=pointer]
+  - alert [ref=f27e142]

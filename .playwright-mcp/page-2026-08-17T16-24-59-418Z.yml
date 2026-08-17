@@ -1,0 +1,30 @@
+- generic [active] [ref=f64e1]:
+  - link "Lewati ke konten utama" [ref=f64e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f64e3]:
+      - link "ProofyLink" [ref=f64e4] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f64e10]:
+        - link "Masuk" [ref=f64e12] [cursor=pointer]:
+          - /url: /login
+        - button "Open menu" [ref=f64e17]
+  - main [ref=f64e19]:
+    - status [ref=f64e20]: Menyiapkan notifikasi...
+  - contentinfo [ref=f64e21]:
+    - generic [ref=f64e22]:
+      - generic [ref=f64e23]:
+        - link "ProofyLink" [ref=f64e24] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=f64e28]: Verified talent. Trusted connections.
+      - navigation [ref=f64e29]:
+        - link "Search talent" [ref=f64e30] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f64e31] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f64e32] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f64e33] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f64e39] [cursor=pointer]

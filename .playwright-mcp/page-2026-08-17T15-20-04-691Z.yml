@@ -1,0 +1,44 @@
+- generic [active] [ref=f41e1]:
+  - link "Lewati ke konten utama" [ref=f41e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f41e3]:
+      - link "ProofyLink" [ref=f41e4] [cursor=pointer]:
+        - /url: /candidate
+      - generic [ref=f41e10]:
+        - link "1 notifikasi baru" [ref=f41e11] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f41e15]: "1"
+        - button "Log out" [ref=f41e16]
+        - button "Open menu" [ref=f41e20]
+  - main [ref=f41e22]:
+    - main [ref=f41e59]:
+      - link "Kembali" [ref=f41e60] [cursor=pointer]:
+        - /url: /candidate/assessments
+      - paragraph [ref=f41e63]: Candidate / assessment
+      - heading "Product thinking check-in" [level=1] [ref=f41e64]
+      - paragraph [ref=f41e65]: "Sumber penilaian: jawaban Anda. Status saat ini: pending human/AI review."
+      - generic [ref=f41e66]: Jawaban hanya dapat dilihat reviewer berwenang. Tidak ada AI scoring otomatis.
+      - generic [ref=f41e72]:
+        - generic [ref=f41e77]:
+          - heading "Siap untuk mulai?" [level=2] [ref=f41e78]
+          - paragraph [ref=f41e79]: Waktu sekitar 20 menit.
+        - button "Mulai assessment" [ref=f41e80]
+  - contentinfo [ref=f41e36]:
+    - generic [ref=f41e37]:
+      - generic [ref=f41e38]:
+        - link "ProofyLink" [ref=f41e39] [cursor=pointer]:
+          - /url: /candidate
+        - paragraph [ref=f41e43]: Verified talent. Trusted connections.
+      - navigation [ref=f41e44]:
+        - link "Profile" [ref=f41e45] [cursor=pointer]:
+          - /url: /candidate/profile
+        - link "Pricing" [ref=f41e46] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f41e47] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f41e48] [cursor=pointer]:
+          - /url: /candidate/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f41e54] [cursor=pointer]
+  - alert [ref=f41e58]: Invitation tidak ditemukan

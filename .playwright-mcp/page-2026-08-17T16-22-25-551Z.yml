@@ -1,0 +1,58 @@
+- generic [active] [ref=f61e1]:
+  - link "Lewati ke konten utama" [ref=f61e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f61e3]:
+      - link "ProofyLink" [ref=f61e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f61e10]:
+        - link "∞" [ref=f61e43] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f61e48] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f61e52]: "1"
+        - button "Log out" [ref=f61e53]
+        - button "Open menu" [ref=f61e17]
+  - main [ref=f61e19]:
+    - main [ref=f61e57]:
+      - generic [ref=f61e58]:
+        - generic [ref=f61e59]:
+          - generic [ref=f61e60]:
+            - paragraph [ref=f61e61]: Pusat informasi
+            - heading "Notifikasi" [level=1] [ref=f61e62]
+            - paragraph [ref=f61e63]: Pantau pembaruan consent, pesan, dan aktivitas penting di workspace Anda.
+          - button "Tandai semua dibaca" [ref=f61e64]
+        - generic [ref=f61e68]:
+          - heading "1 belum dibaca" [level=3] [ref=f61e70]
+          - generic [ref=f61e74]:
+            - article [ref=f61e75]:
+              - generic [ref=f61e79]:
+                - generic [ref=f61e80]:
+                  - heading "Selamat datang di ProofyLink" [level=2] [ref=f61e81]
+                  - time [ref=f61e82]: 14 Agu 2026
+                - paragraph [ref=f61e83]: Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.
+                - button "Tandai sudah dibaca" [ref=f61e84]
+            - article [ref=f61e85]:
+              - generic [ref=f61e89]:
+                - generic [ref=f61e90]:
+                  - heading "Pesan baru tersedia" [level=2] [ref=f61e91]
+                  - time [ref=f61e92]: 13 Agu 2026
+                - paragraph [ref=f61e93]: Anda memiliki percakapan demo yang siap ditinjau.
+  - contentinfo [ref=f61e21]:
+    - generic [ref=f61e22]:
+      - generic [ref=f61e23]:
+        - link "ProofyLink" [ref=f61e24] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f61e28]: Verified talent. Trusted connections.
+      - navigation [ref=f61e29]:
+        - link "Search talent" [ref=f61e30] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f61e31] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f61e32] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f61e33] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f61e39] [cursor=pointer]
+  - alert [ref=f61e94]

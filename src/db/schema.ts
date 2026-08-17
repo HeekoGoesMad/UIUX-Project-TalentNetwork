@@ -37,6 +37,40 @@ export const notificationType = pgEnum("notification_type", ["consent_requested"
 export const conversationStatus = pgEnum("conversation_status", ["active", "read_only", "blocked"]);
 export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected"]);
 export const tokenLedgerEntryType = pgEnum("token_ledger_entry_type", ["grant", "charge", "refund"]);
+export const jobStatus = pgEnum("job_status", ["draft", "published", "closed", "archived"]);
+export const employmentType = pgEnum("employment_type", ["full_time", "part_time", "contract", "internship", "temporary"]);
+export const workArrangement = pgEnum("work_arrangement", ["onsite", "hybrid", "remote"]);
+export const jobRequirementType = pgEnum("job_requirement_type", ["required", "preferred"]);
+export const applicationStatus = pgEnum("application_status", [
+  "new",
+  "shortlisted",
+  "consent_requested",
+  "consent_approved",
+  "screening",
+  "assessment",
+  "review",
+  "interview",
+  "offer",
+  "hired",
+  "rejected",
+  "withdrawn",
+]);
+export const applicationSource = pgEnum("application_source", ["candidate", "recruiter_invitation"]);
+export const assessmentQuestionType = pgEnum("assessment_question_type", [
+  "multiple_choice",
+  "free_text",
+  "situational",
+  "structured_response",
+]);
+export const assessmentInvitationStatus = pgEnum("assessment_invitation_status", [
+  "pending",
+  "started",
+  "submitted",
+  "expired",
+  "revoked",
+]);
+export const assessmentAttemptStatus = pgEnum("assessment_attempt_status", ["in_progress", "submitted", "expired", "abandoned"]);
+export const assessmentReviewStatus = pgEnum("assessment_review_status", ["pending", "in_review", "completed", "disputed"]);
 
 export const users = pgTable("users", {
   id: id(),
@@ -284,6 +318,165 @@ export const tokenLedgerEntries = pgTable("token_ledger_entries", {
   index("token_ledger_entries_account_created_idx").on(table.tokenAccountId, table.createdAt),
 ]);
 
+export const jobs = pgTable("jobs", {
+  id: id(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  status: jobStatus("status").notNull().default("draft"),
+  employmentType: employmentType("employment_type").notNull(),
+  workArrangement: workArrangement("work_arrangement").notNull(),
+  location: text("location"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index("jobs_organization_status_idx").on(table.organizationId, table.status),
+  index("jobs_created_by_idx").on(table.createdBy),
+]);
+
+export const jobRequirements = pgTable("job_requirements", {
+  id: id(),
+  jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  type: jobRequirementType("type").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  minimumExperienceMonths: integer("minimum_experience_months"),
+  createdAt: createdAt(),
+}, (table) => [
+  check("job_requirements_minimum_experience_check", sql`${table.minimumExperienceMonths} is null or ${table.minimumExperienceMonths} >= 0`),
+  index("job_requirements_job_idx").on(table.jobId),
+  index("job_requirements_job_type_idx").on(table.jobId, table.type),
+]);
+
+export const applications = pgTable("applications", {
+  id: id(),
+  jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  candidateProfileId: uuid("candidate_profile_id").notNull().references(() => candidateProfiles.id, { onDelete: "restrict" }),
+  status: applicationStatus("status").notNull().default("new"),
+  source: applicationSource("source").notNull().default("candidate"),
+  coverNote: text("cover_note"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  unique("applications_job_candidate_unique").on(table.jobId, table.candidateProfileId),
+  index("applications_job_status_idx").on(table.jobId, table.status),
+  index("applications_candidate_status_idx").on(table.candidateProfileId, table.status),
+]);
+
+export const applicationStageHistory = pgTable("application_stage_history", {
+  id: id(),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  fromStatus: applicationStatus("from_status"),
+  toStatus: applicationStatus("to_status").notNull(),
+  changedBy: uuid("changed_by").notNull().references(() => users.id),
+  reason: text("reason"),
+  createdAt: createdAt(),
+}, (table) => [
+  index("application_stage_history_application_created_idx").on(table.applicationId, table.createdAt),
+  index("application_stage_history_changed_by_idx").on(table.changedBy),
+]);
+
+export const assessmentTemplates = pgTable("assessment_templates", {
+  id: id(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  timeLimitMinutes: integer("time_limit_minutes"),
+  attemptLimit: integer("attempt_limit").notNull().default(1),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  check("assessment_templates_time_limit_check", sql`${table.timeLimitMinutes} is null or ${table.timeLimitMinutes} > 0`),
+  check("assessment_templates_attempt_limit_check", sql`${table.attemptLimit} > 0`),
+  index("assessment_templates_organization_idx").on(table.organizationId),
+  index("assessment_templates_created_by_idx").on(table.createdBy),
+]);
+
+export const assessmentQuestions = pgTable("assessment_questions", {
+  id: id(),
+  assessmentTemplateId: uuid("assessment_template_id").notNull().references(() => assessmentTemplates.id, { onDelete: "cascade" }),
+  type: assessmentQuestionType("type").notNull(),
+  prompt: text("prompt").notNull(),
+  options: jsonb("options").$type<unknown[]>().notNull().default([]),
+  responseSchema: jsonb("response_schema").$type<Record<string, unknown>>().notNull().default({}),
+  isRequired: boolean("is_required").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: createdAt(),
+}, (table) => [
+  index("assessment_questions_template_idx").on(table.assessmentTemplateId),
+  unique("assessment_questions_template_order_unique").on(table.assessmentTemplateId, table.sortOrder),
+]);
+
+export const assessmentInvitations = pgTable("assessment_invitations", {
+  id: id(),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  assessmentTemplateId: uuid("assessment_template_id").notNull().references(() => assessmentTemplates.id, { onDelete: "restrict" }),
+  candidateProfileId: uuid("candidate_profile_id").notNull().references(() => candidateProfiles.id, { onDelete: "restrict" }),
+  invitedBy: uuid("invited_by").notNull().references(() => users.id),
+  status: assessmentInvitationStatus("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index("assessment_invitations_application_idx").on(table.applicationId),
+  index("assessment_invitations_candidate_status_idx").on(table.candidateProfileId, table.status),
+  index("assessment_invitations_template_idx").on(table.assessmentTemplateId),
+  index("assessment_invitations_invited_by_idx").on(table.invitedBy),
+]);
+
+export const assessmentAttempts = pgTable("assessment_attempts", {
+  id: id(),
+  invitationId: uuid("invitation_id").notNull().references(() => assessmentInvitations.id, { onDelete: "cascade" }),
+  attemptNumber: integer("attempt_number").notNull(),
+  status: assessmentAttemptStatus("status").notNull().default("in_progress"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  check("assessment_attempts_attempt_number_check", sql`${table.attemptNumber} > 0`),
+  unique("assessment_attempts_invitation_number_unique").on(table.invitationId, table.attemptNumber),
+  index("assessment_attempts_invitation_status_idx").on(table.invitationId, table.status),
+]);
+
+export const assessmentAnswers = pgTable("assessment_answers", {
+  id: id(),
+  attemptId: uuid("attempt_id").notNull().references(() => assessmentAttempts.id, { onDelete: "cascade" }),
+  questionId: uuid("question_id").notNull().references(() => assessmentQuestions.id, { onDelete: "restrict" }),
+  response: jsonb("response").$type<unknown>().notNull().default(null),
+  savedAt: timestamp("saved_at", { withTimezone: true }).defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+}, (table) => [
+  unique("assessment_answers_attempt_question_unique").on(table.attemptId, table.questionId),
+  index("assessment_answers_attempt_idx").on(table.attemptId),
+  index("assessment_answers_question_idx").on(table.questionId),
+]);
+
+export const assessmentReviews = pgTable("assessment_reviews", {
+  id: id(),
+  attemptId: uuid("attempt_id").notNull().unique().references(() => assessmentAttempts.id, { onDelete: "cascade" }),
+  reviewerId: uuid("reviewer_id").notNull().references(() => users.id),
+  status: assessmentReviewStatus("status").notNull().default("pending"),
+  score: integer("score"),
+  dimensionScores: jsonb("dimension_scores").$type<Record<string, unknown>>().notNull().default({}),
+  notes: text("notes"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  check("assessment_reviews_score_check", sql`${table.score} is null or ${table.score} between 0 and 100`),
+  index("assessment_reviews_attempt_idx").on(table.attemptId),
+  index("assessment_reviews_reviewer_idx").on(table.reviewerId),
+  index("assessment_reviews_status_idx").on(table.status),
+]);
+
 export const schema = {
   users,
   profiles,
@@ -304,4 +497,14 @@ export const schema = {
   messages,
   tokenAccounts,
   tokenLedgerEntries,
+  jobs,
+  jobRequirements,
+  applications,
+  applicationStageHistory,
+  assessmentTemplates,
+  assessmentQuestions,
+  assessmentInvitations,
+  assessmentAttempts,
+  assessmentAnswers,
+  assessmentReviews,
 };

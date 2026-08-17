@@ -1,0 +1,68 @@
+- generic [active] [ref=f30e1]:
+  - link "Lewati ke konten utama" [ref=f30e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f30e3]:
+      - link "ProofyLink" [ref=f30e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f30e10]:
+        - link "Search talent" [ref=f30e141] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Shortlist" [ref=f30e142] [cursor=pointer]:
+          - /url: /recruiter/shortlists
+        - link "Screening" [ref=f30e143] [cursor=pointer]:
+          - /url: /recruiter/screenings
+        - link "Pesan" [ref=f30e144] [cursor=pointer]:
+          - /url: /recruiter/messages
+        - link "Dashboard" [ref=f30e145] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+      - generic [ref=f30e15]:
+        - link "Search talent" [ref=f30e146] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Masuk" [ref=f30e235] [cursor=pointer]:
+          - /url: /login
+  - main [ref=f30e21]:
+    - generic [ref=f30e167]:
+      - complementary [ref=f30e168]:
+        - generic [ref=f30e169]:
+          - link "ProofyLink" [ref=f30e170] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f30e176]:
+            - generic [ref=f30e177]: Verified Talent Intelligence
+            - heading "Bangun koneksi dari sinyal yang tepat." [level=2] [ref=f30e181]
+            - paragraph [ref=f30e182]: Sistem rekrutmen berbasis sinyal terverifikasi. Privasi kandidat terjaga by default, tanpa spam inbox, dan akses efisien berbasis token.
+          - generic [ref=f30e183]:
+            - generic [ref=f30e184]: 30+ Profil Talent Terverifikasi Siap Diskusi
+            - generic [ref=f30e189]: Consent-first & Garansi 100% Bebas Spam
+            - generic [ref=f30e195]: Model Token Transparan Tanpa Biaya Tersembunyi
+            - generic [ref=f30e201]: Dukungan Kemitraan Kampus, Lembaga & Individual
+        - generic [ref=f30e207]:
+          - generic [ref=f30e208]: ProofyLink Talent Network © 2026
+          - generic [ref=f30e209]: v1.0 Demo
+      - main [ref=f30e210]:
+        - generic [ref=f30e211]:
+          - generic [ref=f30e212]:
+            - text: Akun sedang ditinjau
+            - heading "Provisioning recruiter belum selesai." [level=1] [ref=f30e213]
+          - generic [ref=f30e214]:
+            - paragraph [ref=f30e219]: Terima kasih sudah mendaftar. Tim kami sedang menyiapkan akses organisasi untuk akun recruiter ini. Fitur recruiter akan tersedia setelah status akun menjadi aktif.
+            - link "Kembali ke beranda" [ref=f30e220] [cursor=pointer]:
+              - /url: /
+  - contentinfo [ref=f30e221]:
+    - generic [ref=f30e222]:
+      - generic [ref=f30e223]:
+        - link "ProofyLink" [ref=f30e224] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=f30e228]: Verified talent. Trusted connections.
+      - navigation [ref=f30e229]:
+        - link "Search talent" [ref=f30e230] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f30e231] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f30e232] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f30e233] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f30e136] [cursor=pointer]
+  - alert [ref=f30e140]

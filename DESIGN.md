@@ -8,9 +8,12 @@ This document defines the visual design system for the project. All new componen
 
 - **Framework:** Next.js (App Router) + React + TypeScript
 - **Styling:** Tailwind CSS v4 (CSS-first config via `@theme inline` in `globals.css` — no `tailwind.config.ts`)
-- **Components:** shadcn/ui (new-york style, neutral base)
+- **Components:** Local lightweight shadcn-inspired primitives in `src/components/ui/`, using Radix Dialog, Dropdown Menu, and Slot where needed
 - **Icons:** Lucide React
 - **Fonts:** Plus Jakarta Sans + JetBrains Mono (mono) via `next/font/google`
+- **Backend:** Supabase SSR/Auth, PostgreSQL, and Drizzle ORM
+- **AI:** Vercel AI SDK with mock, local OpenAI-compatible, and Azure provider adapters
+- **Feedback:** Sonner toasts
 - **Theme:** Light mode first; semantic tokens remain structured for future dark mode
 - **Utilities:** `cn()` from `@/lib/utils` (clsx + tailwind-merge)
 
@@ -18,27 +21,28 @@ This document defines the visual design system for the project. All new componen
 
 ## Colors
 
-All values use the **oklch** color space. Colors are defined as CSS custom properties in `globals.css` and bridged to Tailwind via `@theme inline`.
+Active application tokens are defined as hexadecimal CSS custom properties in `src/app/globals.css` and bridged to Tailwind via `@theme inline`. Chart and sidebar values below are reference values only unless they are added to the active CSS token set.
 
 ### ProofyLink Palette
 
-The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink accent (`#EC4899`), clean light grayscale neutrals (`#F9FAFB` → `#111827`), and semantic status colors (`#10B981`, `#F59E0B`, `#EF4444`).
+The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink accent (`#EC4899`), clean light grayscale neutrals (`#F9FAFB` → `#111827`), dark navy surfaces, and semantic status colors (`#10B981`, `#F59E0B`, `#EF4444`).
 
 | Scale | Value | Usage |
 | --- | --- | --- |
-| `primary-purple` | `#7C3AED` | Ungu Primer - Main CTA buttons, active tabs, bullet points, active links |
-| `pink-primary` | `#EC4899` | Pink Primer - Brand secondary accent, gradient highlights |
-| `logo-gradient` | `#7C3AED` → `#EC4899` | Shield logo icon gradient (purple to pink) |
-| `dark-navy` | `#201C45` | CTA banner background (footer section) |
-| `page-bg` | `#F9FAFB` | Main page background (Grayscale 50) |
-| `card-surface` | `#FFFFFF` | Card backgrounds and content containers |
-| `border-hairline` | `#E5E7EB` | Hairline borders and dividers (Grayscale 200) |
-| `heading-text` | `#111827` | Page headings and primary text (Grayscale 900) |
-| `body-text` | `#4B5563` | Paragraphs, descriptions, secondary copy (Grayscale 600) |
-| `danger-red` | `#EF4444` | Merah Kesalahan - Error states, critical warnings, "Risiko Tinggi" badge |
-| `amber-warning` | `#F59E0B` | Kuning Peringatan - Warning states, "Sensitif", "Perlu Klarifikasi" badges |
-| `success-green` | `#10B981` | Hijau Sukses - Success states, verified badges, "Low" risk indicators |
-| `info-blue-tint` | `#EFF6FF` | Financial profile & info highlight background |
+| `primary` | `#7C3AED` | Main CTA buttons, active tabs, bullet points, active links |
+| `pink-primary` | `#EC4899` | Brand secondary accent and gradient highlights |
+| `dark-navy` | `#201C45` | Dark sections, CTA banner, and grid background |
+| `background` | `#F9FAFB` | Main page background |
+| `card` | `#FFFFFF` | Card backgrounds and content containers |
+| `border` | `#E5E7EB` | Hairline borders and dividers |
+| `foreground` | `#111827` | Page headings and primary text |
+| `muted-foreground` | `#6B7280` | Paragraphs, descriptions, and secondary copy |
+| `destructive` | `#EF4444` | Error states and critical warnings |
+| `warning` | `#F59E0B` | Warning and review-needed states |
+| `success` | `#10B981` | Success and verification states |
+| `accent` | `#F1F5F9` | Hover backgrounds and subtle highlights |
+
+The descriptive names `primary-purple`, `page-bg`, `card-surface`, `heading-text`, `body-text`, `danger-red`, `amber-warning`, `success-green`, and `info-blue-tint` are not CSS custom properties. Use the active semantic tokens instead.
 
 ### Semantic Tokens
 
@@ -48,12 +52,12 @@ The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink acc
 | `foreground`           | `#111827`                    | Primary text                  |
 | `primary`              | `#7C3AED`                    | Buttons, links, accents       |
 | `primary-foreground`   | `#FFFFFF`                    | Text on primary               |
-| `secondary`            | `#F3E8FF`                    | Secondary buttons, subtle bg  |
-| `secondary-foreground` | `#7C3AED`                    | Text on secondary             |
+| `secondary`            | `#F1F5F9`                    | Secondary buttons, subtle bg  |
+| `secondary-foreground` | `#374151`                    | Text on secondary             |
 | `muted`                | `#F3F4F6`                    | Subdued backgrounds           |
-| `muted-foreground`     | `#4B5563`                    | Subdued text, placeholders    |
-| `accent`               | `#F3E8FF`                    | Hover backgrounds, highlights |
-| `accent-foreground`    | `#7C3AED`                    | Text on accent                |
+| `muted-foreground`     | `#6B7280`                    | Subdued text, placeholders    |
+| `accent`               | `#F1F5F9`                    | Hover backgrounds, highlights |
+| `accent-foreground`    | `#111827`                    | Text on accent                |
 | `destructive`          | `#EF4444`                    | Error states, delete actions  |
 | `card`                 | `#FFFFFF`                    | Card backgrounds              |
 | `card-foreground`      | `#111827`                    | Card text                     |
@@ -63,7 +67,9 @@ The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink acc
 | `input`                | `#E5E7EB`                    | Input borders                 |
 | `ring`                 | `#7C3AED`                    | Focus rings                   |
 
-### Chart Colors
+### Reference Chart Colors
+
+These values are reference values for future chart work. They are not currently exposed as custom properties in `globals.css`.
 
 | Token       | Light                         | Dark                           |
 | ----------- | ----------------------------- | ------------------------------ |
@@ -73,7 +79,9 @@ The ProofyLink interface uses a vibrant primary purple CTA (`#7C3AED`), pink acc
 | `chart-4` | `oklch(0.828 0.189 84.429)` | `oklch(0.627 0.265 303.9)`   |
 | `chart-5` | `oklch(0.769 0.188 70.08)`  | `oklch(0.645 0.246 16.439)`  |
 
-### Sidebar Colors
+### Reference Sidebar Colors
+
+These values are reference values for a future sidebar token set. They are not currently exposed as custom properties in `globals.css`.
 
 | Token                          | Light                          | Dark                           |
 | ------------------------------ | ------------------------------ | ------------------------------ |
@@ -239,20 +247,11 @@ No custom shadow definitions — all Tailwind defaults.
 
 | Name         | Effect                                | Duration | Easing   |
 | ------------ | ------------------------------------- | -------- | -------- |
-| `fade-in`  | Opacity 0 → 1                        | 0.3s     | ease-out |
 | `fade-up`  | Opacity 0 → 1 + translateY(8px → 0) | 0.4s     | ease-out |
-| `scale-in` | Opacity 0 → 1 + scale(0.97 → 1)     | 0.2s     | ease-out |
+| `pulse-glow` | Opacity and scale pulse              | 6s       | ease-in-out |
+| `marquee-left` / `marquee-right` | Horizontal continuous movement | 35s | linear |
 
-Use via: `animate-fade-in`, `animate-fade-up`, `animate-scale-in`
-
-### tw-animate-css Animations
-
-Used on dialogs and dropdowns:
-
-- `animate-in` / `animate-out`
-- `fade-in-0` / `fade-out-0`
-- `zoom-in-95` / `zoom-out-95`
-- `slide-in-from-{top|bottom|left|right}-2`
+Use via: `animate-fade-up`, `animate-pulse-glow`, `animate-marquee-left`, and `animate-marquee-right`.
 
 ### Transition Classes
 
@@ -274,15 +273,7 @@ Used on dialogs and dropdowns:
 }
 ```
 
-```css
-.auth-bg {
-  background-image: radial-gradient(
-    circle at 50% 0%,
-    var(--accent) 0%,
-    transparent 50%
-  );
-}
-```
+The active global utilities include `.navy-grid`, `.liquid-glass-dark-top`, `.liquid-glass-top`, `.liquid-glass-scrolled`, and the marquee/pulse-glow animation classes. There is no `.auth-bg` utility.
 
 ---
 
@@ -304,8 +295,10 @@ Used on dialogs and dropdowns:
 **Auth pages:**
 
 ```
-flex min-h-[calc(100vh-4rem)] items-center justify-center p-4
-  → Card w-full max-w-md
+min-h-[calc(100vh-4.5rem)] flex items-center justify-center px-4 py-4 sm:py-6
+  → w-full max-w-6xl
+    → rounded-3xl border bg-white shadow-2xl
+      → desktop split trust panel and form panel
 ```
 
 **Standard content pages:**
@@ -362,13 +355,13 @@ Standard Tailwind breakpoints:
 
 ---
 
-## Components (shadcn/ui)
+## Components (shadcn-inspired local UI)
 
 All components live in `src/components/ui/`. They use `data-slot` attributes, accept `className` for overrides via `cn()`, and follow either `React.forwardRef` or functional component patterns.
 
 ### Button
 
-6 variants, 4 sizes (CVA-based):
+5 variants, 4 sizes:
 
 | Variant         | Usage                 |
 | --------------- | --------------------- |
@@ -377,13 +370,12 @@ All components live in `src/components/ui/`. They use `data-slot` attributes, ac
 | `outline`     | Tertiary actions      |
 | `ghost`       | Subtle/icon actions   |
 | `destructive` | Delete/danger actions |
-| `link`        | Inline text links     |
 
 | Size        | Height | Padding |
 | ----------- | ------ | ------- |
 | `sm`      | h-8    | px-3    |
 | `default` | h-9    | px-4    |
-| `lg`      | h-10   | px-6    |
+| `lg`      | h-11   | px-6    |
 | `icon`    | size-9 | —      |
 
 ### Card
@@ -408,7 +400,7 @@ Base: `rounded-full border px-2.5 py-0.5 text-xs font-semibold`
 
 ### Dialog
 
-Radix-based with overlay (`bg-black/50`), fade + zoom animations, optional close button.
+Radix-based with overlay (`bg-black/40`) and an always-present close control.
 
 ### DropdownMenu
 
@@ -456,9 +448,13 @@ hover:shadow-md hover:-translate-y-0.5
 - Label generated copy as `AI draft` and always show `Source`, `Model version`, `Data coverage`, and `Limitations` near the result.
 - CV import is `PDF only`; extraction is a suggestion. Every imported field must remain editable before `Simpan profile`.
 - Use a single-column, high-contrast ATS preview for export. Show a preview action before download and include generated date and CV version.
+- Candidate CV import remains PDF-only, with editable AI-draft fields before saving. CV templates support preview and PDF download.
+- Candidate AI tools include Career Advisor focus modes, career gaps, career roadmap, and CV Builder. Generated content must remain editable and disclose its source and limitations.
+- Candidate workspace includes career status, profile editing, contact-request review, notifications, and consent responses.
+- Recruiter workflows include candidate discovery, masked profile previews, shortlist notes, consent requests, one-token screening, and screening exclusions.
 - Screening is a consent-first flow: show the candidate, purpose, state, and one-token cost before the action. Consent states use plain Indonesian copy and are never implied by profile visibility.
 - Screening insight may discuss data quality and role fit only. Never display salary, financial, credit, protected-attribute, or automated hire/reject conclusions.
-- Use navy for structure, emerald for consent/trust/success, amber for review-needed states, and red only for blocking errors. Do not communicate meaning through color alone.
+- Use purple for primary actions, navy for structure, emerald for consent/trust/success, amber for review-needed states, and red only for blocking errors. Do not communicate meaning through color alone.
 - Minimum contrast is WCAG AA: 4.5:1 for normal text and 3:1 for large text or UI boundaries. Focus rings remain visible on every interactive control.
 
 ---
@@ -487,18 +483,23 @@ The following checks were run against the Next.js development server using Playw
 
 ### Verified flows
 
-- Public landing page renders with ProofyLink navy grid, emerald CTA, responsive network preview, and footer navigation.
-- Recruiter login reaches `/dashboard` and persists the demo session across navigation.
-- Candidate login reaches `/profile` and exposes Profile, Jobs, and Messages navigation.
+- Public landing page renders with ProofyLink navy grid, purple primary CTA, responsive network preview, and footer navigation.
+- Recruiter login reaches the recruiter workspace and persists the demo session across navigation.
+- Candidate login reaches `/candidate` and exposes CV/Profile, Career Advisor, Career Roadmap, Contact Requests, and Messages navigation.
 - Role-protected routes wait for LocalStorage hydration before redirecting.
-- Search renders 30 candidates, URL-backed filters, mobile filter dialog, sort controls, grid/list controls, and numbered pagination.
+- Search renders 30 candidates, React-managed filters, mobile filter dialog, sort controls, grid/list controls, and numbered pagination.
 - Candidate profile scan confirmation opens correctly.
 - First profile scan deducts exactly one token and reveals contact details.
 - Repeat visits do not deduct another token.
 - Shortlist toggling persists to LocalStorage.
 - Private shortlist notes save on blur.
-- Jobs and Messages render polished placeholder states without console errors.
-- No console errors were observed during the final smoke pass.
+- Candidate CV import/edit/save/export flow is available in the development demo.
+- Career Advisor, career gaps, and career roadmap routes expose AI disclosure metadata.
+- Candidate consent requests and recruiter screening initiation are available in the development flow.
+- Notification route exposes notification read-state UI.
+- Recruiter pending-approval and partner workspace routes render their current UI states.
+- Jobs and Messages currently render placeholder states until backend services are implemented.
+- Playwright checks must record the exact route set and any known 404 or console issue; do not claim a clean smoke pass without an explicit run.
 
 ### Accessibility and interaction requirements
 
@@ -514,6 +515,8 @@ The following checks were run against the Next.js development server using Playw
 
 ### Remaining test boundaries
 
-- Authentication, token purchases, jobs, and messaging are demo-only and require backend integration tests when services are added.
+- Supabase-backed authentication, token ledger operations, consent/screening APIs, shortlist persistence, notifications, CV import/export APIs, and AI endpoints require integration coverage.
+- Development localStorage/demo mode must be tested separately from database mode; it must never be treated as production authorization.
+- Jobs and Messages remain placeholder routes until backend functionality is added.
 - CSV export should be manually verified in a browser download context when release packaging is tested.
 - Visual regression screenshots should be added once the final production data and copy are available.

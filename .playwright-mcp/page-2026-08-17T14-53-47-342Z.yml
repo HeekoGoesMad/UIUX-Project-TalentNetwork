@@ -1,0 +1,63 @@
+- generic [active] [ref=f33e1]:
+  - link "Lewati ke konten utama" [ref=f33e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f33e3]:
+      - link "ProofyLink" [ref=f33e4] [cursor=pointer]:
+        - /url: /candidate
+      - navigation [ref=f33e10]:
+        - link "Workspace" [ref=f33e74] [cursor=pointer]:
+          - /url: /candidate
+        - link "CV & Profile" [ref=f33e75] [cursor=pointer]:
+          - /url: /candidate/cv
+        - link "Career Advisor" [ref=f33e76] [cursor=pointer]:
+          - /url: /candidate/career-advisor
+        - link "Permintaan kontak" [ref=f33e77] [cursor=pointer]:
+          - /url: /candidate/contact-requests
+        - link "Pesan" [ref=f33e78] [cursor=pointer]:
+          - /url: /candidate/messages
+      - generic [ref=f33e16]:
+        - link "Explore jobs" [ref=f33e79] [cursor=pointer]:
+          - /url: /jobs
+        - link "1 notifikasi baru" [ref=f33e80] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f33e84]: "1"
+        - button "Log out" [ref=f33e85]
+  - main [ref=f33e27]:
+    - main [ref=f33e221]:
+      - link "Kembali ke aplikasi" [ref=f33e222] [cursor=pointer]:
+        - /url: /candidate/applications
+      - generic [ref=f33e225]:
+        - generic [ref=f33e226]:
+          - paragraph [ref=f33e227]: Application detail
+          - heading "Product Designer" [level=1] [ref=f33e228]
+          - paragraph [ref=f33e229]: Nusantara Labs
+        - generic [ref=f33e230]: New
+      - generic [ref=f33e231]:
+        - heading "Perjalanan aplikasi" [level=3] [ref=f33e233]
+        - generic [ref=f33e241]:
+          - paragraph [ref=f33e242]: New
+          - paragraph [ref=f33e243]: 17 Agu 2026, 22.53
+          - paragraph [ref=f33e244]: Lamaran dikirim kandidat.
+      - generic [ref=f33e245]:
+        - heading "Cover note" [level=3] [ref=f33e247]
+        - paragraph [ref=f33e249]: Saya berpengalaman merancang produk digital dan tertarik membantu tim membangun pengalaman yang berdampak.
+      - button "Tarik lamaran" [ref=f33e250]
+  - contentinfo [ref=f33e52]:
+    - generic [ref=f33e53]:
+      - generic [ref=f33e54]:
+        - link "ProofyLink" [ref=f33e55] [cursor=pointer]:
+          - /url: /candidate
+        - paragraph [ref=f33e59]: Verified talent. Trusted connections.
+      - navigation [ref=f33e60]:
+        - link "Profile" [ref=f33e144] [cursor=pointer]:
+          - /url: /candidate/profile
+        - link "Pricing" [ref=f33e62] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f33e63] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f33e64] [cursor=pointer]:
+          - /url: /candidate/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f33e70] [cursor=pointer]
+  - alert [ref=f33e145]

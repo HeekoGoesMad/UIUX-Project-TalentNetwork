@@ -1,0 +1,68 @@
+- generic [active] [ref=f53e1]:
+  - link "Lewati ke konten utama" [ref=f53e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f53e3]:
+      - link "ProofyLink" [ref=f53e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f53e10]:
+        - link "∞" [ref=f53e207] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f53e212] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f53e216]: "1"
+        - button "Log out" [ref=f53e217]
+        - button "Open menu" [ref=f53e17]
+  - main [ref=f53e19]:
+    - generic [ref=f53e221]:
+      - generic [ref=f53e222]:
+        - generic [ref=f53e223]:
+          - paragraph [ref=f53e224]: Recruiter workspace
+          - heading "Selamat datang kembali, recruiter." [level=1] [ref=f53e228]
+          - paragraph [ref=f53e229]: Pick up the thread with the right talent.
+        - link "Search talent" [ref=f53e230] [cursor=pointer]:
+          - /url: /search
+      - generic [ref=f53e234]:
+        - generic [ref=f53e236]:
+          - paragraph [ref=f53e237]: Token balance
+          - paragraph [ref=f53e238]: "25"
+          - link "Get more tokens" [ref=f53e242] [cursor=pointer]:
+            - /url: /pricing
+        - generic [ref=f53e246]:
+          - paragraph [ref=f53e247]: Profiles unlocked
+          - paragraph [ref=f53e248]: "0"
+        - generic [ref=f53e250]:
+          - paragraph [ref=f53e251]: Shortlisted
+          - paragraph [ref=f53e252]: "0"
+      - generic [ref=f53e253]:
+        - generic [ref=f53e254]:
+          - heading "Continue where you left off" [level=3] [ref=f53e256]
+          - generic [ref=f53e258]:
+            - paragraph [ref=f53e259]: Your workspace is ready.
+            - paragraph [ref=f53e260]: Search the network to find candidates, then come back here to continue.
+            - link "Start searching" [ref=f53e261] [cursor=pointer]:
+              - /url: /search
+        - generic [ref=f53e262]:
+          - heading "Recent scans" [level=3] [ref=f53e264]
+          - paragraph [ref=f53e266]: No scans yet. A preview is free; scan only when you need the full context.
+      - generic [ref=f53e268]:
+        - heading "Recent shortlist" [level=3] [ref=f53e270]
+        - paragraph [ref=f53e272]: Nothing shortlisted yet. Save a promising preview or unlocked profile to build your working set.
+  - contentinfo [ref=f53e273]:
+    - generic [ref=f53e274]:
+      - generic [ref=f53e275]:
+        - link "ProofyLink" [ref=f53e276] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f53e280]: Verified talent. Trusted connections.
+      - navigation [ref=f53e281]:
+        - link "Search talent" [ref=f53e282] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f53e283] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f53e284] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f53e285] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f53e41] [cursor=pointer]
+  - alert [ref=f53e127]

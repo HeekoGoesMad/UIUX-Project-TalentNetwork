@@ -44,11 +44,11 @@ export function SiteHeader() {
       ]
     : visibleUser?.role === "candidate"
     ? [
-        { href: "/candidate", label: "Workspace" },
+        { href: "/candidate", label: "Dashboard" },
         { href: "/candidate/cv", label: "CV & Profile" },
-         { href: "/candidate/career-advisor", label: "Career Advisor" },
-         { href: "/candidate/contact-requests", label: "Permintaan kontak" },
-         { href: "/messages", label: "Pesan" },
+        { href: "/candidate/career-advisor", label: "AI Tools" },
+        { href: "/candidate/applications", label: "Lamaran" },
+        { href: "/candidate/messages", label: "Pesan" },
       ]
     : visibleUser?.role === "partner"
     ? [
@@ -58,12 +58,26 @@ export function SiteHeader() {
         { href: "/partner/analytics", label: "Analytics" },
       ]
     : [
-        { href: "/search", label: "Search talent" },
-         { href: "/shortlist", label: "Shortlist" },
-         { href: "/recruiter/screenings/new", label: "Screening" },
-         { href: "/messages", label: "Pesan" },
-         { href: "/dashboard", label: "Dashboard" },
+        { href: "/recruiter/discover", label: "Search talent" },
+        { href: "/recruiter/shortlists", label: "Shortlist" },
+        { href: "/recruiter/screenings", label: "Screening" },
+        { href: "/recruiter/messages", label: "Pesan" },
+        { href: "/recruiter/dashboard", label: "Dashboard" },
       ];
+
+  const isLinkActive = (href: string) => {
+    if (pathname === href) return true;
+    if (href === "/candidate/career-advisor" && (pathname.startsWith("/candidate/career-") || pathname.startsWith("/candidate/assessments"))) {
+      return true;
+    }
+    if (href === "/candidate/applications" && pathname.startsWith("/candidate/applications")) {
+      return true;
+    }
+    if (href === "/candidate/cv" && (pathname === "/candidate/cv" || pathname === "/candidate/profile")) {
+      return true;
+    }
+    return false;
+  };
 
   return (
     <header
@@ -90,7 +104,7 @@ export function SiteHeader() {
                 ? "/candidate"
                 : visibleUser.role === "partner"
                 ? "/partner"
-                : "/dashboard"
+                : "/recruiter/dashboard"
               : "/"
           }
           className="flex items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
@@ -107,6 +121,7 @@ export function SiteHeader() {
         <nav className="hidden items-center gap-1 text-sm font-medium md:flex">
           {links.map((link) => {
             const isAnchor = link.href.startsWith("#") || link.href.includes("#");
+            const active = !isAnchor && isLinkActive(link.href);
             return isAnchor ? (
               <a
                 key={link.href}
@@ -129,7 +144,7 @@ export function SiteHeader() {
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
+                  active && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
                 )}
               >
                 {link.label}
@@ -142,9 +157,9 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           {!isPublicHeader && (
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex" asChild>
-              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"}>
+              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/recruiter/discover"}>
                 <Search className="size-4" />
-                {visibleUser?.role === "candidate" ? "Explore jobs" : "Search talent"}
+                {visibleUser?.role === "candidate" ? "Cari lowongan" : "Search talent"}
               </Link>
             </Button>
           )}
@@ -161,7 +176,7 @@ export function SiteHeader() {
 
           {visibleUser?.role === "recruiter" && (
             <Link
-              href="/dashboard"
+              href="/recruiter/dashboard"
               className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
               <WalletCards className="size-4 text-[#7C3AED]" />
@@ -244,6 +259,7 @@ export function SiteHeader() {
           <div className="flex flex-col gap-1">
             {links.map((link) => {
               const isAnchor = link.href.startsWith("#") || link.href.includes("#");
+              const active = !isAnchor && isLinkActive(link.href);
               return isAnchor ? (
                 <a
                   key={link.href}
@@ -257,7 +273,10 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                  className={cn(
+                    "rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                    active ? "bg-slate-900 text-white font-semibold" : "text-foreground hover:bg-muted"
+                  )}
                   onClick={() => setOpen(false)}
                 >
                   {link.label}

@@ -1,0 +1,86 @@
+- generic [active] [ref=f51e1]:
+  - link "Lewati ke konten utama" [ref=f51e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f51e3]:
+      - link "ProofyLink" [ref=f51e4] [cursor=pointer]:
+        - /url: /candidate
+      - navigation [ref=f51e241]:
+        - link "Workspace" [ref=f51e242] [cursor=pointer]:
+          - /url: /candidate
+        - link "CV & Profile" [ref=f51e243] [cursor=pointer]:
+          - /url: /candidate/cv
+        - link "Career Advisor" [ref=f51e244] [cursor=pointer]:
+          - /url: /candidate/career-advisor
+        - link "Permintaan kontak" [ref=f51e245] [cursor=pointer]:
+          - /url: /candidate/contact-requests
+        - link "Pesan" [ref=f51e246] [cursor=pointer]:
+          - /url: /candidate/messages
+      - generic [ref=f51e10]:
+        - link "Explore jobs" [ref=f51e247] [cursor=pointer]:
+          - /url: /jobs
+        - link "1 notifikasi baru" [ref=f51e251] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f51e255]: "1"
+        - button "Log out" [ref=f51e256]
+  - main [ref=f51e19]:
+    - main [ref=f51e260]:
+      - paragraph [ref=f51e261]: Candidate workspace
+      - heading "Mulai dari cerita kariermu." [level=1] [ref=f51e262]
+      - paragraph [ref=f51e263]: Buat profile yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
+      - link [ref=f51e265] [cursor=pointer]:
+        - /url: /candidate/profile
+        - generic [ref=f51e267]:
+          - generic [ref=f51e272]:
+            - paragraph [ref=f51e273]: Lihat Profil Kamu
+            - paragraph [ref=f51e274]: Review tampilan profil seperti yang dilihat recruiter
+          - generic [ref=f51e275]: Buka
+      - generic [ref=f51e278]:
+        - link [ref=f51e279] [cursor=pointer]:
+          - /url: /candidate/cv
+          - generic [ref=f51e281]:
+            - heading "CV & Profile" [level=2] [ref=f51e285]
+            - paragraph [ref=f51e286]: Import PDF dan review profile
+            - generic [ref=f51e287]: Buka
+        - link [ref=f51e290] [cursor=pointer]:
+          - /url: /candidate/career-advisor
+          - generic [ref=f51e292]:
+            - heading "Career Advisor" [level=2] [ref=f51e296]
+            - paragraph [ref=f51e297]: Saran berbasis profile
+            - generic [ref=f51e298]: Buka
+        - link [ref=f51e301] [cursor=pointer]:
+          - /url: /candidate/career-roadmap
+          - generic [ref=f51e303]:
+            - heading "Career Roadmap" [level=2] [ref=f51e306]
+            - paragraph [ref=f51e307]: Langkah yang bisa kamu edit
+            - generic [ref=f51e308]: Buka
+        - link [ref=f51e311] [cursor=pointer]:
+          - /url: /candidate/contact-requests
+          - generic [ref=f51e313]:
+            - heading "Contact requests" [level=2] [ref=f51e316]
+            - paragraph [ref=f51e317]: Kelola percakapan recruiter
+            - generic [ref=f51e318]: Buka
+        - link [ref=f51e321] [cursor=pointer]:
+          - /url: /candidate/applications
+          - generic [ref=f51e323]:
+            - heading "Applications" [level=2] [ref=f51e327]
+            - paragraph [ref=f51e328]: Pantau status lamaran kerja
+            - generic [ref=f51e329]: Buka
+  - contentinfo [ref=f51e332]:
+    - generic [ref=f51e333]:
+      - generic [ref=f51e334]:
+        - link "ProofyLink" [ref=f51e335] [cursor=pointer]:
+          - /url: /candidate
+        - paragraph [ref=f51e339]: Verified talent. Trusted connections.
+      - navigation [ref=f51e340]:
+        - link "Profile" [ref=f51e341] [cursor=pointer]:
+          - /url: /candidate/profile
+        - link "Pricing" [ref=f51e342] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f51e343] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f51e344] [cursor=pointer]:
+          - /url: /candidate/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f51e41] [cursor=pointer]
+  - alert [ref=f51e148]: Mulai dari cerita kariermu.

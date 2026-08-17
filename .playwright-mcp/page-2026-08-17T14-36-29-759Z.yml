@@ -1,0 +1,78 @@
+- generic [active] [ref=f22e1]:
+  - link "Lewati ke konten utama" [ref=f22e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f22e3]:
+      - link "ProofyLink" [ref=f22e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f22e10]:
+        - link "∞" [ref=f22e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f22e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f22e54]: "1"
+        - button "Log out" [ref=f22e55]
+        - button "Open menu" [ref=f22e17]
+  - main [ref=f22e19]:
+    - main [ref=f22e155]:
+      - link "Kembali ke jobs" [ref=f22e156] [cursor=pointer]:
+        - /url: /recruiter/jobs
+      - heading "Create job" [level=1] [ref=f22e159]
+      - paragraph [ref=f22e160]: Tulis detail yang membantu kandidat memahami peran ini.
+      - generic [ref=f22e163]:
+        - generic [ref=f22e164]:
+          - text: Title *
+          - textbox "Title *" [ref=f22e165]:
+            - /placeholder: "Contoh: Senior Product Designer"
+        - generic [ref=f22e166]:
+          - text: Description *
+          - textbox "Description *" [ref=f22e167]:
+            - /placeholder: Jelaskan misi, tanggung jawab, dan konteks tim.
+        - generic [ref=f22e168]:
+          - generic [ref=f22e169]:
+            - text: Employment type
+            - combobox "Employment type" [ref=f22e170]:
+              - option "Full-time" [selected]
+              - option "Part-time"
+              - option "Contract"
+              - option "Internship"
+              - option "Temporary"
+          - generic [ref=f22e171]:
+            - text: Work arrangement
+            - combobox "Work arrangement" [ref=f22e172]:
+              - option "On-site"
+              - option "Hybrid" [selected]
+              - option "Remote"
+        - generic [ref=f22e173]:
+          - text: Location
+          - textbox "Location" [ref=f22e174]:
+            - /placeholder: "Contoh: Jakarta Selatan atau Indonesia"
+        - generic [ref=f22e175]:
+          - text: Required skills
+          - generic [ref=f22e176]: (Pisahkan dengan koma)
+          - textbox "Required skills(Pisahkan dengan koma)" [ref=f22e177]:
+            - /placeholder: Figma, UX Research, Product Design
+        - generic [ref=f22e178]:
+          - text: Preferred skills
+          - generic [ref=f22e179]: (Pisahkan dengan koma)
+          - textbox "Preferred skills(Pisahkan dengan koma)" [ref=f22e180]:
+            - /placeholder: Design Systems, Accessibility
+        - button "Save as draft" [ref=f22e181]
+  - contentinfo [ref=f22e23]:
+    - generic [ref=f22e24]:
+      - generic [ref=f22e25]:
+        - link "ProofyLink" [ref=f22e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f22e30]: Verified talent. Trusted connections.
+      - navigation [ref=f22e31]:
+        - link "Search talent" [ref=f22e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f22e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f22e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f22e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f22e41] [cursor=pointer]
+  - alert [ref=f22e154]: Create job

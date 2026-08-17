@@ -1,3 +1,13 @@
 import { NextResponse } from "next/server";
 import { careerAdvisor } from "@/lib/ai/provider";
-export async function POST(request: Request) { try { return NextResponse.json(await careerAdvisor(await request.json())); } catch { return NextResponse.json({ error: "Profile context tidak valid." }, { status: 400 }); } }
+import { accessResponse, isApiAccess, requireApiAccess, withAccessMode } from "@/lib/api/access";
+
+export async function POST(request: Request) {
+  const access = await requireApiAccess("candidate");
+  if (!isApiAccess(access)) return accessResponse(access);
+  try {
+    return withAccessMode(NextResponse.json(await careerAdvisor(await request.json())), access);
+  } catch {
+    return NextResponse.json({ error: "Profile context tidak valid." }, { status: 400 });
+  }
+}

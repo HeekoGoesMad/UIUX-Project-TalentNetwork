@@ -1,0 +1,42 @@
+- generic [active] [ref=f10e1]:
+  - link "Lewati ke konten utama" [ref=f10e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f10e3]:
+      - link "ProofyLink" [ref=f10e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f10e10]:
+        - link "Search talent" [ref=f10e11] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Shortlist" [ref=f10e12] [cursor=pointer]:
+          - /url: /recruiter/shortlists
+        - link "Screening" [ref=f10e13] [cursor=pointer]:
+          - /url: /recruiter/screenings/new
+        - link "Pesan" [ref=f10e14] [cursor=pointer]:
+          - /url: /recruiter/messages
+        - link "Dashboard" [ref=f10e15] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+      - generic [ref=f10e16]:
+        - link "Search talent" [ref=f10e17] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Masuk" [ref=f10e22] [cursor=pointer]:
+          - /url: /login
+  - main [ref=f10e27]:
+    - paragraph [ref=f10e30]: Menyiapkan workspace...
+  - contentinfo [ref=f10e31]:
+    - generic [ref=f10e32]:
+      - generic [ref=f10e33]:
+        - link "ProofyLink" [ref=f10e34] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=f10e38]: Verified talent. Trusted connections.
+      - navigation [ref=f10e39]:
+        - link "Search talent" [ref=f10e40] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f10e41] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f10e42] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f10e43] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f10e49] [cursor=pointer]
