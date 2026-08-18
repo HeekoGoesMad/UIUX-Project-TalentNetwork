@@ -14,7 +14,7 @@ import {
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { CvProfile } from "@/types";
+import { PARTNER_CAMPUSES, type CvProfile } from "@/types";
 import { CvDownload } from "./cv-download";
 
 function blank(email = "", fullName = ""): CvProfile {
@@ -311,51 +311,95 @@ export function CvWorkspace() {
 
           {/* ── Pendidikan ── */}
           <FormSection
-            title="Pendidikan"
+            title="Pendidikan & Kampus"
             icon={<GraduationCap className="size-4 text-[#7C3AED]" />}
           >
             <div className="space-y-4">
-              {profile.education.map((edu, i) => (
-                <div key={i} className="relative rounded-xl border bg-slate-50/60 p-4">
-                  <button
-                    type="button"
-                    onClick={() => removeEdu(i)}
-                    className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus pendidikan"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  <div className="grid gap-3 md:grid-cols-3 pr-6">
-                    <label className="flex flex-col gap-1 text-sm font-medium md:col-span-1">
-                      Universitas / Institusi
-                      <input
-                        className={inputCls}
-                        value={edu.school}
-                        onChange={(e) => updateEdu(i, "school", e.target.value)}
-                        placeholder="Universitas Indonesia"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Jurusan / Program Studi
-                      <input
-                        className={inputCls}
-                        value={edu.program}
-                        onChange={(e) => updateEdu(i, "program", e.target.value)}
-                        placeholder="Teknik Informatika"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Tahun
-                      <input
-                        className={inputCls}
-                        value={edu.dates}
-                        onChange={(e) => updateEdu(i, "dates", e.target.value)}
-                        placeholder="2018 — 2022"
-                      />
-                    </label>
-                  </div>
+              {/* Partner suggestions chips */}
+              <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs">
+                <p className="font-semibold text-[#7C3AED] mb-1.5 flex items-center gap-1.5">
+                  <GraduationCap className="size-3.5" /> Kampus Mitra Djoin:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PARTNER_CAMPUSES.map((campus) => (
+                    <button
+                      key={campus}
+                      type="button"
+                      onClick={() => {
+                        if (profile.education.length === 0) {
+                          setProfile((c) => ({ ...c, education: [{ school: campus, program: "", dates: "" }] }));
+                        } else {
+                          updateEdu(0, "school", campus);
+                        }
+                      }}
+                      className="rounded-lg border border-purple-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-purple-100/60 transition-colors"
+                    >
+                      + {campus}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {profile.education.map((edu, i) => {
+                const partnerMatch = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
+                const isVerified = profile.campusVerification?.institution === partnerMatch && profile.campusVerification?.status === "verified";
+
+                return (
+                  <div key={i} className="relative rounded-xl border bg-slate-50/60 p-4">
+                    <button
+                      type="button"
+                      onClick={() => removeEdu(i)}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
+                      aria-label="Hapus pendidikan"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                    <div className="grid gap-3 md:grid-cols-3 pr-6">
+                      <label className="flex flex-col gap-1 text-sm font-medium md:col-span-1">
+                        Universitas / Institusi
+                        <input
+                          className={inputCls}
+                          value={edu.school}
+                          onChange={(e) => updateEdu(i, "school", e.target.value)}
+                          placeholder="Universitas Indonesia"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Jurusan / Program Studi
+                        <input
+                          className={inputCls}
+                          value={edu.program}
+                          onChange={(e) => updateEdu(i, "program", e.target.value)}
+                          placeholder="Teknik Informatika"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Tahun
+                        <input
+                          className={inputCls}
+                          value={edu.dates}
+                          onChange={(e) => updateEdu(i, "dates", e.target.value)}
+                          placeholder="2018 — 2022"
+                        />
+                      </label>
+                    </div>
+
+                    {partnerMatch && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-700 font-medium">
+                          <GraduationCap className="size-3.5 text-[#7C3AED]" /> Terhubung ke <strong>{partnerMatch} Career Center</strong>
+                        </span>
+                        <span className={isVerified
+                          ? "inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 font-semibold text-emerald-800"
+                          : "inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-800"
+                        }>
+                          {isVerified ? "✓ Terverifikasi Resmi Kampus" : "⏳ Menunggu Verifikasi Career Center"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <Button type="button" variant="outline" size="sm" onClick={addEdu}>
                 <Plus className="size-4" /> Tambah Pendidikan
               </Button>

@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { getDb, schema } from "@/db";
 import { candidateProfileSyncSchema } from "@/lib/profile/schema";
 import { createClient } from "@/lib/supabase/server";
+import { writeAuditLog } from "@/lib/audit";
 
 function validationResponse(error: ZodError) {
   return NextResponse.json({
@@ -84,6 +85,8 @@ export async function POST(request: Request) {
         },
       }).returning({ id: schema.profiles.id });
 
+      const [previousCandidateProfile] = await tx.select({ id: schema.candidateProfiles.id, isPublished: schema.candidateProfiles.isPublished })
+        .from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, user.id)).limit(1);
       const [candidateProfile] = await tx.insert(schema.candidateProfiles).values({
         userId: user.id,
         headline: parsed.data.headline ?? null,
@@ -104,6 +107,17 @@ export async function POST(request: Request) {
           updatedAt: now,
         },
       }).returning({ id: schema.candidateProfiles.id });
+
+      if (previousCandidateProfile && previousCandidateProfile.isPublished !== (parsed.data.isPublished ?? false)) {
+          await writeAuditLog({
+            db: tx,
+            actorUserId: user.id,
+            action: parsed.data.isPublished ? "candidate.profile.published" : "candidate.profile.unpublished",
+            entityType: "candidate_profile",
+            entityId: candidateProfile.id,
+            metadata: { completeness: parsed.data.completeness ?? 0 },
+          });
+      }
 
       for (const section of parsed.data.sections ?? []) {
         await tx.insert(schema.candidateProfileSections).values({

@@ -22,7 +22,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-import { CAREER_STATUS_CONFIG, type CareerStatus, type CvProfile } from "@/types";
+import { CAREER_STATUS_CONFIG, PARTNER_CAMPUSES, type CareerStatus, type CvProfile } from "@/types";
 
 type HistoryItem = CvProfile["experience"][number];
 type EducationItem = CvProfile["education"][number];
@@ -190,7 +190,78 @@ function Intro({ title, text, children }: { title: string; text: string; childre
 function LocationStep({ form, setValue }: { form: FormState; setValue: <K extends keyof FormState>(key: K, value: FormState[K]) => void }) { return <Intro title="Di mana kamu ingin bekerja?" text="Lokasi membantu recruiter menemukan kecocokan yang realistis."><div className="space-y-5"><Field label="Domisili saat ini"><input required className={inputClass} value={form.location} onChange={(event) => setValue("location", event.target.value)} placeholder="Jakarta Selatan" /></Field><Field label="Peran yang dituju" hint="Satu peran utama membantu profilmu tampil lebih fokus."><input required className={inputClass} value={form.targetRole} onChange={(event) => setValue("targetRole", event.target.value)} placeholder="Product Designer" /></Field><Card className="border-[#bcebd8] bg-[#f0fdf9] p-5"><div className="flex gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-[#08744f]" /><div><p className="text-sm font-semibold text-[#0f2040]">Privasi tetap di tanganmu</p><p className="mt-1 text-xs leading-5 text-[#416579]">Lokasi yang kamu masukkan tampil sebagai area umum, bukan alamat lengkap.</p></div></div></Card></div></Intro>; }
 
 function HistoryStep({ items, update, add, remove }: { items: HistoryItem[]; update: (index: number, key: keyof HistoryItem, value: string) => void; add: () => void; remove: (index: number) => void }) { return <Intro title="Pengalaman yang membentukmu." text="Tambahkan pekerjaan yang paling relevan. Tidak harus sempurna, kamu bisa mengeditnya nanti."><div className="space-y-4">{items.map((item, index) => <Card key={index} className="p-5"><div className="mb-4 flex items-center justify-between"><span className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Pengalaman {index + 1}</span>{items.length > 1 && <button type="button" onClick={() => remove(index)} className="text-xs font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}</div><div className="grid gap-4 sm:grid-cols-2"><Field label="Perusahaan"><input className={inputClass} value={item.company} onChange={(event) => update(index, "company", event.target.value)} placeholder="Nama perusahaan" /></Field><Field label="Jabatan"><input className={inputClass} value={item.role} onChange={(event) => update(index, "role", event.target.value)} placeholder="Product Designer" /></Field></div><Field label="Periode"><input className={`${inputClass} mt-4`} value={item.dates} onChange={(event) => update(index, "dates", event.target.value)} placeholder="2022 - sekarang" /></Field><Field label="Pencapaian utama" hint="Satu hasil yang paling ingin kamu tunjukkan"><textarea className={`${textareaClass} mt-4 min-h-20`} value={item.achievements[0] ?? ""} onChange={(event) => update(index, "achievements", event.target.value)} placeholder="Contoh: Meningkatkan aktivasi pengguna sebesar 20%" /></Field></Card>)}<Button type="button" variant="outline" onClick={add}><Plus className="size-4" />Tambah pengalaman</Button></div></Intro>; }
-function EducationStep({ items, update, add, remove }: { items: EducationItem[]; update: (index: number, key: keyof EducationItem, value: string) => void; add: () => void; remove: (index: number) => void }) { return <Intro title="Latar belajarmu." text="Pendidikan formal, bootcamp, atau program belajar yang ingin kamu tampilkan."><div className="space-y-4">{items.map((item, index) => <Card key={index} className="p-5"><div className="mb-4 flex items-center justify-between"><span className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Pendidikan {index + 1}</span>{items.length > 1 && <button type="button" onClick={() => remove(index)} className="text-xs font-semibold text-muted-foreground hover:text-destructive">Hapus</button>}</div><div className="space-y-4"><Field label="Institusi"><input className={inputClass} value={item.school} onChange={(event) => update(index, "school", event.target.value)} placeholder="Universitas atau program" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Program studi"><input className={inputClass} value={item.program} onChange={(event) => update(index, "program", event.target.value)} placeholder="Desain Komunikasi Visual" /></Field><Field label="Periode"><input className={inputClass} value={item.dates} onChange={(event) => update(index, "dates", event.target.value)} placeholder="2018 - 2022" /></Field></div></div></Card>)}<Button type="button" variant="outline" onClick={add}><Plus className="size-4" />Tambah pendidikan</Button></div></Intro>; }
+function EducationStep({ items, update, add, remove }: { items: EducationItem[]; update: (index: number, key: keyof EducationItem, value: string) => void; add: () => void; remove: (index: number) => void }) {
+  return (
+    <Intro title="Latar belajarmu." text="Pendidikan formal atau kampus. Kampus mitra kami akan memverifikasi profilmu secara resmi!">
+      <div className="space-y-4">
+        {/* Partner campus quick suggestions */}
+        <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3.5 text-xs">
+          <p className="font-semibold text-[#7C3AED] mb-1.5 flex items-center gap-1.5">
+            <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi Djoin untuk Verifikasi Otomatis:
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {PARTNER_CAMPUSES.map((campus) => (
+              <button
+                key={campus}
+                type="button"
+                onClick={() => {
+                  if (items.length === 0) {
+                    add();
+                    setTimeout(() => update(0, "school", campus), 0);
+                  } else {
+                    update(0, "school", campus);
+                  }
+                }}
+                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-purple-100/70 transition-colors"
+              >
+                + {campus}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {items.map((item, index) => {
+          const partnerMatch = PARTNER_CAMPUSES.find((c) => item.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(item.school.toLowerCase()));
+
+          return (
+            <Card key={index} className="p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Pendidikan {index + 1}</span>
+                {items.length > 1 && (
+                  <button type="button" onClick={() => remove(index)} className="text-xs font-semibold text-muted-foreground hover:text-destructive">
+                    Hapus
+                  </button>
+                )}
+              </div>
+              <div className="space-y-4">
+                <Field label="Institusi / Universitas">
+                  <input className={inputClass} value={item.school} onChange={(event) => update(index, "school", event.target.value)} placeholder="Contoh: Universitas Indonesia" />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Program studi">
+                    <input className={inputClass} value={item.program} onChange={(event) => update(index, "program", event.target.value)} placeholder="Teknik Informatika" />
+                  </Field>
+                  <Field label="Periode">
+                    <input className={inputClass} value={item.dates} onChange={(event) => update(index, "dates", event.target.value)} placeholder="2020 - 2024" />
+                  </Field>
+                </div>
+                {partnerMatch && (
+                  <div className="flex items-center gap-2 rounded-lg bg-purple-50 p-2.5 text-xs text-[#7C3AED] font-medium border border-purple-100">
+                    <GraduationCap className="size-4 shrink-0" />
+                    <span>Terhubung ke Career Center <strong>{partnerMatch}</strong>. Profilmu akan masuk ke queue verifikasi kampus!</span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+        <Button type="button" variant="outline" onClick={add}>
+          <Plus className="size-4" />Tambah pendidikan
+        </Button>
+      </div>
+    </Intro>
+  );
+}
 
 function TagsStep({ form, tagInput, setTagInput, addTag, removeTag }: { form: FormState; tagInput: { skills: string; tools: string }; setTagInput: React.Dispatch<React.SetStateAction<{ skills: string; tools: string }>>; addTag: (kind: "skills" | "tools") => void; removeTag: (kind: "skills" | "tools", tag: string) => void }) { const group = (kind: "skills" | "tools", label: string, placeholder: string) => <Field label={label} hint="Tekan Enter untuk menambahkan"><div className="rounded-lg border bg-white p-2 focus-within:border-[#19a974] focus-within:ring-[3px] focus-within:ring-[#19a974]/20"><div className="flex flex-wrap gap-2">{form[kind].map((tag) => <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-[#e3f5ed] px-2.5 py-1 text-xs font-semibold text-[#08744f]">{tag}<button type="button" aria-label={`Hapus ${tag}`} onClick={() => removeTag(kind, tag)}><X className="size-3" /></button></span>)}<input className="h-7 min-w-[140px] flex-1 border-0 px-1 text-sm outline-none" value={tagInput[kind]} onChange={(event) => setTagInput((current) => ({ ...current, [kind]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addTag(kind); } }} placeholder={placeholder} /></div></div></Field>; return <Intro title="Apa yang kamu kuasai?" text="Pilih kata-kata yang membantu recruiter memahami kekuatanmu."><div className="space-y-6">{group("skills", "Skills", "Contoh: User Research")}{group("tools", "Tools", "Contoh: Figma")}</div></Intro>; }
 function ArrangementStep({ value, onChange }: { value: CvProfile["workArrangement"]; onChange: (value: CvProfile["workArrangement"]) => void }) { const options: { value: CvProfile["workArrangement"]; title: string; text: string }[] = [{ value: "remote", title: "Remote", text: "Bekerja sepenuhnya dari lokasi pilihanmu" }, { value: "hybrid", title: "Hybrid", text: "Menggabungkan kerja remote dan dari kantor" }, { value: "onsite", title: "On-site", text: "Bekerja dari lokasi kantor" }]; return <Intro title="Cara kerja seperti apa yang cocok?" text="Preferensi ini membantu percakapan awal terasa lebih relevan."><div className="space-y-3">{options.map((option) => <button type="button" key={option.value} onClick={() => onChange(option.value)} aria-pressed={value === option.value} className={`flex w-full items-start gap-4 rounded-xl border p-5 text-left transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#19a974] ${value === option.value ? "border-[#19a974] bg-[#f0fdf9]" : "bg-white"}`}><span className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${value === option.value ? "border-[#19a974] bg-[#19a974] text-white" : "border-slate-300"}`}>{value === option.value && <Check className="size-3.5" />}</span><span><strong className="block text-sm">{option.title}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.text}</span></span></button>)}</div></Intro>; }

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { schema } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 
 const startSchema = z.object({
   candidateProfileId: z.string().uuid(),
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
         status: "in_progress",
         tokenCost: 1,
         startedAt: now,
-      }).returning({ id: schema.screeningRuns.id, status: schema.screeningRuns.status });
+      }).returning({ id: schema.screeningRuns.id, status: schema.screeningRuns.status, tokenCost: schema.screeningRuns.tokenCost, candidateProfileId: schema.screeningRuns.candidateProfileId });
 
       const [ledger] = await tx.insert(schema.tokenLedgerEntries).values({
         tokenAccountId: account.id,
@@ -89,6 +90,9 @@ export async function POST(request: Request) {
         await tx.delete(schema.screeningRuns).where(eq(schema.screeningRuns.id, run.id));
         return { error: "Token screening organisasi tidak mencukupi.", status: 402 as const };
       }
+
+      await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "token.charge", entityType: "token_ledger_entry", entityId: ledger.id, metadata: { amount: 1, screeningRunId: run.id } });
+      await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "screening.started", entityType: "screening_run", entityId: run.id, metadata: { tokenCost: run.tokenCost, candidateProfileId: run.candidateProfileId } });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };
     });

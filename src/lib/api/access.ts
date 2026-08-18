@@ -3,11 +3,12 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
+import type { Database } from "@/db";
 
 export type ApiRole = "candidate" | "recruiter";
 export type ApiAccess =
   | { mode: "demo"; role: ApiRole }
-  | { mode: "database"; role: ApiRole; user: AppUser };
+  | { mode: "database"; role: ApiRole; user: AppUser; db: Database };
 export type ApiAccessFailure = { error: string; status: 401 | 403 | 503 };
 
 function demoAuthEnabled() {
@@ -39,7 +40,7 @@ export async function requireApiAccess(role: ApiRole): Promise<ApiAccess | ApiAc
         status: 403,
       };
     }
-    return { mode: "database", role, user: current.user };
+    return { mode: "database", role, user: current.user, db: current.db };
   } catch (error) {
     console.error("API authorization lookup failed", error);
     return { error: "Layanan autentikasi belum tersedia.", status: 503 };

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { assessmentReviewCreateSchema, assessmentReviewPatchSchema, uuidSchema } from "@/lib/assessment";
-import { notificationData, systemNotification } from "@/lib/notifications";
+import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 type Current = Exclude<Awaited<ReturnType<typeof getCurrentAppUser>>, { error: string; status: number }>;
 
@@ -46,6 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ att
       const [existing] = await tx.select({ id: schema.assessmentReviews.id }).from(schema.assessmentReviews).where(eq(schema.assessmentReviews.attemptId, attemptId)).limit(1);
       if (existing) return { error: "Review untuk attempt ini sudah ada.", status: 409 as const };
        const [review] = await tx.insert(schema.assessmentReviews).values({ attemptId, reviewerId: current.user.id, status: parsed.data.status ?? "pending", score: parsed.data.score ?? null, dimensionScores: parsed.data.dimensionScores ?? {}, notes: parsed.data.notes ?? null, reviewedAt: parsed.data.reviewedAt ? new Date(parsed.data.reviewedAt) : null }).returning();
+        await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "assessment.review.created", entityType: "assessment_review", entityId: review.id, metadata: { attemptId, status: review.status, hasScore: review.score !== null, hasDimensionScores: Object.keys(review.dimensionScores ?? {}).length > 0 } });
        if (review.status === "completed" || review.status === "disputed") await notifyCandidateReview(tx, access.invitation.id, access.candidateProfileId, attemptId, review.status);
        return { review };
     });
@@ -75,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
        if (!previous) return { error: "Review tidak ditemukan atau bukan milik reviewer ini.", status: 404 as const };
        const values = { ...reviewFields, ...(reviewedAt !== undefined ? { reviewedAt: reviewedAt ? new Date(reviewedAt) : null } : {}), updatedAt: new Date() };
        const [review] = await tx.update(schema.assessmentReviews).set(values).where(and(eq(schema.assessmentReviews.attemptId, attemptId), eq(schema.assessmentReviews.reviewerId, current.user.id))).returning();
+        if (review) await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "assessment.review.updated", entityType: "assessment_review", entityId: review.id, metadata: { attemptId, fromStatus: previous.status, toStatus: review.status, changedFields: Object.keys(reviewFields) } });
        if (review && review.status !== previous.status && (review.status === "completed" || review.status === "disputed")) await notifyCandidateReview(tx, access.invitation.id, access.candidateProfileId, attemptId, review.status);
        return { review };
      });
@@ -113,5 +116,5 @@ async function notifyCandidateReview(tx: Parameters<Parameters<Current["db"]["tr
   const [candidate] = await tx.select({ userId: schema.candidateProfiles.userId }).from(schema.candidateProfiles).where(eq(schema.candidateProfiles.id, candidateProfileId)).limit(1);
   if (!candidate) return;
   const label = status === "completed" ? "selesai" : "memerlukan perhatian";
-  await tx.insert(schema.notifications).values([systemNotification({ userId: candidate.userId, title: `Review assessment ${label}`, body: status === "completed" ? "Review assessment Anda telah selesai." : "Review assessment Anda ditandai untuk ditinjau kembali.", data: notificationData(`assessment-review:${attemptId}:${status}`, `/candidate/assessments/${invitationId}`, { invitationId, attemptId, status }) })]);
+  await createNotificationWithDeliveries(tx, systemNotification({ userId: candidate.userId, title: `Review assessment ${label}`, body: status === "completed" ? "Review assessment Anda telah selesai." : "Review assessment Anda ditandai untuk ditinjau kembali.", data: notificationData(`assessment-review:${attemptId}:${status}`, `/candidate/assessments/${invitationId}`, { invitationId, attemptId, status }) }));
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { uuidSchema } from "@/lib/assessment";
+import { writeAuditLog } from "@/lib/audit";
 
 const createSchema = z.object({ invitationId: uuidSchema }).strict();
 export async function POST(request: Request) {
@@ -23,6 +24,8 @@ export async function POST(request: Request) {
       if (attemptNumber > 5) return { error: "Batas percobaan assessment tercapai.", status: 409 as const };
       const [attempt] = await tx.insert(schema.assessmentAttempts).values({ invitationId: invitation.id, attemptNumber }).returning();
       await tx.update(schema.assessmentInvitations).set({ status: "started", updatedAt: new Date() }).where(eq(schema.assessmentInvitations.id, invitation.id));
+      const [job] = await tx.select({ organizationId: schema.jobs.organizationId }).from(schema.applications).innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId)).where(eq(schema.applications.id, invitation.applicationId)).limit(1);
+      await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: job?.organizationId ?? null, action: "assessment.attempt.started", entityType: "assessment_attempt", entityId: attempt.id, metadata: { invitationId: invitation.id, attemptNumber } });
       return { attempt };
     });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });

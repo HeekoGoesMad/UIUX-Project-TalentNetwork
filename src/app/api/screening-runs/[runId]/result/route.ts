@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { schema } from "@/db";
 import { screening, summary } from "@/lib/ai/provider";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
@@ -42,7 +43,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       if (run.status !== "in_progress" && run.status !== "pending") return { error: "Screening run tidak dapat diproses ulang.", status: 409 as const };
       const [insight, aiSummary] = await Promise.all([screening(input, { strict: true }), summary(input, { strict: true })]);
       const [score] = await tx.insert(schema.screeningScores).values({ screeningRunId: run.id, score: insight.score, label: insight.label, coverage: insight.coverage, evidence: insight.evidence, limitations: insight.limitations, source: insight.source, modelVersion: insight.modelVersion }).returning();
-      await tx.update(schema.screeningRuns).set({ status: "completed", completedAt: new Date(), errorMessage: null }).where(eq(schema.screeningRuns.id, run.id));
+       await tx.update(schema.screeningRuns).set({ status: "completed", completedAt: new Date(), errorMessage: null }).where(eq(schema.screeningRuns.id, run.id));
+       await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "screening.completed", entityType: "screening_run", entityId: run.id, metadata: { score: score.score, coverage: score.coverage, source: score.source, modelVersion: score.modelVersion } });
       return { run: { ...run, status: "completed" as const }, score, aiSummary };
       });
       if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
@@ -87,12 +89,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
             metadata: { screeningRunId: run.id, reason: "screening_result_failed" },
           }).onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey }).returning({ id: schema.tokenLedgerEntries.id });
 
-          if (refund) {
+           if (refund) {
             await tx.update(schema.tokenAccounts).set({
               balance: sql`${schema.tokenAccounts.balance} + ${run.tokenCost}`,
               updatedAt: new Date(),
             }).where(eq(schema.tokenAccounts.id, account.id));
-          }
+           }
+           await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: run.organizationId, action: "screening.failed", entityType: "screening_run", entityId: run.id, metadata: { reason: "screening_result_failed" } });
+           if (refund) await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: run.organizationId, action: "token.refund", entityType: "token_ledger_entry", entityId: refund.id, metadata: { amount: run.tokenCost, screeningRunId: run.id } });
           return { refunded: true };
         })).refunded;
       } catch (refundError) {

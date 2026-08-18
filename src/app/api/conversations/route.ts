@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     const [approved] = await current.db.select({
       candidateUserId: schema.candidateProfiles.userId,
       organizationId: schema.consentRequestBatches.organizationId,
+      consentRequestItemId: schema.consentRequestItems.id,
     })
       .from(schema.consentRequestItems)
       .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.consentRequestItems.candidateProfileId))
@@ -115,6 +116,8 @@ export async function POST(request: Request) {
       const [conversation] = await tx.insert(schema.conversations).values({
         organizationId: approved.organizationId,
         createdBy: current.user.id,
+        consentRequestItemId: approved.consentRequestItemId,
+        retentionExpiresAt: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
       }).returning({ id: schema.conversations.id });
       await tx.insert(schema.conversationParticipants).values([
         { conversationId: conversation.id, userId: current.user.id },

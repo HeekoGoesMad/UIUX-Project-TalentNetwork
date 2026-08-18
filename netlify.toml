@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = ".next"
 
+# No catch-all rewrite is configured here. App Router pages, middleware, API routes,
+# and dynamic routes require the target's Next.js server/runtime integration.
+# Configure that integration according to the deployment target; this file does not
+# claim that a static export can serve the application.
+
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "AI_PROVIDER,AZURE_OPENAI_API_KEY,AZURE_OPENAI_ENDPOINT"
   SECRETS_SCAN_OMIT_PATHS = ".next/**,.netlify/**,.agents/"

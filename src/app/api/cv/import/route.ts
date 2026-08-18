@@ -17,5 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Upload hanya menerima file PDF." }, { status: 415 });
   }
   if (file.size > 5_000_000) return NextResponse.json({ error: "Ukuran PDF maksimal 5 MB." }, { status: 413 });
-  return withAccessMode(NextResponse.json({ cvId: crypto.randomUUID(), ...importCv(file.name) }), access);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") return NextResponse.json({ error: "File bukan PDF yang valid." }, { status: 400 });
+  return withAccessMode(NextResponse.json({ cvId: crypto.randomUUID(), ...importCv(file.name), extractionStatus: "suggestion_only", extractionConfidence: null, extractionProvider: "unconfigured", note: "Hasil ini hanya saran editable; tidak ada OCR atau ekstraksi provider aktif." }), access);
 }

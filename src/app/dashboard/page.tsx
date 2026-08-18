@@ -54,7 +54,7 @@ export default function Dashboard() {
             <p className="mt-2 text-muted-foreground">Pick up the thread with the right talent.</p>
           </div>
           <Button asChild>
-            <Link href="/search">
+            <Link href="/recruiter/discover">
               <Search className="size-4" /> Search talent
             </Link>
           </Button>
@@ -67,7 +67,7 @@ export default function Dashboard() {
               <p className="mt-1 text-amber-900/80">Tersisa {tokens} token untuk unlock profile.</p>
             </div>
             <Button variant="outline" asChild>
-              <Link href="/pricing">
+              <Link href="/recruiter/billing">
                 Add tokens <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -92,7 +92,7 @@ export default function Dashboard() {
                     <WalletCards className="size-7 text-[#7C3AED]" />
                     {tokens}
                   </p>
-                  <Link href="/pricing" className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">
+                  <Link href="/recruiter/billing" className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">
                     Get more tokens <ArrowRight className="ml-1 size-4" />
                   </Link>
                 </CardContent>
@@ -122,7 +122,7 @@ export default function Dashboard() {
                       {recent.map((candidate) => (
                         <Link
                           key={candidate.id}
-                          href={`/talent/${candidate.id}`}
+                          href={`/recruiter/discover/${candidate.id}`}
                           className="flex items-center justify-between rounded-xl border p-3 hover:bg-slate-50"
                         >
                           <span>
@@ -142,7 +142,7 @@ export default function Dashboard() {
                         Search the network to find candidates, then come back here to continue.
                       </p>
                       <Button className="mt-4" size="sm" asChild>
-                        <Link href="/search">Start searching</Link>
+                        <Link href="/recruiter/discover">Start searching</Link>
                       </Button>
                     </div>
                   )}
@@ -156,7 +156,7 @@ export default function Dashboard() {
                   {scanned.length ? (
                     <div className="space-y-3">
                       {scanned.map((candidate) => (
-                        <Link key={candidate.id} href={`/talent/${candidate.id}`} className="block text-sm hover:text-slate-900">
+                        <Link key={candidate.id} href={`/recruiter/discover/${candidate.id}`} className="block text-sm hover:text-slate-900">
                           <span className="font-medium">{candidate.name}</span>
                           <span className="block text-muted-foreground">{candidate.role}</span>
                         </Link>
@@ -180,7 +180,7 @@ export default function Dashboard() {
                   {shortlist.length ? (
                     <div className="grid gap-3 md:grid-cols-3">
                       {shortlist.map((candidate) => (
-                        <Link key={candidate.id} href={`/talent/${candidate.id}`} className="rounded-xl border p-3 hover:bg-slate-50">
+                        <Link key={candidate.id} href={`/recruiter/discover/${candidate.id}`} className="rounded-xl border p-3 hover:bg-slate-50">
                           <p className="font-medium">{candidate.name}</p>
                           <p className="mt-1 text-sm text-muted-foreground">{candidate.role}</p>
                         </Link>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { CvProfile } from "@/types";
 import { type CvTemplateId, buildCvHtml } from "@/lib/cv/templates";
 import { accessResponse, isApiAccess, requireApiAccess, withAccessMode } from "@/lib/api/access";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request) {
   const access = await requireApiAccess("candidate");
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
     });
     await browser.close();
 
-    return withAccessMode(new NextResponse(new Uint8Array(pdf), {
+     if (access.mode === "database") await writeAuditLog({ db: access.db, actorUserId: access.user.id, action: "cv.exported", entityType: "cv", metadata: { exportKind: "profile_pdf", template: templateId } });
+     return withAccessMode(new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${safeFileName}"`,

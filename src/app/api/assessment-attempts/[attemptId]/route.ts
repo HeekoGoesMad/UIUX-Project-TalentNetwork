@@ -4,7 +4,8 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { parseResponse, uuidSchema } from "@/lib/assessment";
-import { notificationData, systemNotification } from "@/lib/notifications";
+import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 const patchSchema = z.object({ questionId: uuidSchema.optional(), response: z.unknown().optional(), submit: z.boolean().optional() }).strict();
 export async function GET(_request: Request, { params }: { params: Promise<{ attemptId: string }> }) {
@@ -40,10 +41,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
         const answers = await tx.select({ questionId: schema.assessmentAnswers.questionId }).from(schema.assessmentAnswers).where(eq(schema.assessmentAnswers.attemptId, attemptId));
         if (required.some((question) => !answers.some((answer) => answer.questionId === question.id))) return { error: "Jawab semua pertanyaan wajib sebelum mengirim.", status: 400 as const };
          const now = new Date(); await tx.update(schema.assessmentAttempts).set({ status: "submitted", submittedAt: now, updatedAt: now }).where(eq(schema.assessmentAttempts.id, attemptId)); await tx.update(schema.assessmentAnswers).set({ submittedAt: now }).where(eq(schema.assessmentAnswers.attemptId, attemptId)); await tx.update(schema.assessmentInvitations).set({ status: "submitted", updatedAt: now }).where(eq(schema.assessmentInvitations.id, access.invitation.id));
+          await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: access.jobOrganizationId, action: "assessment.attempt.submitted", entityType: "assessment_attempt", entityId: attemptId, metadata: { invitationId: access.invitation.id } });
          const recipients = await tx.select({ userId: schema.organizationMembers.userId }).from(schema.organizationMembers)
            .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
            .where(and(eq(schema.organizationMembers.organizationId, access.jobOrganizationId), or(inArray(schema.organizationMembers.role, ["owner", "admin"]), and(eq(schema.organizationMembers.role, "recruiter"), eq(schema.users.recruiterProvisioningStatus, "active")))));
-         if (recipients.length) await tx.insert(schema.notifications).values(recipients.map(({ userId }) => systemNotification({ userId, title: "Assessment selesai dikirim", body: `Kandidat mengirim jawaban untuk ${access.template.name}.`, data: notificationData(`assessment-attempt:${attemptId}:submitted`, `/recruiter/assessments/attempts/${attemptId}`, { attemptId, status: "submitted" }) })));
+          await Promise.all(recipients.map(({ userId }) => createNotificationWithDeliveries(tx, systemNotification({ userId, title: "Assessment selesai dikirim", body: `Kandidat mengirim jawaban untuk ${access.template.name}.`, data: notificationData(`assessment-attempt:${attemptId}:submitted:${userId}`, `/recruiter/assessments/attempts/${attemptId}`, { attemptId, status: "submitted" }) }))));
       }
       return { ok: true };
     });

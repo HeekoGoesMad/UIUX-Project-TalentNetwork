@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/db";
 import { createClient } from "@/lib/supabase/server";
+import { writeAuditLog } from "@/lib/audit";
+import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
 import { GET as getConsentRequests } from "./read";
 
 export { getConsentRequests as GET };
@@ -81,14 +83,22 @@ export async function POST(request: Request) {
         type: "requested" as const,
         metadata: { purpose: parsed.data.purpose, expiresAt: parsed.data.expiresAt ?? null },
       })));
-
-      await tx.insert(schema.notifications).values(candidates.map((candidate) => ({
-        userId: candidate.userId,
-        type: "consent_requested" as const,
-        title: "Permintaan consent baru",
-        body: parsed.data.message ?? `Recruiter meminta consent untuk: ${parsed.data.purpose}`,
-        data: { batchId: batch.id, candidateProfileId: candidate.id },
+      await Promise.all(items.map((item) => writeAuditLog({
+        db: tx,
+        actorUserId: recruiter.id,
+        organizationId: membership.organizationId,
+        action: "consent.request.created",
+        entityType: "consent_request_item",
+        entityId: item.id,
+        metadata: { purpose: parsed.data.purpose, hasMessage: Boolean(parsed.data.message), expiresAt: parsed.data.expiresAt ?? null },
       })));
+
+      await Promise.all(candidates.map((candidate) => createNotificationWithDeliveries(tx, systemNotification({
+        userId: candidate.userId,
+        title: "Permintaan consent baru",
+        body: "Recruiter meminta consent untuk mengakses profil Anda.",
+        data: notificationData(`consent-request:${batch.id}:${candidate.id}`, "/candidate/consent-requests", { batchId: batch.id, candidateProfileId: candidate.id }),
+      }))));
 
       return { batchId: batch.id, itemIds: items.map((item) => item.id) };
     });

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { schema, type Database } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { uuidSchema } from "@/lib/assessment";
-import { notificationData, systemNotification } from "@/lib/notifications";
+import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 const createSchema = z.object({ applicationId: uuidSchema, assessmentTemplateId: uuidSchema, expiresAt: z.string().datetime({ offset: true }).nullable().optional() }).strict();
 
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
       if (!template || template.organizationId !== scope.membership.organizationId) return { error: "Template assessment tidak ditemukan dalam organisasi recruiter.", status: 404 as const };
       const [existing] = await tx.select({ id: schema.assessmentInvitations.id }).from(schema.assessmentInvitations).where(and(eq(schema.assessmentInvitations.applicationId, parsed.data.applicationId), eq(schema.assessmentInvitations.assessmentTemplateId, parsed.data.assessmentTemplateId), eq(schema.assessmentInvitations.status, "pending"))).limit(1);
       if (existing) return { error: "Invitation untuk aplikasi dan template ini sudah aktif.", status: 409 as const };
-       const [invitation] = await tx.insert(schema.assessmentInvitations).values({ applicationId: parsed.data.applicationId, assessmentTemplateId: parsed.data.assessmentTemplateId, candidateProfileId: application.application.candidateProfileId, invitedBy: current.user.id, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }).returning();
-       await tx.insert(schema.notifications).values([systemNotification({ userId: application.candidateUserId, title: "Invitation assessment baru", body: "Anda menerima invitation assessment baru dari recruiter.", data: notificationData(`assessment-invitation:${invitation.id}:created`, `/candidate/assessments/${invitation.id}`, { invitationId: invitation.id, status: "pending" }) })]);
+        const [invitation] = await tx.insert(schema.assessmentInvitations).values({ applicationId: parsed.data.applicationId, assessmentTemplateId: parsed.data.assessmentTemplateId, candidateProfileId: application.application.candidateProfileId, invitedBy: current.user.id, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }).returning();
+        await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "assessment.invitation.created", entityType: "assessment_invitation", entityId: invitation.id, metadata: { applicationId: invitation.applicationId, assessmentTemplateId: invitation.assessmentTemplateId, expiresAt: parsed.data.expiresAt ?? null } });
+        await createNotificationWithDeliveries(tx, systemNotification({ userId: application.candidateUserId, title: "Invitation assessment baru", body: "Anda menerima invitation assessment baru dari recruiter.", data: notificationData(`assessment-invitation:${invitation.id}:created`, `/candidate/assessments/${invitation.id}`, { invitationId: invitation.id, status: "pending" }) }));
        return { invitation };
     });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });

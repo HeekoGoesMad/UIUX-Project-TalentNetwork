@@ -109,6 +109,16 @@ The first database phase uses Supabase Auth and PostgreSQL with Drizzle ORM.
 
 Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations committed. The application can still run in local demo fallback mode when Supabase variables are absent, but real registration, persistent profiles, and database consent requests require Supabase configuration.
 
+### Production configuration hardening
+
+Production validates configuration through the internal `GET /api/health/config` endpoint. Send the `x-healthcheck-token` header matching the server-only `HEALTHCHECK_TOKEN`; the response contains readiness flags only and never returns credential values. A missing or invalid production configuration returns a safe list of required variable names, not secrets.
+
+The feature flags are `BILLING_ENABLED`, `DOCUMENT_STORAGE_ENABLED`, and `EMAIL_DELIVERY_ENABLED`. Billing and document storage default to enabled, while email delivery defaults to disabled. In production, enabled billing requires a non-mock `PAYMENT_PROVIDER` and `PAYMENT_WEBHOOK_SECRET`, enabled document storage requires `SUPABASE_CV_BUCKET`, and enabled email delivery requires a non-mock `EMAIL_PROVIDER` and `EMAIL_WEBHOOK_SECRET`. `NEXT_PUBLIC_DEV_AUTH_BYPASS` and `DEV_TOKEN_GRANT_ENABLED` must never be true in production. `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are always required in production.
+
+Local development remains usable with the defaults in `.env.example`: mock AI, demo auth fallback, mock billing, in-memory/demo document behavior, and no email delivery. Real Supabase Auth, database persistence, payments, storage, and email delivery still require their external services and credentials.
+
+The repository intentionally does not add a static `/* /index.html 200` fallback. The deployment target must provide its supported Next.js App Router runtime for middleware, API routes, and dynamic routes.
+
 ---
 
 ## 📁 Project Structure

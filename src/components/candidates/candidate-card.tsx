@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, Lock, MapPin, Wrench } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
 import { useApp } from "@/providers/app-provider";
 import { maskName } from "@/lib/candidate-display";
@@ -13,9 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
-  const { shortlisted, toggleShortlist, scans } = useApp();
+  const { shortlisted, toggleShortlist, scans, partnerVerifications } = useApp();
   const unlocked = scans.some((scan) => scan.candidateId === candidate.id);
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
+  const verif = partnerVerifications?.[candidate.id] ?? candidate.campusVerification;
 
   return (
     <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}>
@@ -25,7 +26,18 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
         <div className="min-w-0 flex-1">
           {/* Category + shortlist row */}
           <div className="mb-2 flex items-center justify-between gap-2">
-            <CandidateCategoryBadge category={candidate.talentCategory} />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CandidateCategoryBadge category={candidate.talentCategory} />
+              {verif?.status === "verified" && (
+                <span
+                  title={`Terverifikasi oleh ${verif.verifiedBy || verif.institution}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]"
+                >
+                  <GraduationCap className="size-3 text-[#7C3AED]" />
+                  Campus Verified · {verif.institution.replace("Universitas ", "UI ").replace("Institut Teknologi ", "IT ")}
+                </span>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -93,7 +105,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
           </div>
 
           <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className={list ? "" : "w-full justify-center"}>
-            <Link href={`/talent/${candidate.id}`}>
+            <Link href={`/recruiter/discover/${candidate.id}`}>
               {unlocked ? (
                 "Lihat Detail"
               ) : (

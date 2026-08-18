@@ -1,20 +1,65 @@
 "use client";
 
-import { createContext, startTransition, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
+import { AppState, CampusVerification, CareerStatus, ConsentState, CvProfile, DemoUser, PARTNER_CAMPUSES, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
+import { candidates } from "@/data/candidates";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
-const initial: AppState = { tokens: 25, scans: [], shortlisted: [], notes: {}, recentlyViewed: [], screeningTokens: 1, previewsUsed: 0, screeningConsents: {}, screeningResults: {}, contactRequests: {}, cvProfile: null, careerStatus: "open-to-work" };
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Layanan autentikasi tidak merespons.")), timeoutMs)),
+  ]);
+}
+
+const defaultPartnerVerifications: Record<string, CampusVerification> = Object.fromEntries(
+  candidates.filter((c) => c.campusVerification).map((c) => [c.id, c.campusVerification!])
+);
+
+const initial: AppState = {
+  tokens: 25,
+  scans: [],
+  shortlisted: [],
+  notes: {},
+  recentlyViewed: [],
+  screeningTokens: 1,
+  previewsUsed: 0,
+  screeningConsents: {},
+  screeningResults: {},
+  contactRequests: {},
+  cvProfile: null,
+  careerStatus: "open-to-work",
+  partnerVerifications: defaultPartnerVerifications,
+};
+
 const demoNotifications: BootstrapNotification[] = [
   { id: "demo-notification-1", type: "system", title: "Selamat datang di ProofyLink", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
   { id: "demo-notification-2", type: "message_received", title: "Pesan baru tersedia", body: "Anda memiliki percakapan demo yang siap ditinjau.", data: {}, readAt: "2026-08-13T08:00:00Z", createdAt: "2026-08-13T08:00:00Z" },
 ];
+
 export type RemoteShortlistItem = { id: string; candidateProfileId: string; status: string; notes: string | null; candidate?: { name: string | null; role: string | null; location: string | null } };
 export type RemoteConsentRequest = { itemId: string; candidateProfileId: string; consentState: ConsentState; recruiterName: string | null; recruiterEmail: string | null; organizationName: string | null; purpose: string; createdAt: string; respondedAt: string | null; history: { type: string; createdAt: string }[] };
+
+type BootstrapProfile = {
+  id: string;
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type BootstrapTokenAccount = { accountId: string | null; balance: number; updatedAt: string | null };
+type BootstrapNotification = { id: string; type: string; title: string; body: string | null; data: Record<string, unknown>; readAt: string | null; createdAt: string };
+type BootstrapShortlist = { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; items: Array<{ id: string; candidateProfileId: string; status: string; notes: string | null; createdAt: string; candidate?: { name: string | null; role: string | null; location: string | null } }> };
+type BootstrapSection = { type: string; content: Record<string, unknown> };
+type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus };
 
 type Context = AppState & {
   hydrated: boolean;
@@ -28,6 +73,10 @@ type Context = AppState & {
   shortlists: BootstrapShortlist[];
   consentRequests: Record<string, unknown>[];
   databaseError: string | null;
+  activePartnerInstitution: string;
+  setActivePartnerInstitution: (institution: string) => void;
+  verifyCandidateByPartner: (candidateId: string, status: "verified" | "rejected") => Promise<boolean>;
+  verifyAllCandidatesForInstitution: (institution: string) => Promise<number>;
   markNotificationRead: (id: string) => Promise<boolean>;
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
@@ -48,23 +97,6 @@ type Context = AppState & {
   startScreening: (candidateId: string) => Promise<boolean>;
   previewCandidate: (candidateId: string) => boolean;
 };
-
-type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus };
-
-type BootstrapProfile = {
-  id: string;
-  userId: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  phone: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type BootstrapTokenAccount = { accountId: string | null; balance: number; updatedAt: string | null };
-type BootstrapNotification = { id: string; type: string; title: string; body: string | null; data: Record<string, unknown>; readAt: string | null; createdAt: string };
-type BootstrapShortlist = { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; items: Array<{ id: string; candidateProfileId: string; status: string; notes: string | null; createdAt: string; candidate?: { name: string | null; role: string | null; location: string | null } }> };
-type BootstrapSection = { type: string; content: Record<string, unknown> };
 
 function remoteCvProfile(payload: { identity?: { email?: string }; profile?: BootstrapProfile | null; candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null; candidateSections?: BootstrapSection[] }): CvProfile | null {
   const candidate = payload.candidateProfile;
@@ -123,6 +155,9 @@ function parseState(value: string | null): AppState {
       contactRequests: parsed.contactRequests && typeof parsed.contactRequests === "object" ? parsed.contactRequests : {},
       cvProfile: parsed.cvProfile && typeof parsed.cvProfile === "object" ? parsed.cvProfile : null,
       careerStatus: parsed.careerStatus ?? "open-to-work",
+      partnerVerifications: parsed.partnerVerifications && typeof parsed.partnerVerifications === "object"
+        ? { ...defaultPartnerVerifications, ...parsed.partnerVerifications }
+        : defaultPartnerVerifications,
     };
   } catch {
     return initial;
@@ -130,21 +165,45 @@ function parseState(value: string | null): AppState {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(initial);
-  const [user, setUser] = useState<DemoUser | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const [bootstrapped, setBootstrapped] = useState(false);
+  const devBypass = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
+  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && !devBypass;
+
+  const [state, setState] = useState<AppState>(() => {
+    if (typeof window === "undefined") return initial;
+    return parseState(localStorage.getItem(storageKey));
+  });
+  const [user, setUser] = useState<DemoUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    const session = localStorage.getItem(sessionKey);
+    if (!session) return null;
+    try {
+      return JSON.parse(session) as DemoUser;
+    } catch {
+      return null;
+    }
+  });
+  const [hydrated] = useState(true);
+  const [bootstrapped, setBootstrapped] = useState(() => !supabaseConfigured);
   const [profile, setProfile] = useState<BootstrapProfile | null>(null);
   const [tokenAccount, setTokenAccount] = useState<BootstrapTokenAccount>({ accountId: null, balance: 0, updatedAt: null });
   const [notifications, setNotifications] = useState<BootstrapNotification[]>([]);
   const [shortlists, setShortlists] = useState<BootstrapShortlist[]>([]);
   const [consentRequests, setConsentRequests] = useState<Record<string, unknown>[]>([]);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
+  const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(() => {
+    if (typeof window === "undefined") return "Universitas Indonesia";
+    const session = localStorage.getItem(sessionKey);
+    if (session) {
+      try {
+        const parsed = JSON.parse(session) as DemoUser;
+        if (parsed.companyName) return parsed.companyName;
+      } catch {}
+    }
+    return "Universitas Indonesia";
+  });
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
-  const devBypass = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
-  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && !devBypass;
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
@@ -152,12 +211,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     const metadata = authUser.user_metadata ?? {};
-    const role = metadata.role === "candidate" || metadata.role === "recruiter" ? metadata.role : pendingRole.current;
+    const role = metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : pendingRole.current;
     if (!role) {
       setUser(null);
       return;
     }
-    const provisioningStatus: ProvisioningStatus = role === "candidate" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending";
+    const provisioningStatus: ProvisioningStatus = role === "candidate" || role === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending";
     setUser({
       role,
       provisioningStatus,
@@ -165,6 +224,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : authUser.email ?? "Pengguna",
       companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
     });
+    if (typeof metadata.companyName === "string" && metadata.companyName.trim()) {
+      setActivePartnerInstitution(metadata.companyName);
+    }
   };
 
   const loadBootstrap = async () => {
@@ -172,11 +234,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDatabaseError(null);
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
-      const payload = await response.json() as {
-         identity?: { role?: UserRole; email?: string; provisioningStatus?: ProvisioningStatus };
-         profile?: BootstrapProfile | null;
-         candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
-         candidateSections?: BootstrapSection[];
+      const payload = (await response.json()) as {
+        identity?: { role?: UserRole; email?: string; provisioningStatus?: ProvisioningStatus };
+        profile?: BootstrapProfile | null;
+        candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
+        candidateSections?: BootstrapSection[];
         token?: BootstrapTokenAccount;
         notifications?: BootstrapNotification[];
         shortlists?: BootstrapShortlist[];
@@ -190,217 +252,248 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const consentResponse = await fetch("/api/consent-requests", { cache: "no-store" });
-      const consentPayload = await consentResponse.json() as { requests?: Record<string, unknown>[]; error?: string };
-      if (!consentResponse.ok) throw new Error(consentPayload.error || "Gagal memuat permintaan consent.");
+      const consentPayload = (await consentResponse.json()) as { requests?: Record<string, unknown>[]; error?: string };
 
       setProfile(payload.profile ?? null);
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
-       setNotifications(payload.notifications ?? []);
+      setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
-       setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
-       const remoteProfile = remoteCvProfile(payload);
-       setState((current) => ({
-         ...current,
-         cvProfile: remoteProfile,
-         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
-        tokens: payload.token?.balance ?? 0,
-        shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
-         screeningConsents: Object.fromEntries((consentPayload.requests ?? payload.consentRequests ?? []).flatMap((request) => {
-          const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
-          const status = request.status;
-          if (!candidateId || typeof status !== "string") return [];
-          const consent = ({ pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" } as Partial<Record<string, ConsentState>>)[status];
-          return consent ? [[candidateId, consent]] : [];
-        })),
-      }));
-      setBootstrapped(true);
+      setConsentRequests(consentPayload.requests ?? []);
+      const remoteCv = remoteCvProfile(payload);
+      if (remoteCv) {
+        setState((current) => ({ ...current, cvProfile: remoteCv, careerStatus: remoteCv.careerStatus }));
+      }
+      if (consentPayload.requests && Array.isArray(consentPayload.requests)) {
+        const consents: Record<string, ConsentState> = {};
+        for (const item of consentPayload.requests as RemoteConsentRequest[]) {
+          if (item.candidateProfileId) consents[item.candidateProfileId] = item.consentState;
+        }
+        setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, ...consents } }));
+      }
     } catch (error) {
-      setState({ ...initial, tokens: 0 });
-      setProfile(null);
-      setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
-       setNotifications([]);
-      setShortlists([]);
-      setConsentRequests([]);
-      setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
-      toast.error("Gagal menyiapkan workspace", { description: error instanceof Error ? error.message : "Data database tidak dapat dimuat." });
+      setDatabaseError(error instanceof Error ? error.message : "Gagal memuat data aplikasi.");
+    } finally {
+      setBootstrapped(true);
     }
   };
 
   useEffect(() => {
-    let active = true;
-    if (supabaseConfigured) {
-      const supabase = createClient();
-      void supabase.auth.getUser().then(({ data }) => {
-        if (active) {
-          setSupabaseUser(data.user);
-          if (data.user) void loadBootstrap();
-          else setBootstrapped(true);
-          setHydrated(true);
-        }
-      });
-      const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (active) {
-          setSupabaseUser(session?.user ?? null);
-          if (session?.user) void loadBootstrap();
-          else setBootstrapped(true);
-        }
-      });
-      return () => {
-        active = false;
-        subscription.subscription.unsubscribe();
-      };
-    }
-
-    startTransition(() => {
-      setState(parseState(window.localStorage.getItem(storageKey)));
-      try {
-        const savedUser = window.localStorage.getItem(sessionKey);
-        if (savedUser) setUser(JSON.parse(savedUser) as DemoUser);
-      } catch {
-        window.localStorage.removeItem(sessionKey);
-      }
-      setHydrated(true);
-      setBootstrapped(true);
+    if (!supabaseConfigured) return;
+    const supabase = createClient();
+    void supabase.auth.getSession().then(({ data }: { data: { session: { user: { email?: string; user_metadata?: Record<string, unknown> } } | null } }) => {
+      setSupabaseUser(data.session?.user ?? null);
+      if (data.session?.user) void loadBootstrap();
+      else setBootstrapped(true);
     });
-    return () => { active = false; };
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+      setSupabaseUser(session?.user ?? null);
+      if (session?.user) void loadBootstrap();
+      else {
+        setBootstrapped(true);
+        setProfile(null);
+        setNotifications([]);
+        setShortlists([]);
+      }
+    });
+    return () => { listener.subscription.unsubscribe(); };
   }, [supabaseConfigured]);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!supabaseConfigured) window.localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [hydrated, state, supabaseConfigured]);
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }, [state, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!supabaseConfigured) {
-      if (user) window.localStorage.setItem(sessionKey, JSON.stringify(user));
-      else window.localStorage.removeItem(sessionKey);
+    if (user) {
+      localStorage.setItem(sessionKey, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(sessionKey);
     }
-  }, [hydrated, user, supabaseConfigured]);
+  }, [user, hydrated]);
+
+  const verifyCandidateByPartner = async (candidateId: string, status: "verified" | "rejected") => {
+    const existing = state.partnerVerifications?.[candidateId];
+    const institution = existing?.institution || activePartnerInstitution;
+    const now = new Date().toISOString();
+    const updated: CampusVerification = {
+      institution,
+      program: existing?.program,
+      year: existing?.year,
+      status,
+      verifiedAt: status === "verified" ? now : undefined,
+      verifiedBy: status === "verified" ? `${institution} Career Center` : undefined,
+    };
+
+    setState((current) => {
+      const nextVerifications = { ...(current.partnerVerifications ?? {}), [candidateId]: updated };
+      const nextCv = current.cvProfile && (current.cvProfile.id === candidateId || candidateId === "my-candidate")
+        ? { ...current.cvProfile, campusVerification: updated }
+        : current.cvProfile;
+      return {
+        ...current,
+        partnerVerifications: nextVerifications,
+        cvProfile: nextCv,
+      };
+    });
+
+    if (status === "verified") {
+      setNotifications((current) => [
+        {
+          id: `verify-notif-${Date.now()}`,
+          type: "system",
+          title: "Verifikasi Kampus Berhasil",
+          body: `Profil kandidat ${candidateId} telah diverifikasi oleh ${institution} Career Center.`,
+          data: { candidateId, institution },
+          readAt: null,
+          createdAt: now,
+        },
+        ...current,
+      ]);
+      toast.success("Talent berhasil diverifikasi!", {
+        description: `Tag unik 'Campus Verified · ${institution}' aktif untuk kandidat.`,
+      });
+    } else {
+      toast.info("Verifikasi ditolak");
+    }
+    return true;
+  };
+
+  const verifyAllCandidatesForInstitution = async (institution: string) => {
+    const now = new Date().toISOString();
+    let count = 0;
+    setState((current) => {
+      const next = { ...(current.partnerVerifications ?? {}) };
+      Object.entries(next).forEach(([id, verif]) => {
+        if (verif.institution.toLowerCase() === institution.toLowerCase() && verif.status === "pending") {
+          next[id] = { ...verif, status: "verified", verifiedAt: now, verifiedBy: `${institution} Career Center` };
+          count++;
+        }
+      });
+      return { ...current, partnerVerifications: next };
+    });
+    toast.success(`${count} talent berhasil diverifikasi massal!`);
+    return count;
+  };
 
   const markNotificationRead = async (id: string) => {
-    if (!supabaseConfigured) {
-      setNotifications((current) => (current.length ? current : demoNotifications).map((notification) => notification.id === id ? { ...notification, readAt: new Date().toISOString() } : notification));
-      return true;
+    if (supabaseConfigured) {
+      const response = await fetch(`/api/notifications`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id, read: true }),
+      });
+      if (!response.ok) return false;
     }
-    const response = await fetch("/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationId: id }) });
-    if (!response.ok) return false;
-    setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, readAt: new Date().toISOString() } : notification));
+    setNotifications((current) => current.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item));
     return true;
   };
 
   const markAllNotificationsRead = async () => {
-    if (!supabaseConfigured) {
-      setNotifications((current) => (current.length ? current : demoNotifications).map((notification) => ({ ...notification, readAt: notification.readAt ?? new Date().toISOString() })));
-      return true;
+    if (supabaseConfigured) {
+      const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
+      await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
     }
-    const response = await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) });
-    if (!response.ok) return false;
-    setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt ?? new Date().toISOString() })));
+    setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
     return true;
   };
 
-  const login = async (role: UserRole, email: string, password?: string): Promise<AuthResult> => {
-    if (!supabaseConfigured) {
-      const isDemoCandidate = role === "candidate";
-      const defaultName = isDemoCandidate ? DEMO_CANDIDATE_USER.name : role === "partner" ? "Mitra Kampus / Lembaga" : "Alex Morgan";
-      setUser({ role, provisioningStatus: "active", email: email || (isDemoCandidate ? DEMO_CANDIDATE_USER.email : "demo@proofylink.id"), name: email && email !== DEMO_CANDIDATE_USER.email ? email.split("@")[0] : defaultName });
-      if (isDemoCandidate && (!state.cvProfile || state.cvProfile.fullName === "")) {
-        setState((current) => ({ ...current, cvProfile: DEMO_CANDIDATE_CV, careerStatus: "open-to-work" }));
-      }
-      return { role, provisioningStatus: "active" };
-    }
+  const login = async (role: UserRole, email: string, password: string): Promise<AuthResult> => {
     pendingRole.current = role;
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || "" });
-    if (error) return { error: error.message };
-    const metadataRole = data.user?.user_metadata?.role;
-    const actualRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" ? metadataRole : undefined;
-    return { role: actualRole };
+    if (supabaseConfigured) {
+      const supabase = createClient();
+      try {
+        const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
+        if (error) return { error: error.message };
+        const metadata = data.user.user_metadata ?? {};
+        const actualRole = metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : role;
+        const provisioningStatus: ProvisioningStatus = actualRole === "candidate" || actualRole === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending";
+        setUser({ role: actualRole, provisioningStatus, email, name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email, companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined });
+        return { role: actualRole, provisioningStatus };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : "Gagal masuk." };
+      }
+    }
+    const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: role === "recruiter" ? "active" : "active", companyName: role === "partner" ? "Universitas Indonesia" : undefined };
+    setUser(nextUser);
+    return { role, provisioningStatus: "active" };
   };
 
   const loginAsDemoCandidate = () => {
     setUser(DEMO_CANDIDATE_USER);
     setState((current) => ({
       ...current,
-      cvProfile: DEMO_CANDIDATE_CV,
-      careerStatus: "open-to-work",
+      cvProfile: current.cvProfile ?? DEMO_CANDIDATE_CV,
+      careerStatus: current.careerStatus ?? "open-to-work",
     }));
-    toast.success("Masuk sebagai Kandidat Demo (Nadia)", {
-      description: "Profil lengkap dengan riwayat Tokopedia & OVO berhasil dimuat.",
-    });
+    toast.success("Masuk sebagai Candidate Demo");
   };
 
-  const register = async (name: string, role: UserRole, email: string, password: string, companyName = ""): Promise<AuthResult> => {
-    if (!supabaseConfigured) {
-      const provisioningStatus: ProvisioningStatus = role === "candidate" || role === "partner" || devBypass ? "active" : "pending";
-      setUser({ role, provisioningStatus, email, name, companyName: companyName || undefined });
-      return { role, provisioningStatus };
-    }
+  const register = async (name: string, role: UserRole, email: string, password: string, companyName?: string): Promise<AuthResult> => {
     pendingRole.current = role;
-    const supabase = createClient();
-    const provisioningStatus: ProvisioningStatus = role === "candidate" ? "active" : "pending";
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(role === "candidate" ? "/candidate/onboarding" : "/recruiter/pending")}`;
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo, data: { name, role, companyName, provisioningStatus } } });
-    if (error) return { error: error.message };
-    if (data.session) setSupabaseUser(data.user);
-    return { needsConfirmation: !data.session, role, provisioningStatus };
+    if (supabaseConfigured) {
+      const supabase = createClient();
+      try {
+        const { data, error } = await withTimeout(supabase.auth.signUp({ email, password, options: { data: { name, role, companyName, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" } } }), 10000);
+        if (error) return { error: error.message };
+        if (!data.session) return { needsConfirmation: true, role };
+        setUser({ role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending", email, name, companyName });
+        return { role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : "Gagal mendaftar." };
+      }
+    }
+    setUser({ name, role, email, provisioningStatus: "active", companyName });
+    return { role, provisioningStatus: "active" };
   };
 
   const logout = async () => {
     if (supabaseConfigured) {
-      const { error } = await createClient().auth.signOut();
-      if (error) toast.error("Gagal keluar", { description: error.message });
+      const supabase = createClient();
+      try { await supabase.auth.signOut(); } catch {}
     }
     setUser(null);
+    localStorage.removeItem(sessionKey);
   };
 
   const scan = (id: string) => {
     if (state.scans.some((item) => item.candidateId === id)) return true;
-    if (devBypass) {
-      setState((current) => ({ ...current, scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }] }));
-      toast.success("Profil talent dibuka", { description: "Mode development: token scan tidak digunakan." });
-      return true;
-    }
     if (state.tokens <= 0) {
-      toast.error("You are out of tokens", { description: "Add tokens to scan another profile." });
+      toast.error("Token tidak cukup", { description: "Beli paket token di halaman billing." });
       return false;
     }
     setState((current) => ({
       ...current,
-      tokens: Math.max(0, current.tokens - 1),
+      tokens: current.tokens - 1,
       scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
-    toast.success("Profile unlocked", { description: "One token was used." });
+    toast.success("Profile unlocked", { description: "Satu token digunakan." });
     return true;
   };
 
   const toggleShortlist = (id: string) => {
-    if (supabaseConfigured && /^[0-9a-f-]{36}$/i.test(id)) {
-      const existing = shortlists.flatMap((shortlist) => shortlist.items).find((item) => item.candidateProfileId === id);
-      void fetch("/api/shortlists", { method: existing ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(existing ? { itemId: existing.id } : { candidateProfileId: id }) }).then(async (response) => {
-        if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error ?? "Shortlist gagal diperbarui.");
-        await loadBootstrap();
-        toast.success(existing ? "Dihapus dari shortlist" : "Ditambahkan ke shortlist");
-      }).catch((error: unknown) => toast.error("Shortlist gagal diperbarui", { description: error instanceof Error ? error.message : "Coba lagi." }));
-      return;
-    }
     setState((current) => {
-    const exists = current.shortlisted.includes(id);
-    toast.success(exists ? "Removed from shortlist" : "Added to shortlist");
-    return { ...current, shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id] };
+      const exists = current.shortlisted.includes(id);
+      return {
+        ...current,
+        shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id],
+      };
     });
   };
 
   const saveNote = (id: string, note: string) => {
-    const item = shortlists.flatMap((shortlist) => shortlist.items).find((candidate) => candidate.candidateProfileId === id);
-    if (supabaseConfigured && item) {
-      void fetch("/api/shortlists", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: item.id, notes: note }) }).then((response) => { if (!response.ok) throw new Error(); }).catch(() => toast.error("Catatan shortlist gagal disimpan."));
-      return;
-    }
     setState((current) => ({ ...current, notes: { ...current.notes, [id]: note } }));
+    toast.success("Catatan disimpan");
   };
-  const viewed = (id: string) => setState((current) => ({ ...current, recentlyViewed: [id, ...current.recentlyViewed.filter((item) => item !== id)].slice(0, 5) }));
+
+  const viewed = (id: string) => {
+    setState((current) => ({
+      ...current,
+      recentlyViewed: [id, ...current.recentlyViewed.filter((item) => item !== id)].slice(0, 10),
+    }));
+  };
+
   const syncProfile = async (profile: CvProfile) => {
     const response = await fetch("/api/profile/sync", {
       method: "POST",
@@ -423,14 +516,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error ?? "Profil belum dapat disinkronkan.");
   };
+
   const saveCvProfile = async (profile: CvProfile) => {
-    const saved = { ...profile, updatedAt: new Date().toISOString() };
-    setState((current) => ({ ...current, cvProfile: saved, careerStatus: saved.careerStatus }));
+    let campusVerification = profile.campusVerification;
+    const edu = profile.education?.[0];
+    if (edu?.school) {
+      const match = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
+      if (match) {
+        campusVerification = {
+          institution: match,
+          program: edu.program || "Umum",
+          year: edu.dates || "2024",
+          status: campusVerification?.institution === match && campusVerification?.status === "verified" ? "verified" : "pending",
+          verifiedAt: campusVerification?.institution === match && campusVerification?.status === "verified" ? campusVerification.verifiedAt : undefined,
+          verifiedBy: campusVerification?.institution === match && campusVerification?.status === "verified" ? campusVerification.verifiedBy : undefined,
+        };
+      }
+    }
+    const saved = { ...profile, campusVerification, updatedAt: new Date().toISOString() };
+    setState((current) => ({
+      ...current,
+      cvProfile: saved,
+      careerStatus: saved.careerStatus,
+      partnerVerifications: campusVerification
+        ? { ...current.partnerVerifications, [profile.id || "my-candidate"]: campusVerification }
+        : current.partnerVerifications,
+    }));
     if (supabaseConfigured) {
       try { await syncProfile(saved); } catch (error) { toast.error("Profil tersimpan sementara", { description: error instanceof Error ? error.message : "Database belum diperbarui." }); return; }
     }
-    toast.success("Profil CV tersimpan");
+    toast.success("Profil CV tersimpan", {
+      description: campusVerification ? `Terhubung ke Career Center ${campusVerification.institution}` : undefined,
+    });
   };
+
   const saveCareerStatus = async (status: CareerStatus) => {
     setState((current) => ({ ...current, careerStatus: status, cvProfile: current.cvProfile ? { ...current.cvProfile, careerStatus: status, openToWork: status !== "not-available" } : null }));
     if (supabaseConfigured) {
@@ -441,7 +560,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     toast.success("Status karier diperbarui");
   };
+
   const saveScreeningResult = (candidateId: string, result: ScreeningResult) => setState((current) => ({ ...current, screeningResults: { ...current.screeningResults, [candidateId]: result } }));
+
   const requestConsentBatch = async (candidateIds: string[]) => {
     const uniqueIds = [...new Set(candidateIds)];
     if (!uniqueIds.length) return false;
@@ -454,36 +575,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     uniqueIds.forEach((id) => setState((current) => {
       const now = new Date().toISOString();
-      const existing = (current.contactRequests ?? {})[id];
-      const request: ContactRequest = existing ?? { candidateId: id, recruiterName: user?.name, company: user?.companyName || "Perusahaan recruiter", email: user?.email, requestedAt: now, history: [] };
-      return { ...current, screeningConsents: { ...current.screeningConsents, [id]: "pending-candidate-consent" }, contactRequests: { ...(current.contactRequests ?? {}), [id]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } } };
+      return {
+        ...current,
+        screeningConsents: { ...current.screeningConsents, [id]: "pending-candidate-consent" },
+        contactRequests: { ...(current.contactRequests ?? {}), [id]: { candidateId: id, recruiterName: user?.name ?? "Recruiter Demo", company: user?.companyName ?? "Perusahaan Demo", email: user?.email ?? "recruiter@example.com", requestedAt: now, history: [{ state: "pending-candidate-consent", at: now }] } },
+      };
     }));
+    toast.success(`Permintaan consent dikirim ke ${uniqueIds.length} kandidat`);
     return true;
   };
 
   const requestConsent = async (candidateId: string) => {
     if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
-      return requestConsentBatch([candidateId]);
+      const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: [candidateId], purpose: "Screening kandidat" }) });
+      if (!response.ok) { toast.error("Permintaan consent gagal dikirim", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
+      await loadBootstrap();
+      toast.success("Permintaan consent terkirim");
+      return true;
     }
     setState((current) => {
-    const now = new Date().toISOString();
-    const existing = (current.contactRequests ?? {})[candidateId];
-    const request: ContactRequest = existing ?? {
-      candidateId,
-      recruiterName: user?.name,
-      company: user?.companyName || "Perusahaan recruiter",
-      email: user?.email,
-      requestedAt: now,
-      history: [],
-    };
-    return {
-      ...current,
-      screeningConsents: { ...current.screeningConsents, [candidateId]: "pending-candidate-consent" },
-      contactRequests: { ...(current.contactRequests ?? {}), [candidateId]: { ...request, history: [...(request.history ?? []), { state: "pending-candidate-consent", at: now }] } },
-    };
+      const now = new Date().toISOString();
+      return {
+        ...current,
+        screeningConsents: { ...current.screeningConsents, [candidateId]: "pending-candidate-consent" },
+        contactRequests: { ...(current.contactRequests ?? {}), [candidateId]: { candidateId, recruiterName: user?.name ?? "Recruiter Demo", company: user?.companyName ?? "Perusahaan Demo", email: user?.email ?? "recruiter@example.com", requestedAt: now, history: [{ state: "pending-candidate-consent", at: now }] } },
+      };
     });
+    toast.success("Permintaan consent terkirim", { description: "Kandidat perlu menyetujui sebelum screening dimulai." });
     return true;
   };
+
   const respondToConsent = async (candidateId: string, consent: Extract<ConsentState, "consented" | "declined">) => {
     const request = consentRequests.find((item) => item.candidateProfileId === candidateId);
     if (supabaseConfigured && request && typeof request.itemId === "string") {
@@ -493,16 +614,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return true;
     }
     setState((current) => {
-    const now = new Date().toISOString();
-    const request = (current.contactRequests ?? {})[candidateId];
-    return {
-      ...current,
-      screeningConsents: { ...current.screeningConsents, [candidateId]: consent },
-      contactRequests: request ? { ...(current.contactRequests ?? {}), [candidateId]: { ...request, history: [...(request.history ?? []), { state: consent, at: now }] } } : (current.contactRequests ?? {}),
-    };
+      const now = new Date().toISOString();
+      const request = (current.contactRequests ?? {})[candidateId];
+      return {
+        ...current,
+        screeningConsents: { ...current.screeningConsents, [candidateId]: consent },
+        contactRequests: request ? { ...(current.contactRequests ?? {}), [candidateId]: { ...request, history: [...(request.history ?? []), { state: consent, at: now }] } } : (current.contactRequests ?? {}),
+      };
     });
     return true;
   };
+
   const approvePendingRequests = async () => {
     if (supabaseConfigured) {
       const pending = consentRequests.filter((item) => item.status === "pending" && typeof item.candidateProfileId === "string");
@@ -510,19 +632,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return results.every(Boolean);
     }
     setState((current) => {
-    const now = new Date().toISOString();
-    const pendingIds = Object.entries(current.screeningConsents).filter(([, consent]) => consent === "pending-candidate-consent").map(([candidateId]) => candidateId);
-    if (!pendingIds.length) return current;
-    const contactRequests = { ...current.contactRequests };
-    pendingIds.forEach((candidateId) => {
-      const request = contactRequests[candidateId];
-      if (request) contactRequests[candidateId] = { ...request, history: [...(request.history ?? []), { state: "consented", at: now }] };
-    });
-    toast.success(`${pendingIds.length} permintaan disetujui`);
-    return { ...current, screeningConsents: { ...current.screeningConsents, ...Object.fromEntries(pendingIds.map((id) => [id, "consented"])) }, contactRequests };
+      const now = new Date().toISOString();
+      const pendingIds = Object.entries(current.screeningConsents).filter(([, consent]) => consent === "pending-candidate-consent").map(([candidateId]) => candidateId);
+      if (!pendingIds.length) return current;
+      const contactRequests = { ...current.contactRequests };
+      pendingIds.forEach((candidateId) => {
+        const request = contactRequests[candidateId];
+        if (request) contactRequests[candidateId] = { ...request, history: [...(request.history ?? []), { state: "consented", at: now }] };
+      });
+      toast.success(`${pendingIds.length} permintaan disetujui`);
+      return { ...current, screeningConsents: { ...current.screeningConsents, ...Object.fromEntries(pendingIds.map((id) => [id, "consented"])) }, contactRequests };
     });
     return true;
   };
+
   const startScreening = async (candidateId: string) => {
     if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
       try {
@@ -549,7 +672,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const resultData = (await resultResponse.json()) as { error?: string };
         if (!resultResponse.ok) throw new Error(resultData.error ?? "Hasil screening belum dapat disimpan.");
         setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, [candidateId]: "screening-completed" } }));
-         toast.success("Screening selesai", { description: "Token dan skor tersimpan di database." });
+        toast.success("Screening selesai", { description: "Token dan skor tersimpan di database." });
         return true;
       } catch (error) {
         toast.error("Screening belum dapat dimulai", { description: error instanceof Error ? error.message : "Coba lagi." });
@@ -565,6 +688,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success("Screening dimulai", { description: "Tepat satu token digunakan." });
     return true;
   };
+
   const previewCandidate = (candidateId: string) => {
     if (state.scans.some((scan) => scan.candidateId === candidateId)) return true;
     if (state.previewsUsed >= 5) { toast.error("Free preview trial habis", { description: "Screening tetap membutuhkan consent dan token." }); return false; }
@@ -572,7 +696,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider
+      value={{
+        ...state,
+        hydrated,
+        dbMode: supabaseConfigured,
+        devBypass,
+        bootstrapped,
+        user,
+        profile,
+        tokenAccount,
+        notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications),
+        shortlists,
+        consentRequests,
+        databaseError,
+        activePartnerInstitution,
+        setActivePartnerInstitution,
+        verifyCandidateByPartner,
+        verifyAllCandidatesForInstitution,
+        markNotificationRead,
+        markAllNotificationsRead,
+        login,
+        loginAsDemoCandidate,
+        register,
+        logout,
+        scan,
+        toggleShortlist,
+        saveNote,
+        viewed,
+        saveCvProfile,
+        saveCareerStatus,
+        saveScreeningResult,
+        requestConsent,
+        requestConsentBatch,
+        respondToConsent,
+        approvePendingRequests,
+        startScreening,
+        previewCandidate,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {

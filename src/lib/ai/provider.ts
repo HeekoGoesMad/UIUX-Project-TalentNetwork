@@ -135,130 +135,221 @@ export async function interviewQuestions(input: unknown) {
 
 export async function careerAdvisor(input: unknown) {
   const raw = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
-  const focus = typeof raw.focus === "string" ? raw.focus : "ats";
+  const focus = (typeof raw.focus === "string" && ["ats", "headline", "star", "role"].includes(raw.focus)
+    ? raw.focus
+    : "ats") as "ats" | "headline" | "star" | "role";
   const context = profileContextSchema.parse(input);
 
   const role = context.targetRole || context.headline || "Senior Product Designer";
 
-  const fallbackHeadlineSuggestions = [
-    `${role} | Specialized in UX Research & Scalable Design Systems`,
-    `${role} — Transforming Complex Product Workflows into Intuitive UI`,
-    `Data-Driven ${role} | Proven Track Record in Conversion & Usability`,
-  ];
+  // Focus-specific fallbacks
+  let summaryText = "";
+  let answerText = "";
 
-  const fallbackStarBullets = [
-    {
-      before: "Bertanggung jawab merancang ulang tampilan aplikasi produk.",
-      after: "Merancang ulang 12+ flow produk utama di Tokopedia, meningkatkan tingkat penyelesaian task user sebesar 28% dan efisiensi registrasi 15%.",
-      impactReason: "Mengganti deskripsi tugas umum dengan metrik kuantitatif (STAR method) yang langsung menarik perhatian recruiter.",
-    },
-    {
-      before: "Membuat design system untuk tim engineering.",
-      after: "Membangun & mendokumentasikan Design System 4.0 berbasis Tailwind CSS & React, mempercepat waktu delivery frontend hingga 35%.",
-      impactReason: "Menonjolkan teknologi spesifik dan dampak efisiensi tim cross-functional.",
-    },
-  ];
+  const atsData = {
+    score: Math.min(95, 60 + context.skills.length * 4),
+    detectedKeywords: context.skills.length ? context.skills.slice(0, 5) : ["Product Design", "UX Research", "Figma"],
+    missingKeywords: ["Cross-functional Leadership", "Design Systems at Scale", "Conversion Rate Optimization (CRO)", "Product Analytics", "A/B Testing"],
+    sectionAudits: [
+      {
+        section: "Headline & Identitas Profesional",
+        status: "good" as const,
+        notes: [
+          `Menyebutkan istilah peran target (${role}) dengan jelas.`,
+          "Format teks bersih tanpa karakter simbol yang membingungkan parser ATS.",
+        ],
+        recommendation: "Tambahkan domain industri (e.g. Fintech/B2B SaaS) agar relevansi pencarian recruiter naik 30%.",
+      },
+      {
+        section: "Ringkasan Profil (About)",
+        status: "needs_improvement" as const,
+        notes: [
+          "Masih terlalu ringkas dan belum merangkum total tahun pengalaman.",
+          "Keyword inti ATS belum tersebar merata di paragraf pertama.",
+        ],
+        recommendation: "Tulis ringkasan 3-paragraf: Peran & Nilai Utama, Keahlian Kunci, dan Dampak Kerja Terbukti.",
+      },
+      {
+        section: "Pengalaman Kerja (Experience)",
+        status: "needs_improvement" as const,
+        notes: [
+          "Poin deskripsi masih didominasi kata pasif ('bertanggung jawab atas...').",
+          "Angka metrik kuantitatif belum konsisten di semua riwayat posisi.",
+        ],
+        recommendation: "Gunakan Strong Action Verbs di awal setiap bullet dan sertakan minimal 1 angka metrik (%, user, waktu).",
+      },
+      {
+        section: "Daftar Keahlian (Skills)",
+        status: "good" as const,
+        notes: [
+          `Terdaftar ${context.skills.length || 4} skill yang relevan dengan domain desain.`,
+          "Kombinasi hard skill dan metodologi kerja sudah terlihat.",
+        ],
+        recommendation: "Kelompokkan skill ke dalam Hard Skills, Tools, dan Core Methodologies agar mudah dipindai HR.",
+      },
+    ],
+    formatChecks: [
+      { check: "Standar Tipografi & Format Heading", passed: true, tip: "Gunakan nama heading baku: Experience, Education, Skills, Portfolio." },
+      { check: "Kepadatan Kata Kunci (Keyword Density)", passed: false, tip: "Pastikan keyword role target muncul 3-4 kali secara natural di berbagai seksi." },
+      { check: "Keterbacaan Font & Bullet Point", passed: true, tip: "Gunakan bullet standar (•) tanpa ikon grafis rumit yang gagal diekstrak ATS." },
+      { check: "Link Portofolio & Kontak Aktif", passed: true, tip: "Sertakan tautan LinkedIn, Portfolio live URL, dan email profesional." },
+    ],
+  };
 
-  const fallbackPillars = [
-    {
-      name: "Pilar 1: Headline & Target Role Positioning",
-      score: context.headline ? 85 : 45,
-      status: context.headline ? ("excellent" as const) : ("needs_improvement" as const),
-      recommendation: context.headline
-        ? "Headline kamu sudah cukup spesifik. Pertimbangkan menambahkan nilai dampak utama atau spesialisasi industri."
-        : "Headline masih terlalu umum. Gunakan pola [Role] | [Spesialisasi] | [Dampak Utama].",
-      actionables: [
-        "Tambahkan 2-3 keyword industri di headline",
-        "Sebutkan domain spesifik (misal: Fintech, SaaS, E-Commerce)",
-      ],
-    },
-    {
-      name: "Pilar 2: Outcome-Based Experience (STAR Method)",
-      score: 70,
-      status: "good" as const,
-      recommendation: "Beberapa poin pengalaman kerja masih berupa daftar tugas. Ubah menjadi pencapaian terukur dengan angka & metrik.",
-      actionables: [
-        "Gunakan kata kerja aksi di setiap bullet (Memimpin, Meningkatkan, Mengurangi)",
-        "Sertakan persentase, jumlah user, atau efisiensi waktu",
-      ],
-    },
-    {
-      name: "Pilar 3: ATS & Skill Alignment",
-      score: Math.min(95, 50 + context.skills.length * 10),
-      status: context.skills.length >= 4 ? ("excellent" as const) : ("needs_improvement" as const),
-      recommendation: `Kamu saat ini mendaftarkan ${context.skills.length} skill. Lengkapi dengan toolchain modern dan metrik penguasaan.`,
-      actionables: [
-        "Pastikan skill inti (misal: User Research, Prototyping, Figma) terdaftar di bagian atas",
-        "Pilih skill yang paling sering muncul di deskripsi lowongan target",
-      ],
-    },
-    {
-      name: "Pilar 4: Proof of Work & Portfolio",
-      score: 65,
-      status: "good" as const,
-      recommendation: "Pekerja di bidang digital memerlukan bukti nyata. Sertakan link studi kasus, Figma prototypes, atau live URL.",
-      actionables: [
-        "Tambahkan minimal 2 link karya utama dengan konteks peranmu",
-        "Jelaskan tantangan unik yang kamu selesaikan di setiap proyek",
-      ],
-    },
-    {
-      name: "Pilar 5: Verification & Recruiter Consent",
-      score: 90,
-      status: "excellent" as const,
-      recommendation: "Status profil dan kesiapan kontak recruiter aktif. Pertimbangkan memperbarui ketersediaan kerja secara berkala.",
-      actionables: [
-        "Pastikan nomor kontak & email tetap terverifikasi",
-        "Perbarui status ketersediaan kerja (Open to Work / Freelance)",
-      ],
-    },
-  ];
+  const headlineData = {
+    currentHeadline: context.headline || `${role} di Industri Teknologi`,
+    formula: "[Role Utama] | [Spesialisasi / Domain Unggulan] | [Dampak Terukur & Nilai Tambah]",
+    options: [
+      {
+        headline: `${role} | End-to-End Product Design & UX Strategy for High-Growth SaaS`,
+        rationale: "Menonjolkan kemampuan end-to-end design dan domain SaaS yang sangat dicari recruiter tier-1.",
+        keywords: ["End-to-End Product Design", "UX Strategy", "SaaS Architecture"],
+        tag: "Paling Direkomendasikan",
+      },
+      {
+        headline: `Senior ${role} • Design Systems Specialist & Data-Informed UX (Fintech/E-Commerce)`,
+        rationale: "Fokus kuat pada keahlian Design System dan pendekatan riset berbasis data kuantitatif.",
+        keywords: ["Design Systems", "Data-Informed UX", "Fintech & E-Commerce"],
+        tag: "Fokus Spesialisasi",
+      },
+      {
+        headline: `${role} — Driving +30% User Conversion Through Frictionless Product Experience`,
+        rationale: "Menonjolkan metrik dampak bisnis (conversion rate) yang langsung menarik perhatian hiring manager.",
+        keywords: ["Conversion Rate Optimization", "Product Experience", "Product Growth"],
+        tag: "Dampak Bisnis (Impact)",
+      },
+    ],
+    tips: [
+      "Gunakan tanda pipa (|) atau bullet (•) sebagai pemisah yang rapi dan ATS-friendly.",
+      "Hindari kata sifat generik seperti 'Hardworking', 'Passionate', atau 'Creative Guru'.",
+      "Selalu sertakan nama peran spesifik yang ingin kamu lamar (Target Role).",
+      "Maksimal 120-160 karakter agar tidak terpotong di hasil pencarian LinkedIn atau database rekrutmen.",
+    ],
+  };
 
-  let summaryText = `Evaluasi profil karier untuk target role ${role}.`;
-  let answerText = `Rekomendasi utama untuk memperkuat profil ${role}: tingkatkan bukti pencapaian dengan metrik kuantitatif dan selaraskan keyword dengan standar ATS recruiter.`;
+  const starData = {
+    frameworkExplanation: "STAR Method (Situation, Task, Action, Result) adalah standar industri untuk menyusun poin pengalaman kerja yang meyakinkan hiring manager dan menembus filter ATS.",
+    bullets: [
+      {
+        before: "Bertanggung jawab merancang ulang tampilan antarmuka aplikasi produk utama.",
+        after: "Memimpin redesign 12+ flow produk utama di aplikasi, meningkatkan task completion rate sebesar 28% dan memangkas waktu onboarding 15%.",
+        impactReason: "Mengganti deskripsi tugas pasif dengan angka metrik konkret (%) dan action verb 'Memimpin'.",
+        metricsHighlight: "+28% Task Completion · -15% Onboarding Time",
+      },
+      {
+        before: "Membuat komponen design system dan berkolaborasi dengan engineer frontend.",
+        after: "Membangun & mendokumentasikan Design System 4.0 (150+ komponen tokenized), mempercepat siklus sprint frontend hingga 35%.",
+        impactReason: "Menjelaskan skala kontribusi nyata (150+ komponen) dan efisiensi delivery tim lintas fungsi.",
+        metricsHighlight: "150+ Komponen Tokenized · 35% Faster Sprint Delivery",
+      },
+      {
+        before: "Melakukan user research dan interview responden untuk pengembangan fitur baru.",
+        after: "Menjalankan 24 sesi usability testing & wawancara mendalam, menurunkan drop-off rate pada checkout flow sebesar 18%.",
+        impactReason: "Menunjukkan volume riset dan dampak langsung pada metrik bisnis krusial (drop-off rate).",
+        metricsHighlight: "24 Usability Sessions · -18% Drop-off Rate",
+      },
+    ],
+    actionVerbs: [
+      "Memimpin (Led)",
+      "Mengembangkan (Architected)",
+      "Meningkatkan (Accelerated)",
+      "Mengoptimasi (Optimized)",
+      "Memangkas (Reduced)",
+      "Merestrukturisasi (Revamped)",
+    ],
+  };
+
+  const roleData = {
+    targetRole: role,
+    matchScore: 84,
+    matchLevel: "Tinggi (Strong Alignment)",
+    coreCompetencies: [
+      { competency: "User Research & Usability Validation", candidateLevel: "Advanced", requiredLevel: "Advanced", status: "match" as const },
+      { competency: "Scalable Design Systems Architecture", candidateLevel: "Intermediate", requiredLevel: "Advanced", status: "gap" as const },
+      { competency: "Cross-functional Stakeholder Management", candidateLevel: "Advanced", requiredLevel: "Intermediate", status: "exceeds" as const },
+      { competency: "Product Analytics & Growth Experimentation", candidateLevel: "Intermediate", requiredLevel: "Advanced", status: "gap" as const },
+    ],
+    criticalGaps: [
+      "Pengalaman dalam mengukur dampak desain pasca-rilis (A/B testing & product analytics) perlu lebih ditonjolkan di CV.",
+      "Portofolio studi kasus perlu menyertakan rationale arsitektur Design System berskala multi-platform.",
+      "Perjelas peran kepemimpinan desain (mentoring junior designer atau ownership feature end-to-end).",
+    ],
+    strategicRecommendations: [
+      "Cantumkan minimal 1 studi kasus yang menceritakan kolaborasi intensif dengan Product Manager & Engineering Lead.",
+      "Tuliskan metrik keberhasilan bisnis di setiap proyek dalam CV dan link portfolio.",
+      "Sesuaikan deskripsi About dengan keyword kualifikasi senior yang ada di lowongan target.",
+    ],
+  };
 
   if (focus === "ats") {
-    summaryText = `Fokus Optimasi ATS: Menyesuaikan struktur dan keyword profil agar mudah dipindai oleh sistem ATS & recruiter.`;
+    summaryText = `Analisis Kompatibilitas ATS untuk target role ${role}: Skor keterbacaan ${atsData.score}/100. Kerapian keyword inti sudah baik, namun perlu pengayaan metrik kuantitatif dan keyword domain spesifik.`;
     answerText = `Optimasi ATS: Pastikan istilah role (${role}) dan skill utama muncul secara alami di Headline, About, dan Experience. Gunakan format standar tanpa jargon yang membingungkan.`;
   } else if (focus === "headline") {
-    summaryText = `Fokus Crafting Headline: Menyusun identitas profesional yang menarik perhatian recruiter dalam 3 detik pertama.`;
+    summaryText = `Crafting Headline Profesional untuk ${role}: 3 usulan headline berbobot tinggi dengan formula 3-bagian (Role + Spesialisasi + Dampak Terukur).`;
     answerText = `Headline Crafting: Gunakan formula 3-bagian: Role Utama + Spesialisasi Utama + Nilai Tambah/Dampak. Hindari kata-kata generik seperti 'hardworking' atau 'passionate'.`;
   } else if (focus === "star") {
-    summaryText = `Fokus STAR Bullets: Mengubah daftar tugas menjadi cerita sukses berorientasi dampak (Situation, Task, Action, Result).`;
+    summaryText = `Transformasi Pengalaman STAR untuk ${role}: 3 contoh perubahan sebelum & sesudah menggunakan formula Situation-Task-Action-Result dengan metrik terukur.`;
     answerText = `STAR Bullets: Setiap pengalaman kerja harus menceritakan (1) Masalah yang dihadapi, (2) Aksi konkret yang kamu ambil, dan (3) Hasil terukur yang dicapai.`;
   } else if (focus === "role") {
-    summaryText = `Fokus Role Alignment: Mengarahkan profil agar sejalan dengan kualifikasi ${role}.`;
+    summaryText = `Audit Keselarasan Peran (Role Alignment) untuk ${role}: Skor kecocokan 84% (Tinggi). 2 dari 4 kompetensi kunci match sempurna, dengan 2 area gap pada aspek Design System & Analytics.`;
     answerText = `Role Alignment: Audit profilmu terhadap lowongan ${role} di pasar. Eliminasi skill yang tidak relevan dan tonjolkan pencapaian yang paling mendukung role impianmu.`;
   }
 
   const structuredAdviceData = {
-    opening: `Profil kamu saat ini memiliki fondasi yang kuat untuk peran ${role}, namun memerlukan penyempurnaan pada aspek pembuktian hasil kerja dan kompatibilitas ATS.`,
+    opening: `Berdasarkan analisis fokus '${focus.toUpperCase()}' untuk profil ${role}, berikut poin-poin evaluasi utama:`,
     whatGood: [
-      `Fokus keahlian pada ${context.skills.slice(0, 3).join(", ") || "Design & Research"} sudah terlihat jelas dan konsisten.`,
-      `Pengalaman kerja nyata di industri mendukung klaim kompetensi profesionalmu.`,
-      `Profil sudah memiliki struktur dasar yang lengkap dari headline hingga daftar riwayat kerja.`,
+      `Fokus spesialisasi pada ${context.skills.slice(0, 3).join(", ") || "Design & Research"} sudah konsisten.`,
+      `Pengalaman kerja relevan mendukung positioning profil untuk peran ${role}.`,
     ],
     whatNotGood: [
-      `Beberapa poin deskripsi pengalaman masih bersifat kualitatif tanpa menyertakan angka metrik (misal: % efisiensi, akumulasi user, atau revenue).`,
-      `Headline masih bisa diperjelas dengan pola 3-bagian (Role + Spesialisasi + Nilai Tambah) agar langsung dilirik recruiter dalam 3 detik.`,
+      `Beberapa poin deskripsi pengalaman masih bersifat kualitatif tanpa menyertakan angka metrik konkrety.`,
       `Keyword kunci pendukung sistem ATS recruiter belum tersebar secara optimal pada ringkasan 'About'.`,
     ],
-    conclusion: `Jika kamu memperbarui headline dan mengubah 2-3 bullet point pengalaman kerja ke metode STAR (dengan metrik konkret), skor daya saing profilmu di pasar kerja akan meningkat secara signifikan.`,
+    conclusion: `Terapkan rekomendasi di bawah untuk meningkatkan visibilitas profilmu di mata recruiter dan sistem ATS.`,
   };
+
+  const nextSteps = focus === "ats"
+    ? [
+        "Tambahkan missing keywords ke dalam seksi Skills dan Ringkasan About.",
+        "Ubah poin pasif pada Experience menjadi kalimat aktif dengan metrik konkret.",
+        "Jalankan ulang Gap Analysis untuk mengevaluasi kesesuaian skill.",
+      ]
+    : focus === "headline"
+    ? [
+        "Pilih salah satu usulan Headline di bawah yang paling sesuai dengan portofoliomu.",
+        "Salin headline dan perbarui di CV Workspace.",
+        "Pastikan headline LinkedIn selaras dengan headline ProofyLink.",
+      ]
+    : focus === "star"
+    ? [
+        "Gunakan tombol Salin Bullet untuk merevisi 2-3 poin pengalaman terbarumu.",
+        "Ganti kata kerja umum dengan Action Verbs yang direkomendasikan.",
+        "Tambahkan angka estimasi dampak (persentase / jumlah user) di setiap bullet.",
+      ]
+    : [
+        "Lengkapi portofolio dengan studi kasus yang membuktikan penguasaan gap kompetensi.",
+        "Soroti pengalaman kolaborasi lintas fungsi di bagian deskripsi pengalaman kerja.",
+        "Perbarui target role di profil untuk sinkronisasi rekomendasi lowongan.",
+      ];
 
   return aiResult(advisorSchema, JSON.stringify({ ...context, focus }), {
     focus,
     summary: summaryText,
-    headlineSuggestions: fallbackHeadlineSuggestions,
-    starBullets: fallbackStarBullets,
-    pillars: fallbackPillars,
+    headlineSuggestions: headlineData.options.map((o) => o.headline),
+    starBullets: starData.bullets.map((b) => ({
+      before: b.before,
+      after: b.after,
+      impactReason: b.impactReason,
+      metricsHighlight: b.metricsHighlight,
+    })),
+    pillars: [],
     structuredAdvice: structuredAdviceData,
+    atsDetails: atsData,
+    headlineDetails: headlineData,
+    starDetails: starData,
+    roleDetails: roleData,
     answer: answerText,
-    nextSteps: [
-      `Pilih salah satu usulan Headline di atas dan perbarui profilmu di CV Workspace.`,
-      `Gunakan metode STAR untuk merevisi 2 bullet point pengalaman kerja paling terbaru.`,
-      `Jalankan ulang Gap Analysis untuk mengecek persentase kesesuaian skill dengan lowongan target.`,
-    ],
+    nextSteps,
     limitations: [
       "Rekomendasi berasal dari analisis profil internal dan standar industri ATS.",
       "Hasil AI merupakan panduan review untuk membantu keputusan personalmu.",

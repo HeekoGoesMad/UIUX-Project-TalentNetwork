@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
-import { notificationData, systemNotification } from "@/lib/notifications";
+import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 const uuid = z.string().uuid();
 const createSchema = z.object({
@@ -70,16 +71,17 @@ export async function POST(request: Request) {
 
     const result = await current.db.transaction(async (tx) => {
        const [application] = await tx.insert(schema.applications).values({ jobId: job.id, candidateProfileId: candidate.id, coverNote: parsed.data.coverNote }).returning();
-       await tx.insert(schema.applicationStageHistory).values({ applicationId: application.id, fromStatus: null, toStatus: "new", changedBy: current.user.id, reason: "Lamaran dikirim kandidat." });
+        await tx.insert(schema.applicationStageHistory).values({ applicationId: application.id, fromStatus: null, toStatus: "new", changedBy: current.user.id, reason: "Lamaran dikirim kandidat." });
+        await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: job.organizationId, action: "application.created", entityType: "application", entityId: application.id, metadata: { jobId: job.id, candidateProfileId: candidate.id, source: application.source } });
        const recipients = await tx.select({ userId: schema.organizationMembers.userId }).from(schema.organizationMembers)
          .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
          .where(and(eq(schema.organizationMembers.organizationId, job.organizationId), or(inArray(schema.organizationMembers.role, ["owner", "admin"]), and(eq(schema.organizationMembers.role, "recruiter"), eq(schema.users.recruiterProvisioningStatus, "active")))));
-       if (recipients.length) await tx.insert(schema.notifications).values(recipients.map(({ userId }) => systemNotification({
+        await Promise.all(recipients.map(({ userId }) => createNotificationWithDeliveries(tx, systemNotification({
          userId,
          title: "Lamaran baru masuk",
          body: `Kandidat mengirim lamaran untuk ${job.title}.`,
          data: notificationData(`application:${application.id}:submitted`, `/recruiter/applications/${application.id}`, { applicationId: application.id, jobId: job.id }),
-       })));
+        }))));
        return application;
     });
     return NextResponse.json({ application: result }, { status: 201 });

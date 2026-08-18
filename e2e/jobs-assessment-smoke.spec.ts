@@ -31,6 +31,11 @@ test.describe("jobs and assessment smoke coverage", () => {
     expect(new URL(page.url()).searchParams.get("next")).toBe("/notifications");
   });
 
+  test("notification preferences require authentication", async ({ request }) => {
+    const response = await request.get("/api/notification-preferences");
+    expect([401, 403, 503]).toContain(response.status());
+  });
+
   test("public pages produce no uncaught browser errors", async ({ browser }) => {
     for (const route of ["/", "/jobs", "/pricing"]) {
       const page = await browser.newPage();

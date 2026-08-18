@@ -49,16 +49,54 @@ export const INDUSTRY_CATEGORY_CONFIG: Record<IndustryCategory, { label: string 
   "technology-software": { label: "Technology / Software" },
 };
 
+export const PARTNER_CAMPUSES = [
+  "Universitas Indonesia",
+  "Institut Teknologi Bandung",
+  "Universitas Gadjah Mada",
+  "Binus University",
+  "Telkom University",
+  "Institut Teknologi Sepuluh Nopember",
+  "Universitas Airlangga",
+  "Universitas Padjadjaran",
+] as const;
+
+export type PartnerCampus = typeof PARTNER_CAMPUSES[number];
+
+export type CampusVerification = {
+  institution: string;
+  program?: string;
+  year?: string;
+  status: "pending" | "verified" | "rejected";
+  verifiedAt?: string;
+  verifiedBy?: string;
+};
+
 export type Candidate = {
-  id: string; name: string; initials: string; role: string; location: string; experience: number;
-  availability: string; skills: string[]; tools: string[]; education: string; salary: string; summary: string;
-  endorsements: string[]; certifications: string[]; portfolio: string[]; email: string; phone: string;
+  id: string;
+  name: string;
+  initials: string;
+  role: string;
+  location: string;
+  experience: number;
+  availability: string;
+  skills: string[];
+  tools: string[];
+  education: string;
+  salary: string;
+  summary: string;
+  endorsements: string[];
+  certifications: string[];
+  portfolio: string[];
+  email: string;
+  phone: string;
   linkedin: string;
   history: { company: string; role: string; years: string }[];
   careerStatus?: CareerStatus;
   talentCategory: TalentCategory;
   industry: IndustryCategory;
+  campusVerification?: CampusVerification;
 };
+
 export type Scan = { candidateId: string; scannedAt: string };
 export type ScreeningInsight = { score: number; label: string; coverage: number; evidence: string[]; limitations: string[]; followUp: string; modelVersion: string; source: "mock" | "azure" | "local" };
 export type AiSummary = { summary: string; strengths: string[]; evidence: string[]; limitations: string[]; modelVersion: string; source: "mock" | "azure" | "local" };
@@ -72,7 +110,23 @@ export type ContactRequest = {
   requestedAt?: string;
   history?: ContactRequestHistory[];
 };
-export type AppState = { tokens: number; scans: Scan[]; shortlisted: string[]; notes: Record<string, string>; recentlyViewed: string[]; screeningTokens: number; previewsUsed: number; screeningConsents: Record<string, ConsentState>; screeningResults: Record<string, ScreeningResult>; contactRequests?: Record<string, ContactRequest>; cvProfile: CvProfile | null; careerStatus: CareerStatus };
+
+export type AppState = {
+  tokens: number;
+  scans: Scan[];
+  shortlisted: string[];
+  notes: Record<string, string>;
+  recentlyViewed: string[];
+  screeningTokens: number;
+  previewsUsed: number;
+  screeningConsents: Record<string, ConsentState>;
+  screeningResults: Record<string, ScreeningResult>;
+  contactRequests?: Record<string, ContactRequest>;
+  cvProfile: CvProfile | null;
+  careerStatus: CareerStatus;
+  partnerVerifications?: Record<string, CampusVerification>;
+};
+
 export type UserRole = "candidate" | "recruiter" | "partner";
 export type ProvisioningStatus = "pending" | "active" | "rejected";
 export type DemoUser = { name: string; email: string; role: UserRole; provisioningStatus?: ProvisioningStatus; companyName?: string };
@@ -96,6 +150,7 @@ export type CvProfile = {
   workArrangement: "remote" | "hybrid" | "onsite";
   openToWork: boolean;
   careerStatus: CareerStatus;
+  campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
 };

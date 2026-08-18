@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 const grantSchema = z.object({
   amount: z.number().int().min(1).max(1000).default(25),
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
           .set({ balance: sql`${schema.tokenAccounts.balance} + ${payload.data.amount}`, updatedAt: new Date() })
           .where(eq(schema.tokenAccounts.id, accountId));
       }
+      if (entry) await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: scope.membership.organizationId, action: "token.grant", entityType: "token_ledger_entry", entityId: entry.id, metadata: { amount: payload.data.amount, source: "development-token-grant" } });
 
       const [updatedAccount] = await tx.select({ balance: schema.tokenAccounts.balance })
         .from(schema.tokenAccounts)
