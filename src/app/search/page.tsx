@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
 import { candidates } from "@/data/candidates";
-import { CandidateCard } from "@/components/candidates/candidate-card";
+import { CandidateCard } from "@/components/talent/candidate-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

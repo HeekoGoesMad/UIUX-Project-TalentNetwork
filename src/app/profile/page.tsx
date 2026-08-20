@@ -13,9 +13,9 @@ import {
   Wrench,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { CandidateStatusBadge } from "@/components/candidates/candidate-status-badge";
-import { VerifiedBadge } from "@/components/candidates/verified-badge";
-import { AiSummaryCard } from "@/components/candidates/ai-summary-card";
+import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
+import { VerifiedBadge } from "@/components/talent/verified-badge";
+import { AiSummaryCard } from "@/components/talent/ai-summary-card";
 import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

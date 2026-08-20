@@ -4,9 +4,9 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/db";
 import { createClient } from "@/lib/supabase/server";
-import { GET as getConsentRequests } from "./read";
+import { getConsentRequests as GET } from "@/lib/api/consent-requests";
 
-export { getConsentRequests as GET };
+export { GET };
 
 const requestSchema = z.object({
   candidateProfileIds: z.array(z.string().uuid()).min(1).max(100),

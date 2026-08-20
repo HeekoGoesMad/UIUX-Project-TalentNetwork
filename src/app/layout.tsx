@@ -21,7 +21,11 @@ export const metadata: Metadata = {
   description: "Platform Talent Intelligence untuk membantu recruiter menemukan, memahami, dan menyaring kandidat dengan lebih cepat serta membantu talent membangun karier yang lebih baik.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="id"
