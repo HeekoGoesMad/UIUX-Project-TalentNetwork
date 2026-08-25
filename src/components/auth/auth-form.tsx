@@ -323,14 +323,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             )}
           </Button>
 
-          {!supabaseConfigured && (
+          {process.env.NODE_ENV !== "production" && !supabaseConfigured && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <Info className="size-3.5 shrink-0 text-[#7C3AED]" aria-hidden="true" />
               Mode demo: {mode === "login" ? "masuk" : "daftar"} dengan email apa pun
             </p>
           )}
 
-          {!supabaseConfigured && role === "candidate" && (
+          {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "candidate" && (
             <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
