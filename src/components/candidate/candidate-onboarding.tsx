@@ -56,11 +56,11 @@ const steps = [
 const emptyHistory: HistoryItem = { company: "", role: "", dates: "", achievements: [""] };
 const emptyEducation: EducationItem = { school: "", program: "", dates: "" };
 const careerLabels: Record<CareerStatus, string> = {
-  "open-to-work": "Siap bekerja",
-  "open-for-opportunities": "Terbuka untuk peluang",
-  "freelance-available": "Tersedia untuk freelance",
-  "internship-available": "Tersedia untuk magang",
-  "not-available": "Belum tersedia",
+  "open-to-work": "Open to Work",
+  "open-for-opportunities": "Open for Opportunities",
+  "freelance-available": "Freelance",
+  "internship-available": "Internship",
+  "not-available": "Not Available",
 };
 
 const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, email: string): FormState => ({
