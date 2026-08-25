@@ -82,6 +82,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name || email.split("@")[0], companyName: companyName || undefined }),
       }).then((response) => response.ok ? response.json() : null).catch(() => null);
+      if (!synced) {
+        setLoading(false);
+        setErrorMessage("Tidak dapat menyiapkan profil akun Anda. Periksa koneksi Anda dan coba lagi.");
+        return;
+      }
     }
     router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
   };
