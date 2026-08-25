@@ -9,6 +9,7 @@ import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleSelector } from "./role-selector";
+import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -89,6 +90,27 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       }
     }
     router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
+  };
+
+  const signInWithGoogle = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const next = getNext();
+      const redirectUrl = new URL("/auth/callback", window.location.origin);
+      if (next && next.startsWith("/") && !next.startsWith("//")) redirectUrl.searchParams.set("next", next);
+      redirectUrl.searchParams.set("role", role);
+
+      const { error } = await createClient().auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectUrl.toString() },
+      });
+      if (error) throw error;
+    } catch (error) {
+      setLoading(false);
+      setErrorMessage(`Tidak dapat masuk dengan Google: ${error instanceof Error ? error.message : "Coba lagi."}`);
+    }
   };
 
   const emailPlaceholder =
@@ -327,6 +349,26 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               </>
             )}
           </Button>
+
+          {supabaseConfigured && (
+            <>
+              <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                atau
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-xl text-xs sm:text-sm"
+                disabled={loading}
+                onClick={signInWithGoogle}
+              >
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
+                {loading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
+              </Button>
+            </>
+          )}
 
           {process.env.NODE_ENV !== "production" && !supabaseConfigured && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
