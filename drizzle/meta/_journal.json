@@ -22,6 +22,13 @@
       "when": 1786637893650,
       "tag": "0002_giant_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787681837847,
+      "tag": "0003_red_champions",
+      "breakpoints": true
     }
   ]
 }

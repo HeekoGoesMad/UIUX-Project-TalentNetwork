@@ -48,6 +48,12 @@ Rotation steps for any secret: generate new value at provider → update in Verc
   2. Open **Runtime Logs** for the failing deployment — look for `[health] database probe failed` or build errors.
   3. Hit `/api/health` — a 503 means the DB probe fails (connection string, pooled connection limits, or DB outage).
 
+## Admin & Recruiter Approvals
+
+- Promote an admin directly in SQL (no UI flow): `UPDATE users SET role = 'admin' WHERE email = '...';`
+- Approve/reject recruiters via API — `PATCH /api/admin/recruiters/{userId}` with body `{"action": "approve" | "reject", "reason": "..."}` (reason mandatory for reject); list pending recruiters first with `GET /api/admin/recruiters`. Both require a signed-in user whose `users.role` is `admin` (session cookie auth).
+- Approval flips `users.recruiter_provisioning_status` to `active`/`rejected`; audit entries land in the **`audit_logs`** table (`admin.recruiter.*` and `organization.member.updated`).
+
 ## Pre-Release Checklist
 
 - [ ] CI green on release branch: lint + typecheck (`npx tsc --noEmit`) + build.

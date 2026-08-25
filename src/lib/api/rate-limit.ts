@@ -8,6 +8,7 @@ export const RATE_LIMITS = {
   cvExport: { limit: 5, windowMs: 60_000 },
   cvImport: { limit: 10, windowMs: 60_000 },
   messages: { limit: 30, windowMs: 60_000 },
+  billing: { limit: 10, windowMs: 60_000 },
 } as const;
 
 // ponytail: per-serverless-instance memory only; swap for Upstash Redis if multi-instance consistency matters

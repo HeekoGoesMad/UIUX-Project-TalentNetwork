@@ -126,6 +126,21 @@ The first database phase uses Supabase Auth and PostgreSQL with Drizzle ORM.
 
 Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations committed. The application can still run in local demo fallback mode when Supabase variables are absent, but real registration, persistent profiles, and database consent requests require Supabase configuration.
 
+### Admin bootstrap & recruiter approvals
+
+There is no self-service admin signup. Promote the first admin directly in the database (Supabase SQL editor or `psql`):
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
+```
+
+Admin-only API (session cookie auth; caller must have `users.role = 'admin'`, otherwise `403`):
+
+- `GET /api/admin/recruiters` — lists all recruiters with their profile and provisioning status.
+- `PATCH /api/admin/recruiters/{userId}` — approves or rejects a recruiter (`{"action": "approve" | "reject", "reason": "..."}`; reason required for reject), optionally upserting organization membership via `organizationId`/`organizationRole`.
+
+Approval flips `users.recruiter_provisioning_status` to `active` (or `rejected`); every action is recorded in the `audit_logs` table (`admin.recruiter.approve` / `admin.recruiter.reject`, plus `organization.member.updated` when membership changes).
+
 ---
 
 ## 📁 Project Structure
