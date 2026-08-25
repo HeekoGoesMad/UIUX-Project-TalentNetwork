@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
 
 export class TokenLedgerService {
@@ -23,91 +23,6 @@ export class TokenLedgerService {
       balance: account?.balance ?? 0,
       updatedAt: account?.updatedAt ?? null,
     };
-  }
-
-  /**
-   * Execute a token charge with idempotency and balance validation.
-   */
-  static async charge(
-    db: Database,
-    params: {
-      organizationId: string;
-      amount: number;
-      idempotencyKey: string;
-      screeningRunId?: string;
-      metadata?: Record<string, unknown>;
-    }
-  ) {
-    const chargeAmount = params.amount > 0 ? -params.amount : params.amount;
-    const absAmount = Math.abs(chargeAmount);
-
-    return db.transaction(async (tx) => {
-      const [account] = await tx
-        .select({ id: schema.tokenAccounts.id, balance: schema.tokenAccounts.balance })
-        .from(schema.tokenAccounts)
-        .where(eq(schema.tokenAccounts.organizationId, params.organizationId))
-        .limit(1);
-
-      if (!account) {
-        return { error: "Akun token organisasi belum tersedia.", status: 409 as const };
-      }
-
-      if (account.balance < absAmount) {
-        return { error: "Token screening organisasi tidak mencukupi.", status: 402 as const };
-      }
-
-      const [ledger] = await tx
-        .insert(schema.tokenLedgerEntries)
-        .values({
-          tokenAccountId: account.id,
-          type: "charge",
-          amount: chargeAmount,
-          idempotencyKey: params.idempotencyKey,
-          screeningRunId: params.screeningRunId ?? null,
-          metadata: params.metadata ?? {},
-        })
-        .onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey })
-        .returning({ id: schema.tokenLedgerEntries.id });
-
-      if (!ledger) {
-        // Idempotent hit: entry already exists
-        const [existing] = await tx
-          .select({
-            id: schema.tokenLedgerEntries.id,
-            screeningRunId: schema.tokenLedgerEntries.screeningRunId,
-          })
-          .from(schema.tokenLedgerEntries)
-          .where(eq(schema.tokenLedgerEntries.idempotencyKey, params.idempotencyKey))
-          .limit(1);
-
-        return {
-          idempotent: true,
-          ledgerId: existing?.id,
-          screeningRunId: existing?.screeningRunId,
-          balance: account.balance,
-        };
-      }
-
-      const [charged] = await tx
-        .update(schema.tokenAccounts)
-        .set({
-          balance: sql`${schema.tokenAccounts.balance} - ${absAmount}`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(schema.tokenAccounts.id, account.id), sql`${schema.tokenAccounts.balance} >= ${absAmount}`))
-        .returning({ balance: schema.tokenAccounts.balance });
-
-      if (!charged) {
-        await tx.delete(schema.tokenLedgerEntries).where(eq(schema.tokenLedgerEntries.id, ledger.id));
-        return { error: "Token screening organisasi tidak mencukupi.", status: 402 as const };
-      }
-
-      return {
-        idempotent: false,
-        ledgerId: ledger.id,
-        balance: charged.balance,
-      };
-    });
   }
 
   /**

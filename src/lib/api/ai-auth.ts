@@ -29,6 +29,18 @@ function finishAiAuth(context: AiAuthContext): AiAuthResult {
       status: 429,
     };
   }
+  const daily = enforceRateLimit(
+    `ai-daily:${context.user?.id ?? "dev"}`,
+    RATE_LIMITS.aiDaily.limit,
+    RATE_LIMITS.aiDaily.windowMs
+  );
+  if (!daily.allowed) {
+    return {
+      success: false,
+      error: "Kuota harian fitur AI sudah habis. Coba lagi besok.",
+      status: 429,
+    };
+  }
   return { success: true, context };
 }
 
