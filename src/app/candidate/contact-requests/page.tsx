@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 import type { ConsentState } from "@/types";
 
@@ -60,7 +61,12 @@ export default function ContactRequestsPage() {
       </div>
 
        {(!hydrated || (dbMode && !bootstrapped)) ? <div className="mt-8 rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground" role="status">Memuat permintaan...</div> : databaseError ? <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">Permintaan belum dapat dimuat. {databaseError}</div> : requests.length === 0 ?
-        <div className="mt-8 rounded-lg border border-dashed bg-card p-10 text-center"><ShieldCheck className="mx-auto size-8 text-[#19a974]" /><h2 className="mt-4 font-semibold">Inbox kamu masih tenang</h2><p className="mt-2 text-sm text-muted-foreground">Permintaan dari recruiter akan muncul di sini untuk kamu tinjau.</p></div> :
+        <EmptyState
+          className="mt-8 border-dashed"
+          icon={ShieldCheck}
+          title="Inbox kamu masih tenang"
+          description="Permintaan dari recruiter akan muncul di sini untuk kamu tinjau."
+        /> :
           <div className="mt-8 space-y-4">{candidateError && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{candidateError}</div>}{requests.map(({ candidateId, state, request }) => {
             const candidate = dbMode ? remoteCandidates[candidateId] : candidates.find((item) => item.id === candidateId);
           const isPending = state === "pending-candidate-consent";

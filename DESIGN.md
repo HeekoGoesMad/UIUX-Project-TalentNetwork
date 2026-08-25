@@ -517,3 +517,7 @@ The following checks were run against the Next.js development server using Playw
 - Authentication, token purchases, jobs, and messaging are demo-only and require backend integration tests when services are added.
 - CSV export should be manually verified in a browser download context when release packaging is tested.
 - Visual regression screenshots should be added once the final production data and copy are available.
+
+### UX pass (August 2026)
+
+Playwright-verified at desktop + mobile viewports: URL-backed search filters/sort restore across reloads; onboarding blocks empty required fields inline and restores localStorage drafts; locked profiles mask salary and hide CV preview until unlock; CV preview dialog offers honest print-to-PDF; partner registration records a demo request without logging in; mobile drawer traps focus and closes on Escape; FAQ/tabs expose ARIA state; zero console errors. Shared `EmptyState` component now backs all empty-result states.

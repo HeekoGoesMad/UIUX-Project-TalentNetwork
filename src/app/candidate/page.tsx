@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, FileText, Map, MessageCircle, Sparkles, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
 
 const items = [
   ["/candidate/cv", "CV & Profil", "Impor PDF dan tinjau profil", FileText],
@@ -19,6 +20,10 @@ export default function CandidateHome() {
         <p className="mt-3 max-w-2xl text-muted-foreground">
           Buat profil yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
         </p>
+
+        <div className="mt-8">
+          <ProfileCompletionCard />
+        </div>
 
         {/* Back to Profile button */}
         <div className="mt-8">

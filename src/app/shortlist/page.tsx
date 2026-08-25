@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, FileText, Send, Trash2 } from "lucide-react";
+import { Bookmark, Check, Download, FileText, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { candidates } from "@/data/candidates";
 import { useApp } from "@/providers/app-provider";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/shared/empty-state";
 
 const consentLabels: Record<string, { label: string; className: string }> = {
   "pending-candidate-consent": { label: "Menunggu consent", className: "border-amber-200 bg-amber-50 text-amber-800" },
@@ -117,9 +118,11 @@ export default function Shortlist() {
           })}
         </div>
       ) : (
-        <div className="mt-8 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {dbMode && remoteItems.length ? "Profil kandidat shortlist tidak ditemukan di database." : "Belum ada kandidat di shortlist."}
-        </div>
+        <EmptyState
+          icon={Bookmark}
+          title={dbMode && remoteItems.length ? "Profil kandidat shortlist tidak ditemukan di database." : "Belum ada kandidat di shortlist."}
+          className="mt-8 border-dashed"
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
