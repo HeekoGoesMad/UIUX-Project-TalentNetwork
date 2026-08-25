@@ -19,7 +19,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
-    void fetch("/api/candidates", { cache: "no-store" })
+    void fetch("/api/candidates?limit=12", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as { candidates?: Candidate[] };
         if (response.ok) setRemoteCandidates(payload.candidates ?? []);
