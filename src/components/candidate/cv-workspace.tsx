@@ -175,7 +175,7 @@ export function CvWorkspace() {
           <div>
             <p className="flex items-center gap-2 font-semibold text-[#111827]">
               <FileUp className="size-4 text-[#7C3AED]" />
-              Impor CV PDF
+              Import CV PDF
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               PDF only, maksimal 5 MB. Hasil AI adalah saran yang bisa kamu edit.
