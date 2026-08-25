@@ -25,6 +25,7 @@ const templates = ["Halo, terima kasih sudah menghubungi saya.", "Apakah Anda te
 
 function MessagesContent({ routeConversationId }: { routeConversationId?: string }) {
   const { user: appUser, hydrated, dbMode, bootstrapped, databaseError } = useApp();
+  const databaseMode = dbMode;
   const user = appUser as typeof appUser & { id: string };
   const router = useRouter();
   const searchParams = useSearchParams();

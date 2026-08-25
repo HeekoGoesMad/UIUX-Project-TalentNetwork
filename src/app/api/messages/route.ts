@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { and, eq } from "drizzle-orm";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { MessagingService } from "@/lib/services/messaging";
+import { schema, type Database } from "@/db";
+
+export async function getParticipant(db: Database, conversationId: string, userId: string) {
+  const [participant] = await db
+    .select()
+    .from(schema.conversationParticipants)
+    .where(
+      and(
+        eq(schema.conversationParticipants.conversationId, conversationId),
+        eq(schema.conversationParticipants.userId, userId)
+      )
+    )
+    .limit(1);
+  return participant ?? null;
+}
 
 const messageSchema = z.object({
   conversationId: z.string().uuid(),

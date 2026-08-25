@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
     const strict = url.searchParams.get("strict") === "true" || body?.strict === true;
     const res = await summary(body, { strict });
-    return withAccessMode(NextResponse.json(res), access);
+    return NextResponse.json(res);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Gagal menghasilkan ringkasan profil AI.";
     return NextResponse.json(

@@ -25,9 +25,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Request body tidak valid." }, { status: 400 });
   }
 
-  const html = buildCvHtml(profile, templateId);
-  const safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
-
   let browser: Browser | undefined;
 
   try {
@@ -50,13 +47,16 @@ export async function POST(request: Request) {
     });
 
      if (access.mode === "database") await writeAuditLog({ db: access.db, actorUserId: access.user.id, action: "cv.exported", entityType: "cv", metadata: { exportKind: "profile_pdf", template: templateId } });
-     return withAccessMode(new NextResponse(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safeFileName}"`,
-        "Content-Length": String(pdf.byteLength),
-      },
-    });
+     return withAccessMode(
+       new NextResponse(new Uint8Array(pdf), {
+         headers: {
+           "Content-Type": "application/pdf",
+           "Content-Disposition": `attachment; filename="${safeFileName}"`,
+           "Content-Length": String(pdf.byteLength),
+         },
+       }),
+       access
+     );
   } catch (error) {
     console.error("[cv/export] Playwright error:", error);
     return NextResponse.json(

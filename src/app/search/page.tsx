@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Database, Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
+import { Database, GraduationCap, Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
 import { candidates } from "@/data/candidates";
 import { CandidateCard } from "@/components/talent/candidate-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -338,7 +338,7 @@ function SearchResultsSkeleton() {
 // Main page
 // ────────────────────────────────────────────────────────────────
 function SearchPageContent() {
-  const { user, dbMode, bootstrapped, databaseError } = useApp();
+  const { user, dbMode, bootstrapped, databaseError, partnerVerifications } = useApp();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

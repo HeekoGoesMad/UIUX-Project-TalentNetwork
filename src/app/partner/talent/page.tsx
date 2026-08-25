@@ -166,9 +166,9 @@ export default function PartnerTalentPage() {
         {/* Stats Row */}
         <div className="mt-6 grid grid-cols-3 gap-4">
           {[
-            { label: "Total Talent", value: MOCK_TALENT.length, color: "text-slate-900" },
-            { label: "Terverifikasi", value: MOCK_TALENT.filter((t) => t.status === "verified").length, color: "text-emerald-600" },
-            { label: "Menunggu Verifikasi", value: MOCK_TALENT.filter((t) => t.status === "pending").length, color: "text-amber-600" },
+            { label: "Total Talent", value: candidates.length, color: "text-slate-900" },
+            { label: "Terverifikasi", value: candidates.filter((t) => t.campusVerification?.status === "verified").length, color: "text-emerald-600" },
+            { label: "Menunggu Verifikasi", value: candidates.filter((t) => t.campusVerification?.status === "pending").length, color: "text-amber-600" },
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="p-4 text-center">

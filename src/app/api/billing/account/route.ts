@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
       const [member] = await scope.db.select({ id: schema.organizationMembers.userId }).from(schema.organizationMembers).where(eq(schema.organizationMembers.organizationId, scope.organizationId));
       if (!member || parsed.data.billingOwnerId !== member.id) {
         const members = await scope.db.select({ id: schema.organizationMembers.userId }).from(schema.organizationMembers).where(eq(schema.organizationMembers.organizationId, scope.organizationId));
-        if (!members.some((item) => item.id === parsed.data.billingOwnerId)) return NextResponse.json({ error: "Billing owner harus anggota organisasi." }, { status: 400 });
+        if (!members.some((item: { id: string }) => item.id === parsed.data.billingOwnerId)) return NextResponse.json({ error: "Billing owner harus anggota organisasi." }, { status: 400 });
       }
     }
     const [account] = await scope.db.insert(schema.billingAccounts).values({ organizationId: scope.organizationId, billingOwnerId: parsed.data.billingOwnerId ?? scope.user.id, spendLimit: parsed.data.spendLimit ?? null }).onConflictDoUpdate({ target: schema.billingAccounts.organizationId, set: { billingOwnerId: parsed.data.billingOwnerId ?? scope.user.id, spendLimit: parsed.data.spendLimit ?? null, updatedAt: new Date() } }).returning();

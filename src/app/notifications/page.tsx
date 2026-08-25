@@ -113,6 +113,7 @@ export default function NotificationsPage() {
           <CardContent className="p-0">
             {notifications.length === 0 ? <EmptyState icon={Bell} title="Belum ada notifikasi." className="border-0 shadow-none" /> : notifications.map((notification) => {
               const unread = !notification.readAt;
+              const href = "href" in notification ? (notification as { href?: string }).href : undefined;
               return <article key={notification.id} className={`flex gap-4 border-b p-5 last:border-0 ${unread ? "bg-[#f7fcfa]" : "bg-white"}`}>
                 <span className={`mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ${unread ? "bg-[#d7f5e8] text-[#08744f]" : "bg-[#f0f6fd] text-slate-400"}`} aria-hidden="true"><Circle className={`size-2.5 fill-current ${unread ? "" : "opacity-40"}`} /></span>
                 <div className="min-w-0 flex-1">

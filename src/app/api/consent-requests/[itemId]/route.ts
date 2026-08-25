@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { ConsentService } from "@/lib/services/consent";
 
-const decisionSchema = z.object({ decision: z.enum(["approved", "declined", "revoked"]) });
+const decisionSchema = z.object({ decision: z.enum(["approved", "declined"]) });
 
 export async function PATCH(
   request: Request,

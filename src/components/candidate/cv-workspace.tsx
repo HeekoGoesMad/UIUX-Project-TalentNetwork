@@ -405,48 +405,6 @@ export function CvWorkspace() {
             icon={<GraduationCap className="size-4 text-primary" />}
           >
             <div className="space-y-4">
-              {profile.education.map((edu, i) => (
-                <div key={i} className="relative rounded-xl border bg-muted/40 p-4">
-                  <button
-                    type="button"
-                    onClick={() => removeEdu(i)}
-                    className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus pendidikan"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  <div className="grid gap-3 md:grid-cols-3 pr-6">
-                    <label className="flex flex-col gap-1 text-sm font-medium md:col-span-1">
-                      Universitas / Institusi
-                      <input
-                        className={inputCls}
-                        value={edu.school}
-                        onChange={(e) => updateEdu(i, "school", e.target.value)}
-                        placeholder="Universitas Indonesia"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Jurusan / Program Studi
-                      <input
-                        className={inputCls}
-                        value={edu.program}
-                        onChange={(e) => updateEdu(i, "program", e.target.value)}
-                        placeholder="Teknik Informatika"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Tahun
-                      <input
-                        className={inputCls}
-                        value={edu.dates}
-                        onChange={(e) => updateEdu(i, "dates", e.target.value)}
-                        placeholder="2018 — 2022"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
               {profile.education.map((edu, i) => {
                 const partnerMatch = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
                 const isVerified = profile.campusVerification?.institution === partnerMatch && profile.campusVerification?.status === "verified";

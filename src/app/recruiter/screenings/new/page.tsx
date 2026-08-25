@@ -120,6 +120,16 @@ export default function NewScreeningPage() {
     return item.name.toLowerCase().includes(q) || item.role.toLowerCase().includes(q) || item.location.toLowerCase().includes(q);
   });
 
+  if (!candidate) {
+    return (
+      <ProtectedRoute role="recruiter">
+        <main className="container mx-auto max-w-3xl px-4 py-8">
+          <p className="text-muted-foreground">{candidateError ?? "Kandidat tidak ditemukan atau belum dipilih."}</p>
+        </main>
+      </ProtectedRoute>
+    );
+  }
+
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-3xl px-4 py-8">
      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]"><ClipboardCheck className="size-4" /> Workspace Recruiter</p>
      <div className="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-bold">Screening berbasis privasi</h1><p className="mt-2 text-muted-foreground">Minta consent sebelum menjalankan insight kecocokan peran dan kualitas data.</p></div><Link href={`/talent/${candidate.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-[#7C3AED]">Lihat profil <ArrowRight className="size-4" /></Link></div>

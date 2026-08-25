@@ -2,13 +2,14 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { schema } from "@/db";
-import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { type Database } from "@/db";
+import { getCurrentAppUser, getRecruiterScope, type AppUser } from "@/lib/api/auth";
 
 export async function currentUserOrError() {
   return getCurrentAppUser();
 }
 
-export type BillingScope = { db: NonNullable<Awaited<ReturnType<typeof getCurrentAppUser>>["db"]>; user: NonNullable<Awaited<ReturnType<typeof getCurrentAppUser>>["user"]>; organizationId: string | null; organizationRole: string };
+export type BillingScope = { db: Database; user: AppUser; organizationId: string | null; organizationRole: string };
 export async function billingScope(current: Awaited<ReturnType<typeof getCurrentAppUser>>): Promise<BillingScope | { error: string; status: 401 | 403 }> {
   if (!("user" in current) || !current.user || !current.db) return { error: "Autentikasi diperlukan.", status: 401 as const };
   const user = current.user;
