@@ -8,6 +8,14 @@
                 "@playwright/mcp@latest"
             ],
             "enabled": true
+        },
+        "brevo": {
+            "type": "remote",
+            "url": "https://mcp.brevo.com/v1/brevo/mcp",
+            "headers": {
+                "Authorization": "Bearer eyJhcGlfa2V5IjoieGtleXNpYi0yMTVhNjc3YWRiOWZlYzBmNDM1YmE2ODhlYjIwYzFmMzgxOGNhNTQwNTU5ZDMwMTQzZTFmOGFlMmNiMWQwNjJhLTFzNEVPM21UaUFEMDhFQVkifQ=="
+            },
+            "enabled": true
         }
     }
 }

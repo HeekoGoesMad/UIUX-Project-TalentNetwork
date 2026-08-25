@@ -5,7 +5,9 @@ import type { User } from "@supabase/supabase-js";
 import { getDb, schema } from "@/db";
 import { ensureDefaultShortlist } from "@/lib/api/shortlists";
 
-export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string }) {
+type PersistedRole = "candidate" | "recruiter";
+
+export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string; role?: PersistedRole }) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
   const authEmail = authUser.email;
 
@@ -24,7 +26,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     const existing = existingByAuthId ?? existingByEmail;
 
     const metadataRole = authUser.user_metadata?.role;
-    const role = existing?.role ?? (metadataRole === "candidate" || metadataRole === "recruiter" ? metadataRole : null);
+    const role = existing?.role ?? (metadataRole === "candidate" || metadataRole === "recruiter" ? metadataRole : input.role ?? null);
     if (!role) throw new Error("ROLE_UNVERIFIED");
 
     const [user] = existing

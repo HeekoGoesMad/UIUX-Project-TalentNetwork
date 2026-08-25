@@ -8,37 +8,105 @@ export type NotificationEmail = {
 
 export type EmailDeliveryResult = {
   providerMessageId: string;
-  mode: "mock";
+  mode: "brevo" | "mock";
 };
 
-type EmailProvider = { kind: "mock" } | { kind: "configured"; name: string };
+type BrevoConfig = {
+  apiKey: string;
+  senderEmail: string;
+  senderName: string;
+};
 
-function getEmailProvider(): EmailProvider {
-  if (process.env.NODE_ENV !== "production") return { kind: "mock" };
-
+function getBrevoConfig(): BrevoConfig {
   const provider = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-  const webhookSecret = process.env.EMAIL_WEBHOOK_SECRET?.trim();
-  if (!provider || !webhookSecret) {
-    throw new Error("Production email delivery requires EMAIL_PROVIDER and EMAIL_WEBHOOK_SECRET.");
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
+  const senderName = process.env.BREVO_SENDER_NAME?.trim();
+
+  if (provider !== "brevo") {
+    throw new Error("Production email delivery requires EMAIL_PROVIDER=brevo.");
   }
-  if (provider === "mock") {
-    throw new Error("Mock email provider is not available in production.");
+  if (!apiKey || !senderEmail || !senderName) {
+    throw new Error(
+      "Production email delivery requires BREVO_API_KEY, BREVO_SENDER_EMAIL, and BREVO_SENDER_NAME.",
+    );
   }
-  return { kind: "configured", name: provider };
+
+  return { apiKey, senderEmail, senderName };
 }
 
-/**
- * Phase 1 intentionally has no network email implementation. Development is
- * observable through delivery rows; production fails explicitly until a
- * provider adapter is added and configured.
- */
+function escapeHtml(value: string) {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character] ?? character,
+  );
+}
+
+function getEmailProvider(): "mock" | "brevo" {
+  if (process.env.NODE_ENV !== "production") return "mock";
+  return "brevo";
+}
+
 export async function sendNotificationEmail(input: NotificationEmail): Promise<EmailDeliveryResult> {
   const provider = getEmailProvider();
-  if (provider.kind === "mock") {
-    void input;
+  if (provider === "mock") {
     return { providerMessageId: `mock-demo-${Date.now()}`, mode: "mock" };
   }
 
-  void input;
-  throw new Error(`Email provider ${provider.name} has no adapter; no email was sent.`);
+  const config = getBrevoConfig();
+  let response: Response;
+
+  try {
+    response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": config.apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { email: config.senderEmail, name: config.senderName },
+        to: [{ email: input.to }],
+        subject: input.subject,
+        textContent: input.text,
+        htmlContent: `<p>${escapeHtml(input.text).replace(/\n/g, "<br />")}</p>`,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new Error("Brevo email request timed out.");
+    }
+    throw new Error("Brevo email request failed before a response was received.");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Brevo email request failed with status ${response.status}.`);
+  }
+
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("Brevo email response was not valid JSON.");
+  }
+
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("messageId" in result) ||
+    typeof result.messageId !== "string" ||
+    !result.messageId
+  ) {
+    throw new Error("Brevo email response did not include a messageId.");
+  }
+
+  return { providerMessageId: result.messageId, mode: "brevo" };
 }
