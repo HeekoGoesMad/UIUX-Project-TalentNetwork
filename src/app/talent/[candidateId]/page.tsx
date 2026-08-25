@@ -15,8 +15,10 @@ import {
   FileText,
   Globe,
   Loader2,
+  Lock,
   Mail,
   Phone,
+  Printer,
   RefreshCw,
   ScanLine,
   ShieldCheck,
@@ -43,6 +45,63 @@ import {
 } from "@/components/ui/dialog";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import type { AiSummary, Candidate, ScreeningInsight, ScreeningResult } from "@/types";
+
+const PORTFOLIO_LABELS: Record<string, string> = {
+  "github.com": "GitHub",
+  "gitlab.com": "GitLab",
+  "linkedin.com": "LinkedIn",
+  "behance.net": "Behance",
+  "dribbble.com": "Dribbble",
+  "medium.com": "Medium",
+};
+
+function portfolioLabel(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return PORTFOLIO_LABELS[hostname] ?? hostname;
+  } catch {
+    return "Portofolio";
+  }
+}
+
+const CV_PRINT_CSS = `
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #cv-print-sheet,
+  #cv-print-sheet * {
+    visibility: visible !important;
+  }
+  #cv-print-sheet {
+    position: absolute !important;
+    inset: auto !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #cv-print-sheet > button {
+    display: none !important;
+  }
+  [data-print-hide] {
+    display: none !important;
+  }
+}
+@page {
+  margin: 14mm;
+}
+`;
 
 function List({ items }: { items: string[] }) {
   return (
@@ -341,6 +400,7 @@ export default function TalentProfile() {
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
   const [loadedCandidateId, setLoadedCandidateId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [openingConversation, setOpeningConversation] = useState(false);
@@ -418,6 +478,32 @@ export default function TalentProfile() {
   };
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
+  const isShortlisted = shortlisted.includes(candidate.id);
+
+  const copyProfileLink = async () => {
+    const url = window.location.href;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API tidak tersedia");
+      await navigator.clipboard.writeText(url);
+      toast.success("Tautan profil berhasil disalin");
+    } catch {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        if (!document.execCommand("copy")) throw new Error("execCommand gagal");
+        toast.success("Tautan profil berhasil disalin");
+      } catch {
+        toast.error("Tautan gagal disalin", {
+          description: "Browser menolak akses clipboard. Salin manual dari address bar.",
+        });
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -457,17 +543,15 @@ export default function TalentProfile() {
                 variant="secondary"
                 size="icon"
                 onClick={() => toggleShortlist(candidate.id)}
-                aria-label="Simpan ke shortlist"
+                aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
+                aria-pressed={isShortlisted}
               >
-                <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary" : ""} />
+                <Bookmark className={isShortlisted ? "fill-primary" : ""} />
               </Button>
               <Button
                 variant="secondary"
                 size="icon"
-                onClick={() => {
-                  navigator.clipboard?.writeText(window.location.href);
-                  toast.success("Tautan profil berhasil disalin");
-                }}
+                onClick={() => void copyProfileLink()}
                 aria-label="Salin tautan profil"
               >
                 <Copy />
@@ -546,8 +630,9 @@ export default function TalentProfile() {
                   </div>
 
                   <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-amber-200/60 pt-4">
-                    <span className="font-mono text-sm font-semibold text-amber-950">
-                      Ekspektasi gaji: {candidate.salary}
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-amber-950">
+                      <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+                      Ekspektasi gaji: Tersembunyi — buka profil untuk melihat
                     </span>
                     <Button
                       size="lg"
@@ -593,15 +678,15 @@ export default function TalentProfile() {
 
               {/* Portfolio & CV buttons */}
               <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
-                {candidate.portfolio.map((url, idx) => (
-                  <Button key={idx} variant="outline" size="sm" asChild>
+                {candidate.portfolio.map((url) => (
+                  <Button key={url} variant="outline" size="sm" asChild>
                     <a href={url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> Portofolio #{idx + 1}
+                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> {portfolioLabel(url)}
                     </a>
                   </Button>
                 ))}
-                <Button variant="outline" size="sm" onClick={() => toast.info("Mengunduh CV...", { description: `${candidate.name}_CV.pdf` })}>
-                  <FileText className="mr-1.5 size-3.5 text-primary" /> Unduh CV PDF
+                <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
+                  <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
                 </Button>
               </div>
             </div>
@@ -718,6 +803,93 @@ export default function TalentProfile() {
             <Button disabled={scanning || (tokens <= 0 && !devBypass)} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
               {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CV Preview Dialog */}
+      <Dialog open={cvPreviewOpen} onOpenChange={setCvPreviewOpen}>
+        <DialogContent id="cv-print-sheet" className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <style>{CV_PRINT_CSS}</style>
+          <DialogHeader>
+            <DialogTitle>Pratinjau CV (ATS)</DialogTitle>
+            <DialogDescription>
+              Format satu kolom siap diekspor. Ekspor memakai fitur cetak browser — aplikasi ini demo dan tidak membuat file PDF secara otomatis.
+            </DialogDescription>
+          </DialogHeader>
+
+          <article className="space-y-5 rounded-md border bg-white p-6 text-[#111827]">
+            <header>
+              <h3 className="text-xl font-bold tracking-tight">{candidate.name}</h3>
+              <p className="mt-1 text-sm text-[#374151]">
+                {candidate.role} · {candidate.location} · {candidate.experience} tahun pengalaman
+              </p>
+              <p className="mt-2 break-all text-sm text-[#374151]">
+                {candidate.email} · {candidate.phone} · {candidate.linkedin}
+              </p>
+            </header>
+
+            <div className="flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 font-mono text-xs text-[#374151]">
+              <span>Versi CV: 1.0 · Demo</span>
+              <span>
+                Dibuat:{" "}
+                {new Date().toLocaleString("id-ID", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Ringkasan</h4>
+              <p className="mt-2 text-sm leading-6 text-[#374151]">{candidate.summary}</p>
+            </section>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Skill &amp; Tools</h4>
+              <p className="mt-2 text-sm leading-6 text-[#374151]">
+                <span className="font-semibold">Skill:</span> {candidate.skills.join(", ")}
+              </p>
+              <p className="text-sm leading-6 text-[#374151]">
+                <span className="font-semibold">Tools:</span> {candidate.tools.join(", ")}
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Pengalaman Kerja</h4>
+              <ul className="mt-2 space-y-2">
+                {candidate.history.map((item) => (
+                  <li key={`${item.company}-${item.role}`} className="text-sm leading-6">
+                    <span className="font-semibold">{item.role}</span>
+                    <span className="text-[#374151]"> — {item.company}</span>
+                    <span className="block font-mono text-xs text-[#374151]">{item.years}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <p className="border-t pt-3 text-xs text-[#374151]">
+              Dokumen demo yang dihasilkan ProofyLink berdasarkan data profil kandidat di aplikasi.
+            </p>
+          </article>
+
+          <DialogFooter data-print-hide className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setCvPreviewOpen(false)}>
+              Tutup
+            </Button>
+            <Button
+              onClick={() => {
+                toast.info("Dialog cetak dibuka", {
+                  description: "Pilih tujuan \u201CSave as PDF\u201D untuk menyimpan CV ini. Ekspor demo — tidak ada file PDF yang dibuat otomatis.",
+                });
+                window.print();
+              }}
+            >
+              <Printer className="mr-2 size-4" /> Cetak / Simpan sebagai PDF
             </Button>
           </DialogFooter>
         </DialogContent>

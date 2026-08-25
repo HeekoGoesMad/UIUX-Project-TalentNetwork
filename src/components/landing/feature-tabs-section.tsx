@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
 import {
   Brain,
@@ -27,6 +27,24 @@ export function FeatureTabsSection() {
   const [activeTab, setActiveTab] = useState<TabId>("search");
   const [tokenCalculatorCount, setTokenCalculatorCount] = useState<number>(10);
 
+  const handleTablistKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = TABS.findIndex((tab) => tab.id === activeTab);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % TABS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = TABS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    setActiveTab(TABS[nextIndex].id);
+    document.getElementById(`feature-tab-${TABS[nextIndex].id}`)?.focus();
+  };
+
   return (
     <section id="features" className="py-20 lg:py-28 bg-[#F9FAFB] scroll-mt-20">
       <div className="container mx-auto px-4">
@@ -42,14 +60,24 @@ export function FeatureTabsSection() {
           </p>
         </div>
 
-        {/* Interactive Feature Tabs */}
-        <div className="mt-12 max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-white p-2 shadow-sm border border-slate-200/80">
+        <div
+          role="tablist"
+          aria-label="Fitur unggulan platform"
+          onKeyDown={handleTablistKeyDown}
+          className="mt-12 max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-white p-2 shadow-sm border border-slate-200/80"
+        >
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                type="button"
+                role="tab"
+                id={`feature-tab-${tab.id}`}
+                aria-selected={active}
+                aria-controls={`feature-panel-${tab.id}`}
+                tabIndex={active ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 ${
                   active
@@ -66,7 +94,13 @@ export function FeatureTabsSection() {
 
         {/* Tab Showcase Contents */}
         <div className="mt-8 max-w-5xl mx-auto">
-          {activeTab === "search" && (
+          <div
+            role="tabpanel"
+            id="feature-panel-search"
+            aria-labelledby="feature-tab-search"
+            tabIndex={0}
+            hidden={activeTab !== "search"}
+          >
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-slate-50 px-3 py-1 text-xs font-semibold text-[#7C3AED]">
@@ -120,9 +154,15 @@ export function FeatureTabsSection() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {activeTab === "privacy" && (
+          <div
+            role="tabpanel"
+            id="feature-panel-privacy"
+            aria-labelledby="feature-tab-privacy"
+            tabIndex={0}
+            hidden={activeTab !== "privacy"}
+          >
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -164,9 +204,15 @@ export function FeatureTabsSection() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {activeTab === "tokens" && (
+          <div
+            role="tabpanel"
+            id="feature-panel-tokens"
+            aria-labelledby="feature-tab-tokens"
+            tabIndex={0}
+            hidden={activeTab !== "tokens"}
+          >
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#1E40AF]">
@@ -182,15 +228,17 @@ export function FeatureTabsSection() {
                 <div className="mt-6 space-y-4">
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-slate-700">
-                      <span>Jumlah Profil Kandidat yang Dibuka:</span>
+                      <label htmlFor="token-calculator-range">Jumlah Profil Kandidat yang Dibuka:</label>
                       <span className="font-mono text-sm text-[#7C3AED]">{tokenCalculatorCount} Kandidat</span>
                     </div>
                     <input
+                      id="token-calculator-range"
                       type="range"
                       min="1"
                       max="50"
                       value={tokenCalculatorCount}
                       onChange={(e) => setTokenCalculatorCount(parseInt(e.target.value))}
+                      aria-valuetext={`${tokenCalculatorCount} kandidat`}
                       className="mt-2 w-full accent-[#7C3AED]"
                     />
                   </div>
@@ -219,9 +267,15 @@ export function FeatureTabsSection() {
                 </Button>
               </div>
             </div>
-          )}
+          </div>
 
-          {activeTab === "ai" && (
+          <div
+            role="tabpanel"
+            id="feature-panel-ai"
+            aria-labelledby="feature-tab-ai"
+            tabIndex={0}
+            hidden={activeTab !== "ai"}
+          >
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
@@ -256,7 +310,7 @@ export function FeatureTabsSection() {
                 </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </section>

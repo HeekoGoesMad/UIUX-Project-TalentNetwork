@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Search, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowRight, Database, Search, ShieldCheck, WalletCards } from "lucide-react";
 import { useEffect, useState } from "react";
 import { candidates as demoCandidates } from "@/data/candidates";
+import { maskName } from "@/lib/candidate-display";
 import { useApp } from "@/providers/app-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Candidate } from "@/types";
@@ -13,6 +15,7 @@ import type { Candidate } from "@/types";
 export default function Dashboard() {
   const { tokens, scans, shortlisted, recentlyViewed, user, dbMode, bootstrapped, databaseError } = useApp();
   const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
@@ -21,10 +24,15 @@ export default function Dashboard() {
         const payload = await response.json() as { candidates?: Candidate[] };
         if (response.ok) setRemoteCandidates(payload.candidates ?? []);
       })
-      .catch(() => setRemoteCandidates([]));
+      .catch(() => setRemoteCandidates([]))
+      .finally(() => setRemoteLoaded(true));
   }, [dbMode, bootstrapped]);
 
   const candidatesList = dbMode && remoteCandidates.length > 0 ? remoteCandidates : demoCandidates;
+  const databaseEmpty = dbMode && bootstrapped && !databaseError && remoteLoaded && remoteCandidates.length === 0;
+
+  const displayNameFor = (candidate: Candidate) =>
+    scans.some((scan) => scan.candidateId === candidate.id) ? candidate.name : maskName(candidate.name);
 
   const recent = recentlyViewed
     .map((id) => candidatesList.find((candidate) => candidate.id === id))
@@ -60,7 +68,19 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {tokens <= 5 && (
+        {tokens === 0 ? (
+          <div className="mt-6 flex flex-col justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm sm:flex-row sm:items-center">
+            <div>
+              <p className="font-semibold text-red-950">Token habis</p>
+              <p className="mt-1 text-red-900/80">Anda tidak punya token untuk membuka profil kandidat baru. Beli token untuk melanjutkan.</p>
+            </div>
+            <Button asChild>
+              <Link href="/pricing">
+                Beli token sekarang <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        ) : tokens <= 5 && (
           <div className="mt-6 flex flex-col justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm sm:flex-row sm:items-center">
             <div>
               <p className="font-semibold text-amber-950">Saldo token hampir habis</p>
@@ -82,6 +102,18 @@ export default function Dashboard() {
           <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">
             Data dashboard belum dapat dimuat. {databaseError}
           </div>
+        ) : databaseEmpty ? (
+          <EmptyState
+            icon={Database}
+            title="Belum ada kandidat di database."
+            description="Mode database aktif dan daftar kandidat masih kosong, sehingga dashboard tidak mencampur data demo ke dalam sesi ini. Untuk melihat alur dengan data contoh, coba mode demo."
+            action={
+              <Button asChild>
+                <Link href="/search">Coba cari talent</Link>
+              </Button>
+            }
+            className="mt-8"
+          />
         ) : (
           <>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -111,6 +143,39 @@ export default function Dashboard() {
               </Card>
             </div>
 
+            <section className="mt-8" aria-label="Aksi cepat">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link
+                  href="/search"
+                  className="card-interactive flex items-start justify-between gap-4 rounded-lg border bg-card p-5 shadow-sm"
+                >
+                  <span>
+                    <span className="flex items-center gap-2 font-semibold text-foreground">
+                      <Search className="size-4 text-[#7C3AED]" /> Cari Talent
+                    </span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Jelajahi jaringan talent dan simpan kandidat potensial ke shortlist.
+                    </span>
+                  </span>
+                  <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                </Link>
+                <Link
+                  href="/recruiter"
+                  className="card-interactive flex items-start justify-between gap-4 rounded-lg border bg-card p-5 shadow-sm"
+                >
+                  <span>
+                    <span className="flex items-center gap-2 font-semibold text-foreground">
+                      <ShieldCheck className="size-4 text-[#7C3AED]" /> Portal rekruter
+                    </span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Pantau kuota pratinjau gratis dan buat permintaan screening berbasis consent.
+                    </span>
+                  </span>
+                  <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                </Link>
+              </div>
+            </section>
+
             <section className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_.8fr]">
               <Card>
                 <CardHeader>
@@ -126,7 +191,7 @@ export default function Dashboard() {
                           className="flex items-center justify-between rounded-xl border p-3 hover:bg-slate-50"
                         >
                           <span>
-                            <span className="font-medium">{candidate.name}</span>
+                            <span className="font-medium">{displayNameFor(candidate)}</span>
                             <span className="block text-sm text-muted-foreground">
                               {candidate.role} · {candidate.location}
                             </span>
@@ -157,7 +222,7 @@ export default function Dashboard() {
                     <div className="space-y-3">
                       {scanned.map((candidate) => (
                         <Link key={candidate.id} href={`/talent/${candidate.id}`} className="block text-sm hover:text-slate-900">
-                          <span className="font-medium">{candidate.name}</span>
+                          <span className="font-medium">{displayNameFor(candidate)}</span>
                           <span className="block text-muted-foreground">{candidate.role}</span>
                         </Link>
                       ))}
@@ -181,7 +246,7 @@ export default function Dashboard() {
                     <div className="grid gap-3 md:grid-cols-3">
                       {shortlist.map((candidate) => (
                         <Link key={candidate.id} href={`/talent/${candidate.id}`} className="rounded-xl border p-3 hover:bg-slate-50">
-                          <p className="font-medium">{candidate.name}</p>
+                          <p className="font-medium">{displayNameFor(candidate)}</p>
                           <p className="mt-1 text-sm text-muted-foreground">{candidate.role}</p>
                         </Link>
                       ))}

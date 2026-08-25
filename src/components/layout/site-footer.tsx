@@ -37,6 +37,8 @@ export function SiteFooter() {
           <Link href="/pricing">Harga & Token</Link>
           <Link href="/jobs">Lowongan</Link>
           <Link href="/messages">Pesan</Link>
+          <Link href="/terms">Syarat &amp; Ketentuan</Link>
+          <Link href="/privacy">Kebijakan Privasi</Link>
         </nav>
       </div>
     </footer>

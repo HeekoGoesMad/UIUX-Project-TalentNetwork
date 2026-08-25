@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronRight, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { candidates } from "@/data/candidates";
 
 const CATEGORIES = [
@@ -75,7 +76,20 @@ export function TalentPreviewSection() {
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {filteredCandidates.map((c) => (
+          {filteredCandidates.length === 0 ? (
+            <EmptyState
+              icon={UserCheck}
+              title="Belum ada talent pada kategori ini"
+              description="Pratinjau jaringan demo ini tidak memiliki kandidat untuk filter yang dipilih. Coba kategori lain atau telusuri seluruh jaringan di halaman Search."
+              action={
+                <Button variant="outline" size="sm" onClick={() => setCandidateFilter("all")}>
+                  Lihat Semua Peran
+                </Button>
+              }
+              className="md:col-span-2 lg:col-span-4"
+            />
+          ) : (
+            filteredCandidates.map((c) => (
             <Card
               key={c.id}
               className="border-white/15 bg-white/95 text-[#10233f] shadow-lg backdrop-blur-md rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform"
@@ -114,7 +128,8 @@ export function TalentPreviewSection() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          ))
+          )}
         </div>
 
         <div className="mt-12 text-center">

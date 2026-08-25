@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,49 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const drawer = drawerRef.current;
+    const menuButton = menuButtonRef.current;
+    const getFocusable = () =>
+      Array.from(drawer?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? []);
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = getFocusable();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!drawer?.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      menuButton?.focus();
+    };
+  }, [open]);
 
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
@@ -80,7 +123,7 @@ export function SiteHeader() {
             ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
             : isOverDarkHeader
             ? "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-dark-top text-white"
-            : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-[#0a1628]"
+            : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-foreground"
         )}
       >
         {/* Logo */}
@@ -96,11 +139,11 @@ export function SiteHeader() {
           }
           className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
             <ShieldCheck className="size-5" />
           </span>
-          <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-[#111827]")}>
-            Proofy<span className="text-[#7C3AED]">Link</span>
+          <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-foreground")}>
+            Proofy<span className="text-primary">Link</span>
           </span>
         </Link>
 
@@ -157,7 +200,7 @@ export function SiteHeader() {
               href="/partner"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
-              <GraduationCap className="size-4 text-[#7C3AED]" />
+              <GraduationCap className="size-4 text-primary" />
               <span className="hidden text-muted-foreground sm:inline text-xs">Career Center</span>
             </Link>
           )}
@@ -167,7 +210,7 @@ export function SiteHeader() {
               href="/dashboard"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
-              <WalletCards className="size-4 text-[#7C3AED]" />
+              <WalletCards className="size-4 text-primary" />
               <span className="font-mono">{devBypass ? "∞" : tokens}</span>
               <span className="hidden text-muted-foreground sm:inline">token</span>
             </Link>
@@ -176,9 +219,9 @@ export function SiteHeader() {
           {visibleUser && (() => {
             const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href="/notifications" className="relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+              <Link href="/notifications" className="relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
                 <Bell className="size-4" />
-                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#19a974] text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
             );
           })()}
@@ -203,7 +246,7 @@ export function SiteHeader() {
                   asChild
                 >
                   <Link href="/register">
-                    <UserPlus className="mr-1.5 size-4 inline text-[#7C3AED]" />
+                    <UserPlus className="mr-1.5 size-4 inline text-primary" />
                     Daftar akun
                   </Link>
                 </Button>
@@ -211,12 +254,7 @@ export function SiteHeader() {
                 <Button
                   variant="default"
                   size="sm"
-                  className={cn(
-                    "rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9 whitespace-nowrap",
-                    isOverDarkHeader
-                      ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
-                      : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
-                  )}
+                  className="rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
                   asChild
                 >
                   <Link href="/login">
@@ -230,10 +268,13 @@ export function SiteHeader() {
 
           {/* Mobile Menu Toggle */}
           <Button
+            ref={menuButtonRef}
             variant="ghost"
             size="icon"
             className={cn("rounded-full md:hidden shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
             aria-label={open ? "Tutup menu" : "Buka menu"}
+            aria-expanded={open}
+            aria-controls="mobile-menu"
             onClick={() => setOpen(!open)}
           >
             {open ? <X /> : <Menu />}
@@ -243,7 +284,14 @@ export function SiteHeader() {
 
       {/* Mobile Drawer */}
       {open && (
-        <nav className="mt-2 rounded-2xl border bg-white/95 backdrop-blur-xl p-4 shadow-2xl md:hidden pointer-events-auto animate-fade-up">
+        <nav
+          ref={drawerRef}
+          id="mobile-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu navigasi"
+          className="mt-2 rounded-2xl border bg-white/95 backdrop-blur-xl p-4 shadow-2xl md:hidden pointer-events-auto animate-fade-up"
+        >
           <div className="flex flex-col gap-1">
             {links.map((link) => {
               const isAnchor = link.href.startsWith("#") || link.href.includes("#");
@@ -271,7 +319,7 @@ export function SiteHeader() {
               <div className="mt-2 border-t pt-3 flex flex-col gap-2">
                 {pathname !== "/login" && (
                   <Link
-                    className="flex items-center justify-center gap-2 rounded-xl bg-[#7C3AED] py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#6D28D9]"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                     href="/login"
                     onClick={() => setOpen(false)}
                   >
@@ -284,7 +332,7 @@ export function SiteHeader() {
                     href="/register"
                     onClick={() => setOpen(false)}
                   >
-                    <UserPlus className="size-4 text-[#7C3AED]" /> Daftar akun baru
+                    <UserPlus className="size-4 text-primary" /> Daftar akun baru
                   </Link>
                 )}
               </div>
