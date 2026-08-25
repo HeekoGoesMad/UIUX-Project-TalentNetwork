@@ -1,3 +1,23 @@
 import { NextResponse } from "next/server";
 import { careerAdvisor } from "@/lib/ai/provider";
-export async function POST(request: Request) { try { return NextResponse.json(await careerAdvisor(await request.json())); } catch { return NextResponse.json({ error: "Profile context tidak valid." }, { status: 400 }); } }
+import { getAiEndpointAuth } from "@/lib/api/ai-auth";
+
+export async function POST(request: Request) {
+  const auth = await getAiEndpointAuth();
+  if (!auth.success) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  try {
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Data profil tidak valid." }, { status: 400 });
+    }
+
+    const result = await careerAdvisor(body);
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Gagal memproses rekomendasi karier AI.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
