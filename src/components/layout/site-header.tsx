@@ -6,17 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
-  const { tokens, user, hydrated, notifications, devBypass, logout, activePartnerInstitution, partnerVerifications } = useApp();
+  const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
   const visibleUser = hydrated ? user : null;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -64,13 +57,6 @@ export function SiteHeader() {
       menuButton?.focus();
     };
   }, [open]);
-
-  const pendingVerificationsCount = useMemo(() => {
-    if (!partnerVerifications) return 0;
-    return Object.values(partnerVerifications).filter(
-      (v) => v.institution.toLowerCase() === activePartnerInstitution.toLowerCase() && v.status === "pending"
-    ).length;
-  }, [partnerVerifications, activePartnerInstitution]);
 
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
@@ -148,7 +134,7 @@ export function SiteHeader() {
                 ? "/candidate"
                 : visibleUser.role === "partner"
                 ? "/partner"
-                : "/recruiter/dashboard"
+                : "/dashboard"
               : "/"
           }
           className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
@@ -180,174 +166,20 @@ export function SiteHeader() {
               </a>
             ) : (
               <Link
-                href="/recruiter/dashboard"
+                key={link.href}
+                href={link.href}
                 className={cn(
                   "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  isLinkActive("/recruiter/dashboard") &&
-                    (isOverDarkHeader
-                      ? "bg-white/15 font-semibold text-white"
-                      : "bg-slate-900 text-white font-semibold")
+                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
                 )}
               >
-                Dashboard
+                {link.label}
               </Link>
-
-              {/* Sourcing Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    "flex items-center gap-1 rounded-full px-3.5 py-1.5 transition-colors duration-200 outline-none select-none",
-                    isOverDarkHeader
-                      ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                      : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                    isRecruiterSourcingActive &&
-                      (isOverDarkHeader
-                        ? "bg-white/15 font-semibold text-white"
-                        : "bg-slate-900 text-white font-semibold")
-                  )}
-                >
-                  <span>Sourcing</span>
-                  <ChevronDown className="size-3.5 opacity-70 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64 p-1.5">
-                  <DropdownMenuLabel>Talent Discovery</DropdownMenuLabel>
-                  {recruiterSourcingItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    const active = pathname.startsWith(item.href);
-                    return (
-                      <DropdownMenuItem key={item.href} asChild className={active ? "bg-slate-100 font-semibold text-[#7C3AED]" : ""}>
-                        <Link href={item.href} className="flex items-start gap-3 py-2">
-                          <div className={cn(
-                            "flex size-8 shrink-0 items-center justify-center rounded-lg mt-0.5",
-                            active ? "bg-[#7C3AED] text-white" : "bg-purple-50 text-[#7C3AED]"
-                          )}>
-                            <ItemIcon className="size-4" />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-semibold text-foreground">{item.label}</span>
-                            <span className="text-[11px] font-normal text-muted-foreground leading-tight">
-                              {item.description}
-                            </span>
-                          </div>
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Pipeline Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    "flex items-center gap-1 rounded-full px-3.5 py-1.5 transition-colors duration-200 outline-none select-none",
-                    isOverDarkHeader
-                      ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                      : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                    isRecruiterPipelineActive &&
-                      (isOverDarkHeader
-                        ? "bg-white/15 font-semibold text-white"
-                        : "bg-slate-900 text-white font-semibold")
-                  )}
-                >
-                  <span>Hiring & Ops</span>
-                  <ChevronDown className="size-3.5 opacity-70 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-72 p-1.5">
-                  <DropdownMenuLabel>Pipeline & Selection</DropdownMenuLabel>
-                  {recruiterPipelineItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    const active = pathname.startsWith(item.href);
-                    return (
-                      <DropdownMenuItem key={item.href} asChild className={active ? "bg-slate-100 font-semibold text-[#7C3AED]" : ""}>
-                        <Link href={item.href} className="flex items-start gap-3 py-2">
-                          <div className={cn(
-                            "flex size-8 shrink-0 items-center justify-center rounded-lg mt-0.5",
-                            active ? "bg-[#7C3AED] text-white" : "bg-purple-50 text-[#7C3AED]"
-                          )}>
-                            <ItemIcon className="size-4" />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-semibold text-foreground">{item.label}</span>
-                            <span className="text-[11px] font-normal text-muted-foreground leading-tight">
-                              {item.description}
-                            </span>
-                          </div>
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Messages / Pesan */}
-              <Link
-                href="/recruiter/messages"
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 transition-colors duration-200",
-                  isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
-                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  isLinkActive("/recruiter/messages") &&
-                    (isOverDarkHeader
-                      ? "bg-white/15 font-semibold text-white"
-                      : "bg-slate-900 text-white font-semibold")
-                )}
-              >
-                Pesan
-              </Link>
-            </>
-          ) : (
-            /* Non-recruiter standard links */
-            (isPublicHeader
-              ? publicLinks
-              : visibleUser?.role === "candidate"
-              ? candidateLinks
-              : partnerLinks
-            ).map((link) => {
-              const isAnchor = link.href.startsWith("#") || link.href.includes("#");
-              const active = !isAnchor && isLinkActive(link.href);
-              return isAnchor ? (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "rounded-full px-4 py-2 transition-colors duration-200",
-                    isOverDarkHeader
-                      ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                      : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
-                  )}
-                >
-                  {link.label}
-                </a>
-              ) : (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "inline-flex items-center rounded-full px-4 py-2 transition-colors duration-200",
-                    isOverDarkHeader
-                      ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
-                      : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                    active &&
-                      (isOverDarkHeader
-                        ? "bg-white/15 font-semibold text-white"
-                        : "bg-slate-900 text-white font-semibold")
-                  )}
-                >
-                  <span>{link.label}</span>
-                  {"badge" in link && typeof link.badge === "number" && link.badge > 0 && (
-                    <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-                      {link.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })
-          )}
+            );
+          })}
         </nav>
 
         {/* Right Actions */}
@@ -491,136 +323,21 @@ export function SiteHeader() {
                     href="/login"
                     onClick={() => setOpen(false)}
                   >
-                    <LayoutDashboard className="size-4 text-[#7C3AED]" />
-                    Dashboard
+                    <UserRound className="size-4" /> Masuk ke workspace
                   </Link>
+                )}
+                {pathname !== "/register" && (
                   <Link
-                    href="/recruiter/messages"
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                      isLinkActive("/recruiter/messages") ? "bg-slate-900 text-white font-semibold" : "text-foreground hover:bg-muted"
-                    )}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-xs"
+                    href="/register"
                     onClick={() => setOpen(false)}
                   >
                     <UserPlus className="size-4 text-primary" /> Daftar akun baru
                   </Link>
-                </div>
+                )}
               </div>
-
-              {/* Sourcing Section */}
-              <div>
-                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Sourcing & Talent</p>
-                <div className="mt-1.5 flex flex-col gap-1">
-                  {recruiterSourcingItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    const active = pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                          active ? "bg-slate-900 text-white font-semibold" : "text-foreground hover:bg-muted"
-                        )}
-                        onClick={() => setOpen(false)}
-                      >
-                        <ItemIcon className="size-4 text-[#7C3AED]" />
-                        <div className="flex flex-col">
-                          <span>{item.label}</span>
-                          <span className="text-[10px] text-muted-foreground">{item.description}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Pipeline Section */}
-              <div>
-                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hiring & Pipeline</p>
-                <div className="mt-1.5 flex flex-col gap-1">
-                  {recruiterPipelineItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    const active = pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                          active ? "bg-slate-900 text-white font-semibold" : "text-foreground hover:bg-muted"
-                        )}
-                        onClick={() => setOpen(false)}
-                      >
-                        <ItemIcon className="size-4 text-[#7C3AED]" />
-                        <div className="flex flex-col">
-                          <span>{item.label}</span>
-                          <span className="text-[10px] text-muted-foreground">{item.description}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Other roles mobile drawer */
-            <div className="flex flex-col gap-1">
-              {(isPublicHeader
-                ? publicLinks
-                : visibleUser?.role === "candidate"
-                ? candidateLinks
-                : partnerLinks
-              ).map((link) => {
-                const isAnchor = link.href.startsWith("#") || link.href.includes("#");
-                const active = !isAnchor && isLinkActive(link.href);
-                return isAnchor ? (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-slate-50 hover:text-foreground"
-                    onClick={() => setOpen(false)}
-                  >
-                    {link.label}
-                  </a>
-                ) : (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-                      active ? "bg-slate-900 text-white font-semibold" : "text-foreground hover:bg-muted"
-                    )}
-                    onClick={() => setOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-              {!visibleUser && (
-                <div className="mt-2 border-t pt-3 flex flex-col gap-2">
-                  {pathname !== "/login" && (
-                    <Link
-                      className="flex items-center justify-center gap-2 rounded-xl bg-[#7C3AED] py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#6D28D9]"
-                      href="/login"
-                      onClick={() => setOpen(false)}
-                    >
-                      <UserRound className="size-4" /> Masuk ke workspace
-                    </Link>
-                  )}
-                  {pathname !== "/register" && (
-                    <Link
-                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-xs"
-                      href="/register"
-                      onClick={() => setOpen(false)}
-                    >
-                      <UserPlus className="size-4 text-[#7C3AED]" /> Daftar akun baru
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </nav>
       )}
     </header>

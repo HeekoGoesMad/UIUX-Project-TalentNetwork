@@ -1,33 +1,32 @@
 import { Candidate, CareerStatus, IndustryCategory, TalentCategory } from "@/types";
 
-const names = [
-  "Ayu Lestari", "Budi Santoso", "Citra Dewi", "Dimas Anggara", "Eka Putri",
-  "Fajar Hidayat", "Gita Savitri", "Hendra Wijaya", "Indah Permata", "Joko Susilo",
-  "Kartika Sari", "Lukman Hakim", "Maya Safitri", "Naufal Rizki", "Olivia Tan",
-  "Pratama Yudha", "Qori Andayani", "Rian Pratama", "Siti Rahma", "Taufik Hidayat",
-  "Utami Ningsih", "Vino Bastian", "Winda Utami", "Xavier Malik", "Yolanda Putri",
-  "Zainal Abidin", "Aditya Nugraha", "Bella Chyntia", "Candra Kirana", "Dian Sastro",
+const names = ["Nadia Putri","Rizky Pratama","Clara Wijaya","Bima Santoso","Maya Kusuma","Aditya Ramadhan","Salsabila Noor","Kevin Hartono","Dewi Lestari","Fajar Nugroho","Sarah Tan","Dimas Haryanto","Anisa Rahma","Bagas Permana","Citra Anggraini","Yoga Saputra","Larasati Dewi","Rafi Maulana","Intan Sari","Gilang Wibowo","Mei Chen","Arif Setiawan","Nina Kurnia","Rendra Wijaya","Vania Putri","Teguh Adi","Alya Prameswari","Raka Putra","Wulan Sari","Hendra Gunawan"];
+const roles = ["Senior Product Designer","Frontend Engineer","Growth Marketing Lead","Data Scientist","Product Manager","UX Researcher","Backend Engineer","Brand Strategist"];
+const cities = ["Jakarta","Bandung","Surabaya","Yogyakarta","Bali","Tangerang","Semarang","Medan"];
+const skills = ["Figma","React","TypeScript","SQL","Product strategy","Research","Python","Go","Brand systems","Analytics"];
+
+const careerStatuses: CareerStatus[] = ["open-to-work","open-for-opportunities","freelance-available","internship-available","not-available"];
+
+// ~40% DJoin Verified, ~60% Public — realistic distribution
+const talentCategories: TalentCategory[] = [
+  "djoin-verified","djoin-verified","public","public","public",
+  "djoin-verified","public","public","djoin-verified","public",
+  "public","djoin-verified","public","public","djoin-verified",
+  "public","public","djoin-verified","public","public",
+  "djoin-verified","public","public","djoin-verified","public",
+  "public","djoin-verified","public","public","public",
 ];
 
-const roles = [
-  "UI/UX Designer", "Product Designer", "Frontend Developer", "Fullstack Developer",
-  "Growth Marketer", "Brand Strategist", "Data Analyst", "Operations Lead",
-  "HR Generalist", "Account Executive",
-];
-
-const cities = ["Jakarta", "Bandung", "Surabaya", "Yogyakarta", "Bali", "Remote Indonesia"];
-
-const skills = [
-  "Figma", "User Research", "Wireframing", "Prototyping", "Design Systems",
-  "React", "TypeScript", "Next.js", "Tailwind CSS", "Node.js",
-  "Data Analysis", "SQL", "Python", "A/B Testing", "SEO",
-  "Performance Marketing", "Content Strategy", "Copywriting", "HR Operations", "Talent Acquisition",
-];
-
+// Map roles to industries
 const industries: IndustryCategory[] = [
-  "technology-software", "product-design", "technology-software", "technology-software",
-  "marketing-digital", "marketing-digital", "data-analytics", "human-capital",
-  "human-capital", "sales-bizdev",
+  "product-design",    // Senior Product Designer
+  "technology-software",// Frontend Engineer
+  "marketing-digital", // Growth Marketing Lead
+  "data-analytics",    // Data Scientist
+  "product-design",    // Product Manager
+  "human-capital",     // UX Researcher
+  "technology-software",// Backend Engineer
+  "sales-bizdev",      // Brand Strategist
 ];
 
 const toolsList = ["Figma", "Excel", "Notion", "Looker Studio", "Jira", "Meta Ads", "Google Workspace", "HRIS"];
