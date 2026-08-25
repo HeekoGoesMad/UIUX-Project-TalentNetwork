@@ -19,9 +19,9 @@ export async function POST(request: Request) {
     const res = await summary(body, { strict });
     return NextResponse.json(res);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Gagal menghasilkan ringkasan profil AI.";
+    console.error("Gagal menghasilkan ringkasan profil AI:", error);
     return NextResponse.json(
-      { error: message },
+      { error: "Fitur AI belum dapat diproses. Coba lagi nanti." },
       { status: error instanceof Error && error.message.includes("Konfigurasi") ? 503 : 400 }
     );
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Browser } from "playwright-core";
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
 import { buildCvHtml } from "@/lib/cv/templates";
 
 const experienceItem = z.object({
@@ -54,6 +55,14 @@ const exportSchema = z.object({
 export async function POST(request: Request) {
   const current = await getCurrentAppUser();
   if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+  const rate = enforceRateLimit(`cv-export:${current.user.id}`, RATE_LIMITS.cvExport.limit, RATE_LIMITS.cvExport.windowMs);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Terlalu banyak permintaan. Coba lagi sebentar." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+    );
+  }
 
   const payload = exportSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) {

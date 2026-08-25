@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
 import type { Database } from "@/db";
 
 export type AllowedAiRole = "candidate" | "recruiter" | "admin" | "partner";
@@ -13,20 +14,35 @@ export type AiAuthContext = {
 
 type AiAuthResult =
   | { success: true; context: AiAuthContext }
-  | { success: false; error: string; status: 401 | 403 };
+  | { success: false; error: string; status: 401 | 403 | 429 };
+
+function finishAiAuth(context: AiAuthContext): AiAuthResult {
+  const { allowed } = enforceRateLimit(
+    `ai:${context.user?.id ?? "dev-bypass"}`,
+    RATE_LIMITS.ai.limit,
+    RATE_LIMITS.ai.windowMs
+  );
+  if (!allowed) {
+    return {
+      success: false,
+      error: "Terlalu banyak permintaan fitur AI. Coba lagi sebentar.",
+      status: 429,
+    };
+  }
+  return { success: true, context };
+}
 
 export async function getAiEndpointAuth(options?: {
   allowedRoles?: AllowedAiRole[];
 }): Promise<AiAuthResult> {
+  if (process.env.NODE_ENV === "production" && process.env.DEV_AUTH_BYPASS) {
+    throw new Error("DEV_AUTH_BYPASS must not be set in production");
+  }
   const isDevBypass =
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true" ||
-    (!process.env.DATABASE_URL && process.env.NODE_ENV !== "production");
+    process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true";
 
   if (isDevBypass) {
-    return {
-      success: true,
-      context: { user: null, isDevBypass: true },
-    };
+    return finishAiAuth({ user: null, isDevBypass: true });
   }
 
   const current = await getCurrentAppUser();
@@ -54,12 +70,9 @@ export async function getAiEndpointAuth(options?: {
     };
   }
 
-  return {
-    success: true,
-    context: {
-      user: current.user,
-      db: current.db,
-      isDevBypass: false,
-    },
-  };
+  return finishAiAuth({
+    user: current.user,
+    db: current.db,
+    isDevBypass: false,
+  });
 }

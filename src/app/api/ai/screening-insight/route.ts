@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== "true") {
+  if (process.env.DATABASE_URL && process.env.DEV_AUTH_BYPASS !== "true") {
     return NextResponse.json(
       { error: "Gunakan endpoint screening run resmi agar consent dan charge token tervalidasi." },
       { status: 409 }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const result = await screening(body.profile);
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Gagal memproses insight screening.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Gagal memproses insight screening:", error);
+    return NextResponse.json({ error: "Fitur AI belum dapat diproses. Coba lagi nanti." }, { status: 400 });
   }
 }

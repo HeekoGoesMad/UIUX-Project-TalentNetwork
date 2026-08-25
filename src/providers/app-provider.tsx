@@ -143,8 +143,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
-  const devBypass = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
-  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && !devBypass;
+  const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const configError = process.env.NODE_ENV === "production" && !supabaseConfigured;
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
