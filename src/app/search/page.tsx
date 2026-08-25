@@ -322,8 +322,8 @@ export default function SearchPage() {
       {/* ── Header ── */}
       <div className="flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Talent network</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#111827]">Find the right signal.</h1>
+          <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Jaringan Talent</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#111827]">Temukan sinyal yang tepat.</h1>
           <p className="mt-2 text-muted-foreground">
             {filtered.length} kandidat ditemukan.
           </p>
@@ -333,7 +333,7 @@ export default function SearchPage() {
             variant={filters.view === "grid" ? "secondary" : "outline"}
             size="icon"
             onClick={() => setFilters((f) => ({ ...f, view: "grid" }))}
-            aria-label="Grid view"
+            aria-label="Tampilan grid"
           >
             <Grid2X2 />
           </Button>
@@ -341,7 +341,7 @@ export default function SearchPage() {
             variant={filters.view === "list" ? "secondary" : "outline"}
             size="icon"
             onClick={() => setFilters((f) => ({ ...f, view: "list" }))}
-            aria-label="List view"
+            aria-label="Tampilan daftar"
           >
             <List />
           </Button>
@@ -356,8 +356,8 @@ export default function SearchPage() {
             value={filters.q}
             onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value, page: 1 }))}
             className="pl-9"
-            placeholder="Cari nama, role, skill, atau kota..."
-            aria-label="Search talent"
+            placeholder="Cari nama, role, keahlian, atau kota..."
+            aria-label="Cari talent"
           />
         </div>
 
@@ -410,7 +410,7 @@ export default function SearchPage() {
           {databaseEmpty ? (
             <div className="rounded-lg border border-dashed p-10 text-center">
               <h2 className="text-xl font-semibold">Belum ada kandidat di database.</h2>
-              <p className="mt-2 text-muted-foreground">Belum ada profile kandidat yang dipublikasikan untuk recruiter.</p>
+              <p className="mt-2 text-muted-foreground">Belum ada profil kandidat yang dipublikasikan untuk recruiter.</p>
             </div>
           ) : results.length > 0 ? (
             <div
@@ -444,7 +444,7 @@ export default function SearchPage() {
           {filtered.length > pageSize && (
             <nav
               className="mt-8 flex flex-wrap justify-center gap-2"
-              aria-label="Search results pages"
+              aria-label="Halaman hasil pencarian"
             >
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                 <Button

@@ -148,7 +148,7 @@ export function CvWorkspace() {
   async function importPdf(file: File) {
     const form = new FormData();
     form.set("file", file);
-    setMessage("Membaca PDF sebagai draft...");
+    setMessage("Membaca PDF sebagai draf...");
     const response = await fetch("/api/cv/import", { method: "POST", body: form });
     const data = await response.json();
     if (!response.ok) { setMessage(data.error); return; }
@@ -163,7 +163,7 @@ export function CvWorkspace() {
       portfolio: data.portfolio ?? c.portfolio,
       sourceFileName: file.name,
     }));
-    setMessage("Draft berhasil dibuat. Review semua field sebelum menyimpan.");
+    setMessage("Draf berhasil dibuat. Tinjau semua field sebelum menyimpan.");
   }
 
 
@@ -196,7 +196,7 @@ export function CvWorkspace() {
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-[#111827]">Review CV &amp; Profile</CardTitle>
+          <CardTitle className="text-[#111827]">Tinjau CV &amp; Profil</CardTitle>
           <p className="text-sm text-muted-foreground">
             Isi semua field agar recruiter mendapatkan gambaran lengkap tentang kamu.
           </p>
@@ -363,7 +363,7 @@ export function CvWorkspace() {
           </FormSection>
 
           {/* ── Skills ── */}
-          <FormSection title="Skills">
+          <FormSection title="Skill">
             <Field
               label="Daftar Skill"
               hint="Pisahkan dengan koma. Contoh: Recruitment, Payroll, Digital Marketing"
@@ -425,7 +425,7 @@ export function CvWorkspace() {
 
           {/* ── Portfolio ── */}
           <FormSection
-            title="Portfolio"
+            title="Portofolio"
             icon={<ExternalLink className="size-4 text-[#7C3AED]" />}
           >
             <div className="space-y-3">
@@ -441,14 +441,14 @@ export function CvWorkspace() {
                     type="button"
                     onClick={() => removePortfolio(i)}
                     className="shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus portfolio"
+                    aria-label="Hapus portofolio"
                   >
                     <Trash2 className="size-4" />
                   </button>
                 </div>
               ))}
               <Button type="button" variant="outline" size="sm" onClick={addPortfolio}>
-                <Plus className="size-4" /> Tambah Link / Project
+                <Plus className="size-4" /> Tambah Link / Proyek
               </Button>
             </div>
           </FormSection>
@@ -456,7 +456,7 @@ export function CvWorkspace() {
           {/* ── Action buttons ── */}
           <div className="flex flex-wrap gap-3 border-t pt-4">
             <Button onClick={() => { void saveCvProfile(profile).then(() => setMessage("Profil berhasil disimpan dan disinkronkan.")); }}>
-              <Save className="size-4" /> Simpan Profile
+              <Save className="size-4" /> Simpan Profil
             </Button>
           </div>
 
@@ -476,8 +476,8 @@ export function CvWorkspace() {
       {/* ── Download / Template Picker ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-[#111827]">Preview & Download CV</CardTitle>
-          <p className="text-sm text-muted-foreground">Pilih template dan unduh CV-mu sebagai PDF. Simpan profile terlebih dahulu agar data terbaru digunakan.</p>
+          <CardTitle className="text-[#111827]">Pratinjau &amp; Unduh CV</CardTitle>
+          <p className="text-sm text-muted-foreground">Pilih template dan unduh CV-mu sebagai PDF. Simpan profil terlebih dahulu agar data terbaru digunakan.</p>
         </CardHeader>
         <CardContent>
           <CvDownload profile={profile} />

@@ -168,7 +168,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Sending…
+                  Mengirimkan…
                 </>
               ) : (
                 <>
@@ -246,7 +246,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               />
               <button
                 type="button"
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                 className="absolute right-3.5 top-3 sm:top-3.5 text-slate-400 hover:text-slate-600 focus-visible:outline-none"
                 onClick={() => setShowPassword(!showPassword)}
               >
@@ -264,7 +264,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 type="checkbox"
                 className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
               />
-              <span>Saya menyetujui Ketentuan Layanan & Privacy Policy.</span>
+              <span>Saya menyetujui Ketentuan Layanan &amp; Kebijakan Privasi.</span>
             </label>
           )}
 
@@ -290,7 +290,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                  <Sparkles className="size-4 text-[#7C3AED]" /> Quick Demo Login
+                  <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
                 </span>
                 <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
                   Profil Lengkap

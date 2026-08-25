@@ -7,7 +7,7 @@ export default function Page() {
     <ProtectedRoute role="candidate">
       <main className="container mx-auto max-w-5xl px-4 py-8">
         <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#08744f]">
-          <Sparkles className="size-4" /> Candidate Workspace
+          <Sparkles className="size-4" />Workspace Kandidat
         </p>
         <h1 className="mt-2 text-3xl font-bold text-[#0f2040]">Career Profile Advisor</h1>
         <p className="mt-2 mb-8 text-muted-foreground">

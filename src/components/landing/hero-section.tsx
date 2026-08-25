@@ -57,11 +57,11 @@ export function HeroSection() {
           <Card className="relative overflow-hidden border-white/15 bg-white/95 text-[#111827] shadow-2xl backdrop-blur-xl rounded-2xl">
             <div className="border-b border-slate-200/80 bg-[#F9FAFB] px-6 py-4 flex items-center justify-between">
               <div>
-                <p className="font-semibold text-sm">Network pulse</p>
-                <p className="text-xs text-muted-foreground">Verified profiles open to conversation</p>
+                <p className="font-semibold text-sm">Aktivitas Jaringan</p>
+                <p className="text-xs text-muted-foreground">Profil terverifikasi yang siap berdiskusi</p>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-[#7C3AED]">
-                Live signal
+                Sinyal Aktif
               </span>
             </div>
 
@@ -80,7 +80,7 @@ export function HeroSection() {
                       {item.initials}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#111827]">Private candidate</p>
+                      <p className="truncate text-sm font-semibold text-[#111827]">Kandidat Privat</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {item.role} · {item.city}
                       </p>

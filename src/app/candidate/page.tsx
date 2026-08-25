@@ -4,20 +4,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
 const items = [
-  ["/candidate/cv", "CV & Profile", "Import PDF dan review profile", FileText],
-  ["/candidate/career-advisor", "Career Advisor", "Saran berbasis profile", Sparkles],
-  ["/candidate/career-roadmap", "Career Roadmap", "Langkah yang bisa kamu edit", Map],
-  ["/candidate/contact-requests", "Contact requests", "Kelola percakapan recruiter", MessageCircle],
+  ["/candidate/cv", "CV & Profil", "Impor PDF dan tinjau profil", FileText],
+  ["/candidate/career-advisor", "Career Advisor", "Saran cerdas berbasis profil", Sparkles],
+  ["/candidate/career-roadmap", "Career Roadmap", "Langkah terarah yang bisa kamu sesuaikan", Map],
+  ["/candidate/contact-requests", "Permintaan Kontak", "Kelola percakapan dengan recruiter", MessageCircle],
 ] as const;
 
 export default function CandidateHome() {
   return (
     <ProtectedRoute role="candidate">
       <main className="container mx-auto max-w-5xl px-4 py-12">
-        <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Candidate workspace</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Workspace Kandidat</p>
         <h1 className="mt-3 text-4xl font-bold text-[#111827]">Mulai dari cerita kariermu.</h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Buat profile yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
+          Buat profil yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
         </p>
 
         {/* Back to Profile button */}
@@ -31,7 +31,7 @@ export default function CandidateHome() {
                 <div className="flex-1">
                   <p className="font-semibold text-[#7C3AED]">Lihat Profil Kamu</p>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    Review tampilan profil seperti yang dilihat recruiter
+                    Tinjau tampilan profil seperti yang dilihat recruiter
                   </p>
                 </div>
                 <span className="inline-flex items-center text-sm font-semibold text-[#7C3AED]">

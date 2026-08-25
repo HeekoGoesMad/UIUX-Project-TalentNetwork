@@ -363,7 +363,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return true;
     }
     if (state.tokens <= 0) {
-      toast.error("You are out of tokens", { description: "Add tokens to scan another profile." });
+      toast.error("Token Anda habis", { description: "Tambah token untuk membuka profil lainnya." });
       return false;
     }
     setState((current) => ({
@@ -371,7 +371,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tokens: Math.max(0, current.tokens - 1),
       scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
-    toast.success("Profile unlocked", { description: "One token was used." });
+    toast.success("Profil berhasil dibuka", { description: "1 token telah digunakan." });
     return true;
   };
 
@@ -387,7 +387,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setState((current) => {
     const exists = current.shortlisted.includes(id);
-    toast.success(exists ? "Removed from shortlist" : "Added to shortlist");
+    toast.success(exists ? "Dihapus dari shortlist" : "Ditambahkan ke shortlist");
     return { ...current, shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id] };
     });
   };
@@ -567,7 +567,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
   const previewCandidate = (candidateId: string) => {
     if (state.scans.some((scan) => scan.candidateId === candidateId)) return true;
-    if (state.previewsUsed >= 5) { toast.error("Free preview trial habis", { description: "Screening tetap membutuhkan consent dan token." }); return false; }
+    if (state.previewsUsed >= 5) { toast.error("Pratinjau gratis trial habis", { description: "Screening tetap membutuhkan consent dan token." }); return false; }
     setState((current) => ({ ...current, previewsUsed: current.previewsUsed + 1 }));
     return true;
   };

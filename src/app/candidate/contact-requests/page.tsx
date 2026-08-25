@@ -52,9 +52,9 @@ export default function ContactRequestsPage() {
     <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
       <div className="flex flex-col gap-6 border-b pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
-      <p className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Workspace kandidat / privasi</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-[#08744f]">Workspace Kandidat / Privasi</p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Permintaan kontak</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Pilih siapa yang boleh melanjutkan ke screening. Profile kamu tetap aman sampai kamu menyetujui permintaan.</p>
+          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Pilih siapa yang boleh melanjutkan ke screening. Profil kamu tetap aman sampai kamu menyetujui permintaan.</p>
         </div>
         {pending.length > 0 && <Button onClick={approvePendingRequests}><Check className="size-4" /> Setujui {pending.length} permintaan</Button>}
       </div>

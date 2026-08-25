@@ -154,10 +154,10 @@ function ScreeningResults({
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
-            <ShieldCheck className="size-4" /> Recruiter insight
+            <ShieldCheck className="size-4" /> Insight Recruiter
           </p>
           <h2 id="screening-results-title" className="mt-2 text-2xl font-bold text-[#111827]">
-            Hasil screening
+            Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Insight berbasis role fit dan kualitas data, ditampilkan setelah consent kandidat dan screening selesai.
@@ -177,7 +177,7 @@ function ScreeningResults({
             <div>
               <p className="font-semibold text-[#111827]">Hasil belum tersedia</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profile sudah dibuka.
+                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profil sudah dibuka.
               </p>
             </div>
           </CardContent>
@@ -233,7 +233,7 @@ function ScreeningResults({
                 </div>
                 <div className="mt-5">
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Data coverage</span>
+                    <span className="font-semibold">Cakupan data</span>
                     <span className="font-mono text-[#7C3AED]">{result.insight.coverage}%</span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[#7C3AED]/20">
@@ -243,7 +243,7 @@ function ScreeningResults({
                     />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Seberapa banyak konteks profile yang tersedia untuk insight ini.
+                    Seberapa banyak konteks profil yang tersedia untuk insight ini.
                   </p>
                 </div>
               </div>
@@ -253,7 +253,7 @@ function ScreeningResults({
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Evidence yang terdeteksi</CardTitle>
+                <CardTitle className="text-lg">Bukti yang terdeteksi</CardTitle>
               </CardHeader>
               <CardContent>
                 <List items={result.insight.evidence} />
@@ -300,15 +300,15 @@ function ScreeningResults({
           <Card className="bg-muted/30">
             <CardContent className="space-y-3 p-5">
               <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-muted-foreground">
-                <span>Source: {result.insight.source}</span>
+                <span>Sumber: {result.insight.source}</span>
                 <span>Model: {result.insight.modelVersion}</span>
-                <span>Fetched: {new Date(result.fetchedAt).toLocaleDateString("id-ID")}</span>
+                <span>Diambil: {new Date(result.fetchedAt).toLocaleDateString("id-ID")}</span>
               </div>
               <p className="flex gap-2 text-sm font-medium">
                 <CircleHelp className="mt-0.5 size-4 shrink-0 text-amber-600" />
                 Human review diperlukan. Gunakan hasil ini sebagai bahan persiapan interview, bukan keputusan hire/reject.
               </p>
-              <p className="text-sm text-muted-foreground">Next step: {result.insight.followUp}</p>
+              <p className="text-sm text-muted-foreground">Langkah berikutnya: {result.insight.followUp}</p>
             </CardContent>
           </Card>
         </div>
@@ -381,19 +381,19 @@ export default function TalentProfile() {
     );
 
   if (dbMode && (!bootstrapped || loadedCandidateId !== candidateId))
-    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-muted-foreground" role="status">Memuat profile kandidat dari database...</p></div>;
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-muted-foreground" role="status">Memuat profil kandidat dari database...</p></div>;
 
   if (dbMode && databaseError)
-    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-red-700" role="alert">Profile kandidat belum dapat dimuat. {databaseError}</p><Button className="mt-6" asChild><Link href="/search">Kembali ke pencarian</Link></Button></div>;
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-red-700" role="alert">Profil kandidat belum dapat dimuat. {databaseError}</p><Button className="mt-6" asChild><Link href="/search">Kembali ke pencarian</Link></Button></div>;
 
   if (!candidate)
     return (
       <div className="container mx-auto max-w-md px-4 py-16 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">404 / profile missing</p>
-        <h1 className="mt-3 text-3xl font-bold">This profile moved on.</h1>
-        <p className="mt-3 text-muted-foreground">Try another candidate from the network.</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">404 / Profil Tidak Ditemukan</p>
+        <h1 className="mt-3 text-3xl font-bold">Profil ini sudah tidak tersedia.</h1>
+        <p className="mt-3 text-muted-foreground">Coba cari kandidat lain di jaringan talent.</p>
         <Button className="mt-6" asChild>
-          <Link href="/search">Return to search</Link>
+          <Link href="/search">Kembali ke pencarian</Link>
         </Button>
       </div>
     );
@@ -403,8 +403,8 @@ export default function TalentProfile() {
 
   const startScan = () => {
     if (tokens <= 0 && !devBypass) {
-      toast.error("No tokens available", {
-        description: "Add tokens before scanning a new profile.",
+      toast.error("Token tidak mencukupi", {
+        description: "Beli token terlebih dahulu sebelum membuka profil baru.",
       });
       setConfirmOpen(false);
       return;
@@ -457,7 +457,7 @@ export default function TalentProfile() {
                 variant="secondary"
                 size="icon"
                 onClick={() => toggleShortlist(candidate.id)}
-                aria-label="Toggle shortlist"
+                aria-label="Simpan ke shortlist"
               >
                 <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary" : ""} />
               </Button>
@@ -466,9 +466,9 @@ export default function TalentProfile() {
                 size="icon"
                 onClick={() => {
                   navigator.clipboard?.writeText(window.location.href);
-                  toast.success("Profile link copied");
+                  toast.success("Tautan profil berhasil disalin");
                 }}
-                aria-label="Copy profile link"
+                aria-label="Salin tautan profil"
               >
                 <Copy />
               </Button>
@@ -482,7 +482,7 @@ export default function TalentProfile() {
           <CardContent className="space-y-8 px-6 py-8 sm:px-10">
             {/* Overview / AI Summary Preview */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Summary / Overview</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Summary / Ringkasan Profil</h3>
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
 
@@ -535,10 +535,10 @@ export default function TalentProfile() {
                       <Check className="size-3.5 text-amber-700" /> Nomor Telepon / WA
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <Check className="size-3.5 text-amber-700" /> CV (PDF Download)
+                      <Check className="size-3.5 text-amber-700" /> CV (Unduh PDF)
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <Check className="size-3.5 text-amber-700" /> LinkedIn Profile
+                      <Check className="size-3.5 text-amber-700" /> Profil LinkedIn
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Check className="size-3.5 text-amber-700" /> Portofolio Lengkap
@@ -547,7 +547,7 @@ export default function TalentProfile() {
 
                   <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-amber-200/60 pt-4">
                     <span className="font-mono text-sm font-semibold text-amber-950">
-                      Expected range: {candidate.salary}
+                      Ekspektasi gaji: {candidate.salary}
                     </span>
                     <Button
                       size="lg"
@@ -568,7 +568,7 @@ export default function TalentProfile() {
             {/* Contact & Links Bar */}
             <div className="rounded-xl border bg-slate-50/80 p-5">
               <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Unlocked Contact &amp; Profiles
+                Kontak &amp; Profil Terbuka
               </p>
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 <div className="flex items-center gap-2 text-sm">
@@ -586,7 +586,7 @@ export default function TalentProfile() {
                 <div className="flex items-center gap-2 text-sm">
                   <Globe className="size-4 text-sky-600 shrink-0" />
                   <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
-                    LinkedIn Profile <ExternalLink className="size-3" />
+                    Profil LinkedIn <ExternalLink className="size-3" />
                   </a>
                 </div>
               </div>
@@ -596,12 +596,12 @@ export default function TalentProfile() {
                 {candidate.portfolio.map((url, idx) => (
                   <Button key={idx} variant="outline" size="sm" asChild>
                     <a href={url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> Portfolio #{idx + 1}
+                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> Portofolio #{idx + 1}
                     </a>
                   </Button>
                 ))}
                 <Button variant="outline" size="sm" onClick={() => toast.info("Mengunduh CV...", { description: `${candidate.name}_CV.pdf` })}>
-                  <FileText className="mr-1.5 size-3.5 text-primary" /> Download CV PDF
+                  <FileText className="mr-1.5 size-3.5 text-primary" /> Unduh CV PDF
                 </Button>
               </div>
             </div>
@@ -615,7 +615,7 @@ export default function TalentProfile() {
             {/* Skills & Tools */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skills</p>
+                <p className="mb-2 text-sm font-semibold">Skill</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">
@@ -667,7 +667,7 @@ export default function TalentProfile() {
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, charge token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, pemotongan token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
                 </div>
                 <Button
                   disabled={openingConversation}
