@@ -40,27 +40,37 @@ export function FaqSection() {
         <div className="mt-12 space-y-4">
           {FAQS.map((faq, idx) => {
             const isOpen = openFaq === idx;
+            const buttonId = `faq-trigger-${idx}`;
+            const panelId = `faq-panel-${idx}`;
             return (
               <div
                 key={idx}
                 className="rounded-2xl border border-slate-200/80 bg-[#f8fafc] overflow-hidden transition-colors"
               >
                 <button
+                  type="button"
+                  id={buttonId}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
                   className="w-full flex items-center justify-between p-5 text-left text-sm font-bold text-[#111827] hover:bg-slate-100 cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   <ChevronDown
-                    className={`size-5 text-slate-500 transition-transform duration-200 shrink-0 ${
+                    className={`size-5 text-muted-foreground transition-transform duration-200 shrink-0 ${
                       isOpen ? "rotate-180 text-[#7C3AED]" : ""
                     }`}
                   />
                 </button>
-                {isOpen && (
-                  <div className="px-5 pb-5 text-xs sm:text-sm leading-6 text-muted-foreground border-t border-slate-200/60 pt-3">
-                    {faq.a}
-                  </div>
-                )}
+                <div
+                  id={panelId}
+                  role="region"
+                  aria-labelledby={buttonId}
+                  hidden={!isOpen}
+                  className="px-5 pb-5 text-xs sm:text-sm leading-6 text-muted-foreground border-t border-slate-200/60 pt-3"
+                >
+                  {faq.a}
+                </div>
               </div>
             );
           })}

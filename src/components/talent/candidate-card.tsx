@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
   const { shortlisted, toggleShortlist, scans } = useApp();
   const unlocked = scans.some((scan) => scan.candidateId === candidate.id);
+  const isShortlisted = shortlisted.includes(candidate.id);
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
 
   return (
@@ -31,9 +32,10 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
               size="icon"
               className="-mr-2 -mt-1 shrink-0"
               onClick={() => toggleShortlist(candidate.id)}
-              aria-label="Simpan ke shortlist"
+              aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
+              aria-pressed={isShortlisted}
             >
-              <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary text-primary" : ""} />
+              <Bookmark className={isShortlisted ? "fill-primary text-primary" : ""} />
             </Button>
           </div>
 

@@ -24,8 +24,19 @@ export function InteractiveMarquee({
   const currentSpeedRef = useRef(speed);
   const isHoveredRef = useRef(false);
   const isDraggingRef = useRef(false);
+  const prefersReducedMotionRef = useRef(false);
   const startXRef = useRef(0);
   const [isDraggingState, setIsDraggingState] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    prefersReducedMotionRef.current = mediaQuery.matches;
+    const handleChange = (event: MediaQueryListEvent) => {
+      prefersReducedMotionRef.current = event.matches;
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -46,7 +57,7 @@ export function InteractiveMarquee({
       if (isVisible) {
         const singleWidth = singleContentRef.current?.offsetWidth || 0;
 
-        if (!isDraggingRef.current) {
+        if (!isDraggingRef.current && !prefersReducedMotionRef.current) {
           // Smoothly interpolate speed on hover / unhover to prevent any visual jumps
           const targetSpeed = isHoveredRef.current ? hoverSpeed : speed;
           currentSpeedRef.current += (targetSpeed - currentSpeedRef.current) * 0.08;
@@ -141,11 +152,11 @@ export function InteractiveMarquee({
           {children}
         </div>
         {/* Set 2 (for seamless infinite loop) */}
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center" aria-hidden="true">
           {children}
         </div>
         {/* Set 3 (extra buffer for ultra-wide displays) */}
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center" aria-hidden="true">
           {children}
         </div>
       </div>

@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ExternalLink,
+  FileText,
   GraduationCap,
   MapPin,
   Pencil,
@@ -19,6 +20,7 @@ import { AiSummaryCard } from "@/components/talent/ai-summary-card";
 import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
 import { cn } from "@/lib/utils";
@@ -283,7 +285,12 @@ export default function ProfilePage() {
             </section>
 
             {!cvProfile && dbMode && (
-              <Card><CardContent className="p-6"><h2 className="text-lg font-semibold">Profil belum tersedia</h2><p className="mt-2 text-sm text-muted-foreground">Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu.</p><Button className="mt-4" asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button></CardContent></Card>
+              <EmptyState
+                icon={FileText}
+                title="Profil belum tersedia"
+                description="Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu."
+                action={<Button asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button>}
+              />
             )}
 
             {/* Tentang Saya & AI Summary */}
@@ -412,14 +419,17 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed p-5 text-center">
-                  <BriefcaseBusiness className="mx-auto size-6 text-[#7C3AED]" />
-                  <p className="mt-2 text-sm font-semibold">Tampilkan karya terbaikmu</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/candidate">Tambah portofolio</Link>
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={BriefcaseBusiness}
+                  title="Tampilkan karya terbaikmu"
+                  description="Tambahkan case study terbaikmu."
+                  action={
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/candidate">Tambah portofolio</Link>
+                    </Button>
+                  }
+                  className="rounded-xl border-dashed bg-transparent p-5 shadow-none"
+                />
               )}
             </ProfileSection>
           </aside>
