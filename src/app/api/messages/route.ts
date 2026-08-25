@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { and, eq } from "drizzle-orm";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
 import { MessagingService } from "@/lib/services/messaging";
+import { schema, type Database } from "@/db";
+
+export async function getParticipant(db: Database, conversationId: string, userId: string) {
+  const [participant] = await db
+    .select()
+    .from(schema.conversationParticipants)
+    .where(
+      and(
+        eq(schema.conversationParticipants.conversationId, conversationId),
+        eq(schema.conversationParticipants.userId, userId)
+      )
+    )
+    .limit(1);
+  return participant ?? null;
+}
 
 const messageSchema = z.object({
   conversationId: z.string().uuid(),
   body: z.string().trim().min(1).max(4_000),
+  attachment: z.object({ name: z.string().trim().min(1).max(255), mimeType: z.string().trim().max(120), size: z.number().int().positive().max(25_000_000) }).optional(),
 });
 
 export async function GET(request: Request) {

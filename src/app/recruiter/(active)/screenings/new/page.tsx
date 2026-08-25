@@ -1,51 +1,134 @@
 "use client";
-import { useEffect, useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, ShieldCheck } from "lucide-react";
-import { findCandidate } from "@/data/candidates";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Loader2, Search, ShieldCheck, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import { candidates as demoCandidates, findCandidate } from "@/data/candidates";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-export default function Page() {
+import type { Candidate } from "@/types";
+
+export default function NewScreeningPage() {
+  const router = useRouter();
   const { screeningTokens, screeningConsents, requestConsent, startScreening, dbMode, bootstrapped, databaseError } = useApp();
   const [candidateId, setCandidateId] = useState("");
   const [candidate, setCandidate] = useState<{ id: string; name: string | null; role: string | null; location: string | null } | null>(null);
   const [candidateError, setCandidateError] = useState<string | null>(null);
+  const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loadingAction, setLoadingAction] = useState(false);
+
+  // Load candidate list for picker
+  useEffect(() => {
+    if (!dbMode || !bootstrapped) return;
+    void fetch("/api/candidates", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { candidates?: Candidate[] };
+        if (response.ok) setRemoteCandidates(payload.candidates ?? []);
+      })
+      .catch(() => setRemoteCandidates([]));
+  }, [dbMode, bootstrapped]);
+
+  const availableCandidates = useMemo(() => {
+    return dbMode && remoteCandidates.length > 0 ? remoteCandidates : demoCandidates;
+  }, [dbMode, remoteCandidates]);
+
   useEffect(() => {
     if (dbMode && !bootstrapped) return;
     const requestedId = new URLSearchParams(window.location.search).get("candidateId");
-    const timer = window.setTimeout(() => {
-      if (!requestedId) {
-        if (dbMode) setCandidateError("Kandidat belum dipilih.");
-        else setCandidateId("candidate-1");
-      } else setCandidateId(requestedId);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (requestedId) {
+      setCandidateId(requestedId);
+    }
   }, [dbMode, bootstrapped]);
+
   useEffect(() => {
     if (!candidateId || (dbMode && !bootstrapped)) return;
     let active = true;
     if (!dbMode) {
       const fixture = findCandidate(candidateId);
-      const timer = window.setTimeout(() => {
-        if (active) {
-          setCandidate(fixture ? { id: fixture.id, name: fixture.name, role: fixture.role, location: fixture.location } : null);
-          setCandidateError(fixture ? null : "Kandidat tidak ditemukan.");
-        }
-      }, 0);
-      return () => { active = false; window.clearTimeout(timer); };
+      if (active) {
+        setCandidate(fixture ? { id: fixture.id, name: fixture.name, role: fixture.role, location: fixture.location } : null);
+        setCandidateError(fixture ? null : "Kandidat tidak ditemukan.");
+      }
+      return () => { active = false; };
     }
-    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { cache: "no-store" }).then(async (response) => {
-      const payload = await response.json() as { candidate?: typeof candidate; error?: string };
-      if (!response.ok || !payload.candidate) throw new Error(payload.error ?? "Profil kandidat tidak ditemukan.");
-      if (active) { setCandidate(payload.candidate); setCandidateError(null); }
-    }).catch((error: unknown) => { if (active) { setCandidate(null); setCandidateError(error instanceof Error ? error.message : "Data kandidat belum dapat dimuat."); } });
+    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { candidate?: typeof candidate; error?: string };
+        if (!response.ok || !payload.candidate) throw new Error(payload.error ?? "Profil kandidat tidak ditemukan.");
+        if (active) {
+          setCandidate(payload.candidate);
+          setCandidateError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setCandidate(null);
+          setCandidateError(error instanceof Error ? error.message : "Data kandidat belum dapat dimuat.");
+        }
+      });
     return () => { active = false; };
   }, [candidateId, dbMode, bootstrapped]);
-  const consent = screeningConsents[candidateId];
 
-  if (!candidate) return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-3xl px-4 py-8"><p className="text-destructive">{databaseError ?? candidateError ?? "Memuat kandidat..."}</p></main></ProtectedRoute>;
+  const consent = candidateId ? screeningConsents[candidateId] : undefined;
+
+  const handleRequestConsent = async () => {
+    if (!candidateId) return;
+    setLoadingAction(true);
+    try {
+      await requestConsent(candidateId);
+      toast.success("Permintaan consent terkirim", {
+        description: `Permintaan screening dikirimkan ke ${candidate?.name ?? "kandidat"}.`,
+      });
+      router.push("/recruiter/screenings");
+    } catch {
+      toast.error("Gagal mengirim permintaan consent");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleStartScreening = async () => {
+    if (!candidateId) return;
+    setLoadingAction(true);
+    try {
+      const success = await startScreening(candidateId);
+      if (success) {
+        toast.success("Screening berhasil dijalankan!", {
+          description: "Membuka hasil screening dan insight kandidat.",
+        });
+        router.push(`/recruiter/screenings/${candidateId}`);
+      } else {
+        toast.error("Token screening tidak mencukupi atau consent belum aktif.");
+        setLoadingAction(false);
+      }
+    } catch (error) {
+      toast.error("Gagal menjalankan screening", {
+        description: error instanceof Error ? error.message : "Coba lagi.",
+      });
+      setLoadingAction(false);
+    }
+  };
+
+  const filteredCandidates = availableCandidates.filter((item) => {
+    const q = searchQuery.toLowerCase();
+    return item.name.toLowerCase().includes(q) || item.role.toLowerCase().includes(q) || item.location.toLowerCase().includes(q);
+  });
+
+  if (!candidate) {
+    return (
+      <ProtectedRoute role="recruiter">
+        <main className="container mx-auto max-w-3xl px-4 py-8">
+          <p className="text-muted-foreground">{candidateError ?? "Kandidat tidak ditemukan atau belum dipilih."}</p>
+        </main>
+      </ProtectedRoute>
+    );
+  }
 
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-3xl px-4 py-8">
      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]"><ClipboardCheck className="size-4" /> Workspace Recruiter</p>

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, FileText, Map, MessageCircle, Sparkles, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,7 +29,7 @@ export default function CandidateHome() {
 
         {/* Back to Profile button */}
         <div className="mt-8">
-          <Link href="/profile">
+          <Link href="/candidate/profile">
             <Card className="card-interactive border-slate-200 bg-slate-50 transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-5">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-50">
@@ -47,17 +49,20 @@ export default function CandidateHome() {
           </Link>
         </div>
 
-        {/* Workspace menu items */}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {items.map(([href, title, text, Icon]) => (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {items.map(([href, title, desc, Icon]) => (
             <Link key={href} href={href}>
-              <Card className="card-interactive h-full">
-                <CardContent className="p-5">
-                  <Icon className="size-5 text-[#7C3AED]" />
-                  <h2 className="mt-5 font-semibold text-[#111827]">{title}</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">{text}</p>
-                  <span className="mt-5 inline-flex items-center text-sm font-semibold text-[#7C3AED]">
-                    Buka <ArrowRight className="ml-1 size-4" />
+              <Card className="card-interactive h-full transition-all hover:border-[#7C3AED]/40 hover:shadow-md">
+                <CardContent className="flex h-full flex-col justify-between p-6">
+                  <div>
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
+                      <Icon className="size-5" />
+                    </div>
+                    <h2 className="mt-4 text-lg font-semibold text-[#111827]">{title}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+                  </div>
+                  <span className="mt-6 inline-flex items-center text-xs font-semibold text-[#7C3AED]">
+                    Akses <ArrowRight className="ml-1 size-3.5" />
                   </span>
                 </CardContent>
               </Card>

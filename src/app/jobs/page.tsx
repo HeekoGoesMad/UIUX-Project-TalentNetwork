@@ -1,2 +1,5 @@
-import { ComingSoon } from "@/components/placeholders/coming-soon";
-export default function JobsPage() { return <ComingSoon kind="jobs" />; }
+import { PublicJobsPage } from "@/components/jobs/job-ui";
+
+export default function JobsPage() {
+  return <PublicJobsPage />;
+}

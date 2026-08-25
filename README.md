@@ -141,6 +141,18 @@ Admin-only API (session cookie auth; caller must have `users.role = 'admin'`, ot
 
 Approval flips `users.recruiter_provisioning_status` to `active` (or `rejected`); every action is recorded in the `audit_logs` table (`admin.recruiter.approve` / `admin.recruiter.reject`, plus `organization.member.updated` when membership changes).
 
+### Production configuration hardening
+
+Production validates configuration through the internal `GET /api/health/config` endpoint. Send the `x-healthcheck-token` header matching the server-only `HEALTHCHECK_TOKEN`; the response contains readiness flags only and never returns credential values. A missing or invalid production configuration returns a safe list of required variable names, not secrets.
+
+The feature flags are `BILLING_ENABLED`, `DOCUMENT_STORAGE_ENABLED`, and `EMAIL_DELIVERY_ENABLED`. Billing and document storage default to enabled, while email delivery defaults to disabled. In production, enabled billing requires a non-mock `PAYMENT_PROVIDER` and `PAYMENT_WEBHOOK_SECRET`, enabled document storage requires `SUPABASE_CV_BUCKET`, and enabled email delivery requires `EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`. The application sends notification email through Brevo's transactional email API. `DEV_AUTH_BYPASS`, `NEXT_PUBLIC_DEMO_MODE`, and `DEV_TOKEN_GRANT_ENABLED` must never be true in production. `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are always required in production.
+
+Supabase Auth email delivery is separate from application notification email. Configure Supabase Auth SMTP in the Supabase dashboard; the Brevo variables above are not used for Supabase Auth SMTP.
+
+Local development remains usable with the defaults in `.env.example`: mock AI, demo auth fallback, mock billing, in-memory/demo document behavior, and no email delivery. Real Supabase Auth, database persistence, payments, storage, and email delivery still require their external services and credentials.
+
+The repository intentionally does not add a static `/* /index.html 200` fallback. The deployment target must provide its supported Next.js App Router runtime for middleware, API routes, and dynamic routes.
+
 ---
 
 ## 📁 Project Structure

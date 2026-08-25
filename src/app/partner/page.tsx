@@ -18,6 +18,7 @@ import {
   Info,
 } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
+import { candidates } from "@/data/candidates";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,8 +63,32 @@ const TOP_INDUSTRIES = [
 ];
 
 export default function PartnerDashboardPage() {
-  const { user } = useApp();
-  const institutionName = user?.name ?? "Universitas Demo";
+  const { user, activePartnerInstitution, partnerVerifications, cvProfile } = useApp();
+  const institutionName = activePartnerInstitution || user?.name || "Universitas Indonesia";
+
+  // Compute live stats for this institution
+  const talentPool = candidates.filter((c) => {
+    const verif = partnerVerifications?.[c.id] ?? c.campusVerification;
+    const inst = verif?.institution ?? c.education;
+    return inst && inst.toLowerCase().includes(institutionName.toLowerCase());
+  });
+
+  const verifiedTalent = talentPool.filter((c) => {
+    const verif = partnerVerifications?.[c.id] ?? c.campusVerification;
+    return verif?.status === "verified";
+  });
+
+  const pendingTalent = talentPool.filter((c) => {
+    const verif = partnerVerifications?.[c.id] ?? c.campusVerification;
+    return verif?.status === "pending";
+  });
+
+  const dynamicStats = [
+    { label: "Mahasiswa Terdata", value: `${talentPool.length + (cvProfile ? 1 : 0)}`, icon: Users, color: "text-slate-700", bg: "bg-slate-100", trend: "+12 bulan ini" },
+    { label: "Campus Verified Talent", value: `${verifiedTalent.length}`, icon: BadgeCheck, color: "text-emerald-600", bg: "bg-emerald-50", trend: `${verifiedTalent.length} profil aktif` },
+    { label: "Pending Verifikasi", value: `${pendingTalent.length}`, icon: Clock, color: "text-amber-600", bg: "bg-amber-50", trend: `${pendingTalent.length} menunggu review` },
+    { label: "Tingkat Penempatan", value: "78%", icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50", trend: "+5% dari semester lalu" },
+  ];
 
   return (
     <ProtectedRoute role="partner">
@@ -78,13 +103,13 @@ export default function PartnerDashboardPage() {
               Selamat datang, {institutionName}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Dashboard career center kampus Anda — kelola talent, pantau employer, dan lacak penempatan.
+              Dashboard career center kampus Anda — verifikasi mahasiswa, pantau employer, dan lacak penempatan.
             </p>
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <Link href="/partner/talent">
-                <Users className="size-4" /> Kelola Talent
+                <Users className="size-4" /> Kelola Talent ({talentPool.length})
               </Link>
             </Button>
             <Button asChild>
@@ -107,23 +132,23 @@ export default function PartnerDashboardPage() {
         <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5">
           <ShieldCheck className="size-5 shrink-0 text-[#7C3AED]" />
           <div className="flex-1 text-sm">
-            <span className="font-semibold text-slate-900">Partner Terverifikasi ProofyLink</span>
-            <span className="ml-2 text-muted-foreground">· Tanpa biaya implementasi · Akses penuh seluruh fitur</span>
+            <span className="font-semibold text-slate-900">Partner Terverifikasi ProofyLink · {institutionName}</span>
+            <span className="ml-2 text-muted-foreground">· Akses resmi verifikasi alumni & mahasiswa</span>
           </div>
           <Badge className="bg-[#7C3AED] text-white">Aktif</Badge>
         </div>
 
         {/* ── Stats Grid ─────────────────────────────────────────── */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PARTNER_STATS.map((stat) => (
+          {dynamicStats.map((stat) => (
             <Card key={stat.label}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{stat.label}</p>
                     <p className={`mt-2 font-mono text-4xl font-bold ${stat.color}`}>{stat.value}</p>
-                    <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                      <TrendingUp className="size-3" /> {stat.trend}
+                    <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                      {stat.trend}
                     </p>
                   </div>
                   <div className={`flex size-10 items-center justify-center rounded-xl ${stat.bg}`}>
@@ -145,40 +170,41 @@ export default function PartnerDashboardPage() {
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/partner/talent" className="text-xs text-muted-foreground">
-                  Lihat semua <ChevronRight className="size-3" />
+                  Lihat semua ({talentPool.length}) <ChevronRight className="size-3" />
                 </Link>
               </Button>
             </CardHeader>
             <CardContent className="space-y-2">
-              {RECENT_TALENT.map((talent) => (
-                <div
-                  key={talent.name}
-                  className="flex items-center justify-between rounded-lg border p-3 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                      {talent.name.split(" ").map((n) => n[0]).join("")}
+              {talentPool.slice(0, 5).map((candidate) => {
+                const verif = partnerVerifications?.[candidate.id] ?? candidate.campusVerification;
+                const isVerified = verif?.status === "verified";
+                return (
+                  <div
+                    key={candidate.id}
+                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-9 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-[#7C3AED]">
+                        {candidate.initials}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{candidate.name}</p>
+                        <p className="text-xs text-muted-foreground">{candidate.role} · {candidate.location}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold">{talent.name}</p>
-                      <p className="text-xs text-muted-foreground">{talent.program} · Angkatan {talent.year}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={isVerified
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"
+                          : "bg-amber-50 text-amber-700 border border-amber-200 font-medium"}
+                      >
+                        {isVerified ? <CheckCircle2 className="mr-1 size-2.5" /> : <Clock className="mr-1 size-2.5" />}
+                        {isVerified ? "Terverifikasi" : "Pending Review"}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {talent.unlocked > 0 && (
-                      <span className="text-xs text-muted-foreground">{talent.unlocked}x dilihat</span>
-                    )}
-                    <Badge
-                      className={talent.status === "Terverifikasi"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"
-                        : "bg-amber-50 text-amber-700 border border-amber-200 font-medium"}
-                    >
-                      {talent.status === "Terverifikasi" ? <CheckCircle2 className="mr-1 size-2.5" /> : <Clock className="mr-1 size-2.5" />}
-                      {talent.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 

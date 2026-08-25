@@ -1,0 +1,2 @@
+import { AdminShell } from "@/components/admin/admin-shell";
+export default function AdminPage() { return <AdminShell title="Operations overview"><div className="rounded-2xl border bg-card p-6"><h2 className="text-lg font-semibold">Phase 1 operations</h2><p className="mt-2 text-sm text-muted-foreground">Gunakan navigasi untuk mengelola provisioning recruiter, organisasi, token, dan audit trail. Semua data diambil dari API database.</p></div></AdminShell>; }

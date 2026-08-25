@@ -3,6 +3,7 @@
 ## Project
 
 - This is a single-package Next.js 16 App Router app; the application entrypoints are under `src/app/`.
+- Current route groups include public/auth pages, `/candidate/*`, `/recruiter/*`, `/partner/*`, `/api/*`, `/talent/[candidateId]`, `/notifications`, `/shortlist`, `/pricing`, `/jobs`, and `/messages`.
 - `src/app/page.tsx` is the home route, `layout.tsx` owns global metadata/fonts/layout, and `globals.css` imports Tailwind CSS v4.
 - TypeScript path alias `@/*` resolves to `src/*`.
 - Keep generated or local files out of changes: `node_modules/`, `.next/`, `out/`, `build/`, `next-env.d.ts`, `*.tsbuildinfo`, and `.env*` are ignored.
@@ -12,7 +13,8 @@
 - Install dependencies with `npm install`; use the committed `package-lock.json` and npm rather than switching package managers.
 - Start the dev server with `npm run dev` and open `http://localhost:3000`.
 - Run checks in this order: `npm run lint`, then `npx tsc --noEmit`, then `npm run build` when a production build is relevant.
-- There is no test runner or test script in `package.json`; do not claim tests passed unless a test tool is added or invoked explicitly.
+- No repository test files or test script are currently configured. Playwright dependencies and Playwright-MCP are available, but do not claim automated tests passed unless a test tool is explicitly invoked.
+- Database commands are `npm run db:generate`, `npm run db:migrate`, and `npm run db:check`.
 - Run the production server after a successful build with `npm run start`.
 
 ## Responses

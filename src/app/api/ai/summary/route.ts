@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { summary } from "@/lib/ai/provider";
 import { getAiEndpointAuth } from "@/lib/api/ai-auth";
 

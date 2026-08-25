@@ -6,40 +6,117 @@ import {
   BadgeCheck,
   CheckCircle2,
   Clock,
-  Filter,
   GraduationCap,
   Search,
   UserCheck,
   Users,
-  Info,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-
-const MOCK_TALENT = [
-  { id: "1", name: "Anya Fitriani", initials: "AF", program: "Teknik Informatika", year: "2024", skills: ["React", "TypeScript", "Node.js"], status: "verified", views: 3 },
-  { id: "2", name: "Budi Hartono", initials: "BH", program: "Manajemen Bisnis", year: "2024", skills: ["Marketing", "Analytics", "Excel"], status: "verified", views: 1 },
-  { id: "3", name: "Citra Maharani", initials: "CM", program: "Desain Komunikasi Visual", year: "2023", skills: ["Figma", "Illustrator", "UI/UX"], status: "verified", views: 5 },
-  { id: "4", name: "Dian Purnomo", initials: "DP", program: "Sistem Informasi", year: "2024", skills: ["SQL", "Python", "Tableau"], status: "pending", views: 0 },
-  { id: "5", name: "Eko Prasetyo", initials: "EP", program: "Akuntansi", year: "2023", skills: ["SAP", "Excel", "Financial modeling"], status: "verified", views: 2 },
-  { id: "6", name: "Fitri Handayani", initials: "FH", program: "Psikologi", year: "2024", skills: ["HR", "Recruitment", "Assessment"], status: "pending", views: 0 },
-  { id: "7", name: "Galih Pratama", initials: "GP", program: "Teknik Informatika", year: "2023", skills: ["Go", "Docker", "Kubernetes"], status: "verified", views: 8 },
-  { id: "8", name: "Hana Rahmawati", initials: "HR", program: "Komunikasi", year: "2024", skills: ["Content", "Copywriting", "SEO"], status: "verified", views: 4 },
-];
+import { useApp } from "@/providers/app-provider";
+import { candidates } from "@/data/candidates";
+import { PARTNER_CAMPUSES } from "@/types";
 
 export default function PartnerTalentPage() {
+  const {
+    activePartnerInstitution,
+    setActivePartnerInstitution,
+    partnerVerifications,
+    verifyCandidateByPartner,
+    verifyAllCandidatesForInstitution,
+    cvProfile,
+  } = useApp();
+
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "verified" | "pending">("all");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const filtered = MOCK_TALENT.filter((t) => {
+  // Combine candidates and cvProfile matching the active institution
+  const talentPool = useMemo(() => {
+    const list: Array<{
+      id: string;
+      name: string;
+      initials: string;
+      program: string;
+      year: string;
+      skills: string[];
+      status: "verified" | "pending" | "rejected";
+      views: number;
+      isLiveCandidate?: boolean;
+    }> = [];
+
+    // Check candidate pool
+    candidates.forEach((c, idx) => {
+      const verif = partnerVerifications?.[c.id] ?? c.campusVerification;
+      const institution = verif?.institution ?? c.education;
+      if (institution && institution.toLowerCase().includes(activePartnerInstitution.toLowerCase())) {
+        list.push({
+          id: c.id,
+          name: c.name,
+          initials: c.initials,
+          program: verif?.program ?? ["Teknik Informatika", "Desain Komunikasi Visual", "Sistem Informasi", "Manajemen Bisnis"][idx % 4],
+          year: verif?.year ?? `202${3 + (idx % 2)}`,
+          skills: c.skills,
+          status: verif?.status ?? "verified",
+          views: 2 + (idx % 6),
+        });
+      }
+    });
+
+    // Check if the current user's cvProfile belongs to this campus
+    if (cvProfile) {
+      const cvEdu = cvProfile.education?.[0];
+      const cvVerif = partnerVerifications?.[cvProfile.id || "my-candidate"] ?? cvProfile.campusVerification;
+      const cvInst = cvVerif?.institution || cvEdu?.school;
+      if (cvInst && cvInst.toLowerCase().includes(activePartnerInstitution.toLowerCase())) {
+        list.unshift({
+          id: cvProfile.id || "my-candidate",
+          name: `${cvProfile.fullName || "Kandidat Anda"} (Profil Aktif)`,
+          initials: (cvProfile.fullName || "KA").split(" ").map((n) => n[0]).join("").slice(0, 2),
+          program: cvEdu?.program || cvVerif?.program || "Program Studi Mahasiswa",
+          year: cvEdu?.dates || cvVerif?.year || "2024",
+          skills: cvProfile.skills.length ? cvProfile.skills : ["Product Design", "Figma"],
+          status: cvVerif?.status ?? "pending",
+          views: 1,
+          isLiveCandidate: true,
+        });
+      }
+    }
+
+    return list;
+  }, [activePartnerInstitution, partnerVerifications, cvProfile]);
+
+  const verifiedCount = talentPool.filter((t) => t.status === "verified").length;
+  const pendingCount = talentPool.filter((t) => t.status === "pending").length;
+
+  const filtered = talentPool.filter((t) => {
     const matchQ = t.name.toLowerCase().includes(query.toLowerCase()) || t.program.toLowerCase().includes(query.toLowerCase());
     const matchF = filter === "all" || t.status === filter;
     return matchQ && matchF;
   });
+
+  const handleVerify = async (id: string) => {
+    setActionLoading(id);
+    await verifyCandidateByPartner(id, "verified");
+    setActionLoading(null);
+  };
+
+  const handleReject = async (id: string) => {
+    setActionLoading(id);
+    await verifyCandidateByPartner(id, "rejected");
+    setActionLoading(null);
+  };
+
+  const handleBatchVerify = async () => {
+    setActionLoading("batch");
+    await verifyAllCandidatesForInstitution(activePartnerInstitution);
+    setActionLoading(null);
+  };
 
   return (
     <ProtectedRoute role="partner">
@@ -54,32 +131,44 @@ export default function PartnerTalentPage() {
               <GraduationCap className="size-4" /> Talent Kampus Terverifikasi
             </p>
             <h1 className="mt-2 text-3xl font-bold text-[#1A1A2E]">Kelola Talent Kampus</h1>
-            <p className="mt-1 text-muted-foreground text-sm">Verifikasi, pantau, dan kelola talent dari institusi Anda.</p>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Verifikasi mahasiswa & alumni dari <strong>{activePartnerInstitution}</strong> untuk memberikan badge resmi.
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="size-3.5" /> Filter Lanjutan
-            </Button>
-            <Button size="sm">
-              <UserCheck className="size-3.5" /> Verifikasi Massal
-            </Button>
-          </div>
-        </div>
 
-        {/* ── Sample Data Notice ─────────────────────────────────── */}
-        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5">
-          <Info className="size-5 shrink-0 text-amber-600" />
-          <p className="flex-1 text-sm font-medium text-amber-800">
-            Data contoh — metrik partner belum terhubung ke sistem.
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Campus Selector */}
+            <div className="flex items-center gap-2 rounded-xl border bg-white px-3 py-1.5 shadow-2xs">
+              <span className="text-xs text-muted-foreground">Institusi:</span>
+              <select
+                aria-label="Pilih Institusi Kampus"
+                value={activePartnerInstitution}
+                onChange={(e) => setActivePartnerInstitution(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-foreground outline-none cursor-pointer"
+              >
+                {PARTNER_CAMPUSES.map((campus) => (
+                  <option key={campus} value={campus}>
+                    {campus}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {pendingCount > 0 && (
+              <Button size="sm" onClick={handleBatchVerify} disabled={actionLoading === "batch"} className="bg-emerald-600 hover:bg-emerald-700">
+                <UserCheck className="size-3.5 mr-1" />
+                {actionLoading === "batch" ? "Memverifikasi..." : `Verifikasi Semua (${pendingCount})`}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats Row */}
         <div className="mt-6 grid grid-cols-3 gap-4">
           {[
-            { label: "Total Talent", value: MOCK_TALENT.length, color: "text-slate-900" },
-            { label: "Terverifikasi", value: MOCK_TALENT.filter((t) => t.status === "verified").length, color: "text-emerald-600" },
-            { label: "Menunggu Verifikasi", value: MOCK_TALENT.filter((t) => t.status === "pending").length, color: "text-amber-600" },
+            { label: "Total Talent", value: candidates.length, color: "text-slate-900" },
+            { label: "Terverifikasi", value: candidates.filter((t) => t.campusVerification?.status === "verified").length, color: "text-emerald-600" },
+            { label: "Menunggu Verifikasi", value: candidates.filter((t) => t.campusVerification?.status === "pending").length, color: "text-amber-600" },
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="p-4 text-center">
@@ -122,49 +211,81 @@ export default function PartnerTalentPage() {
         <Card className="mt-4">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="size-4 text-muted-foreground" /> {filtered.length} talent ditemukan
+              <Users className="size-4 text-muted-foreground" /> {filtered.length} talent terdaftar
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2.5">
             {filtered.length === 0 ? (
-              <p className="rounded-xl bg-muted p-6 text-center text-sm text-muted-foreground">
-                Tidak ada talent yang cocok dengan pencarian.
-              </p>
+              <div className="rounded-xl bg-muted/40 p-8 text-center">
+                <GraduationCap className="mx-auto size-8 text-muted-foreground mb-2" />
+                <p className="text-sm font-semibold text-foreground">Tidak ada talent pada kategori ini</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mahasiswa yang menginput <strong>{activePartnerInstitution}</strong> pada pendidikan profil akan otomatis muncul di sini.
+                </p>
+              </div>
             ) : (
               filtered.map((talent) => (
                 <div
                   key={talent.id}
-                  className="flex flex-wrap items-center gap-4 rounded-xl border p-4 transition-all hover:shadow-sm hover:bg-slate-50"
+                  className={`flex flex-wrap items-center gap-4 rounded-xl border p-4 transition-all hover:shadow-xs ${
+                    talent.isLiveCandidate ? "bg-purple-50/40 border-purple-200" : "hover:bg-slate-50/80"
+                  }`}
                 >
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-[#7C3AED]">
                     {talent.initials}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{talent.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{talent.name}</p>
+                      {talent.isLiveCandidate && (
+                        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]">
+                          Profil Anda
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{talent.program} · Angkatan {talent.year}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {talent.skills.map((s) => (
+                      {talent.skills.slice(0, 3).map((s) => (
                         <Badge key={s} variant="outline" className="text-[10px] px-1.5 py-0">{s}</Badge>
                       ))}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {talent.views > 0 && (
-                      <span className="text-xs text-muted-foreground">{talent.views}× dilihat employer</span>
+                      <span className="text-xs text-muted-foreground hidden sm:inline">{talent.views}× dilihat employer</span>
                     )}
                     <Badge
                       className={talent.status === "verified"
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-amber-50 text-amber-700 border border-amber-200"}
+                        : talent.status === "pending"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-red-50 text-red-700 border border-red-200"}
                     >
                       {talent.status === "verified"
                         ? <><CheckCircle2 className="mr-1 size-3" />Terverifikasi</>
                         : <><Clock className="mr-1 size-3" />Menunggu</>}
                     </Badge>
                     {talent.status === "pending" && (
-                      <Button size="sm" className="h-7 text-xs">
-                        <BadgeCheck className="size-3" /> Verifikasi
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+                          disabled={actionLoading === talent.id}
+                          onClick={() => handleVerify(talent.id)}
+                        >
+                          <BadgeCheck className="size-3 mr-1" />
+                          {actionLoading === talent.id ? "Memproses..." : "Verifikasi"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                          disabled={actionLoading === talent.id}
+                          onClick={() => handleReject(talent.id)}
+                        >
+                          Tolak
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
