@@ -16,12 +16,17 @@ type Resolution =
   | { kind: "user"; user: AppUser }
   | { kind: "unauthenticated" }
   | { kind: "provisioning" }
-  | { kind: "unavailable" };
+  | { kind: "unavailable" }
+  | { kind: "demo" };
 
 async function resolveAccess(): Promise<Resolution> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return { kind: "unavailable" };
+  if (!url || !key) {
+    // Intentional demo mode outside production: guarded segments render,
+    // data APIs stay unused by the demo UI. Production fails closed instead.
+    return process.env.NODE_ENV === "production" ? { kind: "unavailable" } : { kind: "demo" };
+  }
   try {
     const res = await getCurrentAppUser();
     if (!("error" in res)) return { kind: "user", user: res.user };
@@ -43,6 +48,7 @@ export async function requireAppUser(): Promise<GuardResult> {
 
 export async function requireRole(roles: Role[]): Promise<GuardResult> {
   const res = await resolveAccess();
+  if (res.kind === "demo") return { ok: true };
   if (res.kind === "unauthenticated") redirect("/login");
   if (res.kind === "unavailable") return { ok: false };
   if (res.kind === "provisioning") redirect("/recruiter/pending");
