@@ -1,9 +1,9 @@
 import { asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { currentUserOrError } from "@/lib/billing/access";
 import { writeAuditLog } from "@/lib/audit";
-import { z } from "zod";
 
 const packageSchema = z.object({ code: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/), name: z.string().trim().min(2).max(120), tokenAmount: z.number().int().positive(), priceMinor: z.number().int().nonnegative(), currency: z.string().trim().length(3), validityDays: z.number().int().positive().nullable().optional() }).strict();
 
@@ -28,5 +28,8 @@ export async function POST(request: Request) {
     const [item] = await current.db.insert(schema.tokenPackages).values({ ...parsed.data, currency: parsed.data.currency.toUpperCase(), validityDays: parsed.data.validityDays ?? null }).returning();
     await writeAuditLog({ db: current.db, actorUserId: current.user.id, action: "admin.billing.package.created", entityType: "token_package", entityId: item.id, metadata: { code: item.code } });
     return NextResponse.json({ package: item }, { status: 201 });
-  } catch { return NextResponse.json({ error: "Paket token tidak dapat dibuat." }, { status: 409 }); }
+  } catch (error) {
+    console.error("Billing package create failed", error);
+    return NextResponse.json({ error: "Paket token tidak dapat dibuat." }, { status: 409 });
+  }
 }

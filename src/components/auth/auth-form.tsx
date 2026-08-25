@@ -83,6 +83,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name || email.split("@")[0], companyName: companyName || undefined }),
       }).then((response) => response.ok ? response.json() : null).catch(() => null);
+      if (!synced) {
+        setLoading(false);
+        setErrorMessage("Tidak dapat menyiapkan profil akun Anda. Periksa koneksi Anda dan coba lagi.");
+        return;
+      }
     }
     router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
   };
@@ -92,9 +97,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setErrorMessage(null);
 
     try {
-      const next = safeNext(getNext());
+      const next = getNext();
       const redirectUrl = new URL("/auth/callback", window.location.origin);
-      if (next) redirectUrl.searchParams.set("next", next);
+      if (next && next.startsWith("/") && !next.startsWith("//")) redirectUrl.searchParams.set("next", next);
       redirectUrl.searchParams.set("role", role);
 
       const { error } = await createClient().auth.signInWithOAuth({
@@ -345,14 +350,34 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             )}
           </Button>
 
-          {!supabaseConfigured && (
+          {supabaseConfigured && (
+            <>
+              <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                atau
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-xl text-xs sm:text-sm"
+                disabled={loading}
+                onClick={signInWithGoogle}
+              >
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
+                {loading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
+              </Button>
+            </>
+          )}
+
+          {process.env.NODE_ENV !== "production" && !supabaseConfigured && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <Info className="size-3.5 shrink-0 text-[#7C3AED]" aria-hidden="true" />
               Mode demo: {mode === "login" ? "masuk" : "daftar"} dengan email apa pun
             </p>
           )}
 
-          {!supabaseConfigured && role === "candidate" && (
+          {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "candidate" && (
             <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
@@ -400,7 +425,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   );
 }
 
-const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== "true";
+const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus) {
   if (role === "candidate") {
@@ -417,8 +442,4 @@ function destination(role: UserRole, next: string | null, isRegistration = false
 
 function getNext() {
   return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
-}
-
-function safeNext(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : null;
 }

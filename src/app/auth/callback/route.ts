@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.redirect(new URL(destination, requestUrl.origin));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Verifikasi email gagal.";
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, requestUrl.origin));
+    console.error("Verifikasi email gagal:", error);
+    return NextResponse.redirect(new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin));
   }
 }

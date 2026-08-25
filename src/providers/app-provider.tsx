@@ -74,6 +74,7 @@ type Context = AppState & {
   shortlists: BootstrapShortlist[];
   consentRequests: Record<string, unknown>[];
   databaseError: string | null;
+  configError?: boolean;
   activePartnerInstitution: string;
   setActivePartnerInstitution: (institution: string) => void;
   verifyCandidateByPartner: (candidateId: string, status: "verified" | "rejected") => Promise<boolean>;
@@ -164,9 +165,9 @@ function parseState(value: string | null): AppState {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const devBypass = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
-  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && !devBypass;
-
+  const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const configError = process.env.NODE_ENV === "production" && !supabaseConfigured;
   const [state, setState] = useState<AppState>(() => {
     if (typeof window === "undefined") return initial;
     return parseState(localStorage.getItem(storageKey));
@@ -275,8 +276,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
       setBootstrapped(true);
     } catch (error) {
-      setDatabaseError(error instanceof Error ? error.message : "Gagal memuat data aplikasi.");
-    } finally {
+      setState({ ...initial, tokens: 0 });
+      setProfile(null);
+      setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
+       setNotifications([]);
+      setShortlists([]);
+      setConsentRequests([]);
+      setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
+      toast.error("Gagal menyiapkan workspace", { description: error instanceof Error ? error.message : "Data database tidak dapat dimuat." });
       setBootstrapped(true);
     }
   };
@@ -701,49 +708,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return (
-    <AppContext.Provider
-      value={{
-        ...state,
-        hydrated,
-        dbMode: supabaseConfigured,
-        devBypass,
-        bootstrapped,
-        user,
-        profile,
-        tokenAccount,
-        notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications),
-        shortlists,
-        consentRequests,
-        databaseError,
-        activePartnerInstitution,
-        setActivePartnerInstitution,
-        verifyCandidateByPartner,
-        verifyAllCandidatesForInstitution,
-        markNotificationRead,
-        markAllNotificationsRead,
-        login,
-        loginAsDemoCandidate,
-        register,
-        logout,
-        scan,
-        toggleShortlist,
-        saveNote,
-        viewed,
-        saveCvProfile,
-        saveCareerStatus,
-        saveScreeningResult,
-        requestConsent,
-        requestConsentBatch,
-        respondToConsent,
-        approvePendingRequests,
-        startScreening,
-        previewCandidate,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
+  if (configError) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-sm rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-base font-bold text-slate-900">Kesalahan Konfigurasi</h1>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">Aplikasi tidak dapat dijalankan karena konfigurasi autentikasi belum lengkap. Silakan hubungi administrator.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

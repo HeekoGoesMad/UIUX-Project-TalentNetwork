@@ -100,72 +100,71 @@ export default function ProfilePage() {
     portfolio: source?.portfolio ?? [],
   };
 
-  const regenerateAiSummary = useCallback(async () => {
-    setAiLoading(true);
-    setAiError(null);
+  const summaryKey = JSON.stringify([
+    source?.headline ?? "",
+    source?.about ?? "",
+    source?.skills ?? [],
+    source?.location ?? "",
+    source && "targetRole" in source ? source.targetRole : (source?.headline ?? ""),
+  ]);
+
+  const requestAiSummary = useCallback(async (): Promise<{ ok: boolean; data?: AiSummary; error?: string }> => {
     try {
-      const targetRole = source && "targetRole" in source ? source.targetRole : p.headline;
-      const profileContext = {
-        headline: p.headline,
-        about: p.about,
-        skills: p.skills,
-        targetRole: targetRole || "Talent",
-        location: p.location,
-      };
+      const [headline, about, skills, location, targetRole] = JSON.parse(summaryKey) as [
+        string,
+        string,
+        string[],
+        string,
+        string,
+      ];
       const response = await fetch("/api/ai/summary?strict=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...profileContext, strict: true }),
+        body: JSON.stringify({
+          headline,
+          about,
+          skills,
+          targetRole: targetRole || "Talent",
+          location,
+          strict: true,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error || "Gagal memuat AI Summary.");
       }
-      setAiSummary(payload as AiSummary);
+      return { ok: true, data: payload as AiSummary };
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : "Gagal memuat AI Summary.");
-    } finally {
-      setAiLoading(false);
+      return { ok: false, error: err instanceof Error ? err.message : "Gagal memuat AI Summary." };
     }
-  }, [p.headline, p.about, p.skills, p.location, source]);
+  }, [summaryKey]);
+
+  const regenerateAiSummary = useCallback(() => {
+    setAiLoading(true);
+    setAiError(null);
+    void requestAiSummary().then((outcome) => {
+      if (outcome.ok && outcome.data) setAiSummary(outcome.data);
+      else setAiError(outcome.error ?? "Gagal memuat AI Summary.");
+      setAiLoading(false);
+    });
+  }, [requestAiSummary]);
 
   useEffect(() => {
     let active = true;
-    const targetRole = source && "targetRole" in source ? source.targetRole : p.headline;
-    const profileContext = {
-      headline: p.headline,
-      about: p.about,
-      skills: p.skills,
-      targetRole: targetRole || "Talent",
-      location: p.location,
-    };
-
-    fetch("/api/ai/summary?strict=true", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...profileContext, strict: true }),
-    })
-      .then(async (res) => {
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error || "Gagal memuat AI Summary.");
-        if (active) {
-          setAiSummary(payload as AiSummary);
-          setAiError(null);
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          setAiError(err instanceof Error ? err.message : "Gagal memuat AI Summary.");
-        }
-      })
-      .finally(() => {
-        if (active) setAiLoading(false);
-      });
-
+    requestAiSummary().then((outcome) => {
+      if (!active) return;
+      if (outcome.ok && outcome.data) {
+        setAiSummary(outcome.data);
+        setAiError(null);
+      } else {
+        setAiError(outcome.error ?? "Gagal memuat AI Summary.");
+      }
+      setAiLoading(false);
+    });
     return () => {
       active = false;
     };
-  }, [p.headline, p.about, p.skills, p.location, source]);
+  }, [requestAiSummary]);
 
   const { pct, missing } = calcCompleteness(p);
 

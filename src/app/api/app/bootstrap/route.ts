@@ -3,10 +3,27 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope, getRecruiterTokenAccount } from "@/lib/api/auth";
+import { syncAuthenticatedUser } from "@/lib/api/sync-user";
+import { createClient } from "@/lib/supabase/server";
+import { ShortlistService } from "@/lib/services/shortlist";
 
 export async function GET() {
   try {
-    const current = await getCurrentAppUser();
+    let current = await getCurrentAppUser();
+    if ("error" in current && current.status === 403) {
+      // Fresh login race: auth session exists but the profile row is not
+      // synced yet. Self-heal by syncing now instead of failing the call.
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      if (data.user?.email) {
+        try {
+          await syncAuthenticatedUser(data.user, {});
+          current = await getCurrentAppUser();
+        } catch {
+          // fall through to the original error below
+        }
+      }
+    }
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const membership = current.user.role === "recruiter" ? await getRecruiterScope(current.db, current.user) : null;
@@ -25,36 +42,9 @@ export async function GET() {
     const organization = membership && !("error" in membership)
       ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, membership.membership.organizationId)).limit(1))[0] ?? null
       : null;
-    const shortlistRows = membership && !("error" in membership)
-      ? await current.db.select({
-        id: schema.shortlists.id,
-        name: schema.shortlists.name,
-        description: schema.shortlists.description,
-        createdAt: schema.shortlists.createdAt,
-        updatedAt: schema.shortlists.updatedAt,
-         itemId: schema.shortlistItems.id,
-         candidateProfileId: schema.shortlistItems.candidateProfileId,
-         candidateName: schema.profiles.displayName,
-         candidateRole: schema.candidateProfiles.headline,
-         candidateLocation: schema.candidateProfiles.location,
-        status: schema.shortlistItems.status,
-        notes: schema.shortlistItems.notes,
-        itemCreatedAt: schema.shortlistItems.createdAt,
-       }).from(schema.shortlists)
-         .leftJoin(schema.shortlistItems, eq(schema.shortlistItems.shortlistId, schema.shortlists.id))
-         .leftJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.shortlistItems.candidateProfileId))
-         .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-        .where(eq(schema.shortlists.organizationId, membership.membership.organizationId))
+    const shortlists = membership && !("error" in membership)
+      ? (await ShortlistService.list(current.db, membership.membership.organizationId)).shortlists
       : [];
-    const shortlists = shortlistRows.reduce<Array<Record<string, unknown>>>((result, row) => {
-      let shortlist = result.find((item) => item.id === row.id);
-      if (!shortlist) {
-        shortlist = { id: row.id, name: row.name, description: row.description, createdAt: row.createdAt, updatedAt: row.updatedAt, items: [] };
-        result.push(shortlist);
-      }
-       if (row.itemId) (shortlist.items as unknown[]).push({ id: row.itemId, candidateProfileId: row.candidateProfileId, candidate: { name: row.candidateName, role: row.candidateRole, location: row.candidateLocation }, status: row.status, notes: row.notes, createdAt: row.itemCreatedAt });
-      return result;
-    }, []);
     const consents = current.user.role === "candidate" && candidateProfile[0]
       ? await current.db.select().from(schema.consentRequestItems).where(eq(schema.consentRequestItems.candidateProfileId, candidateProfile[0].id))
       : membership && !("error" in membership)

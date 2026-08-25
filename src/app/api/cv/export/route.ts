@@ -1,29 +1,84 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import type { Browser } from "playwright-core";
-import type { CvProfile } from "@/types";
-import { type CvTemplateId, buildCvHtml } from "@/lib/cv/templates";
-import { accessResponse, isApiAccess, requireApiAccess, withAccessMode } from "@/lib/api/access";
-import { writeAuditLog } from "@/lib/audit";
+import { getCurrentAppUser } from "@/lib/api/auth";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
+import { buildCvHtml } from "@/lib/cv/templates";
+
+const experienceItem = z.object({
+  company: z.string().max(120),
+  role: z.string().max(120),
+  dates: z.string().max(60),
+  achievements: z.array(z.string().max(300)).max(20),
+});
+
+const educationItem = z.object({
+  school: z.string().max(160),
+  program: z.string().max(160),
+  dates: z.string().max(60),
+});
+
+const profileSchema = z.object({
+  id: z.string().max(100),
+  fullName: z.string().max(120),
+  headline: z.string().max(160),
+  about: z.string().max(4000),
+  location: z.string().max(120),
+  email: z.string().max(200),
+  phone: z.string().max(40),
+  skills: z.array(z.string().max(60)).max(20),
+  tools: z.array(z.string().max(60)).max(20),
+  industries: z.array(z.string().max(80)).max(20),
+  experience: z.array(experienceItem).max(20),
+  education: z.array(educationItem).max(20),
+  certifications: z.array(z.string().max(160)).max(20),
+  portfolio: z.array(z.string().max(500)).max(20),
+  targetRole: z.string().max(120),
+  workArrangement: z.enum(["remote", "hybrid", "onsite"]),
+  openToWork: z.boolean(),
+  careerStatus: z.enum([
+    "open-to-work",
+    "open-for-opportunities",
+    "freelance-available",
+    "internship-available",
+    "not-available",
+  ]),
+  sourceFileName: z.string().max(260).optional(),
+  updatedAt: z.string().max(60),
+});
+
+const exportSchema = z.object({
+  profile: profileSchema,
+  templateId: z.enum(["ats", "modern", "sidebar", "minimal"]).default("ats"),
+});
 
 export async function POST(request: Request) {
-  const access = await requireApiAccess("candidate");
-  if (!isApiAccess(access)) return accessResponse(access);
-  let profile: CvProfile;
-  let templateId: CvTemplateId;
-  let html: string;
-  let safeFileName: string;
+  const current = await getCurrentAppUser();
+  if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-  try {
-    const body = (await request.json()) as { profile: CvProfile; templateId: CvTemplateId };
-    if (!body || typeof body.profile !== "object" || body.profile === null) throw new Error("invalid-profile");
-    if (body.templateId !== undefined && !["ats", "modern", "sidebar", "minimal"].includes(body.templateId)) throw new Error("invalid-template");
-    profile = body.profile;
-    templateId = body.templateId ?? "ats";
-    html = buildCvHtml(profile, templateId);
-    safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
-  } catch {
-    return NextResponse.json({ error: "Request body tidak valid." }, { status: 400 });
+  const rate = enforceRateLimit(`cv-export:${current.user.id}`, RATE_LIMITS.cvExport.limit, RATE_LIMITS.cvExport.windowMs);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Terlalu banyak permintaan. Coba lagi sebentar." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+    );
   }
+
+  const payload = exportSchema.safeParse(await request.json().catch(() => null));
+  if (!payload.success) {
+    return NextResponse.json({ error: "Data CV tidak valid." }, { status: 400 });
+  }
+
+  const { profile, templateId } = payload.data;
+  const html = buildCvHtml(profile, templateId);
+  const slug = profile.fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9-_ ]+/g, " ")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 50)
+    .replace(/-+$/g, "");
+  const safeFileName = `proofylink-cv-${slug || "cv"}.pdf`;
 
   let browser: Browser | undefined;
 
@@ -46,26 +101,21 @@ export async function POST(request: Request) {
           : { top: "0", bottom: "0", left: "0", right: "0" },
     });
 
-     if (access.mode === "database") await writeAuditLog({ db: access.db, actorUserId: access.user.id, action: "cv.exported", entityType: "cv", metadata: { exportKind: "profile_pdf", template: templateId } });
-     return withAccessMode(
-       new NextResponse(new Uint8Array(pdf), {
-         headers: {
-           "Content-Type": "application/pdf",
-           "Content-Disposition": `attachment; filename="${safeFileName}"`,
-           "Content-Length": String(pdf.byteLength),
-         },
-       }),
-       access
-     );
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${safeFileName}"`,
+        "Content-Length": String(pdf.byteLength),
+      },
+    });
   } catch (error) {
     console.error("[cv/export] Playwright error:", error);
     return NextResponse.json(
       {
         error:
           "PDF generation membutuhkan browser runtime. Pastikan Playwright Chromium terpasang atau gunakan cetak browser.",
-        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 503 },
+      { status: 500 }
     );
   } finally {
     if (browser) {

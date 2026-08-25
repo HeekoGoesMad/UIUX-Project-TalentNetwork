@@ -14,6 +14,7 @@ function recruiterAccessError(status: AppUser["recruiterProvisioningStatus"]) {
       ? "Akun recruiter ditolak oleh organisasi."
       : "Akun recruiter masih menunggu persetujuan organisasi.",
     status: 403 as const,
+    reason: status === "rejected" ? ("recruiter-rejected" as const) : ("recruiter-pending" as const),
   };
 }
 

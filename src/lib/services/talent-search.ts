@@ -92,7 +92,7 @@ export class TalentSearchService {
 
     const query = params?.q?.trim();
     if (query) {
-      const searchPattern = `%${query}%`;
+      const searchPattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
       conditions.push(
         or(
           ilike(schema.profiles.displayName, searchPattern),

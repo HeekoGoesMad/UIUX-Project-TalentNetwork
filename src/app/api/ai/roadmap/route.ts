@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const result = await roadmap(body);
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Gagal memproses roadmap karier AI.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Gagal memproses roadmap karier AI:", error);
+    return NextResponse.json({ error: "Fitur AI belum dapat diproses. Coba lagi nanti." }, { status: 400 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
@@ -13,9 +14,9 @@ export async function GET(request: Request) {
     const notifications = await current.db.select().from(schema.notifications)
       .where(eq(schema.notifications.userId, current.user.id))
       .orderBy(desc(schema.notifications.createdAt)).limit(limit);
-    const unread = await current.db.select({ id: schema.notifications.id }).from(schema.notifications)
+    const [unread] = await current.db.select({ value: count() }).from(schema.notifications)
       .where(and(eq(schema.notifications.userId, current.user.id), isNull(schema.notifications.readAt)));
-    return NextResponse.json({ notifications, unreadCount: unread.length });
+    return NextResponse.json({ notifications, unreadCount: unread?.value ?? 0 });
   } catch {
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
@@ -23,15 +24,17 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const parsed = z
+      .object({ notificationId: z.string().uuid() })
+      .safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: "ID notifikasi tidak valid." }, { status: 400 });
+
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
-    const payload = await request.json() as { notificationId?: string; id?: string };
-    const notificationId = payload.notificationId ?? payload.id;
-    if (!notificationId) return NextResponse.json({ error: "ID notifikasi diperlukan." }, { status: 400 });
 
     const [notification] = await current.db.update(schema.notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(schema.notifications.id, notificationId), eq(schema.notifications.userId, current.user.id)))
+      .where(and(eq(schema.notifications.id, parsed.data.notificationId), eq(schema.notifications.userId, current.user.id)))
       .returning({ id: schema.notifications.id, readAt: schema.notifications.readAt });
     if (!notification) return NextResponse.json({ error: "Notifikasi tidak ditemukan." }, { status: 404 });
     return NextResponse.json({ notification });

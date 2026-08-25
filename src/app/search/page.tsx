@@ -354,7 +354,8 @@ function SearchPageContent() {
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
-    void fetch("/api/candidates", { cache: "no-store" })
+    // Ceiling: client filters/sorts/paginates over this bounded fetch; move filtering server-side once the catalog exceeds ~50 candidates.
+    void fetch("/api/candidates?limit=50", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as { candidates?: Candidate[]; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "Data kandidat belum dapat dimuat.");

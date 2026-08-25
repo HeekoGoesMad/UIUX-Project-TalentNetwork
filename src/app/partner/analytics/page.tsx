@@ -10,6 +10,7 @@ import {
   Target,
   TrendingUp,
   Users,
+  Info,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
@@ -58,9 +59,17 @@ export default function PartnerAnalyticsPage() {
               Analisis placement, program studi, dan dampak kemitraan — periode 2024.
             </p>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" disabled title="Laporan belum tersedia — data masih contoh.">
             <Download className="size-4" /> Unduh Laporan PDF
           </Button>
+        </div>
+
+        {/* ── Sample Data Notice ─────────────────────────────────── */}
+        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5">
+          <Info className="size-5 shrink-0 text-amber-600" />
+          <p className="flex-1 text-sm font-medium text-amber-800">
+            Data contoh — metrik partner belum terhubung ke sistem.
+          </p>
         </div>
 
         {/* KPI Summary */}

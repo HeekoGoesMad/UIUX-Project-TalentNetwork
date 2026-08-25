@@ -81,6 +81,7 @@ export async function sendNotificationEmail(input: NotificationEmail): Promise<E
       signal: AbortSignal.timeout(10_000),
     });
   } catch (error) {
+    console.error("[email] Brevo request failed.", error);
     if (error instanceof DOMException && error.name === "TimeoutError") {
       throw new Error("Brevo email request timed out.");
     }
@@ -88,6 +89,7 @@ export async function sendNotificationEmail(input: NotificationEmail): Promise<E
   }
 
   if (!response.ok) {
+    console.error("[email] Brevo responded with a non-OK status.", { status: response.status });
     throw new Error(`Brevo email request failed with status ${response.status}.`);
   }
 
