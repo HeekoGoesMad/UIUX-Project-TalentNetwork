@@ -2,8 +2,9 @@
 
 import { createContext, startTransition, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
+import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 
 const storageKey = "talent-network-state-v1";
@@ -76,9 +77,7 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     return Array.isArray(value) ? value as T[] : [];
   };
   const preferences = section("preferences");
-  const careerStatus = preferences.careerStatus;
-  const status: CareerStatus = typeof careerStatus === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(careerStatus)
-    ? careerStatus as CareerStatus : "open-to-work";
+  const status = asCareerStatus(preferences.careerStatus);
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
     fullName: base?.displayName ?? "",
@@ -209,7 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
           const status = request.status;
           if (!candidateId || typeof status !== "string") return [];
-          const consent = ({ pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" } as Partial<Record<string, ConsentState>>)[status];
+          const consent = CONSENT_STATE_BY_DB_STATUS[status];
           return consent ? [[candidateId, consent]] : [];
         })),
       }));
@@ -376,7 +375,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleShortlist = (id: string) => {
-    if (supabaseConfigured && /^[0-9a-f-]{36}$/i.test(id)) {
+    if (supabaseConfigured && UUID_RE.test(id)) {
       const existing = shortlists.flatMap((shortlist) => shortlist.items).find((item) => item.candidateProfileId === id);
       void fetch("/api/shortlists", { method: existing ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(existing ? { itemId: existing.id } : { candidateProfileId: id }) }).then(async (response) => {
         if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error ?? "Shortlist gagal diperbarui.");
@@ -385,11 +384,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }).catch((error: unknown) => toast.error("Shortlist gagal diperbarui", { description: error instanceof Error ? error.message : "Coba lagi." }));
       return;
     }
-    setState((current) => {
-    const exists = current.shortlisted.includes(id);
+    const exists = state.shortlisted.includes(id);
+    setState((current) => ({ ...current, shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id] }));
     toast.success(exists ? "Dihapus dari shortlist" : "Ditambahkan ke shortlist");
-    return { ...current, shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id] };
-    });
   };
 
   const saveNote = (id: string, note: string) => {
@@ -445,7 +442,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const requestConsentBatch = async (candidateIds: string[]) => {
     const uniqueIds = [...new Set(candidateIds)];
     if (!uniqueIds.length) return false;
-    if (supabaseConfigured && uniqueIds.every((candidateId) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId))) {
+    if (supabaseConfigured && uniqueIds.every((candidateId) => UUID_RE.test(candidateId))) {
       const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: uniqueIds, purpose: "Screening kandidat" }) });
       if (!response.ok) { toast.error("Permintaan consent gagal dikirim", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
       await loadBootstrap();
@@ -462,7 +459,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const requestConsent = async (candidateId: string) => {
-    if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
+    if (supabaseConfigured && UUID_RE.test(candidateId)) {
       return requestConsentBatch([candidateId]);
     }
     setState((current) => {
@@ -524,7 +521,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
   const startScreening = async (candidateId: string) => {
-    if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
+    if (supabaseConfigured && UUID_RE.test(candidateId)) {
       try {
         const consentResponse = await fetch("/api/consent-requests");
         const consentData = (await consentResponse.json()) as { requests?: { itemId: string; candidateProfileId: string; consentState?: ConsentState }[] };
