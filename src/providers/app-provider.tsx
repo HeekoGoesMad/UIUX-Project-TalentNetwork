@@ -224,6 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setConsentRequests([]);
       setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
       toast.error("Gagal menyiapkan workspace", { description: error instanceof Error ? error.message : "Data database tidak dapat dimuat." });
+      setBootstrapped(true);
     }
   };
 

@@ -3,11 +3,27 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope, getRecruiterTokenAccount } from "@/lib/api/auth";
+import { syncAuthenticatedUser } from "@/lib/api/sync-user";
+import { createClient } from "@/lib/supabase/server";
 import { ShortlistService } from "@/lib/services/shortlist";
 
 export async function GET() {
   try {
-    const current = await getCurrentAppUser();
+    let current = await getCurrentAppUser();
+    if ("error" in current && current.status === 403) {
+      // Fresh login race: auth session exists but the profile row is not
+      // synced yet. Self-heal by syncing now instead of failing the call.
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      if (data.user?.email) {
+        try {
+          await syncAuthenticatedUser(data.user, {});
+          current = await getCurrentAppUser();
+        } catch {
+          // fall through to the original error below
+        }
+      }
+    }
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const membership = current.user.role === "recruiter" ? await getRecruiterScope(current.db, current.user) : null;
