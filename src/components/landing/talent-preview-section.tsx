@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { candidates } from "@/data/candidates";
 
 const CATEGORIES = [
-  { id: "all", label: "Semua Role" },
+  { id: "all", label: "Semua Peran" },
   { id: "tech", label: "Engineering & Tech" },
   { id: "design", label: "Product & Design" },
   { id: "growth", label: "Growth & Marketing" },
@@ -50,7 +50,7 @@ export function TalentPreviewSection() {
             <UserCheck className="size-3.5" /> Eksplorasi Kandidat
           </span>
           <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-5xl">
-            Preview Talent Network Terbuka
+            Pratinjau Jaringan Talent
           </h2>
           <p className="mt-4 text-base text-slate-300 leading-7">
             Intip profil anonim yang siap diajak berdiskusi.
@@ -84,13 +84,13 @@ export function TalentPreviewSection() {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="rounded-md bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-bold text-[#7C3AED]">
-                      Verified Signal
+                      Sinyal Terverifikasi
                     </span>
                     <span className="text-xs text-muted-foreground">{c.location}</span>
                   </div>
 
                   <h4 className="mt-4 font-bold text-base text-[#0f2040] truncate">{c.role}</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">{c.experience} Pengalaman</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{c.experience} tahun pengalaman</p>
 
                   <div className="mt-4 flex flex-wrap gap-1.5">
                     {c.skills.slice(0, 3).map((s) => (
@@ -105,7 +105,7 @@ export function TalentPreviewSection() {
                 </div>
 
                 <div className="mt-6 border-t pt-4 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium">1 Token to unlock</span>
+                  <span className="text-xs text-slate-500 font-medium">1 Token untuk buka profil</span>
                   <Button size="sm" variant="outline" className="rounded-lg text-xs" asChild>
                     <Link href={`/talent/${c.id}`}>
                       Lihat Sinyal <ChevronRight className="ml-1 size-3" />
@@ -124,7 +124,7 @@ export function TalentPreviewSection() {
             asChild
           >
             <Link href="/search">
-              Lihat Semua 30+ Talent Network <ArrowRight className="ml-2 size-4" />
+              Lihat Semua 30+ Talent di Jaringan <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         </div>

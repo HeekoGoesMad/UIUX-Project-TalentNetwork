@@ -15,9 +15,9 @@ import {
 import { Button } from "@/components/ui/button";
 
 const TABS = [
-  { id: "search", label: "Signal Search & AI Match", icon: Search },
-  { id: "privacy", label: "Privacy Context Unlock", icon: Lock },
-  { id: "tokens", label: "Token ROI Estimator", icon: WalletCards },
+  { id: "search", label: "Pencarian Sinyal & AI Match", icon: Search },
+  { id: "privacy", label: "Buka Kontak & Privasi", icon: Lock },
+  { id: "tokens", label: "Estimasi ROI Token", icon: WalletCards },
   { id: "ai", label: "AI Career Advisor", icon: Brain },
 ] as const;
 
@@ -70,7 +70,7 @@ export function FeatureTabsSection() {
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-slate-50 px-3 py-1 text-xs font-semibold text-[#7C3AED]">
-                  Smart Filter & Matching
+                  Filter & Pencarian Cerdas
                 </span>
                 <h3 className="mt-4 text-2xl font-bold text-[#111827]">
                   Cari Berdasarkan Sinyal Konkrit, Bukan Sekadar Resume Text
@@ -92,28 +92,28 @@ export function FeatureTabsSection() {
                 </ul>
                 <Button className="mt-8 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white" asChild>
                   <Link href="/search">
-                    Coba Search Simulator <ArrowRight className="ml-1.5 size-4" />
+                    Coba Simulator Pencarian <ArrowRight className="ml-1.5 size-4" />
                   </Link>
                 </Button>
               </div>
 
               <div className="rounded-2xl border border-slate-200/90 bg-[#F9FAFB] p-5 shadow-inner space-y-3">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Live Search Query</span>
-                  <span className="font-mono text-xs text-[#7C3AED] font-semibold">12 Results Found</span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kueri Pencarian Langsung</span>
+                  <span className="font-mono text-xs text-[#7C3AED] font-semibold">12 Hasil Ditemukan</span>
                 </div>
                 <div className="space-y-2">
                   <div className="rounded-xl border bg-white p-3 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-xs text-[#111827]">Senior Frontend Developer</span>
-                      <span className="font-mono text-xs font-bold text-[#7C3AED] bg-slate-50 px-2 py-0.5 rounded">96% match</span>
+                      <span className="font-mono text-xs font-bold text-[#7C3AED] bg-slate-50 px-2 py-0.5 rounded">Kecocokan 96%</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1">React, Next.js, TypeScript · Jakarta (Remote)</p>
                   </div>
                   <div className="rounded-xl border bg-white p-3 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-xs text-[#0f2040]">Lead Product Designer</span>
-                      <span className="font-mono text-xs font-bold text-[#7C3AED] bg-slate-50 px-2 py-0.5 rounded">93% match</span>
+                      <span className="font-mono text-xs font-bold text-[#7C3AED] bg-slate-50 px-2 py-0.5 rounded">Kecocokan 93%</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1">Figma, Design Systems, Mobile App · Bandung</p>
                   </div>
@@ -126,13 +126,13 @@ export function FeatureTabsSection() {
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                  Privacy By Default
+                  Privasi by Default
                 </span>
                 <h3 className="mt-4 text-2xl font-bold text-[#0f2040]">
                   Kandidat Terlindungi, Recruiter Mendapat Kontak Terverifikasi
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  Semua kandidat di ProofyLink terlindungi dari spam. Identitas asli hanya dapat di-unlock dengan consent dan 1 token per profil, memastikan percakapan profesional dan responsif.
+                  Semua kandidat di ProofyLink terlindungi dari spam. Identitas asli hanya dapat dibuka dengan consent dan 1 token per profil, memastikan percakapan profesional dan responsif.
                 </p>
                 <div className="mt-6 rounded-2xl bg-[#0b2342] p-4 text-white text-xs leading-5">
                   <p className="font-semibold text-[#79e6b2] flex items-center gap-1.5">
@@ -146,20 +146,20 @@ export function FeatureTabsSection() {
 
               <div className="space-y-4">
                 <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-                  <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Status Anonim (Sebelum Unlock)</p>
+                  <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Status Anonim (Sebelum Dibuka)</p>
                   <div className="mt-2 text-xs text-slate-600 space-y-1">
                     <p>Nama: <span className="font-mono text-slate-400">███████████</span></p>
                     <p>Email / WA: <span className="font-mono text-slate-400">██████@████.com</span></p>
-                    <p>Sinyal: Senior UI/UX Designer (Open for conversation)</p>
+                    <p>Sinyal: Senior UI/UX Designer (Siap berdiskusi)</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                  <p className="text-xs font-bold text-[#7C3AED] uppercase tracking-wide">Status Unlocked (Sesudah 1 Token)</p>
+                  <p className="text-xs font-bold text-[#7C3AED] uppercase tracking-wide">Status Terbuka (Sesudah 1 Token)</p>
                   <div className="mt-2 text-xs text-slate-800 space-y-1">
                     <p>Nama: <span className="font-semibold text-[#111827]">Aditya Pratama</span></p>
                     <p>Email / WA: <span className="font-semibold text-[#7C3AED]">aditya.p@proofylink.dev</span></p>
-                    <p>Full Portfolio & Contact Unlocked</p>
+                    <p>Portofolio Lengkap &amp; Kontak Terbuka</p>
                   </div>
                 </div>
               </div>
@@ -170,7 +170,7 @@ export function FeatureTabsSection() {
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#1E40AF]">
-                  Transparent Pricing
+                  Harga Transparan
                 </span>
                 <h3 className="mt-4 text-2xl font-bold text-[#111827]">
                   Kalkulator Hemat Biaya Rekrutmen Berbasis Token
@@ -182,8 +182,8 @@ export function FeatureTabsSection() {
                 <div className="mt-6 space-y-4">
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-slate-700">
-                      <span>Jumlah Profile Candidate Unlock:</span>
-                      <span className="font-mono text-sm text-[#7C3AED]">{tokenCalculatorCount} Candidate</span>
+                      <span>Jumlah Profil Kandidat yang Dibuka:</span>
+                      <span className="font-mono text-sm text-[#7C3AED]">{tokenCalculatorCount} Kandidat</span>
                     </div>
                     <input
                       type="range"
@@ -225,13 +225,13 @@ export function FeatureTabsSection() {
             <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xl grid gap-8 lg:grid-cols-2 items-center animate-fade-up">
               <div>
                 <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                  For Talent & Job Seekers
+                  Untuk Talent &amp; Pencari Kerja
                 </span>
                 <h3 className="mt-4 text-2xl font-bold text-[#0f2040]">
-                  AI Career Advisor & ATS Optimization
+                  AI Career Advisor &amp; Optimasi ATS
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  Untuk kandidat, ProofyLink menyediakan asisten AI cerdas untuk mempolarisasi pengalaman kerja, menyusun poin CV yang lolos ATS, serta memberikan rekomendasi peran yang tepat.
+                  Untuk kandidat, ProofyLink menyediakan asisten AI cerdas untuk memperkuat pengalaman kerja, menyusun poin CV yang lolos ATS, serta memberikan rekomendasi peran yang tepat.
                 </p>
                 <ul className="mt-6 space-y-3 text-sm">
                   {[
@@ -249,7 +249,7 @@ export function FeatureTabsSection() {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#111827]">
-                  <Sparkles className="size-4 text-[#7C3AED]" /> ProofyLink AI Advisor Suggestion
+                  <Sparkles className="size-4 text-[#7C3AED]" /> Saran AI Advisor ProofyLink
                 </div>
                 <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-5">
                   &quot;Tambahkan pencapaian kuantitatif pada pengalaman Frontend Engineer Anda (contoh: Meningkatkan performa LCP sebesar 40%) untuk meningkatkan skor match hingga +15%.&quot;

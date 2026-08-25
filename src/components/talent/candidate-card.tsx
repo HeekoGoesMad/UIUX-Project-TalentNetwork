@@ -31,7 +31,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
               size="icon"
               className="-mr-2 -mt-1 shrink-0"
               onClick={() => toggleShortlist(candidate.id)}
-              aria-label="Toggle shortlist"
+              aria-label="Simpan ke shortlist"
             >
               <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary text-primary" : ""} />
             </Button>
@@ -42,7 +42,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
             <p className="font-semibold text-foreground">{displayName}</p>
             {!unlocked && (
               <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                Preview
+                Pratinjau
               </span>
             )}
           </div>
@@ -63,7 +63,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
             </span>
             <span className="flex items-center gap-1">
               <BriefcaseBusiness className="size-3" />
-              {candidate.experience} thn
+              {candidate.experience} tahun
             </span>
             <span className="flex items-center gap-1">
               <Clock3 className="size-3" />
@@ -73,7 +73,7 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
         </div>
 
         <div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}>
-          <p className="text-xs text-muted-foreground">Expected range</p>
+          <p className="text-xs text-muted-foreground">Ekspektasi gaji</p>
           <p className="font-mono text-sm font-medium">{candidate.salary}</p>
         </div>
 

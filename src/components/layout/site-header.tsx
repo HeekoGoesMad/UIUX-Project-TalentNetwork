@@ -37,7 +37,7 @@ export function SiteHeader() {
   // Navigation links based on route and auth state
   const links = isPublicHeader
     ? [
-        { href: isLanding ? "#features" : "/#features", label: "Fitur Utuh" },
+        { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
         { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
         { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
         { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
@@ -45,20 +45,20 @@ export function SiteHeader() {
     : visibleUser?.role === "candidate"
     ? [
         { href: "/candidate", label: "Workspace" },
-        { href: "/candidate/cv", label: "CV & Profile" },
+        { href: "/candidate/cv", label: "CV & Profil" },
          { href: "/candidate/career-advisor", label: "Career Advisor" },
-         { href: "/candidate/contact-requests", label: "Permintaan kontak" },
+         { href: "/candidate/contact-requests", label: "Permintaan Kontak" },
          { href: "/messages", label: "Pesan" },
       ]
     : visibleUser?.role === "partner"
     ? [
         { href: "/partner", label: "Dashboard" },
-        { href: "/partner/talent", label: "Campus Talent" },
-        { href: "/partner/employers", label: "Employer Access" },
-        { href: "/partner/analytics", label: "Analytics" },
+        { href: "/partner/talent", label: "Talent Kampus" },
+        { href: "/partner/employers", label: "Akses Employer" },
+        { href: "/partner/analytics", label: "Analitik" },
       ]
     : [
-        { href: "/search", label: "Search talent" },
+        { href: "/search", label: "Cari Talent" },
          { href: "/shortlist", label: "Shortlist" },
          { href: "/recruiter/screenings/new", label: "Screening" },
          { href: "/messages", label: "Pesan" },
@@ -144,7 +144,7 @@ export function SiteHeader() {
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex" asChild>
               <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"}>
                 <Search className="size-4" />
-                {visibleUser?.role === "candidate" ? "Explore jobs" : "Search talent"}
+                {visibleUser?.role === "candidate" ? "Eksplorasi lowongan" : "Cari talent"}
               </Link>
             </Button>
           )}
@@ -166,7 +166,7 @@ export function SiteHeader() {
             >
               <WalletCards className="size-4 text-[#7C3AED]" />
               <span className="font-mono">{devBypass ? "∞" : tokens}</span>
-              <span className="hidden text-muted-foreground sm:inline">tokens</span>
+              <span className="hidden text-muted-foreground sm:inline">token</span>
             </Link>
           )}
 
@@ -185,7 +185,7 @@ export function SiteHeader() {
               variant="ghost"
               size="icon"
               className={cn("rounded-full", isOverDarkHeader && "text-white hover:bg-white/10")}
-              aria-label="Log out"
+              aria-label="Keluar dari akun"
               onClick={logout}
             >
               <LogOut className="size-4" />
@@ -230,7 +230,7 @@ export function SiteHeader() {
             variant="ghost"
             size="icon"
             className={cn("rounded-full md:hidden", isOverDarkHeader && "text-white hover:bg-white/10")}
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? "Tutup menu" : "Buka menu"}
             onClick={() => setOpen(!open)}
           >
             {open ? <X /> : <Menu />}

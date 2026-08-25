@@ -1,12 +1,12 @@
 import { InteractiveMarquee } from "@/components/ui/interactive-marquee";
 
 const STATS = [
-  { val: "30+", color: "text-[#111827]", label: "Verified Talent Profiles" },
-  { val: "98%", color: "text-[#7C3AED]", label: "Match Accuracy Signal" },
-  { val: "3x", color: "text-[#111827]", label: "Faster Recruiter Screening" },
-  { val: "1 Token", color: "text-[#7C3AED]", label: "Transparent Cost per Unlock" },
-  { val: "100%", color: "text-[#111827]", label: "Consent-First Privacy" },
-  { val: "0 Spam", color: "text-[#7C3AED]", label: "Direct Verified Contacts" },
+  { val: "30+", color: "text-[#111827]", label: "Profil Talent Terverifikasi" },
+  { val: "98%", color: "text-[#7C3AED]", label: "Akurasi Sinyal Match" },
+  { val: "3x", color: "text-[#111827]", label: "Skrining Recruiter Lebih Cepat" },
+  { val: "1 Token", color: "text-[#7C3AED]", label: "Biaya Transparan per Unlock" },
+  { val: "100%", color: "text-[#111827]", label: "Privasi Berbasis Consent" },
+  { val: "0 Spam", color: "text-[#7C3AED]", label: "Kontak Terverifikasi Langsung" },
 ];
 
 export function MarqueeStatsSection() {
