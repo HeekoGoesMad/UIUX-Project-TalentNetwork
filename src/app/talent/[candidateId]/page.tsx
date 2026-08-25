@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import { findCandidate } from "@/data/candidates";
 import { maskName } from "@/lib/candidate-display";
+import { UUID_RE } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateCategoryBadge } from "@/components/talent/candidate-category-badge";
@@ -146,7 +147,7 @@ function ScreeningResults({
         targetRole: candidate.role,
         location: candidate.location,
       };
-       const isDatabaseCandidate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId);
+       const isDatabaseCandidate = UUID_RE.test(candidateId);
       if (isDatabaseCandidate) {
         const runResponse = await fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`);
         const runData = (await runResponse.json()) as { run?: { id: string; status: string; score?: { score: number; label: string; coverage: number; evidence: unknown; limitations: unknown; source: "mock" | "azure"; modelVersion: string } | null }; error?: string };
@@ -418,7 +419,7 @@ export default function TalentProfile() {
   }, [candidateId, dbMode, bootstrapped]);
 
   useEffect(() => {
-    if (!dbMode || !bootstrapped || !/^[0-9a-f-]{36}$/i.test(candidateId)) return;
+    if (!dbMode || !bootstrapped || !UUID_RE.test(candidateId)) return;
     void fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as { run?: { status?: string } | null };

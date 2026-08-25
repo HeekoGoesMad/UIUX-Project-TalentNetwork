@@ -210,10 +210,8 @@ export function CvWorkspace() {
     try {
       await saveCvProfile(profile);
       setMessage("Profil berhasil disimpan dan disinkronkan.");
-      toast.success("Profil tersimpan", { description: "Perubahan profilmu sudah disinkronkan." });
     } catch {
       setMessage("Profil gagal disimpan. Coba lagi.");
-      toast.error("Gagal menyimpan", { description: "Perubahan belum tersinkron. Coba simpan kembali." });
     } finally {
       setSaving(false);
     }

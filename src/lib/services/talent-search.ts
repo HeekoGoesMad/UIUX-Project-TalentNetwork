@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { schema, type Database } from "@/db";
-import type { Candidate, CareerStatus, IndustryCategory, TalentCategory } from "@/types";
+import { asCareerStatus, type Candidate, type IndustryCategory, type TalentCategory } from "@/types";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -34,18 +34,7 @@ export function serializeCandidate(
     "education"
   );
   const preferences = sections.find((section) => section.type === "preferences")?.content ?? {};
-  const careerStatus = preferences.careerStatus;
-  const status: CareerStatus =
-    typeof careerStatus === "string" &&
-    [
-      "open-to-work",
-      "open-for-opportunities",
-      "freelance-available",
-      "internship-available",
-      "not-available",
-    ].includes(careerStatus)
-      ? (careerStatus as CareerStatus)
-      : "open-to-work";
+  const status = asCareerStatus(preferences.careerStatus);
 
   const name = row.name?.trim() || "Kandidat anonim";
 

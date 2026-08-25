@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { CONSENT_STATE_BY_DB_STATUS } from "@/types";
 import type { AppUser } from "@/lib/api/auth";
 
 export class ConsentService {
@@ -75,13 +76,7 @@ export class ConsentService {
       : [];
 
     const mapState = (status: (typeof rows)[number]["status"]) =>
-      ({
-        pending: "pending-candidate-consent",
-        approved: "consented",
-        declined: "declined",
-        revoked: "withdrawn",
-        expired: "consent-expired",
-      })[status];
+      CONSENT_STATE_BY_DB_STATUS[status];
 
     return {
       requests: rows.map((row) => ({

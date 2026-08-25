@@ -74,3 +74,9 @@ export type CvProfile = {
 };
 
 export type ConsentState = "not-requested" | "pending-candidate-consent" | "consented" | "declined" | "consent-expired" | "withdrawn" | "screening-in-progress" | "screening-completed" | "disputed";
+
+export function asCareerStatus(value: unknown): CareerStatus {
+  return typeof value === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(value) ? (value as CareerStatus) : "open-to-work";
+}
+
+export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
