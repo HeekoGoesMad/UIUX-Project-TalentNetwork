@@ -15,32 +15,37 @@ const ROLE_HOME: Record<Role, string> = {
 type Resolution =
   | { kind: "user"; user: AppUser }
   | { kind: "unauthenticated" }
-  | { kind: "recruiter-pending" };
+  | { kind: "provisioning" }
+  | { kind: "unavailable" };
 
 async function resolveAccess(): Promise<Resolution> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return { kind: "unauthenticated" };
+  if (!url || !key) return { kind: "unavailable" };
   try {
     const res = await getCurrentAppUser();
     if (!("error" in res)) return { kind: "user", user: res.user };
-    if ("reason" in res && res.reason === "recruiter-pending") return { kind: "recruiter-pending" };
-    return { kind: "unauthenticated" };
+    if ("reason" in res) return { kind: "provisioning" };
+    return { kind: "unavailable" };
   } catch {
-    return { kind: "unauthenticated" };
+    return { kind: "unavailable" };
   }
 }
 
-export async function requireAppUser(): Promise<AppUser> {
+export type GuardResult = { ok: true } | { ok: false };
+
+export async function requireAppUser(): Promise<GuardResult> {
   const res = await resolveAccess();
-  if (res.kind !== "user") redirect("/login");
-  return res.user;
+  if (res.kind === "unauthenticated") redirect("/login");
+  if (res.kind === "unavailable") return { ok: false };
+  return { ok: true };
 }
 
-export async function requireRole(roles: Role[]): Promise<AppUser> {
+export async function requireRole(roles: Role[]): Promise<GuardResult> {
   const res = await resolveAccess();
-  if (res.kind === "recruiter-pending") redirect("/recruiter/pending");
-  if (res.kind !== "user") redirect("/login");
+  if (res.kind === "unauthenticated") redirect("/login");
+  if (res.kind === "unavailable") return { ok: false };
+  if (res.kind === "provisioning") redirect("/recruiter/pending");
   if (!roles.includes(res.user.role)) redirect(ROLE_HOME[res.user.role]);
-  return res.user;
+  return { ok: true };
 }
