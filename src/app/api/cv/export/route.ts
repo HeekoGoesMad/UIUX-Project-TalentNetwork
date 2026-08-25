@@ -1,22 +1,75 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import type { Browser } from "playwright-core";
-import type { CvProfile } from "@/types";
-import { type CvTemplateId, buildCvHtml } from "@/lib/cv/templates";
+import { getCurrentAppUser } from "@/lib/api/auth";
+import { buildCvHtml } from "@/lib/cv/templates";
+
+const experienceItem = z.object({
+  company: z.string().max(120),
+  role: z.string().max(120),
+  dates: z.string().max(60),
+  achievements: z.array(z.string().max(300)).max(20),
+});
+
+const educationItem = z.object({
+  school: z.string().max(160),
+  program: z.string().max(160),
+  dates: z.string().max(60),
+});
+
+const profileSchema = z.object({
+  id: z.string().max(100),
+  fullName: z.string().max(120),
+  headline: z.string().max(160),
+  about: z.string().max(4000),
+  location: z.string().max(120),
+  email: z.string().max(200),
+  phone: z.string().max(40),
+  skills: z.array(z.string().max(60)).max(20),
+  tools: z.array(z.string().max(60)).max(20),
+  industries: z.array(z.string().max(80)).max(20),
+  experience: z.array(experienceItem).max(20),
+  education: z.array(educationItem).max(20),
+  certifications: z.array(z.string().max(160)).max(20),
+  portfolio: z.array(z.string().max(500)).max(20),
+  targetRole: z.string().max(120),
+  workArrangement: z.enum(["remote", "hybrid", "onsite"]),
+  openToWork: z.boolean(),
+  careerStatus: z.enum([
+    "open-to-work",
+    "open-for-opportunities",
+    "freelance-available",
+    "internship-available",
+    "not-available",
+  ]),
+  sourceFileName: z.string().max(260).optional(),
+  updatedAt: z.string().max(60),
+});
+
+const exportSchema = z.object({
+  profile: profileSchema,
+  templateId: z.enum(["ats", "modern", "sidebar", "minimal"]).default("ats"),
+});
 
 export async function POST(request: Request) {
-  let profile: CvProfile;
-  let templateId: CvTemplateId;
+  const current = await getCurrentAppUser();
+  if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-  try {
-    const body = (await request.json()) as { profile: CvProfile; templateId: CvTemplateId };
-    profile = body.profile;
-    templateId = body.templateId ?? "ats";
-  } catch {
-    return NextResponse.json({ error: "Request body tidak valid." }, { status: 400 });
+  const payload = exportSchema.safeParse(await request.json().catch(() => null));
+  if (!payload.success) {
+    return NextResponse.json({ error: "Data CV tidak valid." }, { status: 400 });
   }
 
+  const { profile, templateId } = payload.data;
   const html = buildCvHtml(profile, templateId);
-  const safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
+  const slug = profile.fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9-_ ]+/g, " ")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 50)
+    .replace(/-+$/g, "");
+  const safeFileName = `proofylink-cv-${slug || "cv"}.pdf`;
 
   let browser: Browser | undefined;
 
@@ -52,7 +105,6 @@ export async function POST(request: Request) {
       {
         error:
           "PDF generation membutuhkan browser runtime. Pastikan Playwright Chromium terpasang atau gunakan cetak browser.",
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

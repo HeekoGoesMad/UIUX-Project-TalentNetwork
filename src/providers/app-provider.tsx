@@ -29,6 +29,7 @@ type Context = AppState & {
   shortlists: BootstrapShortlist[];
   consentRequests: Record<string, unknown>[];
   databaseError: string | null;
+  configError?: boolean;
   markNotificationRead: (id: string) => Promise<boolean>;
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
@@ -144,6 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const pendingRole = useRef<UserRole | null>(null);
   const devBypass = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) && !devBypass;
+  const configError = process.env.NODE_ENV === "production" && !supabaseConfigured;
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
@@ -569,7 +571,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  if (configError) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-sm rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-base font-bold text-slate-900">Kesalahan Konfigurasi</h1>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">Aplikasi tidak dapat dijalankan karena konfigurasi autentikasi belum lengkap. Silakan hubungi administrator.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
