@@ -14,6 +14,7 @@ import {
   FileCheck2,
   FileText,
   Globe,
+  GraduationCap,
   Loader2,
   Lock,
   Mail,
@@ -396,6 +397,7 @@ export default function TalentProfile() {
     dbMode,
     bootstrapped,
     databaseError,
+    partnerVerifications,
   } = useApp();
 
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
@@ -406,6 +408,8 @@ export default function TalentProfile() {
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [openingConversation, setOpeningConversation] = useState(false);
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
+
+  const verif = candidate ? (partnerVerifications?.[candidate.id] ?? candidate.campusVerification) : undefined;
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
@@ -508,7 +512,7 @@ export default function TalentProfile() {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <Link href="/search" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/recruiter/discover" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Kembali ke pencarian
       </Link>
 
@@ -526,6 +530,12 @@ export default function TalentProfile() {
                 <CandidateCategoryBadge category={candidate.talentCategory} />
                 {candidate.careerStatus && (
                   <CandidateStatusBadge status={candidate.careerStatus} />
+                )}
+                {verif?.status === "verified" && (
+                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
+                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
+                    Campus Verified · {verif.institution}
+                  </Badge>
                 )}
               </div>
 
@@ -689,6 +699,12 @@ export default function TalentProfile() {
                 <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
                   <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
                 </Button>
+                <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
+                  <Link href={completed ? `/recruiter/screenings/${candidate.id}` : `/recruiter/screenings/new?candidateId=${candidate.id}`}>
+                    <ShieldCheck className="mr-1.5 size-3.5" />
+                    {completed ? "Lihat Screening Selesai" : "Minta Screening"}
+                  </Link>
+                </Button>
               </div>
             </div>
 
@@ -742,6 +758,32 @@ export default function TalentProfile() {
                 ))}
               </div>
             </div>
+
+            {/* Education & Campus Partnership */}
+            <div>
+              <p className="mb-3 text-sm font-semibold flex items-center gap-1.5">
+                <GraduationCap className="size-4 text-[#7C3AED]" /> Pendidikan & Verifikasi Kampus
+              </p>
+              <div className="rounded-xl border p-4 bg-slate-50/60">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">{candidate.education}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {verif?.program ? `${verif.program} · Angkatan ${verif.year}` : "Lulusan Perguruan Tinggi"}
+                    </p>
+                  </div>
+                  {verif?.status === "verified" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                      ✓ Terverifikasi oleh {verif.verifiedBy || `${verif.institution} Career Center`}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                      ⏳ Pending Verifikasi Career Center
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </CardContent>
         )}
       </Card>
@@ -763,7 +805,7 @@ export default function TalentProfile() {
                       const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
                       const payload = await response.json() as { conversationId?: string; error?: string };
                       if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-                      router.push(`/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
+                      router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
                     } catch (error) {
                       toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
                     } finally {

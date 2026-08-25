@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Bookmark, Check, Download, FileText, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -108,7 +109,15 @@ export default function Shortlist() {
                         <Trash2 className="size-3" /> Hapus
                       </Button>
                       <Button size="sm" variant="ghost" asChild>
-                        <a href={`/recruiter/screenings/new?candidateId=${candidate.id}`}>Screening</a>
+                        <Link
+                          href={
+                            screeningConsents[candidate.id] === "screening-completed"
+                              ? `/recruiter/screenings/${candidate.id}`
+                              : `/recruiter/screenings/new?candidateId=${candidate.id}`
+                          }
+                        >
+                          Screening
+                        </Link>
                       </Button>
                     </div>
                   </div>

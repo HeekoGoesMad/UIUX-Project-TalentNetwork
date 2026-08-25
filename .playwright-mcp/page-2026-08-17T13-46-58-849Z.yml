@@ -1,0 +1,69 @@
+- generic [active] [ref=f18e1]:
+  - link "Lewati ke konten utama" [ref=f18e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f18e3]:
+      - link "ProofyLink" [ref=f18e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f18e10]:
+        - link "∞" [ref=f18e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f18e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f18e54]: "1"
+        - button "Log out" [ref=f18e55]
+        - button "Open menu" [ref=f18e17]
+  - main [ref=f18e19]:
+    - main [ref=f18e59]:
+      - link "Kembali ke detail" [ref=f18e60] [cursor=pointer]:
+        - /url: /recruiter/screenings/candidate-1
+      - generic [ref=f18e63]:
+        - paragraph [ref=f18e64]: Interview workspace
+        - heading "Pertanyaan interview" [level=1] [ref=f18e68]
+        - paragraph [ref=f18e69]: Draft untuk Nadia Putri, Senior Product Designer.
+      - generic [ref=f18e74]:
+        - paragraph [ref=f18e75]: AI draft, editable
+        - paragraph [ref=f18e76]: Pertanyaan ini adalah rancangan awal untuk membantu recruiter. Edit, hapus, atau tambah pertanyaan sebelum digunakan. Workspace ini bukan sistem assessment kandidat dan tidak menyimpan jawaban atau skor.
+      - generic [ref=f18e77]:
+        - generic [ref=f18e78]:
+          - generic [ref=f18e79]:
+            - heading "Draft questions" [level=3] [ref=f18e80]
+            - paragraph [ref=f18e81]: Tidak ada autosave atau persisted assessment data pada fase ini.
+          - button "Generate ulang" [ref=f18e82]
+        - generic [ref=f18e88]:
+          - generic [ref=f18e89]:
+            - generic [ref=f18e90]: Pertanyaan 1
+            - textbox "Pertanyaan 1" [ref=f18e91]: You mention in your headline that you have a "sharp point of view." Can you describe a specific project where your perspective conflicted with the team or a stakeholder, and how you pushed for a better outcome using research or measurable results?
+            - button "Hapus pertanyaan 1" [ref=f18e92]
+          - generic [ref=f18e96]:
+            - generic [ref=f18e97]: Pertanyaan 2
+            - textbox "Pertanyaan 2" [ref=f18e98]: Your skillset is an interesting blend of a classic design tool (Figma), a programming language (TypeScript), and qualitative research. When starting a new ambiguous project in a Senior role, how do you practically integrate these three skills to move from an initial question to a validated design decision?
+            - button "Hapus pertanyaan 2" [ref=f18e99]
+          - generic [ref=f18e103]:
+            - generic [ref=f18e104]: Pertanyaan 3
+            - textbox "Pertanyaan 3" [ref=f18e105]: You've highlighted your location as Jakarta. For a Senior Product Designer role, are you targeting a remote global position, working for a local Indonesian startup/unicorn, or a multinational corporation's regional office? How does the local culture influence your iterative research process?
+            - button "Hapus pertanyaan 3" [ref=f18e106]
+          - generic [ref=f18e110]:
+            - button "Tambah pertanyaan" [ref=f18e111]
+            - button "Simpan draft (segera)" [disabled]:
+              - text: Simpan draft
+              - generic: (segera)
+      - paragraph [ref=f18e113]: "Source: AI provider yang aktif dan konteks profil kandidat. Limitasi: pertanyaan tidak diverifikasi, tidak menilai respons, dan tidak menjadi keputusan otomatis."
+  - contentinfo [ref=f18e23]:
+    - generic [ref=f18e24]:
+      - generic [ref=f18e25]:
+        - link "ProofyLink" [ref=f18e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f18e30]: Verified talent. Trusted connections.
+      - navigation [ref=f18e31]:
+        - link "Search talent" [ref=f18e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f18e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f18e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f18e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f18e41] [cursor=pointer]
+  - alert [ref=f18e114]

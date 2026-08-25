@@ -1,0 +1,77 @@
+- generic [active] [ref=f55e1]:
+  - link "Lewati ke konten utama" [ref=f55e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f55e3]:
+      - link "ProofyLink" [ref=f55e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f55e10]:
+        - link "∞" [ref=f55e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f55e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f55e54]: "1"
+        - button "Log out" [ref=f55e55]
+        - button "Open menu" [ref=f55e17]
+  - main [ref=f55e19]:
+    - main [ref=f55e59]:
+      - link "Kembali ke assessments" [ref=f55e60] [cursor=pointer]:
+        - /url: /recruiter/assessments
+      - generic [ref=f55e63]:
+        - paragraph [ref=f55e64]: Recruiter / attempt review
+        - heading "Product thinking check-in" [level=1] [ref=f55e65]
+        - paragraph [ref=f55e66]: Review jawaban kandidat dengan konteks yang lengkap, tanpa score otomatis.
+      - paragraph [ref=f55e67]: "Demo mode: attempt review berasal dari demo invitation store."
+      - generic [ref=f55e68]:
+        - generic [ref=f55e70]:
+          - paragraph [ref=f55e71]: Application
+          - paragraph [ref=f55e75]: demo-application-1
+        - generic [ref=f55e77]:
+          - paragraph [ref=f55e78]: Timestamps
+          - paragraph [ref=f55e82]: Started 17 Agu 2026, 23.20
+          - paragraph [ref=f55e83]: Submitted 17 Agu 2026, 23.21
+        - generic [ref=f55e85]:
+          - paragraph [ref=f55e86]: Review status
+          - paragraph [ref=f55e90]: Pending human/AI review
+          - paragraph [ref=f55e91]: Tidak ada score atau keputusan otomatis.
+      - generic [ref=f55e92]:
+        - generic [ref=f55e93]:
+          - heading "Submitted answers" [level=3] [ref=f55e94]
+          - paragraph [ref=f55e98]: "Attempt #1 · status submitted"
+        - generic [ref=f55e99]:
+          - article [ref=f55e100]:
+            - generic [ref=f55e101]:
+              - generic [ref=f55e102]: "01"
+              - generic [ref=f55e103]:
+                - generic [ref=f55e104]:
+                  - heading "Which signal would you validate first before changing a core workflow?" [level=2] [ref=f55e105]
+                  - generic [ref=f55e106]: Pilihan ganda
+                - generic [ref=f55e107]: Repeated user behavior
+                - paragraph [ref=f55e108]: Disimpan 17 Agu 2026, 23.21 · submitted 17 Agu 2026, 23.21
+          - article [ref=f55e109]:
+            - generic [ref=f55e110]:
+              - generic [ref=f55e111]: "02"
+              - generic [ref=f55e112]:
+                - generic [ref=f55e113]:
+                  - heading "Describe how you would communicate an uncertain product decision." [level=2] [ref=f55e114]
+                  - generic [ref=f55e115]: Jawaban bebas
+                - generic [ref=f55e116]: I would explain the evidence, uncertainty, next test, and decision date.
+                - paragraph [ref=f55e117]: Disimpan 17 Agu 2026, 23.21 · submitted 17 Agu 2026, 23.21
+  - contentinfo [ref=f55e23]:
+    - generic [ref=f55e24]:
+      - generic [ref=f55e25]:
+        - link "ProofyLink" [ref=f55e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f55e30]: Verified talent. Trusted connections.
+      - navigation [ref=f55e31]:
+        - link "Search talent" [ref=f55e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f55e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f55e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f55e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f55e41] [cursor=pointer]
+  - alert [ref=f55e118]

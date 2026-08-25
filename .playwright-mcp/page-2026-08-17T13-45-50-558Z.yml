@@ -1,0 +1,70 @@
+- generic [active] [ref=f17e1]:
+  - link "Lewati ke konten utama" [ref=f17e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f17e3]:
+      - link "ProofyLink" [ref=f17e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f17e10]:
+        - link "∞" [ref=f17e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f17e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f17e54]: "1"
+        - button "Log out" [ref=f17e55]
+        - button "Open menu" [ref=f17e17]
+  - main [ref=f17e19]:
+    - main [ref=f17e59]:
+      - link "Kembali ke queue" [ref=f17e60] [cursor=pointer]:
+        - /url: /recruiter/screenings
+      - generic [ref=f17e63]:
+        - generic [ref=f17e64]:
+          - paragraph [ref=f17e65]: Screening detail
+          - heading "Nadia Putri" [level=1] [ref=f17e69]
+          - paragraph [ref=f17e70]: Senior Product Designer · Jakarta
+        - link "Interview questions" [ref=f17e71] [cursor=pointer]:
+          - /url: /recruiter/screenings/candidate-1/questions
+      - generic [ref=f17e75]:
+        - generic [ref=f17e76]:
+          - generic [ref=f17e78]:
+            - generic [ref=f17e79]:
+              - heading "Screening insight" [level=3] [ref=f17e80]
+              - paragraph [ref=f17e81]: Insight role fit dan kualitas data untuk membantu human review.
+            - generic [ref=f17e82]: Belum selesai
+          - generic [ref=f17e84]:
+            - paragraph [ref=f17e88]: Belum ada insight screening
+            - paragraph [ref=f17e89]: Pastikan consent disetujui sebelum menjalankan screening satu token.
+        - generic [ref=f17e90]:
+          - heading "Run timeline" [level=3] [ref=f17e92]
+          - generic [ref=f17e93]:
+            - generic [ref=f17e98]:
+              - paragraph [ref=f17e99]: Status saat ini
+              - paragraph [ref=f17e100]: Menunggu langkah berikutnya
+            - generic [ref=f17e101]:
+              - paragraph [ref=f17e102]: Consent kandidat
+              - paragraph [ref=f17e103]: Belum tersedia
+            - generic [ref=f17e104]:
+              - paragraph [ref=f17e105]: Apa yang tidak dilakukan
+              - paragraph [ref=f17e106]: Tidak menganalisis financial, credit, protected attributes, atau memberi keputusan otomatis hire/reject.
+      - generic [ref=f17e107]:
+        - paragraph [ref=f17e108]: Butuh percakapan terstruktur untuk validasi bukti?
+        - link "Buka workspace" [ref=f17e109] [cursor=pointer]:
+          - /url: /recruiter/screenings/candidate-1/questions
+  - contentinfo [ref=f17e23]:
+    - generic [ref=f17e24]:
+      - generic [ref=f17e25]:
+        - link "ProofyLink" [ref=f17e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f17e30]: Verified talent. Trusted connections.
+      - navigation [ref=f17e31]:
+        - link "Search talent" [ref=f17e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f17e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f17e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f17e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f17e41] [cursor=pointer]
+  - alert [ref=f17e112]

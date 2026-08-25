@@ -1,1 +1,1 @@
-/*  /index.html  200
+# App Router routes must be handled by the Next.js runtime, not a static SPA fallback.

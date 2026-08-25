@@ -1,0 +1,67 @@
+- generic [active] [ref=f40e1]:
+  - link "Lewati ke konten utama" [ref=f40e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f40e3]:
+      - link "ProofyLink" [ref=f40e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f40e10]:
+        - link "∞" [ref=f40e11] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f40e16] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f40e20]: "1"
+        - button "Log out" [ref=f40e21]
+        - button "Open menu" [ref=f40e25]
+  - main [ref=f40e27]:
+    - main [ref=f40e28]:
+      - paragraph [ref=f40e29]: Recruiter / assessments
+      - heading "Assessment yang siap dipakai" [level=1] [ref=f40e30]
+      - paragraph [ref=f40e31]: Susun pertanyaan yang konsisten, lalu kirim untuk dijawab kandidat. Semua jawaban masuk sebagai pending review; belum ada AI scoring.
+      - generic [ref=f40e32]:
+        - paragraph [ref=f40e33]: 2 template
+        - link "Buat template" [ref=f40e34] [cursor=pointer]:
+          - /url: /recruiter/assessments/new
+      - generic [ref=f40e36]:
+        - generic [ref=f40e37]:
+          - generic [ref=f40e38]:
+            - generic [ref=f40e39]:
+              - heading "Customer interview basics" [level=3] [ref=f40e40]
+              - generic [ref=f40e41]: Human review
+            - paragraph [ref=f40e42]: Tanpa deskripsi
+          - generic [ref=f40e43]:
+            - generic [ref=f40e44]:
+              - generic [ref=f40e45]: 1 pertanyaan
+              - generic [ref=f40e46]: 0 invitation
+            - link "Kelola template" [ref=f40e47] [cursor=pointer]:
+              - /url: /recruiter/assessments/demo-template-f62ff674-133a-47bc-a19c-eaf78b242ea2
+        - generic [ref=f40e48]:
+          - generic [ref=f40e49]:
+            - generic [ref=f40e50]:
+              - heading "Product thinking check-in" [level=3] [ref=f40e51]
+              - generic [ref=f40e52]: Human review
+            - paragraph [ref=f40e53]: A short, human-reviewed assessment for product roles.
+          - generic [ref=f40e54]:
+            - generic [ref=f40e55]:
+              - generic [ref=f40e56]: 2 pertanyaan
+              - generic [ref=f40e57]: 1 invitation
+            - link "Kelola template" [ref=f40e58] [cursor=pointer]:
+              - /url: /recruiter/assessments/demo-template-1
+  - contentinfo [ref=f40e59]:
+    - generic [ref=f40e60]:
+      - generic [ref=f40e61]:
+        - link "ProofyLink" [ref=f40e62] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f40e66]: Verified talent. Trusted connections.
+      - navigation [ref=f40e67]:
+        - link "Search talent" [ref=f40e68] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f40e69] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f40e70] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f40e71] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f40e77] [cursor=pointer]
+  - alert [ref=f40e81]

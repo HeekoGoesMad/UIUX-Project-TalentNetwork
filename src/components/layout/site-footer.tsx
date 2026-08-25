@@ -18,8 +18,18 @@ export function SiteFooter() {
   const logoHref = visibleUser
     ? visibleUser.role === "candidate"
       ? "/candidate"
-      : "/dashboard"
+      : visibleUser.role === "partner"
+      ? "/partner"
+      : "/recruiter/dashboard"
     : "/";
+
+  const messageHref = visibleUser?.role === "candidate"
+    ? "/candidate/messages"
+    : visibleUser?.role === "recruiter"
+    ? "/recruiter/messages"
+    : "/messages";
+
+  const discoveryHref = visibleUser?.role === "candidate" ? "/candidate/profile" : visibleUser?.role === "recruiter" ? "/recruiter/discover" : "/search";
 
   return (
     <footer className="border-t bg-white">

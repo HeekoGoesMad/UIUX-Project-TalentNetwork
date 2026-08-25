@@ -1,0 +1,56 @@
+- generic [ref=f15e1]:
+  - link "Lewati ke konten utama" [ref=f15e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f15e3]:
+      - link "ProofyLink" [ref=f15e4] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f15e10]:
+        - link "Daftar akun" [ref=f15e187] [cursor=pointer]:
+          - /url: /register
+        - button "Open menu" [ref=f15e16]
+  - main [ref=f15e18]:
+    - main [ref=f15e194]:
+      - generic [ref=f15e195]:
+        - link "ProofyLink" [ref=f15e197] [cursor=pointer]:
+          - /url: /
+        - generic [ref=f15e203]:
+          - text: Welcome back
+          - heading "Masuk untuk melanjutkan perjalananmu." [level=1] [ref=f15e204]
+        - generic [ref=f15e205]:
+          - generic [ref=f15e206]:
+            - generic [ref=f15e207]: Peran Akun
+            - generic [ref=f15e208]:
+              - button "Recruiter / Hiring Buka profil terverifikasi" [active] [pressed] [ref=f15e209]:
+                - generic [ref=f15e216]:
+                  - generic [ref=f15e217]: Recruiter / Hiring
+                  - generic [ref=f15e218]: Buka profil terverifikasi
+              - button "Talent / Candidate Terima tawaran karir privat" [ref=f15e219]:
+                - generic [ref=f15e225]:
+                  - generic [ref=f15e226]: Talent / Candidate
+                  - generic [ref=f15e227]: Terima tawaran karir privat
+              - button "Partnership Kampus / Lembaga / Partner" [ref=f15e228]:
+                - generic [ref=f15e234]:
+                  - generic [ref=f15e235]: Partnership
+                  - generic [ref=f15e236]: Kampus / Lembaga / Partner
+          - generic [ref=f15e237]:
+            - generic [ref=f15e238]: Alamat Email
+            - textbox "Alamat Email" [ref=f15e243]:
+              - /placeholder: alex@perusahaan.com
+              - text: candidate@example.com
+          - generic [ref=f15e244]:
+            - generic [ref=f15e245]: Kata Sandi
+            - generic [ref=f15e246]:
+              - textbox "Kata Sandi" [ref=f15e250]:
+                - /placeholder: Minimal 6 karakter
+                - text: password123
+              - button "Tampilkan password" [ref=f15e251]
+          - button "Masuk ke Workspace" [ref=f15e255]
+          - paragraph [ref=f15e258]:
+            - text: Belum memiliki akun?
+            - link "Daftar di sini" [ref=f15e259] [cursor=pointer]:
+              - /url: /register
+          - generic [ref=f15e260]: Lingkungan demo terverifikasi
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f15e98] [cursor=pointer]
+  - alert [ref=f15e102]

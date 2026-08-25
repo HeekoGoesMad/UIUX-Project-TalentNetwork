@@ -1,0 +1,64 @@
+- generic [active] [ref=f25e1]:
+  - link "Lewati ke konten utama" [ref=f25e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f25e3]:
+      - link "ProofyLink" [ref=f25e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f25e10]:
+        - link "Search talent" [ref=f25e11] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Shortlist" [ref=f25e12] [cursor=pointer]:
+          - /url: /recruiter/shortlists
+        - link "Screening" [ref=f25e13] [cursor=pointer]:
+          - /url: /recruiter/screenings
+        - link "Pesan" [ref=f25e14] [cursor=pointer]:
+          - /url: /recruiter/messages
+        - link "Dashboard" [ref=f25e15] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+      - generic [ref=f25e16]:
+        - link "Search talent" [ref=f25e17] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Masuk" [ref=f25e22] [cursor=pointer]:
+          - /url: /login
+  - main [ref=f25e27]:
+    - main [ref=f25e28]:
+      - generic [ref=f25e29]:
+        - generic [ref=f25e30]:
+          - paragraph [ref=f25e31]: Peluang terkurasi
+          - heading "Cari pekerjaan yang terasa tepat." [level=1] [ref=f25e35]
+          - paragraph [ref=f25e36]: Temukan peran dari organisasi yang membangun produk berdampak, dengan detail yang jelas sejak awal.
+        - generic [ref=f25e37]:
+          - generic [ref=f25e38]:
+            - generic [ref=f25e42]: Cari job
+            - textbox "Cari job" [ref=f25e43]:
+              - /placeholder: Cari title, company, atau keyword
+          - combobox "Filter work arrangement" [ref=f25e44]:
+            - option "Semua arrangement" [selected]
+            - option "Remote"
+            - option "Hybrid"
+            - option "On-site"
+      - generic [ref=f25e45]:
+        - generic [ref=f25e46]:
+          - paragraph [ref=f25e47]: Job discovery
+          - heading "Lowongan tersedia" [level=2] [ref=f25e48]
+        - generic [ref=f25e49]: 0 lowongan
+      - status [ref=f25e50]: Memuat lowongan...
+      - paragraph [ref=f25e51]: "Mode demo: data lowongan di atas adalah fixture lokal dan tidak membuat application palsu."
+  - contentinfo [ref=f25e52]:
+    - generic [ref=f25e53]:
+      - generic [ref=f25e54]:
+        - link "ProofyLink" [ref=f25e55] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=f25e59]: Verified talent. Trusted connections.
+      - navigation [ref=f25e60]:
+        - link "Search talent" [ref=f25e61] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f25e62] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f25e63] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f25e64] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f25e70] [cursor=pointer]

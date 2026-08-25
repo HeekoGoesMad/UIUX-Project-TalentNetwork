@@ -9,6 +9,7 @@ import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleSelector } from "./role-selector";
+import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -84,6 +85,27 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       }).then((response) => response.ok ? response.json() : null).catch(() => null);
     }
     router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
+  };
+
+  const signInWithGoogle = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const next = safeNext(getNext());
+      const redirectUrl = new URL("/auth/callback", window.location.origin);
+      if (next) redirectUrl.searchParams.set("next", next);
+      redirectUrl.searchParams.set("role", role);
+
+      const { error } = await createClient().auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectUrl.toString() },
+      });
+      if (error) throw error;
+    } catch (error) {
+      setLoading(false);
+      setErrorMessage(`Tidak dapat masuk dengan Google: ${error instanceof Error ? error.message : "Coba lagi."}`);
+    }
   };
 
   const emailPlaceholder =
@@ -395,4 +417,8 @@ function destination(role: UserRole, next: string | null, isRegistration = false
 
 function getNext() {
   return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
+}
+
+function safeNext(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : null;
 }

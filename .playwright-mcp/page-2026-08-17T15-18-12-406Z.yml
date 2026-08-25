@@ -1,0 +1,78 @@
+- generic [active] [ref=f39e1]:
+  - link "Lewati ke konten utama" [ref=f39e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f39e3]:
+      - link "ProofyLink" [ref=f39e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f39e10]:
+        - link "∞" [ref=f39e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f39e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f39e54]: "1"
+        - button "Log out" [ref=f39e55]
+        - button "Open menu" [ref=f39e17]
+  - main [ref=f39e19]:
+    - main [ref=f39e80]:
+      - link "Kembali" [ref=f39e81] [cursor=pointer]:
+        - /url: /recruiter/assessments
+      - paragraph [ref=f39e84]: New assessment
+      - heading "Buat assessment" [level=1] [ref=f39e85]
+      - paragraph [ref=f39e86]: Gunakan bahasa yang dapat dijawab kandidat tanpa menebak maksud reviewer.
+      - generic [ref=f39e88]:
+        - generic [ref=f39e89]:
+          - text: Nama template
+          - textbox "Nama template" [ref=f39e90]:
+            - /placeholder: "Contoh: Product thinking check-in"
+        - generic [ref=f39e91]:
+          - text: Deskripsi
+          - textbox "Deskripsi" [ref=f39e93]:
+            - /placeholder: Apa yang ingin dipahami reviewer?
+        - generic [ref=f39e94]:
+          - text: Batas waktu (menit, opsional)
+          - spinbutton "Batas waktu (menit, opsional)" [ref=f39e95]
+        - generic [ref=f39e96]:
+          - generic [ref=f39e97]:
+            - generic [ref=f39e98]:
+              - heading "Pertanyaan" [level=2] [ref=f39e99]
+              - paragraph [ref=f39e100]: Maksimal 50 pertanyaan. Pilihan ganda maksimal 10 opsi.
+            - button "Tambah" [ref=f39e101]
+          - generic [ref=f39e104]:
+            - generic [ref=f39e105]: PERTANYAAN 01
+            - generic [ref=f39e107]:
+              - text: Pertanyaan
+              - textbox "Pertanyaan 1" [ref=f39e109]
+            - generic [ref=f39e110]:
+              - generic [ref=f39e111]:
+                - text: Tipe
+                - combobox "Tipe pertanyaan 1" [ref=f39e113]:
+                  - option "Pilihan ganda"
+                  - option "Jawaban bebas" [selected]
+                  - option "Situasional"
+                  - option "Jawaban terstruktur"
+              - generic [ref=f39e114]:
+                - checkbox "Wajib dijawab" [checked] [ref=f39e115]
+                - text: Wajib dijawab
+        - generic [ref=f39e116]:
+          - link "Batal" [ref=f39e117] [cursor=pointer]:
+            - /url: /recruiter/assessments
+          - button "Simpan template" [ref=f39e118]
+  - contentinfo [ref=f39e23]:
+    - generic [ref=f39e24]:
+      - generic [ref=f39e25]:
+        - link "ProofyLink" [ref=f39e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f39e30]: Verified talent. Trusted connections.
+      - navigation [ref=f39e31]:
+        - link "Search talent" [ref=f39e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f39e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f39e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f39e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f39e41] [cursor=pointer]
+  - alert [ref=f39e79]: Buat assessment

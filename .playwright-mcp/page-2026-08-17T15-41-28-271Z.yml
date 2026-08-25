@@ -1,0 +1,95 @@
+- generic [active] [ref=f50e1]:
+  - link "Lewati ke konten utama" [ref=f50e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f50e3]:
+      - link "ProofyLink" [ref=f50e4] [cursor=pointer]:
+        - /url: /recruiter/dashboard
+      - generic [ref=f50e10]:
+        - link "∞" [ref=f50e45] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - link "1 notifikasi baru" [ref=f50e50] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f50e54]: "1"
+        - button "Log out" [ref=f50e55]
+        - button "Open menu" [ref=f50e17]
+  - main [ref=f50e19]:
+    - main [ref=f50e59]:
+      - link "Kembali ke Jobs" [ref=f50e60] [cursor=pointer]:
+        - /url: /recruiter/jobs
+      - generic [ref=f50e63]:
+        - generic [ref=f50e64]:
+          - paragraph [ref=f50e65]: Recruiter / application detail
+          - heading "Senior Product Designer" [level=1] [ref=f50e66]
+          - paragraph [ref=f50e67]: ProofyLink Demo
+        - generic [ref=f50e68]: Assessment
+      - paragraph [ref=f50e69]: "Demo mode: application dan invitation demo tidak masuk database."
+      - generic [ref=f50e70]:
+        - generic [ref=f50e71]:
+          - generic [ref=f50e72]:
+            - heading "Candidate identity" [level=3] [ref=f50e74]
+            - generic [ref=f50e78]:
+              - paragraph [ref=f50e79]: Nadia Putri Rahayu
+              - paragraph [ref=f50e80]: Senior Product Designer
+              - paragraph [ref=f50e81]: Jakarta Selatan
+              - generic [ref=f50e82]:
+                - generic [ref=f50e83]:
+                  - term [ref=f50e84]: Submitted
+                  - definition [ref=f50e85]: 17 Agu 2026, 23.41
+                - generic [ref=f50e86]:
+                  - term [ref=f50e87]: Updated
+                  - definition [ref=f50e88]: 17 Agu 2026, 23.41
+          - generic [ref=f50e89]:
+            - heading "Stage history" [level=3] [ref=f50e91]
+            - generic [ref=f50e99]:
+              - paragraph [ref=f50e100]: Assessment
+              - paragraph [ref=f50e101]: 17 Agu 2026, 23.41
+              - paragraph [ref=f50e102]: Lamaran tersedia di mode demo.
+          - generic [ref=f50e103]:
+            - heading "Cover note" [level=3] [ref=f50e105]
+            - paragraph [ref=f50e107]: Kandidat demo untuk memeriksa alur reviewer.
+        - generic [ref=f50e108]:
+          - generic [ref=f50e109]:
+            - generic [ref=f50e110]:
+              - heading "Kirim assessment invitation" [level=3] [ref=f50e111]
+              - paragraph [ref=f50e115]: Pilih template milik organisasi Anda. Invitation baru hanya dibuat setelah dikirim.
+            - generic [ref=f50e116]:
+              - generic [ref=f50e117]:
+                - text: Assessment template
+                - combobox "Assessment template" [ref=f50e118]:
+                  - option "Pilih template..." [selected]
+                  - option "Customer interview basics"
+                  - option "Product thinking check-in"
+              - button "Kirim invitation" [disabled]
+          - generic [ref=f50e119]:
+            - heading "Assessment invitations" [level=3] [ref=f50e121]
+            - generic [ref=f50e124]:
+              - generic [ref=f50e125]:
+                - generic [ref=f50e126]:
+                  - paragraph [ref=f50e127]: Product thinking check-in
+                  - paragraph [ref=f50e128]: Dikirim 17 Agu 2026, 23.20
+                - generic [ref=f50e129]: Terkirim
+              - link "Buka review attempt" [ref=f50e130] [cursor=pointer]:
+                - /url: /recruiter/assessments/attempts/demo-attempt-8fbc5507-5bc2-470e-80db-b9aeb42b1cd9
+          - paragraph [ref=f50e140]:
+            - text: Assessment tidak menghasilkan score otomatis. Attempt yang terkirim menunggu
+            - strong [ref=f50e141]: Pending human/AI review
+            - text: .
+  - contentinfo [ref=f50e23]:
+    - generic [ref=f50e24]:
+      - generic [ref=f50e25]:
+        - link "ProofyLink" [ref=f50e26] [cursor=pointer]:
+          - /url: /recruiter/dashboard
+        - paragraph [ref=f50e30]: Verified talent. Trusted connections.
+      - navigation [ref=f50e31]:
+        - link "Search talent" [ref=f50e32] [cursor=pointer]:
+          - /url: /recruiter/discover
+        - link "Pricing" [ref=f50e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f50e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f50e35] [cursor=pointer]:
+          - /url: /recruiter/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f50e41] [cursor=pointer]
+  - alert [ref=f50e142]

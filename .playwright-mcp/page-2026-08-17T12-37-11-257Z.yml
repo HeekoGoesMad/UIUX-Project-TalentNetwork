@@ -1,0 +1,44 @@
+- generic [active] [ref=f1e1]:
+  - link "Lewati ke konten utama" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f1e3]:
+      - link "ProofyLink" [ref=f1e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f1e10]:
+        - link "Search talent" [ref=f1e11] [cursor=pointer]:
+          - /url: /search
+        - link "Shortlist" [ref=f1e12] [cursor=pointer]:
+          - /url: /shortlist
+        - link "Screening" [ref=f1e13] [cursor=pointer]:
+          - /url: /recruiter/screenings/new
+        - link "Pesan" [ref=f1e14] [cursor=pointer]:
+          - /url: /messages
+        - link "Dashboard" [ref=f1e15] [cursor=pointer]:
+          - /url: /dashboard
+      - generic [ref=f1e16]:
+        - link "Search talent" [ref=f1e17] [cursor=pointer]:
+          - /url: /search
+        - link "Masuk" [ref=f1e22] [cursor=pointer]:
+          - /url: /login
+  - main [ref=f1e27]:
+    - generic [ref=f1e29]:
+      - heading "404" [level=1] [ref=f1e30]
+      - heading "This page could not be found." [level=2] [ref=f1e32]
+  - contentinfo [ref=f1e33]:
+    - generic [ref=f1e34]:
+      - generic [ref=f1e35]:
+        - link "ProofyLink" [ref=f1e36] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=f1e40]: Verified talent. Trusted connections.
+      - navigation [ref=f1e41]:
+        - link "Search talent" [ref=f1e42] [cursor=pointer]:
+          - /url: /search
+        - link "Pricing" [ref=f1e43] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f1e44] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f1e45] [cursor=pointer]:
+          - /url: /messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f1e51] [cursor=pointer]

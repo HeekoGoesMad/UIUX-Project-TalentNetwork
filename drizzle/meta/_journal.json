@@ -22,6 +22,27 @@
       "when": 1786637893650,
       "tag": "0002_giant_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786976588781,
+      "tag": "0003_complex_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786982161854,
+      "tag": "0004_closed_lionheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787012523206,
+      "tag": "0006_phase3_messaging",
+      "breakpoints": true
     }
   ]
 }

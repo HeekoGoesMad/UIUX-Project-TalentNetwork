@@ -1,0 +1,44 @@
+- generic [active] [ref=f41e1]:
+  - link "Lewati ke konten utama" [ref=f41e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f41e3]:
+      - link "ProofyLink" [ref=f41e4] [cursor=pointer]:
+        - /url: /candidate
+      - generic [ref=f41e10]:
+        - link "1 notifikasi baru" [ref=f41e11] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f41e15]: "1"
+        - button "Log out" [ref=f41e16]
+        - button "Open menu" [ref=f41e20]
+  - main [ref=f41e22]:
+    - main [ref=f41e23]:
+      - paragraph [ref=f41e24]: Candidate / assessments
+      - heading "Assessment Anda" [level=1] [ref=f41e25]
+      - paragraph [ref=f41e26]: Jawab dengan konteks Anda sendiri. Jawaban akan menunggu human/AI review, tanpa keputusan otomatis.
+      - generic [ref=f41e29]:
+        - generic [ref=f41e30]:
+          - generic [ref=f41e31]:
+            - heading "Product thinking check-in" [level=2] [ref=f41e32]
+            - generic [ref=f41e33]: Menunggu
+          - paragraph [ref=f41e34]: Dari lamaran untuk Nadia Pratama
+        - link "Mulai" [ref=f41e35] [cursor=pointer]:
+          - /url: /candidate/assessments/demo-invitation-1
+  - contentinfo [ref=f41e36]:
+    - generic [ref=f41e37]:
+      - generic [ref=f41e38]:
+        - link "ProofyLink" [ref=f41e39] [cursor=pointer]:
+          - /url: /candidate
+        - paragraph [ref=f41e43]: Verified talent. Trusted connections.
+      - navigation [ref=f41e44]:
+        - link "Profile" [ref=f41e45] [cursor=pointer]:
+          - /url: /candidate/profile
+        - link "Pricing" [ref=f41e46] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f41e47] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f41e48] [cursor=pointer]:
+          - /url: /candidate/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f41e54] [cursor=pointer]
+  - alert [ref=f41e58]

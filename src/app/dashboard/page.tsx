@@ -187,7 +187,7 @@ export default function Dashboard() {
                       {recent.map((candidate) => (
                         <Link
                           key={candidate.id}
-                          href={`/talent/${candidate.id}`}
+                          href={`/recruiter/discover/${candidate.id}`}
                           className="flex items-center justify-between rounded-xl border p-3 hover:bg-slate-50"
                         >
                           <span>

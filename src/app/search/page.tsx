@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Database, Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
+import { Database, GraduationCap, Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
 import { candidates } from "@/data/candidates";
 import { CandidateCard } from "@/components/talent/candidate-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -44,6 +44,7 @@ type Filters = {
   industries: IndustryCategory[];
   experienceBands: string[];
   locations: string[];
+  campusVerifiedOnly?: boolean;
 };
 
 const EXPERIENCE_BANDS = [
@@ -70,6 +71,7 @@ const initialFilters: Filters = {
   industries: [],
   experienceBands: [],
   locations: [],
+  campusVerifiedOnly: false,
 };
 
 function matchesExperience(exp: number, bands: string[]): boolean {
@@ -159,7 +161,8 @@ function FilterPanel({
     filters.careerStatuses.length > 0 ||
     filters.industries.length > 0 ||
     filters.experienceBands.length > 0 ||
-    filters.locations.length > 0;
+    filters.locations.length > 0 ||
+    Boolean(filters.campusVerifiedOnly);
 
   return (
     <div className="space-y-5">
@@ -195,6 +198,21 @@ function FilterPanel({
             />
           );
         })}
+      </FilterSection>
+
+      {/* ── VERIFIKASI KAMPUS ── */}
+      <FilterSection label="Verifikasi Kampus">
+        <CheckRow
+          id="campus-verified-filter"
+          checked={Boolean(filters.campusVerifiedOnly)}
+          onChange={() => set({ campusVerifiedOnly: !filters.campusVerifiedOnly })}
+          label={
+            <span className="flex items-center gap-1 text-xs font-semibold text-[#7C3AED]">
+              <GraduationCap className="size-3.5" />
+              <span>Campus Verified Mitra</span>
+            </span>
+          }
+        />
       </FilterSection>
 
       {/* ── STATUS KARIER ── */}
@@ -320,7 +338,7 @@ function SearchResultsSkeleton() {
 // Main page
 // ────────────────────────────────────────────────────────────────
 function SearchPageContent() {
-  const { user, dbMode, bootstrapped, databaseError } = useApp();
+  const { user, dbMode, bootstrapped, databaseError, partnerVerifications } = useApp();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -388,7 +406,10 @@ function SearchPageContent() {
         const indMatch = !filters.industries.length || filters.industries.includes(c.industry);
         const expMatch = matchesExperience(c.experience, filters.experienceBands);
         const locMatch = !filters.locations.length || filters.locations.includes(c.location);
-        return qMatch && catMatch && statusMatch && indMatch && expMatch && locMatch;
+        const campusMatch = !filters.campusVerifiedOnly || Boolean(
+          (partnerVerifications?.[c.id] ?? c.campusVerification)?.status === "verified"
+        );
+        return qMatch && catMatch && statusMatch && indMatch && expMatch && locMatch && campusMatch;
       })
       .sort((a, b) => {
         if (filters.sort === "experience") return b.experience - a.experience;
@@ -399,7 +420,7 @@ function SearchPageContent() {
         }
         return 0;
       });
-  }, [filters, source]);
+  }, [filters, source, partnerVerifications]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(filters.page, totalPages);
@@ -410,7 +431,8 @@ function SearchPageContent() {
     filters.careerStatuses.length +
     filters.industries.length +
     filters.experienceBands.length +
-    filters.locations.length;
+    filters.locations.length +
+    (filters.campusVerifiedOnly ? 1 : 0);
 
   const resetFilters = () => setFilters(initialFilters);
 

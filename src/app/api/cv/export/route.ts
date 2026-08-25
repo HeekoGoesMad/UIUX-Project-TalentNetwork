@@ -2,21 +2,28 @@ import { NextResponse } from "next/server";
 import type { Browser } from "playwright-core";
 import type { CvProfile } from "@/types";
 import { type CvTemplateId, buildCvHtml } from "@/lib/cv/templates";
+import { accessResponse, isApiAccess, requireApiAccess, withAccessMode } from "@/lib/api/access";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request) {
+  const access = await requireApiAccess("candidate");
+  if (!isApiAccess(access)) return accessResponse(access);
   let profile: CvProfile;
   let templateId: CvTemplateId;
+  let html: string;
+  let safeFileName: string;
 
   try {
     const body = (await request.json()) as { profile: CvProfile; templateId: CvTemplateId };
+    if (!body || typeof body.profile !== "object" || body.profile === null) throw new Error("invalid-profile");
+    if (body.templateId !== undefined && !["ats", "modern", "sidebar", "minimal"].includes(body.templateId)) throw new Error("invalid-template");
     profile = body.profile;
     templateId = body.templateId ?? "ats";
+    html = buildCvHtml(profile, templateId);
+    safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
   } catch {
     return NextResponse.json({ error: "Request body tidak valid." }, { status: 400 });
   }
-
-  const html = buildCvHtml(profile, templateId);
-  const safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
 
   let browser: Browser | undefined;
 
@@ -39,13 +46,17 @@ export async function POST(request: Request) {
           : { top: "0", bottom: "0", left: "0", right: "0" },
     });
 
-    return new NextResponse(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safeFileName}"`,
-        "Content-Length": String(pdf.byteLength),
-      },
-    });
+     if (access.mode === "database") await writeAuditLog({ db: access.db, actorUserId: access.user.id, action: "cv.exported", entityType: "cv", metadata: { exportKind: "profile_pdf", template: templateId } });
+     return withAccessMode(
+       new NextResponse(new Uint8Array(pdf), {
+         headers: {
+           "Content-Type": "application/pdf",
+           "Content-Disposition": `attachment; filename="${safeFileName}"`,
+           "Content-Length": String(pdf.byteLength),
+         },
+       }),
+       access
+     );
   } catch (error) {
     console.error("[cv/export] Playwright error:", error);
     return NextResponse.json(
@@ -54,7 +65,7 @@ export async function POST(request: Request) {
           "PDF generation membutuhkan browser runtime. Pastikan Playwright Chromium terpasang atau gunakan cetak browser.",
         details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 503 },
     );
   } finally {
     if (browser) {

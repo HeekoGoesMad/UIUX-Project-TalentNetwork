@@ -16,13 +16,14 @@ export const screeningSchema = z.object({
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const advisorSchema = z.object({
-  focus: z.string().default("general"),
+  focus: z.enum(["ats", "headline", "star", "role", "general"]).default("ats"),
   summary: z.string(),
   headlineSuggestions: z.array(z.string()).default([]),
   starBullets: z.array(z.object({
     before: z.string(),
     after: z.string(),
     impactReason: z.string(),
+    metricsHighlight: z.string().optional(),
   })).default([]),
   pillars: z.array(z.object({
     name: z.string(),
@@ -36,6 +37,56 @@ export const advisorSchema = z.object({
     whatGood: z.array(z.string()),
     whatNotGood: z.array(z.string()),
     conclusion: z.string(),
+  }).optional(),
+  atsDetails: z.object({
+    score: z.number().min(0).max(100),
+    detectedKeywords: z.array(z.string()),
+    missingKeywords: z.array(z.string()),
+    sectionAudits: z.array(z.object({
+      section: z.string(),
+      status: z.enum(["good", "needs_improvement"]),
+      notes: z.array(z.string()),
+      recommendation: z.string(),
+    })),
+    formatChecks: z.array(z.object({
+      check: z.string(),
+      passed: z.boolean(),
+      tip: z.string(),
+    })),
+  }).optional(),
+  headlineDetails: z.object({
+    currentHeadline: z.string(),
+    formula: z.string(),
+    options: z.array(z.object({
+      headline: z.string(),
+      rationale: z.string(),
+      keywords: z.array(z.string()),
+      tag: z.string(),
+    })),
+    tips: z.array(z.string()),
+  }).optional(),
+  starDetails: z.object({
+    frameworkExplanation: z.string(),
+    bullets: z.array(z.object({
+      before: z.string(),
+      after: z.string(),
+      impactReason: z.string(),
+      metricsHighlight: z.string(),
+    })),
+    actionVerbs: z.array(z.string()),
+  }).optional(),
+  roleDetails: z.object({
+    targetRole: z.string(),
+    matchScore: z.number().min(0).max(100),
+    matchLevel: z.string(),
+    coreCompetencies: z.array(z.object({
+      competency: z.string(),
+      candidateLevel: z.string(),
+      requiredLevel: z.string(),
+      status: z.enum(["match", "gap", "exceeds"]),
+    })),
+    criticalGaps: z.array(z.string()),
+    strategicRecommendations: z.array(z.string()),
   }).optional(),
   answer: z.string(),
   nextSteps: z.array(z.string()),

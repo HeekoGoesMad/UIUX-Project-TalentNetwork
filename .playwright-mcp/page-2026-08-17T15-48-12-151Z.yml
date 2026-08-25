@@ -1,0 +1,74 @@
+- generic [active] [ref=f53e1]:
+  - link "Lewati ke konten utama" [ref=f53e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f53e3]:
+      - link "ProofyLink" [ref=f53e4] [cursor=pointer]:
+        - /url: /candidate
+      - generic [ref=f53e10]:
+        - link "1 notifikasi baru" [ref=f53e45] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=f53e49]: "1"
+        - button "Log out" [ref=f53e50]
+        - button "Open menu" [ref=f53e17]
+  - main [ref=f53e19]:
+    - main [ref=f53e54]:
+      - paragraph [ref=f53e55]: Candidate workspace
+      - heading "Mulai dari cerita kariermu." [level=1] [ref=f53e56]
+      - paragraph [ref=f53e57]: Buat profile yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
+      - link [ref=f53e59] [cursor=pointer]:
+        - /url: /candidate/profile
+        - generic [ref=f53e61]:
+          - generic [ref=f53e66]:
+            - paragraph [ref=f53e67]: Lihat Profil Kamu
+            - paragraph [ref=f53e68]: Review tampilan profil seperti yang dilihat recruiter
+          - generic [ref=f53e69]: Buka
+      - generic [ref=f53e72]:
+        - link [ref=f53e73] [cursor=pointer]:
+          - /url: /candidate/cv
+          - generic [ref=f53e75]:
+            - heading "CV & Profile" [level=2] [ref=f53e79]
+            - paragraph [ref=f53e80]: Import PDF dan review profile
+            - generic [ref=f53e81]: Buka
+        - link [ref=f53e84] [cursor=pointer]:
+          - /url: /candidate/career-advisor
+          - generic [ref=f53e86]:
+            - heading "Career Advisor" [level=2] [ref=f53e90]
+            - paragraph [ref=f53e91]: Saran berbasis profile
+            - generic [ref=f53e92]: Buka
+        - link [ref=f53e95] [cursor=pointer]:
+          - /url: /candidate/career-roadmap
+          - generic [ref=f53e97]:
+            - heading "Career Roadmap" [level=2] [ref=f53e100]
+            - paragraph [ref=f53e101]: Langkah yang bisa kamu edit
+            - generic [ref=f53e102]: Buka
+        - link [ref=f53e105] [cursor=pointer]:
+          - /url: /candidate/contact-requests
+          - generic [ref=f53e107]:
+            - heading "Contact requests" [level=2] [ref=f53e110]
+            - paragraph [ref=f53e111]: Kelola percakapan recruiter
+            - generic [ref=f53e112]: Buka
+        - link [ref=f53e115] [cursor=pointer]:
+          - /url: /candidate/applications
+          - generic [ref=f53e117]:
+            - heading "Applications" [level=2] [ref=f53e121]
+            - paragraph [ref=f53e122]: Pantau status lamaran kerja
+            - generic [ref=f53e123]: Buka
+  - contentinfo [ref=f53e23]:
+    - generic [ref=f53e24]:
+      - generic [ref=f53e25]:
+        - link "ProofyLink" [ref=f53e26] [cursor=pointer]:
+          - /url: /candidate
+        - paragraph [ref=f53e30]: Verified talent. Trusted connections.
+      - navigation [ref=f53e31]:
+        - link "Profile" [ref=f53e126] [cursor=pointer]:
+          - /url: /candidate/profile
+        - link "Pricing" [ref=f53e33] [cursor=pointer]:
+          - /url: /pricing
+        - link "Jobs" [ref=f53e34] [cursor=pointer]:
+          - /url: /jobs
+        - link "Messages" [ref=f53e35] [cursor=pointer]:
+          - /url: /candidate/messages
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f53e41] [cursor=pointer]
+  - alert [ref=f53e127]

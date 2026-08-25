@@ -1,0 +1,87 @@
+- generic [ref=f32e1]:
+  - link "Lewati ke konten utama" [ref=f32e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic [ref=f32e3]:
+      - link "ProofyLink" [ref=f32e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f32e10]:
+        - link "Fitur Utuh" [ref=f32e11] [cursor=pointer]:
+          - /url: /#features
+        - link "Cara Kerja" [ref=f32e12] [cursor=pointer]:
+          - /url: /#how-it-works
+        - link "Harga & Token" [ref=f32e13] [cursor=pointer]:
+          - /url: /#pricing
+        - link "FAQ" [ref=f32e14] [cursor=pointer]:
+          - /url: /#faq
+      - link "Daftar akun" [ref=f32e17] [cursor=pointer]:
+        - /url: /register
+  - main [ref=f32e21]:
+    - generic [ref=f32e24]:
+      - complementary [ref=f32e25]:
+        - generic [ref=f32e26]:
+          - link "ProofyLink" [ref=f32e27] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f32e33]:
+            - generic [ref=f32e34]: Verified Talent Intelligence
+            - heading "Bangun koneksi dari sinyal yang tepat." [level=2] [ref=f32e38]
+            - paragraph [ref=f32e39]: Sistem rekrutmen berbasis sinyal terverifikasi. Privasi kandidat terjaga by default, tanpa spam inbox, dan akses efisien berbasis token.
+          - generic [ref=f32e40]:
+            - generic [ref=f32e41]: 30+ Profil Talent Terverifikasi Siap Diskusi
+            - generic [ref=f32e46]: Consent-first & Garansi 100% Bebas Spam
+            - generic [ref=f32e52]: Model Token Transparan Tanpa Biaya Tersembunyi
+            - generic [ref=f32e58]: Dukungan Kemitraan Kampus, Lembaga & Individual
+        - generic [ref=f32e64]:
+          - generic [ref=f32e65]: ProofyLink Talent Network © 2026
+          - generic [ref=f32e66]: v1.0 Demo
+      - main [ref=f32e67]:
+        - generic [ref=f32e68]:
+          - generic [ref=f32e69]:
+            - text: Welcome back
+            - heading "Masuk untuk melanjutkan perjalananmu." [level=1] [ref=f32e70]
+          - generic [ref=f32e71]:
+            - generic [ref=f32e72]:
+              - generic [ref=f32e73]: Peran Akun
+              - generic [ref=f32e74]:
+                - button "Recruiter / Hiring Buka profil terverifikasi" [ref=f32e75]:
+                  - generic [ref=f32e82]:
+                    - generic [ref=f32e83]: Recruiter / Hiring
+                    - generic [ref=f32e84]: Buka profil terverifikasi
+                - button "Talent / Candidate Terima tawaran karir privat" [active] [pressed] [ref=f32e85]:
+                  - generic [ref=f32e91]:
+                    - generic [ref=f32e92]: Talent / Candidate
+                    - generic [ref=f32e93]: Terima tawaran karir privat
+                - button "Partnership Kampus / Lembaga / Partner" [ref=f32e94]:
+                  - generic [ref=f32e100]:
+                    - generic [ref=f32e101]: Partnership
+                    - generic [ref=f32e102]: Kampus / Lembaga / Partner
+            - generic [ref=f32e103]:
+              - generic [ref=f32e104]: Alamat Email
+              - textbox "Alamat Email" [ref=f32e109]:
+                - /placeholder: nadia@email.com
+                - text: candidate@example.com
+            - generic [ref=f32e110]:
+              - generic [ref=f32e111]: Kata Sandi
+              - generic [ref=f32e112]:
+                - textbox "Kata Sandi" [ref=f32e116]:
+                  - /placeholder: Minimal 6 karakter
+                  - text: password123
+                - button "Tampilkan password" [ref=f32e117]
+            - button "Masuk ke Workspace" [ref=f32e121]
+            - generic [ref=f32e141]:
+              - generic [ref=f32e142]:
+                - generic [ref=f32e143]: Quick Demo Login
+                - generic [ref=f32e147]: Profil Lengkap
+              - paragraph [ref=f32e148]:
+                - text: Masuk sebagai
+                - strong [ref=f32e149]: Nadia Putri Rahayu
+                - text: (Senior Product Designer). Terisi penuh dengan riwayat Tokopedia & OVO untuk pengujian Career Advisor & Roadmap.
+              - button "Masuk Akun Demo Kandidat (Nadia)" [ref=f32e150]
+            - paragraph [ref=f32e124]:
+              - text: Belum memiliki akun?
+              - link "Daftar di sini" [ref=f32e125] [cursor=pointer]:
+                - /url: /register
+            - generic [ref=f32e126]: Lingkungan demo terverifikasi
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f32e136] [cursor=pointer]
+  - alert [ref=f32e140]
