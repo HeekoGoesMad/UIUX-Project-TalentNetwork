@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { getDb, schema } from "@/db";
-import { ensureDefaultShortlist } from "@/lib/api/shortlists";
+import { ShortlistService } from "@/lib/services/shortlist";
 
 type PersistedRole = "candidate" | "recruiter";
 
@@ -59,7 +59,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
         await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
       }
-      if (organizationId) await ensureDefaultShortlist(tx, organizationId, user.id);
+      if (organizationId) await ShortlistService.ensureDefault(tx, organizationId, user.id);
     }
 
     return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus };

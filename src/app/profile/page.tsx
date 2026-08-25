@@ -7,18 +7,20 @@ import {
   Check,
   ChevronDown,
   ExternalLink,
+  FileText,
   GraduationCap,
   MapPin,
   Pencil,
   Wrench,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { CandidateStatusBadge } from "@/components/candidates/candidate-status-badge";
-import { VerifiedBadge } from "@/components/candidates/verified-badge";
-import { AiSummaryCard } from "@/components/candidates/ai-summary-card";
+import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
+import { VerifiedBadge } from "@/components/talent/verified-badge";
+import { AiSummaryCard } from "@/components/talent/ai-summary-card";
 import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
 import { cn } from "@/lib/utils";
@@ -67,9 +69,9 @@ function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: numb
   if (!p.headline) missing.push("Headline");
   if (!p.experience.length) missing.push("Pengalaman Kerja");
   if (!p.education.length) missing.push("Pendidikan");
-  if (!p.skills.length) missing.push("Skills");
+  if (!p.skills.length) missing.push("Skill");
   if (!p.tools.length) missing.push("Tools");
-  if (!p.portfolio.length) missing.push("Portfolio");
+  if (!p.portfolio.length) missing.push("Portofolio");
   const total = 7;
   const filled = total - missing.length;
   return { pct: Math.round((filled / total) * 100), missing };
@@ -180,14 +182,14 @@ export default function ProfilePage() {
         {/* Page header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Candidate profile</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Profil Kandidat</p>
             <h1 className="mt-2 text-3xl font-bold text-[#111827]">Profil kamu</h1>
             <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
           </div>
           <Button variant="outline" asChild>
             <Link href="/candidate">
               <Pencil className="size-4" />
-              Edit profile
+              Edit profil
             </Link>
           </Button>
         </div>
@@ -248,7 +250,7 @@ export default function ProfilePage() {
                         className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border bg-white p-1.5 shadow-xl"
                       >
                         <p className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Career Status
+                          Status Karier
                         </p>
                         {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
                           const cfg = CAREER_STATUS_CONFIG[key];
@@ -283,7 +285,12 @@ export default function ProfilePage() {
             </section>
 
             {!cvProfile && dbMode && (
-              <Card><CardContent className="p-6"><h2 className="text-lg font-semibold">Profil belum tersedia</h2><p className="mt-2 text-sm text-muted-foreground">Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu.</p><Button className="mt-4" asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button></CardContent></Card>
+              <EmptyState
+                icon={FileText}
+                title="Profil belum tersedia"
+                description="Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu."
+                action={<Button asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button>}
+              />
             )}
 
             {/* Tentang Saya & AI Summary */}
@@ -344,7 +351,7 @@ export default function ProfilePage() {
             {/* Profile completeness */}
             <Card>
               <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">Profile completeness</p>
+                <p className="text-sm text-muted-foreground">Kelengkapan Profil</p>
                 <p className="mt-2 text-3xl font-bold text-[#111827]">{pct}%</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
@@ -362,7 +369,7 @@ export default function ProfilePage() {
 
             {/* Skills */}
             {p.skills.length > 0 && (
-              <ProfileSection title="Skills">
+              <ProfileSection title="Skill">
                 <div className="flex flex-wrap gap-2">
                   {p.skills.map((skill) => (
                     <span
@@ -394,7 +401,7 @@ export default function ProfilePage() {
             )}
 
             {/* Portfolio */}
-            <ProfileSection title="Portfolio">
+            <ProfileSection title="Portofolio">
               {p.portfolio.length > 0 ? (
                 <div className="space-y-2">
                   {p.portfolio.map((item, i) => (
@@ -412,14 +419,17 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed p-5 text-center">
-                  <BriefcaseBusiness className="mx-auto size-6 text-[#7C3AED]" />
-                  <p className="mt-2 text-sm font-semibold">Showcase your work</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/candidate">Tambah portfolio</Link>
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={BriefcaseBusiness}
+                  title="Tampilkan karya terbaikmu"
+                  description="Tambahkan case study terbaikmu."
+                  action={
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/candidate">Tambah portofolio</Link>
+                    </Button>
+                  }
+                  className="rounded-xl border-dashed bg-transparent p-5 shadow-none"
+                />
               )}
             </ProfileSection>
           </aside>

@@ -126,19 +126,34 @@ The repository intentionally does not add a static `/* /index.html 200` fallback
 ## 📁 Project Structure
 
 ```
+├── docs/                    # Business requirements, proposals & technical specs
+│   ├── business/            # Business models & partnership proposals
+│   └── specs/               # Candidate profile & modal specifications
+├── scripts/                 # Maintenance, migration & test scripts
+│   └── tests/               # E2E cross-account test scripts
 ├── src/
 │   ├── app/                 # Next.js App Router (pages & API routes)
-│   │   ├── candidate/       # Candidate portal & tools
+│   │   ├── candidate/       # Candidate portal & career tools
 │   │   ├── recruiter/       # Recruiter dashboard & risk screening
-│   │   ├── jobs/            # Job board & detail pages
-│   │   ├── talent/          # Talent discovery network
+│   │   ├── search/          # Talent search & filtering
+│   │   ├── talent/          # Candidate profile pages
+│   │   ├── partner/         # University & partner portal
 │   │   ├── shortlist/       # Saved candidates & shortlists
 │   │   ├── profile/         # User profile management
-│   │   └── api/             # API routes (AI & backend endpoints)
-│   ├── components/          # Reusable UI components & layouts
-│   └── lib/
-│       └── ai/              # AI SDK provider, Zod schemas & fallback engines
+│   │   └── api/             # Next.js route handlers
+│   ├── components/          # Modular component architecture
+│   │   ├── auth/            # Authentication forms & protected routes
+│   │   ├── candidate/       # Candidate portal workspace & CV builder
+│   │   ├── landing/         # Modular landing page sections
+│   │   ├── layout/          # Header, footer & navigation
+│   │   ├── talent/          # Recruiter talent discovery cards & badges
+│   │   └── ui/              # Design system primitives (Radix UI / Tailwind)
+│   ├── config/              # App constants & talent configs
+│   ├── db/                  # Drizzle ORM schema & database client
+│   ├── lib/                 # Core utilities & services (AI, API, Supabase)
+│   └── types/               # TypeScript domain type definitions
 ├── DESIGN.md                # System UI/UX design specifications
+├── AGENTS.md                # AI Pair Programming & architectural rules
 ├── public/                  # Static assets & icons
 └── package.json             # Project configuration & scripts
 ```

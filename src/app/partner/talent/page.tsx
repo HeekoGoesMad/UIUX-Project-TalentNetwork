@@ -127,8 +127,8 @@ export default function PartnerTalentPage() {
 
         <div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
-              <GraduationCap className="size-4" /> Campus Verified Talent
+            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-slate-500">
+              <GraduationCap className="size-4" /> Talent Kampus Terverifikasi
             </p>
             <h1 className="mt-2 text-3xl font-bold text-[#1A1A2E]">Kelola Talent Kampus</h1>
             <p className="mt-1 text-muted-foreground text-sm">
@@ -166,9 +166,9 @@ export default function PartnerTalentPage() {
         {/* Stats Row */}
         <div className="mt-6 grid grid-cols-3 gap-4">
           {[
-            { label: "Total Mahasiswa Terdata", value: talentPool.length, color: "text-slate-900" },
-            { label: "Terverifikasi Resmi", value: verifiedCount, color: "text-emerald-600" },
-            { label: "Pending Verifikasi", value: pendingCount, color: "text-amber-600" },
+            { label: "Total Talent", value: MOCK_TALENT.length, color: "text-slate-900" },
+            { label: "Terverifikasi", value: MOCK_TALENT.filter((t) => t.status === "verified").length, color: "text-emerald-600" },
+            { label: "Menunggu Verifikasi", value: MOCK_TALENT.filter((t) => t.status === "pending").length, color: "text-amber-600" },
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="p-4 text-center">
@@ -201,7 +201,7 @@ export default function PartnerTalentPage() {
                     : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                {f === "all" ? `Semua (${talentPool.length})` : f === "verified" ? `Terverifikasi (${verifiedCount})` : `Pending (${pendingCount})`}
+                {f === "all" ? "Semua" : f === "verified" ? "Terverifikasi" : "Menunggu"}
               </button>
             ))}
           </div>
@@ -262,10 +262,8 @@ export default function PartnerTalentPage() {
                         : "bg-red-50 text-red-700 border border-red-200"}
                     >
                       {talent.status === "verified"
-                        ? <><CheckCircle2 className="mr-1 size-3" />Terverifikasi Kampus</>
-                        : talent.status === "pending"
-                        ? <><Clock className="mr-1 size-3" />Pending Review</>
-                        : <><X className="mr-1 size-3" />Ditolak</>}
+                        ? <><CheckCircle2 className="mr-1 size-3" />Terverifikasi</>
+                        : <><Clock className="mr-1 size-3" />Menunggu</>}
                     </Badge>
                     {talent.status === "pending" && (
                       <div className="flex items-center gap-1.5">

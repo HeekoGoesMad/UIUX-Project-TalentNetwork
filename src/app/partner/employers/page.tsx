@@ -38,7 +38,7 @@ export default function PartnerEmployersPage() {
         <div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-sky-600">
-              <Building2 className="size-4" /> Employer Access
+              <Building2 className="size-4" /> Akses Employer
             </p>
             <h1 className="mt-2 text-3xl font-bold text-[#1A1A2E]">Employer yang Mengakses</h1>
             <p className="mt-1 text-muted-foreground text-sm">Pantau perusahaan yang menjelajahi talent dari institusi Anda.</p>
@@ -50,7 +50,7 @@ export default function PartnerEmployersPage() {
           {[
             { label: "Total Employer", value: EMPLOYERS.length, color: "text-sky-600" },
             { label: "Total Talent Dilihat", value: totalViews, color: "text-[#7C3AED]" },
-            { label: "Konfirmasi Hired", value: totalHired, color: "text-emerald-600" },
+            { label: "Konfirmasi Diterima (Hired)", value: totalHired, color: "text-emerald-600" },
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="p-4 text-center">
@@ -100,7 +100,7 @@ export default function PartnerEmployersPage() {
                   </div>
                   <div>
                     <p className="font-mono font-bold text-emerald-600">{emp.talentHired}</p>
-                    <p className="text-[10px] text-muted-foreground">hired</p>
+                    <p className="text-[10px] text-muted-foreground">diterima</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Aktif</p>

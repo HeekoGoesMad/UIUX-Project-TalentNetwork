@@ -39,14 +39,16 @@ export function SiteFooter() {
             <ShieldCheck className="size-5 text-[#7C3AED]" /> ProofyLink
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">
-            Verified talent. Trusted connections.
+            Talent terverifikasi. Koneksi terpercaya.
           </p>
         </div>
         <nav className="flex flex-wrap gap-5 text-sm text-muted-foreground">
-          <Link href={discoveryHref}>{visibleUser?.role === "candidate" ? "Profile" : "Search talent"}</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/jobs">Jobs</Link>
-          <Link href={messageHref}>Messages</Link>
+          <Link href="/search">Cari Talent</Link>
+          <Link href="/pricing">Harga & Token</Link>
+          <Link href="/jobs">Lowongan</Link>
+          <Link href="/messages">Pesan</Link>
+          <Link href="/terms">Syarat &amp; Ketentuan</Link>
+          <Link href="/privacy">Kebijakan Privasi</Link>
         </nav>
       </div>
     </footer>

@@ -1,22 +1,29 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { summary } from "@/lib/ai/provider";
-import { accessResponse, isApiAccess, requireApiAccess, withAccessMode } from "@/lib/api/access";
+import { getAiEndpointAuth } from "@/lib/api/ai-auth";
 
 export async function POST(request: Request) {
-  const access = await requireApiAccess("candidate");
-  if (!isApiAccess(access)) return accessResponse(access);
+  const auth = await getAiEndpointAuth();
+  if (!auth.success) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const url = new URL(request.url);
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Data ringkasan profil tidak valid." }, { status: 400 });
+    }
+
     const strict = url.searchParams.get("strict") === "true" || body?.strict === true;
     const res = await summary(body, { strict });
     return withAccessMode(NextResponse.json(res), access);
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Gagal menghasilkan ringkasan profil AI.";
     return NextResponse.json(
-      { error: error instanceof z.ZodError ? "Profile context tidak valid." : "Layanan AI belum tersedia." },
-      { status: error instanceof z.ZodError ? 400 : 503 },
+      { error: message },
+      { status: error instanceof Error && error.message.includes("Konfigurasi") ? 503 : 400 }
     );
   }
 }
-

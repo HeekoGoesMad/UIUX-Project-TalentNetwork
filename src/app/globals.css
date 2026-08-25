@@ -9,12 +9,12 @@
   --popover-foreground: #111827;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #374151;
+  --secondary: #f3e8ff;
+  --secondary-foreground: #7c3aed;
   --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
-  --accent: #f1f5f9;
-  --accent-foreground: #111827;
+  --muted-foreground: #4b5563;
+  --accent: #f3e8ff;
+  --accent-foreground: #7c3aed;
   --destructive: #ef4444;
   --success: #10b981;
   --warning: #f59e0b;
@@ -51,6 +51,13 @@ body { background: var(--background); color: var(--foreground); font-family: var
 ::selection { background: #e2e8f0; color: #111827; }
 .card-interactive { transition: transform 200ms ease, box-shadow 200ms ease; }
 .card-interactive:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgb(0 0 0 / 8%); }
+.auth-bg {
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    var(--accent) 0%,
+    transparent 50%
+  );
+}
 .navy-grid { background-color: #201c45; background-image: linear-gradient(rgb(255 255 255 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 5%) 1px, transparent 1px); background-size: 32px 32px; }
 
 /* Liquid Glass Utilities */
@@ -107,8 +114,15 @@ body { background: var(--background); color: var(--foreground); font-family: var
   animation: marquee-right 35s linear infinite;
 }
 
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scale-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+.animate-fade-in { animation: fade-in .3s ease-out both; }
 .animate-fade-up { animation: fade-up .4s ease-out both; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+.animate-scale-in { animation: scale-in .2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .animate-fade-in, .animate-fade-up, .animate-scale-in { animation: none !important; }
+}
 
 

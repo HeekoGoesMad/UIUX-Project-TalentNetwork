@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 
 type QuietHours = { start?: string; end?: string; timezone?: string };
@@ -110,10 +111,9 @@ export default function NotificationsPage() {
             <CardTitle className="flex items-center gap-2 text-lg"><Bell className="size-5 text-[#19a974]" /> {unreadCount ? `${unreadCount} belum dibaca` : "Semua sudah dibaca"}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {notifications.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">Belum ada notifikasi.</p> : notifications.map((notification) => {
-               const unread = !notification.readAt;
-               const href = typeof notification.data.href === "string" && notification.data.href.startsWith("/") ? notification.data.href : null;
-               return <article key={notification.id} className={`flex gap-4 border-b p-5 last:border-0 ${unread ? "bg-[#f7fcfa]" : "bg-white"}`}>
+            {notifications.length === 0 ? <EmptyState icon={Bell} title="Belum ada notifikasi." className="border-0 shadow-none" /> : notifications.map((notification) => {
+              const unread = !notification.readAt;
+              return <article key={notification.id} className={`flex gap-4 border-b p-5 last:border-0 ${unread ? "bg-[#f7fcfa]" : "bg-white"}`}>
                 <span className={`mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ${unread ? "bg-[#d7f5e8] text-[#08744f]" : "bg-[#f0f6fd] text-slate-400"}`} aria-hidden="true"><Circle className={`size-2.5 fill-current ${unread ? "" : "opacity-40"}`} /></span>
                 <div className="min-w-0 flex-1">
                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between"><h2 className={`font-semibold ${unread ? "text-[#0a1628]" : "text-slate-600"}`}>{href ? <Link href={href} onClick={() => { if (unread) void markRead(notification.id); }} className="text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{notification.title}</Link> : notification.title}</h2><time className="shrink-0 text-xs text-muted-foreground" dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</time></div>

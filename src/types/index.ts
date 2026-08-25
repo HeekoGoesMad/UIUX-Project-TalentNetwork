@@ -5,32 +5,7 @@ export type CareerStatus =
   | "internship-available"
   | "not-available";
 
-export const CAREER_STATUS_CONFIG: Record<CareerStatus, { label: string; color: string; dot: string; emoji: string }> = {
-  "open-to-work": { label: "Open to Work", color: "bg-slate-50 text-[#7C3AED] border border-slate-200", dot: "bg-[#7C3AED]", emoji: "🟣" },
-  "open-for-opportunities": { label: "Open for Opportunities", color: "bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B]/30", dot: "bg-[#F59E0B]", emoji: "🟡" },
-  "freelance-available": { label: "Freelance Available", color: "bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]", dot: "bg-[#2563EB]", emoji: "🔵" },
-  "internship-available": { label: "Internship Available", color: "bg-slate-50 text-[#7C3AED] border border-slate-200", dot: "bg-[#7C3AED]", emoji: "🟣" },
-  "not-available": { label: "Not Available", color: "bg-slate-100 text-slate-700", dot: "bg-slate-500", emoji: "⚫" },
-};
-
 export type TalentCategory = "djoin-verified" | "public";
-
-export const TALENT_CATEGORY_CONFIG: Record<TalentCategory, { label: string; badge: string; description: string; color: string; badgeBg: string }> = {
-  "djoin-verified": {
-    label: "DJoin Verified Talent",
-    badge: "🏅",
-    description: "Pernah dibina Djoin, memiliki histori evaluasi & rekam jejak performa",
-    color: "text-[#7C3AED]",
-    badgeBg: "bg-slate-50 border border-slate-200 text-[#7C3AED]",
-  },
-  "public": {
-    label: "Public Talent",
-    badge: "👤",
-    description: "Registrasi mandiri, Career Fair, Campus Partnership, atau Referral",
-    color: "text-slate-600",
-    badgeBg: "bg-slate-50 border border-slate-200 text-slate-600",
-  },
-};
 
 export type IndustryCategory =
   | "human-capital"
@@ -40,14 +15,12 @@ export type IndustryCategory =
   | "data-analytics"
   | "technology-software";
 
-export const INDUSTRY_CATEGORY_CONFIG: Record<IndustryCategory, { label: string }> = {
-  "human-capital": { label: "Human Capital / HR" },
-  "marketing-digital": { label: "Marketing / Digital" },
-  "product-design": { label: "Product / Design" },
-  "sales-bizdev": { label: "Sales / Business Development" },
-  "data-analytics": { label: "Data / Analytics" },
-  "technology-software": { label: "Technology / Software" },
-};
+export {
+  CAREER_STATUS_CONFIG,
+  TALENT_CATEGORY_CONFIG,
+  INDUSTRY_CATEGORY_CONFIG,
+} from "@/config/talent";
+
 
 export const PARTNER_CAMPUSES = [
   "Universitas Indonesia",
@@ -156,3 +129,9 @@ export type CvProfile = {
 };
 
 export type ConsentState = "not-requested" | "pending-candidate-consent" | "consented" | "declined" | "consent-expired" | "withdrawn" | "screening-in-progress" | "screening-completed" | "disputed";
+
+export function asCareerStatus(value: unknown): CareerStatus {
+  return typeof value === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(value) ? (value as CareerStatus) : "open-to-work";
+}
+
+export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };

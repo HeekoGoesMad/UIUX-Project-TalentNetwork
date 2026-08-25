@@ -720,7 +720,7 @@ export function CareerAdvisorWorkspace() {
                     {cvProfile?.fullName || "Profil kamu"}
                   </h2>
                   <Badge variant="outline" className="border-[#19a974]/40 bg-[#e6f7f0] text-[#08744f]">
-                    Ready to Improve
+                    Siap Ditingkatkan
                   </Badge>
                 </div>
                 <p className="mt-1 text-sm font-medium text-[#0f2040]">{headline}</p>
@@ -732,7 +732,7 @@ export function CareerAdvisorWorkspace() {
 
             <Link href="/candidate/cv">
               <Button variant="outline" size="sm" className="gap-2 border-[#19a974] text-[#08744f] hover:bg-[#e6f7f0]">
-                <FileText className="size-4" /> Edit CV Workspace
+                <FileText className="size-4" /> Edit di CV Workspace
               </Button>
             </Link>
           </div>
@@ -822,7 +822,13 @@ export function CareerAdvisorWorkspace() {
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-[#19a974]/40 bg-[#f0fdf9] text-[#08744f] gap-1 px-3 py-1">
                 <Sparkles className="size-3.5" /> Hasil Analisis: {activeFocusPreset.label}
+                <Sparkles className="size-3.5" /> Hasil Analisis Siap
               </Badge>
+              {isStreaming && (
+                <span className="flex items-center gap-1.5 text-xs text-[#08744f] font-mono animate-pulse">
+                  <span className="inline-block size-2 rounded-full bg-[#19a974]" /> Menghasilkan... ({streamProgress}%)
+                </span>
+              )}
             </div>
 
             <Button
@@ -832,6 +838,7 @@ export function CareerAdvisorWorkspace() {
               className="gap-2 border-[#0f2040]/30 text-[#0f2040] hover:bg-[#f0f6fd]"
             >
               <Download className="size-4 text-[#08744f]" /> Unduh PDF
+              <Download className="size-4 text-[#08744f]" /> Unduh Analisis PDF
             </Button>
           </div>
 
@@ -884,6 +891,130 @@ export function CareerAdvisorWorkspace() {
 
           {result.focus === "role" && result.roleDetails && (
             <RoleAlignmentView details={result.roleDetails} />
+          {/* 5-Pillar Scorecard Grid */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-[#0f2040] flex items-center gap-2">
+                <TrendingUp className="size-5 text-[#19a974]" /> Evaluasi 5 Pilar Kesiapan Profil
+              </h2>
+              <span className="text-xs text-muted-foreground">Standar Benchmark HR &amp; ATS</span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {result.pillars.map((pillar, idx) => {
+                const statusColor =
+                  pillar.status === "excellent"
+                    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    : pillar.status === "good"
+                    ? "bg-blue-100 text-blue-800 border-blue-300"
+                    : "bg-amber-100 text-amber-800 border-amber-300";
+
+                return (
+                  <Card key={idx} className="card-interactive flex flex-col justify-between">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className={`text-xs capitalize ${statusColor}`}>
+                          {pillar.status.replace("_", " ")}
+                        </Badge>
+                        <span className="font-mono text-sm font-bold text-[#0f2040]">
+                          {pillar.score}/100
+                        </span>
+                      </div>
+                      <CardTitle className="text-base font-semibold text-[#0f2040] mt-2">
+                        {pillar.name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-xs">
+                      <p className="text-muted-foreground leading-relaxed">{pillar.recommendation}</p>
+                      <div className="space-y-1 border-t pt-2">
+                        <span className="font-semibold text-[#0f2040]">Aksi Disarankan:</span>
+                        <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                          {pillar.actionables.map((act, aIdx) => (
+                            <li key={aIdx}>{act}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Headline Recommendations */}
+          {result.headlineSuggestions.length > 0 && (
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-[#0f2040] flex items-center gap-2">
+                  <Sparkles className="size-5 text-[#19a974]" /> Usulan Headline Berdampak Tinggi
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Klik salin untuk memperbarui headline profesionalmu di CV Workspace.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {result.headlineSuggestions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col gap-2 rounded-lg border bg-[#f0f6fd] p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <span className="font-medium text-[#0f2040]">{item}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCopy(item, `Headline ${idx + 1}`)}
+                      className="no-print shrink-0 gap-1.5 text-xs text-[#08744f] hover:bg-[#e6f7f0]"
+                    >
+                      {copiedText === item ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                      {copiedText === item ? "Tersalin" : "Salin Headline"}
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* STAR Bullet Point Transformations */}
+          {result.starBullets.length > 0 && (
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-[#0f2040] flex items-center gap-2">
+                  <Target className="size-5 text-[#19a974]" /> Transformasi Bullet Pengalaman (STAR Method)
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Bandingkan kalimat umum dengan format STAR yang menonjolkan dampak kuantitatif.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {result.starBullets.map((bullet, idx) => (
+                  <div key={idx} className="rounded-xl border p-4 space-y-3 bg-card">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-lg bg-red-50/60 p-3 text-xs border border-red-100">
+                        <span className="font-semibold text-red-700 block mb-1">Sebelum (Format Deskriptif Biasa):</span>
+                        <p className="text-red-900">{bullet.before}</p>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50/60 p-3 text-xs border border-emerald-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-emerald-800">Sesudah (Format STAR Outcome):</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCopy(bullet.after, "Bullet Point STAR")}
+                            className="no-print h-6 px-2 text-[11px] text-[#08744f] hover:bg-emerald-100"
+                          >
+                            <Copy className="size-3 mr-1" /> Salin Bullet
+                          </Button>
+                        </div>
+                        <p className="text-emerald-950 font-medium">{bullet.after}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 italic">
+                      <Lightbulb className="size-3.5 text-amber-600 shrink-0" /> {bullet.impactReason}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           )}
 
           {/* Actionable Next Steps */}
@@ -930,11 +1061,14 @@ export function CareerAdvisorWorkspace() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
               <span className="font-mono uppercase tracking-wider text-[#08744f] font-semibold flex items-center gap-1">
                 <Bot className="size-3.5" /> AI Transparency Notice
+                <Bot className="size-3.5" /> Pemberitahuan Draf AI
               </span>
               <div className="flex items-center gap-2 text-[11px]">
-                <span>Source: <strong className="uppercase">{result.source}</strong></span>
+                <span>Sumber: <strong className="uppercase">{result.source}</strong></span>
                 <span>•</span>
                 <span>Model: <strong>{result.modelVersion}</strong></span>
+                <span>•</span>
+                <span>Cakupan: <strong>Konteks Profil</strong></span>
               </div>
             </div>
             <div className="space-y-1">

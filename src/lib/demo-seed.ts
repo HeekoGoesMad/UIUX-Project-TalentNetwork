@@ -6,7 +6,7 @@
  * Usage: only active in demo/dev mode (no Supabase configured).
  */
 
-import type { AppState, CvProfile, DemoUser } from "@/types";
+import type { CvProfile, DemoUser } from "@/types";
 
 export const DEMO_CANDIDATE_USER: DemoUser = {
   role: "candidate",
@@ -111,19 +111,4 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
   openToWork: true,
   careerStatus: "open-to-work",
   updatedAt: new Date().toISOString(),
-};
-
-export const DEMO_APP_STATE: Partial<AppState> = {
-  tokens: 25,
-  screeningTokens: 3,
-  previewsUsed: 0,
-  scans: [],
-  shortlisted: [],
-  notes: {},
-  recentlyViewed: [],
-  screeningConsents: {},
-  screeningResults: {},
-  contactRequests: {},
-  cvProfile: DEMO_CANDIDATE_CV,
-  careerStatus: "open-to-work",
 };

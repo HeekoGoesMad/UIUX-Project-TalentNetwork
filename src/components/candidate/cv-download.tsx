@@ -43,7 +43,7 @@ const templates: CvTemplate[] = [
           <div className="h-1.5 w-20 bg-slate-400 rounded" />
         </div>
         <div className="space-y-1">
-          {["PENGALAMAN KERJA", "PENDIDIKAN", "SKILLS"].map((s) => (
+          {["PENGALAMAN KERJA", "PENDIDIKAN", "SKILL"].map((s) => (
             <div key={s}>
               <div className="h-1.5 w-16 bg-slate-900 rounded mb-0.5" />
               <div className="h-1 w-full bg-slate-200 rounded mb-0.5" />
@@ -274,7 +274,7 @@ export function CvDownload({ profile }: { profile: CvProfile }) {
               {downloading ? (
                 <><Loader2 className="size-4 animate-spin mr-1.5" /> Membuat PDF...</>
               ) : (
-                <><Download className="size-4 mr-1.5" /> Download PDF</>
+                <><Download className="size-4 mr-1.5" /> Unduh PDF</>
               )}
             </Button>
             <p className="text-center text-[10px] text-muted-foreground">
@@ -288,7 +288,7 @@ export function CvDownload({ profile }: { profile: CvProfile }) {
       <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
         <ShieldCheck className="size-4 shrink-0 text-amber-600 mt-0.5" />
         <p className="text-xs text-amber-900 leading-relaxed">
-          <strong>Tips ATS:</strong> Gunakan template <strong>ATS Clean</strong> saat apply ke perusahaan besar. Hindari tabel, kolom, dan gambar agar parser sistem rekrutmen dapat membaca semua informasimu dengan benar.
+          <strong>Tips ATS:</strong> Gunakan template <strong>ATS Clean</strong> saat melamar ke perusahaan besar. Hindari tabel, kolom, dan gambar agar parser sistem rekrutmen dapat membaca semua informasimu dengan benar.
         </p>
       </div>
     </div>

@@ -24,152 +24,44 @@ import {
   Zap,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useApp } from "@/providers/app-provider";
-import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
-import { CAREER_STATUS_CONFIG, type CareerStatus, type ConsentState } from "@/types";
+import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
 
-type Application = {
-  id: string;
-  jobId: string;
-  status: string;
-  submittedAt: string;
-  job?: { id: string; title: string; organizationName: string };
-};
-
-const statusLabels: Record<ConsentState, string> = {
-  "not-requested": "Belum diminta",
-  "pending-candidate-consent": "Menunggu jawabanmu",
-  consented: "Disetujui",
-  declined: "Ditolak",
-  "consent-expired": "Kedaluwarsa",
-  withdrawn: "Ditarik",
-  "screening-in-progress": "Screening berjalan",
-  "screening-completed": "Screening selesai",
-  disputed: "Perlu ditinjau",
-};
-
-export default function CandidateDashboard() {
-  const {
-    user,
-    profile,
-    cvProfile,
-    careerStatus,
-    screeningConsents,
-    contactRequests,
-    consentRequests,
-    respondToConsent,
-    dbMode,
-  } = useApp();
-
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loadingApps, setLoadingApps] = useState(true);
-
-  // Active CV data (falls back gracefully to demo seed if not loaded)
-  const activeCv = cvProfile ?? DEMO_CANDIDATE_CV;
-  const displayName = profile?.displayName || user?.name || activeCv.fullName || "Kandidat";
-
-  // Calculate profile completeness
-  const completeness = useMemo(() => {
-    let score = 0;
-    const checks: { label: string; done: boolean; points: number }[] = [
-      { label: "Data Pribadi & Kontak", done: Boolean(activeCv.fullName && activeCv.email), points: 15 },
-      { label: "Headline & Target Peran", done: Boolean(activeCv.headline || activeCv.targetRole), points: 15 },
-      { label: "Ringkasan Profil (Bio)", done: Boolean(activeCv.about && activeCv.about.length > 20), points: 15 },
-      { label: "Pengalaman Kerja", done: Boolean(activeCv.experience && activeCv.experience.length > 0), points: 25 },
-      { label: "Keahlian & Tools", done: Boolean(activeCv.skills && activeCv.skills.length >= 3), points: 20 },
-      { label: "Riwayat Pendidikan", done: Boolean(activeCv.education && activeCv.education.length > 0), points: 10 },
-    ];
-
-    checks.forEach((item) => {
-      if (item.done) score += item.points;
-    });
-
-    return { score, checks };
-  }, [activeCv]);
-
-  // Load applications count from API / LocalStorage
-  useEffect(() => {
-    let active = true;
-    if (!dbMode) {
-      try {
-        const stored = JSON.parse(localStorage.getItem("proofylink-demo-applications") ?? "[]") as Application[];
-        if (active) {
-          setApplications(stored);
-          setLoadingApps(false);
-        }
-      } catch {
-        if (active) setLoadingApps(false);
-      }
-      return () => {
-        active = false;
-      };
-    }
-
-    fetch("/api/applications", { cache: "no-store" })
-      .then(async (res) => {
-        const payload = (await res.json()) as { applications?: Application[] };
-        if (active && res.ok) {
-          setApplications(payload.applications ?? []);
-        }
-      })
-      .catch(() => {
-        if (active) setApplications([]);
-      })
-      .finally(() => {
-        if (active) setLoadingApps(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [dbMode]);
-
-  // Unified contact requests list
-  const remoteRequests = consentRequests
-    .map((request) => ({
-      candidateId: typeof request.candidateProfileId === "string" ? request.candidateProfileId : "",
-      state: statusLabels[request.consentState as ConsentState]
-        ? (request.consentState as ConsentState)
-        : (screeningConsents[String(request.candidateProfileId)] ?? "not-requested"),
-      recruiterName: typeof request.recruiterName === "string" ? request.recruiterName : "Recruiter",
-      organization: typeof request.organizationName === "string" ? request.organizationName : "Perusahaan Mitra",
-      date: typeof request.createdAt === "string" ? request.createdAt : undefined,
-    }))
-    .filter((req) => req.candidateId && req.state !== "not-requested");
-
-  const localRequests = Object.entries(screeningConsents)
-    .filter(([, state]) => state !== "not-requested")
-    .map(([candidateId, state]) => ({
-      candidateId,
-      state,
-      recruiterName: contactRequests?.[candidateId]?.recruiterName || "Recruiter Mitra",
-      organization: contactRequests?.[candidateId]?.company || "Perusahaan Mitra",
-      date: contactRequests?.[candidateId]?.requestedAt,
-    }));
-
-  const allRequests = dbMode ? remoteRequests : localRequests;
-  const pendingRequests = allRequests.filter((req) => req.state === "pending-candidate-consent");
-
-  const activeStatusKey: CareerStatus = careerStatus ?? activeCv.careerStatus ?? "open-to-work";
-  const statusConfig = CAREER_STATUS_CONFIG[activeStatusKey] || CAREER_STATUS_CONFIG["open-to-work"];
-
-  const activeAppsCount = applications.filter((app) => app.status !== "rejected" && app.status !== "withdrawn").length;
+const items = [
+  ["/candidate/cv", "CV & Profil", "Impor PDF dan tinjau profil", FileText],
+  ["/candidate/career-advisor", "Career Advisor", "Saran cerdas berbasis profil", Sparkles],
+  ["/candidate/career-roadmap", "Career Roadmap", "Langkah terarah yang bisa kamu sesuaikan", Map],
+  ["/candidate/contact-requests", "Permintaan Kontak", "Kelola percakapan dengan recruiter", MessageCircle],
+] as const;
 
   return (
     <ProtectedRoute role="candidate">
-      <main className="container mx-auto max-w-6xl px-4 py-8 sm:py-12 space-y-8">
-        {/* Welcome & Profile Banner */}
-        <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs">
-          <div className="absolute -right-16 -top-16 size-72 rounded-full bg-gradient-to-br from-[#7C3AED]/10 to-[#EC4899]/10 blur-3xl pointer-events-none" />
+      <main className="container mx-auto max-w-5xl px-4 py-12">
+        <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Workspace Kandidat</p>
+        <h1 className="mt-3 text-4xl font-bold text-[#111827]">Mulai dari cerita kariermu.</h1>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          Buat profil yang kamu kontrol, lalu gunakan AI sebagai partner review, bukan pengganti keputusanmu.
+        </p>
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-[#7C3AED] border border-purple-100">
-                  <ShieldCheck className="size-3.5" /> Candidate Workspace
+        <div className="mt-8">
+          <ProfileCompletionCard />
+        </div>
+
+        {/* Back to Profile button */}
+        <div className="mt-8">
+          <Link href="/profile">
+            <Card className="card-interactive border-slate-200 bg-slate-50 transition-shadow hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-50">
+                  <User className="size-5 text-[#7C3AED]" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-[#7C3AED]">Lihat Profil Kamu</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Tinjau tampilan profil seperti yang dilihat recruiter
+                  </p>
+                </div>
+                <span className="inline-flex items-center text-sm font-semibold text-[#7C3AED]">
+                  Buka <ArrowRight className="ml-1 size-4" />
                 </span>
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusConfig.color}`}>
                   <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />

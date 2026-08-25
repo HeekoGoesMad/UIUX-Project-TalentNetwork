@@ -4,13 +4,16 @@ import { useEffect, useState } from "react";
 import {
   FileUp,
   GraduationCap,
+  Loader2,
   Plus,
   Save,
   ShieldCheck,
   Trash2,
+  Wrench,
   BriefcaseBusiness,
   ExternalLink,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,9 +66,10 @@ function Field({
 }
 
 const inputCls =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]";
+  "h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
 const textareaCls =
-  "min-h-24 w-full rounded-md border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED]";
+  "min-h-24 w-full rounded-md border bg-background p-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
+const maxPdfBytes = 5 * 1024 * 1024;
 
 // ─── Section wrapper ─────────────────────────────────────────────
 function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
@@ -73,7 +77,7 @@ function FormSection({ title, icon, children }: { title: string; icon?: React.Re
     <div className="space-y-4">
       <div className="flex items-center gap-2 border-b pb-2">
         {icon}
-        <h3 className="font-semibold text-[#111827]">{title}</h3>
+        <h3 className="font-semibold text-foreground">{title}</h3>
       </div>
       {children}
     </div>
@@ -85,6 +89,8 @@ export function CvWorkspace() {
   const { cvProfile, user, dbMode, saveCvProfile } = useApp();
   const [profile, setProfile] = useState<CvProfile>(cvProfile ?? blank(dbMode ? user?.email : "", dbMode ? user?.name : ""));
   const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!cvProfile) return;
@@ -110,12 +116,22 @@ export function CvWorkspace() {
       exp[i] = { ...exp[i], [key]: val };
       return { ...c, experience: exp };
     });
-  const updateExpDesc = (i: number, val: string) =>
+  const updateExpAchievement = (i: number, j: number, val: string) =>
     setProfile((c) => {
       const exp = [...c.experience];
-      exp[i] = { ...exp[i], achievements: val ? [val] : [] };
+      exp[i] = { ...exp[i], achievements: exp[i].achievements.map((item, idx) => (idx === j ? val : item)) };
       return { ...c, experience: exp };
     });
+  const addExpAchievement = (i: number) =>
+    setProfile((c) => ({
+      ...c,
+      experience: c.experience.map((exp, idx) => (idx === i ? { ...exp, achievements: [...exp.achievements, ""] } : exp)),
+    }));
+  const removeExpAchievement = (i: number, j: number) =>
+    setProfile((c) => ({
+      ...c,
+      experience: c.experience.map((exp, idx) => (idx === i ? { ...exp, achievements: exp.achievements.filter((_, aIdx) => aIdx !== j) } : exp)),
+    }));
 
   // Education helpers
   const addEdu = () =>
@@ -144,51 +160,99 @@ export function CvWorkspace() {
       return { ...c, portfolio: p };
     });
 
-  // PDF import
   async function importPdf(file: File) {
-    const form = new FormData();
-    form.set("file", file);
-    setMessage("Membaca PDF sebagai draft...");
-    const response = await fetch("/api/cv/import", { method: "POST", body: form });
-    const data = await response.json();
-    if (!response.ok) { setMessage(data.error); return; }
-    setProfile((c) => ({
-      ...c,
-      ...data,
-      id: data.cvId,
-      skills: data.skills ?? c.skills,
-      tools: data.tools ?? c.tools,
-      experience: data.experience ?? c.experience,
-      education: data.education ?? c.education,
-      portfolio: data.portfolio ?? c.portfolio,
-      sourceFileName: file.name,
-    }));
-    setMessage("Draft berhasil dibuat. Review semua field sebelum menyimpan.");
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setMessage("File harus berformat PDF.");
+      toast.error("File tidak didukung", { description: "Impor CV hanya menerima berkas PDF." });
+      return;
+    }
+    if (file.size > maxPdfBytes) {
+      setMessage("Ukuran file melebihi batas 5 MB.");
+      toast.error("Ukuran file terlalu besar", { description: "Ukuran PDF maksimal 5 MB. Kompres atau pilih file lain." });
+      return;
+    }
+    setImporting(true);
+    setMessage("Membaca PDF sebagai draf...");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/cv/import", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.error ?? "Impor gagal. Coba lagi atau isi manual.");
+        toast.error("Impor gagal", { description: data.error ?? "Server tidak dapat memproses PDF ini." });
+        return;
+      }
+      setProfile((c) => ({
+        ...c,
+        ...data,
+        id: data.cvId,
+        skills: data.skills ?? c.skills,
+        tools: data.tools ?? c.tools,
+        experience: data.experience ?? c.experience,
+        education: data.education ?? c.education,
+        portfolio: data.portfolio ?? c.portfolio,
+        sourceFileName: file.name,
+      }));
+      setMessage("Draf berhasil dibuat. Tinjau semua field sebelum menyimpan.");
+      toast.success("PDF diimpor sebagai draf", { description: "Semua hasil ekstraksi tetap bisa kamu edit sebelum disimpan." });
+    } catch {
+      setMessage("Impor gagal. Coba lagi atau isi manual.");
+      toast.error("Impor gagal", { description: "Periksa koneksi kamu lalu coba lagi." });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await saveCvProfile(profile);
+      setMessage("Profil berhasil disimpan dan disinkronkan.");
+    } catch {
+      setMessage("Profil gagal disimpan. Coba lagi.");
+    } finally {
+      setSaving(false);
+    }
   }
 
 
   return (
     <div className="space-y-6">
       {/* Import banner */}
-      <Card className="border-slate-200 bg-slate-50">
+      <Card className="border-border bg-muted/50">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 font-semibold text-[#111827]">
-              <FileUp className="size-4 text-[#7C3AED]" />
+            <p className="flex items-center gap-2 font-semibold text-foreground">
+              <FileUp className="size-4 text-primary" />
               Import CV PDF
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               PDF only, maksimal 5 MB. Hasil AI adalah saran yang bisa kamu edit.
             </p>
           </div>
-          <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-5 text-sm font-semibold text-white hover:bg-[#6D28D9]">
+          <label
+            aria-disabled={importing}
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors ${
+              importing
+                ? "pointer-events-none bg-primary/60 text-primary-foreground"
+                : "cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+            }`}
+          >
             <input
               className="sr-only"
               type="file"
               accept="application/pdf,.pdf"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void importPdf(f); }}
+              disabled={importing}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) void importPdf(f);
+              }}
             />
-            <FileUp className="size-4" /> Pilih PDF
+            {importing ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
+            {importing ? "Memproses..." : "Pilih PDF"}
           </label>
         </CardContent>
       </Card>
@@ -196,14 +260,13 @@ export function CvWorkspace() {
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-[#111827]">Review CV &amp; Profile</CardTitle>
+          <CardTitle className="text-foreground">Tinjau CV &amp; Profil</CardTitle>
           <p className="text-sm text-muted-foreground">
             Isi semua field agar recruiter mendapatkan gambaran lengkap tentang kamu.
           </p>
         </CardHeader>
         <CardContent className="space-y-8">
 
-          {/* ── Informasi Dasar ── */}
           <FormSection title="Informasi Dasar">
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Nama Lengkap">
@@ -249,11 +312,11 @@ export function CvWorkspace() {
           {/* ── Pengalaman Kerja ── */}
           <FormSection
             title="Pengalaman Kerja"
-            icon={<BriefcaseBusiness className="size-4 text-[#7C3AED]" />}
+            icon={<BriefcaseBusiness className="size-4 text-primary" />}
           >
             <div className="space-y-4">
               {profile.experience.map((exp, i) => (
-                <div key={i} className="relative rounded-xl border bg-slate-50/60 p-4">
+                <div key={i} className="relative rounded-xl border bg-muted/40 p-4">
                   <button
                     type="button"
                     onClick={() => removeExp(i)}
@@ -290,16 +353,43 @@ export function CvWorkspace() {
                         placeholder="Jan 2021 — Present"
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-                      Deskripsi
-                      <textarea
-                        className={textareaCls}
-                        value={exp.achievements?.[0] ?? ""}
-                        onChange={(e) => updateExpDesc(i, e.target.value)}
-                        placeholder="Apa yang kamu kerjakan dan capai di sini?"
-                        rows={2}
-                      />
-                    </label>
+                    <div className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
+                      <span>Pencapaian</span>
+                      {exp.achievements.length === 0 && (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Belum ada pencapaian. Tambahkan hasil terkuatmu di peran ini.
+                        </span>
+                      )}
+                      {exp.achievements.map((achievement, j) => (
+                        <div key={j} className="flex items-start gap-2">
+                          <textarea
+                            className={`${textareaCls} flex-1`}
+                            aria-label={`Pencapaian ${j + 1}`}
+                            value={achievement}
+                            onChange={(e) => updateExpAchievement(i, j, e.target.value)}
+                            placeholder={j === 0 ? "Apa yang kamu kerjakan dan capai di sini?" : "Tambahkan pencapaian lain"}
+                            rows={2}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeExpAchievement(i, j)}
+                            className="mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                            aria-label={`Hapus pencapaian ${j + 1}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="self-start px-2"
+                        onClick={() => addExpAchievement(i)}
+                      >
+                        <Plus className="size-4" /> Tambah Pencapaian
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -311,32 +401,49 @@ export function CvWorkspace() {
 
           {/* ── Pendidikan ── */}
           <FormSection
-            title="Pendidikan & Kampus"
-            icon={<GraduationCap className="size-4 text-[#7C3AED]" />}
+            title="Pendidikan"
+            icon={<GraduationCap className="size-4 text-primary" />}
           >
             <div className="space-y-4">
-              {/* Partner suggestions chips */}
-              <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs">
-                <p className="font-semibold text-[#7C3AED] mb-1.5 flex items-center gap-1.5">
-                  <GraduationCap className="size-3.5" /> Kampus Mitra Djoin:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {PARTNER_CAMPUSES.map((campus) => (
-                    <button
-                      key={campus}
-                      type="button"
-                      onClick={() => {
-                        if (profile.education.length === 0) {
-                          setProfile((c) => ({ ...c, education: [{ school: campus, program: "", dates: "" }] }));
-                        } else {
-                          updateEdu(0, "school", campus);
-                        }
-                      }}
-                      className="rounded-lg border border-purple-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-purple-100/60 transition-colors"
-                    >
-                      + {campus}
-                    </button>
-                  ))}
+              {profile.education.map((edu, i) => (
+                <div key={i} className="relative rounded-xl border bg-muted/40 p-4">
+                  <button
+                    type="button"
+                    onClick={() => removeEdu(i)}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
+                    aria-label="Hapus pendidikan"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                  <div className="grid gap-3 md:grid-cols-3 pr-6">
+                    <label className="flex flex-col gap-1 text-sm font-medium md:col-span-1">
+                      Universitas / Institusi
+                      <input
+                        className={inputCls}
+                        value={edu.school}
+                        onChange={(e) => updateEdu(i, "school", e.target.value)}
+                        placeholder="Universitas Indonesia"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm font-medium">
+                      Jurusan / Program Studi
+                      <input
+                        className={inputCls}
+                        value={edu.program}
+                        onChange={(e) => updateEdu(i, "program", e.target.value)}
+                        placeholder="Teknik Informatika"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm font-medium">
+                      Tahun
+                      <input
+                        className={inputCls}
+                        value={edu.dates}
+                        onChange={(e) => updateEdu(i, "dates", e.target.value)}
+                        placeholder="2018 — 2022"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -407,7 +514,7 @@ export function CvWorkspace() {
           </FormSection>
 
           {/* ── Skills ── */}
-          <FormSection title="Skills">
+          <FormSection title="Skill">
             <Field
               label="Daftar Skill"
               hint="Pisahkan dengan koma. Contoh: Recruitment, Payroll, Digital Marketing"
@@ -427,7 +534,7 @@ export function CvWorkspace() {
             {profile.skills.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {profile.skills.map((s) => (
-                  <span key={s} className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]">
+                  <span key={s} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">
                     {s}
                   </span>
                 ))}
@@ -458,9 +565,9 @@ export function CvWorkspace() {
                 {profile.tools.map((t) => (
                   <span
                     key={t}
-                    className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground"
                   >
-                    🔧 {t}
+                    <Wrench className="size-3.5" /> {t}
                   </span>
                 ))}
               </div>
@@ -469,8 +576,8 @@ export function CvWorkspace() {
 
           {/* ── Portfolio ── */}
           <FormSection
-            title="Portfolio"
-            icon={<ExternalLink className="size-4 text-[#7C3AED]" />}
+            title="Portofolio"
+            icon={<ExternalLink className="size-4 text-primary" />}
           >
             <div className="space-y-3">
               {profile.portfolio.map((item, i) => (
@@ -485,27 +592,28 @@ export function CvWorkspace() {
                     type="button"
                     onClick={() => removePortfolio(i)}
                     className="shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus portfolio"
+                    aria-label="Hapus portofolio"
                   >
                     <Trash2 className="size-4" />
                   </button>
                 </div>
               ))}
               <Button type="button" variant="outline" size="sm" onClick={addPortfolio}>
-                <Plus className="size-4" /> Tambah Link / Project
+                <Plus className="size-4" /> Tambah Link / Proyek
               </Button>
             </div>
           </FormSection>
 
           {/* ── Action buttons ── */}
           <div className="flex flex-wrap gap-3 border-t pt-4">
-            <Button onClick={() => { void saveCvProfile(profile).then(() => setMessage("Profil berhasil disimpan dan disinkronkan.")); }}>
-              <Save className="size-4" /> Simpan Profile
+            <Button onClick={() => void handleSave()} disabled={saving}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving ? "Menyimpan..." : "Simpan Profil"}
             </Button>
           </div>
 
           {message && (
-            <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-[#7C3AED]" role="status">
+            <p className="rounded-lg bg-muted px-4 py-3 text-sm text-primary" role="status">
               {message}
             </p>
           )}
@@ -513,15 +621,15 @@ export function CvWorkspace() {
       </Card>
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <ShieldCheck className="size-3.5 text-[#7C3AED]" />
+        <ShieldCheck className="size-3.5 text-primary" />
         Kamu mengontrol field yang dipublikasikan. Screening recruiter tidak memakai financial atau credit data.
       </p>
 
       {/* ── Download / Template Picker ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-[#111827]">Preview & Download CV</CardTitle>
-          <p className="text-sm text-muted-foreground">Pilih template dan unduh CV-mu sebagai PDF. Simpan profile terlebih dahulu agar data terbaru digunakan.</p>
+          <CardTitle className="text-foreground">Pratinjau &amp; Unduh CV</CardTitle>
+          <p className="text-sm text-muted-foreground">Pilih template dan unduh CV-mu sebagai PDF. Simpan profil terlebih dahulu agar data terbaru digunakan.</p>
         </CardHeader>
         <CardContent>
           <CvDownload profile={profile} />

@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CampusVerification, CareerStatus, ConsentState, CvProfile, DemoUser, PARTNER_CAMPUSES, ProvisioningStatus, ScreeningResult, UserRole } from "@/types";
+import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { candidates } from "@/data/candidates";
 
@@ -108,9 +109,7 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     return Array.isArray(value) ? value as T[] : [];
   };
   const preferences = section("preferences");
-  const careerStatus = preferences.careerStatus;
-  const status: CareerStatus = typeof careerStatus === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(careerStatus)
-    ? careerStatus as CareerStatus : "open-to-work";
+  const status = asCareerStatus(preferences.careerStatus);
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
     fullName: base?.displayName ?? "",
@@ -258,18 +257,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
       setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
-      setConsentRequests(consentPayload.requests ?? []);
-      const remoteCv = remoteCvProfile(payload);
-      if (remoteCv) {
-        setState((current) => ({ ...current, cvProfile: remoteCv, careerStatus: remoteCv.careerStatus }));
-      }
-      if (consentPayload.requests && Array.isArray(consentPayload.requests)) {
-        const consents: Record<string, ConsentState> = {};
-        for (const item of consentPayload.requests as RemoteConsentRequest[]) {
-          if (item.candidateProfileId) consents[item.candidateProfileId] = item.consentState;
-        }
-        setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, ...consents } }));
-      }
+       setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
+       const remoteProfile = remoteCvProfile(payload);
+       setState((current) => ({
+         ...current,
+         cvProfile: remoteProfile,
+         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
+        tokens: payload.token?.balance ?? 0,
+        shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
+         screeningConsents: Object.fromEntries((consentPayload.requests ?? payload.consentRequests ?? []).flatMap((request) => {
+          const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
+          const status = request.status;
+          if (!candidateId || typeof status !== "string") return [];
+          const consent = CONSENT_STATE_BY_DB_STATUS[status];
+          return consent ? [[candidateId, consent]] : [];
+        })),
+      }));
+      setBootstrapped(true);
     } catch (error) {
       setDatabaseError(error instanceof Error ? error.message : "Gagal memuat data aplikasi.");
     } finally {
@@ -460,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const scan = (id: string) => {
     if (state.scans.some((item) => item.candidateId === id)) return true;
     if (state.tokens <= 0) {
-      toast.error("Token tidak cukup", { description: "Beli paket token di halaman billing." });
+      toast.error("Token Anda habis", { description: "Tambah token untuk membuka profil lainnya." });
       return false;
     }
     setState((current) => ({
@@ -468,18 +472,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tokens: current.tokens - 1,
       scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
-    toast.success("Profile unlocked", { description: "Satu token digunakan." });
+    toast.success("Profil berhasil dibuka", { description: "1 token telah digunakan." });
     return true;
   };
 
   const toggleShortlist = (id: string) => {
-    setState((current) => {
-      const exists = current.shortlisted.includes(id);
-      return {
-        ...current,
-        shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id],
-      };
-    });
+    if (supabaseConfigured && UUID_RE.test(id)) {
+      const existing = shortlists.flatMap((shortlist) => shortlist.items).find((item) => item.candidateProfileId === id);
+      void fetch("/api/shortlists", { method: existing ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(existing ? { itemId: existing.id } : { candidateProfileId: id }) }).then(async (response) => {
+        if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error ?? "Shortlist gagal diperbarui.");
+        await loadBootstrap();
+        toast.success(existing ? "Dihapus dari shortlist" : "Ditambahkan ke shortlist");
+      }).catch((error: unknown) => toast.error("Shortlist gagal diperbarui", { description: error instanceof Error ? error.message : "Coba lagi." }));
+      return;
+    }
+    const exists = state.shortlisted.includes(id);
+    setState((current) => ({ ...current, shortlisted: exists ? current.shortlisted.filter((item) => item !== id) : [...current.shortlisted, id] }));
+    toast.success(exists ? "Dihapus dari shortlist" : "Ditambahkan ke shortlist");
   };
 
   const saveNote = (id: string, note: string) => {
@@ -566,7 +575,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const requestConsentBatch = async (candidateIds: string[]) => {
     const uniqueIds = [...new Set(candidateIds)];
     if (!uniqueIds.length) return false;
-    if (supabaseConfigured && uniqueIds.every((candidateId) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId))) {
+    if (supabaseConfigured && uniqueIds.every((candidateId) => UUID_RE.test(candidateId))) {
       const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: uniqueIds, purpose: "Screening kandidat" }) });
       if (!response.ok) { toast.error("Permintaan consent gagal dikirim", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
       await loadBootstrap();
@@ -586,12 +595,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const requestConsent = async (candidateId: string) => {
-    if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
-      const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: [candidateId], purpose: "Screening kandidat" }) });
-      if (!response.ok) { toast.error("Permintaan consent gagal dikirim", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
-      await loadBootstrap();
-      toast.success("Permintaan consent terkirim");
-      return true;
+    if (supabaseConfigured && UUID_RE.test(candidateId)) {
+      return requestConsentBatch([candidateId]);
     }
     setState((current) => {
       const now = new Date().toISOString();
@@ -647,7 +652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const startScreening = async (candidateId: string) => {
-    if (supabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)) {
+    if (supabaseConfigured && UUID_RE.test(candidateId)) {
       try {
         const consentResponse = await fetch("/api/consent-requests");
         const consentData = (await consentResponse.json()) as { requests?: { itemId: string; candidateProfileId: string; consentState?: ConsentState }[] };
@@ -691,7 +696,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const previewCandidate = (candidateId: string) => {
     if (state.scans.some((scan) => scan.candidateId === candidateId)) return true;
-    if (state.previewsUsed >= 5) { toast.error("Free preview trial habis", { description: "Screening tetap membutuhkan consent dan token." }); return false; }
+    if (state.previewsUsed >= 5) { toast.error("Pratinjau gratis trial habis", { description: "Screening tetap membutuhkan consent dan token." }); return false; }
     setState((current) => ({ ...current, previewsUsed: current.previewsUsed + 1 }));
     return true;
   };

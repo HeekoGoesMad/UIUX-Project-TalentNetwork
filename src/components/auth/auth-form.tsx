@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Send, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Info, Send, Sparkles } from "lucide-react";
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
@@ -18,6 +18,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submittedPartner, setSubmittedPartner] = useState(false);
+  const [partnerErrors, setPartnerErrors] = useState<{ email?: string; institution?: string }>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,23 +36,35 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
     setErrorMessage(null);
-
-    if (role === "partner") {
-      window.setTimeout(() => {
-        setLoading(false);
-        login("partner", "mitra@kampus.ac.id", "");
-        router.push("/partner");
-      }, 500);
-      return;
-    }
 
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const companyName = String(form.get("companyName") ?? "").trim();
+
+    if (role === "partner") {
+      const institution = String(form.get("institution") ?? "").trim();
+      const errors: { email?: string; institution?: string } = {};
+      if (!email) {
+        errors.email = "Email lembaga wajib diisi.";
+      } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+        errors.email = "Format email tidak valid.";
+      }
+      if (!institution) {
+        errors.institution = "Asal lembaga atau kampus wajib diisi.";
+      }
+      if (Object.keys(errors).length > 0) {
+        setPartnerErrors(errors);
+        return;
+      }
+      setPartnerErrors({});
+      setSubmittedPartner(true);
+      return;
+    }
+
+    setLoading(true);
     const result = mode === "login" ? await login(role, email, password) : await register(name, role, email, password, companyName);
     if (result.error) {
       setLoading(false);
@@ -113,11 +126,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           onChange={(newRole) => {
             setRole(newRole);
             setSubmittedPartner(false);
+            setPartnerErrors({});
           }}
         />
       </div>
 
-      {errorMessage && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">{errorMessage}</div>}
+      {errorMessage && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{errorMessage}</div>}
 
       {role === "partner" ? (
         submittedPartner ? (
@@ -125,18 +139,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <CheckCircle2 className="size-6" />
             </div>
-            <h4 className="font-bold text-slate-900 text-base">Pendaftaran Partner Terkirim!</h4>
+            <h4 className="font-bold text-slate-900 text-base">Permintaan Partnership Dicatat</h4>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Permohonan pendaftaran partner telah kami terima. Tim Talent Network akan memverifikasi dan membuatkan akun khusus partner untuk lembaga Anda.
+              Permintaan partnership Anda telah dicatat dalam demo ini. Tidak ada akun sungguhan yang dibuat, tidak ada data yang dikirim ke server, dan sesi Anda tidak berubah.
             </p>
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="mt-2 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-              onClick={() => setSubmittedPartner(false)}
+              asChild
             >
-              Kirim Pendaftaran Lain
+              <Link href="/login">Kembali ke Halaman Masuk</Link>
             </Button>
           </div>
         ) : (
@@ -155,9 +169,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   type="email"
                   autoComplete="email"
                   spellCheck={false}
+                  aria-invalid={Boolean(partnerErrors.email)}
                   placeholder="mitra@kampus.ac.id"
                 />
               </div>
+              {partnerErrors.email && (
+                <p role="alert" className="mt-1.5 text-xs font-medium text-red-700">
+                  {partnerErrors.email}
+                </p>
+              )}
             </div>
 
             <div>
@@ -171,14 +191,20 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   name="institution"
                   className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
                   required
+                  aria-invalid={Boolean(partnerErrors.institution)}
                   placeholder="Universitas Indonesia / Instansi Partner"
                 />
               </div>
+              {partnerErrors.institution && (
+                <p role="alert" className="mt-1.5 text-xs font-medium text-red-700">
+                  {partnerErrors.institution}
+                </p>
+              )}
             </div>
 
             <div className="rounded-xl border border-purple-100 bg-slate-100/50 p-3 text-xs text-purple-900 leading-relaxed">
               <p className="font-medium">
-                💡 Pendaftaran partner akan diproses langsung untuk pembuatan akun khusus oleh tim Talent Network.
+                💡 Mode demo: pendaftaran partner hanya simulasi. Tidak ada akun yang dibuat dan data tidak dikirim ke server.
               </p>
             </div>
 
@@ -190,7 +216,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Sending…
+                  Mengirimkan…
                 </>
               ) : (
                 <>
@@ -268,8 +294,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               />
               <button
                 type="button"
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-                className="absolute right-3.5 top-3 sm:top-3.5 text-slate-400 hover:text-slate-600 focus-visible:outline-none"
+                aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                aria-pressed={showPassword}
+                className="absolute right-3.5 top-3 sm:top-3.5 rounded-md p-0.5 text-slate-400 hover:text-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -286,7 +313,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 type="checkbox"
                 className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
               />
-              <span>Saya menyetujui Ketentuan Layanan & Privacy Policy.</span>
+              <span>
+                Saya menyetujui{" "}
+                <Link href="/terms" className="font-semibold text-[#7C3AED] hover:underline">
+                  Syarat &amp; Ketentuan
+                </Link>{" "}
+                dan{" "}
+                <Link href="/privacy" className="font-semibold text-[#7C3AED] hover:underline">
+                  Kebijakan Privasi
+                </Link>
+                .
+              </span>
             </label>
           )}
 
@@ -308,31 +345,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             )}
           </Button>
 
-          {supabaseConfigured && (
-            <>
-              <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                <span className="h-px flex-1 bg-slate-200" />
-                atau
-                <span className="h-px flex-1 bg-slate-200" />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full rounded-xl text-xs sm:text-sm"
-                disabled={loading}
-                onClick={signInWithGoogle}
-              >
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
-                {loading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
-              </Button>
-            </>
+          {!supabaseConfigured && (
+            <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="size-3.5 shrink-0 text-[#7C3AED]" aria-hidden="true" />
+              Mode demo: {mode === "login" ? "masuk" : "daftar"} dengan email apa pun
+            </p>
           )}
 
           {!supabaseConfigured && role === "candidate" && (
             <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                  <Sparkles className="size-4 text-[#7C3AED]" /> Quick Demo Login
+                  <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
                 </span>
                 <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
                   Profil Lengkap

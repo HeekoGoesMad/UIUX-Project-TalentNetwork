@@ -26,15 +26,15 @@ export default function PricingPage() {
           {/* Starter */}
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Starter Pack</span>
-              <h2 className="mt-2 text-2xl font-bold text-[#111827]">10 Tokens</h2>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paket Starter</span>
+              <h2 className="mt-2 text-2xl font-bold text-[#111827]">10 Token</h2>
               <p className="mt-4 font-mono text-3xl font-extrabold text-[#111827]">Rp 250.000</p>
-              <p className="text-xs text-muted-foreground mt-1 font-medium">Rp 25.000 / candidate unlock</p>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">Rp 25.000 / buka profil kandidat</p>
 
               <ul className="mt-6 space-y-3.5 text-sm border-t pt-6">
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span className="text-slate-700 font-medium">Unlock 10 Kontak & Resume</span>
+                  <span className="text-slate-700 font-medium">Buka 10 Kontak &amp; Portofolio</span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
@@ -42,11 +42,11 @@ export default function PricingPage() {
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span className="text-slate-700 font-medium">Fitur Shortlist & Catatan Tim</span>
+                  <span className="text-slate-700 font-medium">Fitur Shortlist &amp; Catatan Tim</span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span className="text-slate-700 font-medium">Token Tidak Kadaluarsa</span>
+                  <span className="text-slate-700 font-medium">Token Tidak Kadaluwarsa</span>
                 </li>
               </ul>
             </div>
@@ -59,19 +59,19 @@ export default function PricingPage() {
           {/* Growth (Featured) */}
           <div className="rounded-3xl border-2 border-[#7C3AED] bg-white p-8 shadow-2xl relative flex flex-col justify-between scale-105 z-10">
             <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#7C3AED] px-4 py-1 font-mono text-xs font-bold text-white shadow-md">
-              MOST POPULAR
+              PALING POPULER
             </span>
 
             <div>
-              <span className="text-xs font-bold text-[#7C3AED] uppercase tracking-wider">Growth Pack</span>
-              <h2 className="mt-2 text-2xl font-bold text-[#111827]">50 Tokens</h2>
+              <span className="text-xs font-bold text-[#7C3AED] uppercase tracking-wider">Paket Growth</span>
+              <h2 className="mt-2 text-2xl font-bold text-[#111827]">50 Token</h2>
               <p className="mt-4 font-mono text-3xl font-extrabold text-[#7C3AED]">Rp 990.000</p>
-              <p className="text-xs text-muted-foreground mt-1 font-medium">Rp 19.800 / candidate unlock (Hemat 20%)</p>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">Rp 19.800 / buka profil kandidat (Hemat 20%)</p>
 
               <ul className="mt-6 space-y-3.5 text-sm border-t pt-6">
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span className="text-slate-800 font-semibold">Unlock 50 Kontak & Resume</span>
+                  <span className="text-slate-800 font-semibold">Buka 50 Kontak &amp; Portofolio</span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
@@ -83,23 +83,23 @@ export default function PricingPage() {
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span className="text-slate-800 font-semibold">Token Tidak Kadaluarsa</span>
+                  <span className="text-slate-800 font-semibold">Token Tidak Kadaluwarsa</span>
                 </li>
               </ul>
             </div>
 
             <Button className="mt-8 rounded-xl w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-5 font-semibold shadow-md" asChild>
-              <Link href="/login">Beli Growth Pack</Link>
+              <Link href="/login">Beli Paket Growth</Link>
             </Button>
           </div>
 
           {/* Enterprise */}
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Enterprise</span>
-              <h2 className="mt-2 text-2xl font-bold text-[#111827]">Custom Tokens</h2>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paket Enterprise</span>
+              <h2 className="mt-2 text-2xl font-bold text-[#111827]">Token Kustom</h2>
               <p className="mt-4 font-mono text-3xl font-extrabold text-[#111827]">Hubungi Kami</p>
-              <p className="text-xs text-muted-foreground mt-1 font-medium">Untuk tim HR & Perusahaan Skala Besar</p>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">Untuk tim HR &amp; Perusahaan Skala Besar</p>
 
               <ul className="mt-6 space-y-3.5 text-sm border-t pt-6">
                 <li className="flex items-center gap-2.5">

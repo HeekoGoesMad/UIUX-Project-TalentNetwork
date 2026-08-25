@@ -1,0 +1,9 @@
+export { HeroSection } from "./hero-section";
+export { MarqueeStatsSection } from "./marquee-stats-section";
+export { FeatureTabsSection } from "./feature-tabs-section";
+export { HowItWorksSection } from "./how-it-works-section";
+export { TalentPreviewSection } from "./talent-preview-section";
+export { PricingSection } from "./pricing-section";
+export { FaqSection } from "./faq-section";
+export { CtaBannerSection } from "./cta-banner-section";
+export { ScrollToTop } from "./scroll-to-top";

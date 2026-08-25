@@ -16,8 +16,10 @@ import {
   Globe,
   GraduationCap,
   Loader2,
+  Lock,
   Mail,
   Phone,
+  Printer,
   RefreshCw,
   ScanLine,
   ShieldCheck,
@@ -27,10 +29,11 @@ import {
 import { toast } from "sonner";
 import { findCandidate } from "@/data/candidates";
 import { maskName } from "@/lib/candidate-display";
+import { UUID_RE } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
-import { CandidateAvatar } from "@/components/candidates/avatar";
-import { CandidateCategoryBadge } from "@/components/candidates/candidate-category-badge";
-import { CandidateStatusBadge } from "@/components/candidates/candidate-status-badge";
+import { CandidateAvatar } from "@/components/talent/avatar";
+import { CandidateCategoryBadge } from "@/components/talent/candidate-category-badge";
+import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +47,63 @@ import {
 } from "@/components/ui/dialog";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import type { AiSummary, Candidate, ScreeningInsight, ScreeningResult } from "@/types";
+
+const PORTFOLIO_LABELS: Record<string, string> = {
+  "github.com": "GitHub",
+  "gitlab.com": "GitLab",
+  "linkedin.com": "LinkedIn",
+  "behance.net": "Behance",
+  "dribbble.com": "Dribbble",
+  "medium.com": "Medium",
+};
+
+function portfolioLabel(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return PORTFOLIO_LABELS[hostname] ?? hostname;
+  } catch {
+    return "Portofolio";
+  }
+}
+
+const CV_PRINT_CSS = `
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #cv-print-sheet,
+  #cv-print-sheet * {
+    visibility: visible !important;
+  }
+  #cv-print-sheet {
+    position: absolute !important;
+    inset: auto !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #cv-print-sheet > button {
+    display: none !important;
+  }
+  [data-print-hide] {
+    display: none !important;
+  }
+}
+@page {
+  margin: 14mm;
+}
+`;
 
 function List({ items }: { items: string[] }) {
   return (
@@ -88,7 +148,7 @@ function ScreeningResults({
         targetRole: candidate.role,
         location: candidate.location,
       };
-       const isDatabaseCandidate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId);
+       const isDatabaseCandidate = UUID_RE.test(candidateId);
       if (isDatabaseCandidate) {
         const runResponse = await fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`);
         const runData = (await runResponse.json()) as { run?: { id: string; status: string; score?: { score: number; label: string; coverage: number; evidence: unknown; limitations: unknown; source: "mock" | "azure"; modelVersion: string } | null }; error?: string };
@@ -155,10 +215,10 @@ function ScreeningResults({
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
-            <ShieldCheck className="size-4" /> Recruiter insight
+            <ShieldCheck className="size-4" /> Insight Recruiter
           </p>
           <h2 id="screening-results-title" className="mt-2 text-2xl font-bold text-[#111827]">
-            Hasil screening
+            Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Insight berbasis role fit dan kualitas data, ditampilkan setelah consent kandidat dan screening selesai.
@@ -178,7 +238,7 @@ function ScreeningResults({
             <div>
               <p className="font-semibold text-[#111827]">Hasil belum tersedia</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profile sudah dibuka.
+                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profil sudah dibuka.
               </p>
             </div>
           </CardContent>
@@ -234,7 +294,7 @@ function ScreeningResults({
                 </div>
                 <div className="mt-5">
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Data coverage</span>
+                    <span className="font-semibold">Cakupan data</span>
                     <span className="font-mono text-[#7C3AED]">{result.insight.coverage}%</span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[#7C3AED]/20">
@@ -244,7 +304,7 @@ function ScreeningResults({
                     />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Seberapa banyak konteks profile yang tersedia untuk insight ini.
+                    Seberapa banyak konteks profil yang tersedia untuk insight ini.
                   </p>
                 </div>
               </div>
@@ -254,7 +314,7 @@ function ScreeningResults({
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Evidence yang terdeteksi</CardTitle>
+                <CardTitle className="text-lg">Bukti yang terdeteksi</CardTitle>
               </CardHeader>
               <CardContent>
                 <List items={result.insight.evidence} />
@@ -301,15 +361,15 @@ function ScreeningResults({
           <Card className="bg-muted/30">
             <CardContent className="space-y-3 p-5">
               <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-muted-foreground">
-                <span>Source: {result.insight.source}</span>
+                <span>Sumber: {result.insight.source}</span>
                 <span>Model: {result.insight.modelVersion}</span>
-                <span>Fetched: {new Date(result.fetchedAt).toLocaleDateString("id-ID")}</span>
+                <span>Diambil: {new Date(result.fetchedAt).toLocaleDateString("id-ID")}</span>
               </div>
               <p className="flex gap-2 text-sm font-medium">
                 <CircleHelp className="mt-0.5 size-4 shrink-0 text-amber-600" />
                 Human review diperlukan. Gunakan hasil ini sebagai bahan persiapan interview, bukan keputusan hire/reject.
               </p>
-              <p className="text-sm text-muted-foreground">Next step: {result.insight.followUp}</p>
+              <p className="text-sm text-muted-foreground">Langkah berikutnya: {result.insight.followUp}</p>
             </CardContent>
           </Card>
         </div>
@@ -343,6 +403,7 @@ export default function TalentProfile() {
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
   const [loadedCandidateId, setLoadedCandidateId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [openingConversation, setOpeningConversation] = useState(false);
@@ -362,7 +423,7 @@ export default function TalentProfile() {
   }, [candidateId, dbMode, bootstrapped]);
 
   useEffect(() => {
-    if (!dbMode || !bootstrapped || !/^[0-9a-f-]{36}$/i.test(candidateId)) return;
+    if (!dbMode || !bootstrapped || !UUID_RE.test(candidateId)) return;
     void fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`, { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as { run?: { status?: string } | null };
@@ -385,19 +446,19 @@ export default function TalentProfile() {
     );
 
   if (dbMode && (!bootstrapped || loadedCandidateId !== candidateId))
-    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-muted-foreground" role="status">Memuat profile kandidat dari database...</p></div>;
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-muted-foreground" role="status">Memuat profil kandidat dari database...</p></div>;
 
   if (dbMode && databaseError)
-    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-red-700" role="alert">Profile kandidat belum dapat dimuat. {databaseError}</p><Button className="mt-6" asChild><Link href="/recruiter/discover">Kembali ke pencarian</Link></Button></div>;
+    return <div className="container mx-auto max-w-md px-4 py-16 text-center"><p className="text-sm text-red-700" role="alert">Profil kandidat belum dapat dimuat. {databaseError}</p><Button className="mt-6" asChild><Link href="/search">Kembali ke pencarian</Link></Button></div>;
 
   if (!candidate)
     return (
       <div className="container mx-auto max-w-md px-4 py-16 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">404 / profile missing</p>
-        <h1 className="mt-3 text-3xl font-bold">This profile moved on.</h1>
-        <p className="mt-3 text-muted-foreground">Try another candidate from the network.</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">404 / Profil Tidak Ditemukan</p>
+        <h1 className="mt-3 text-3xl font-bold">Profil ini sudah tidak tersedia.</h1>
+        <p className="mt-3 text-muted-foreground">Coba cari kandidat lain di jaringan talent.</p>
         <Button className="mt-6" asChild>
-          <Link href="/recruiter/discover">Return to search</Link>
+          <Link href="/search">Kembali ke pencarian</Link>
         </Button>
       </div>
     );
@@ -407,8 +468,8 @@ export default function TalentProfile() {
 
   const startScan = () => {
     if (tokens <= 0 && !devBypass) {
-      toast.error("No tokens available", {
-        description: "Add tokens before scanning a new profile.",
+      toast.error("Token tidak mencukupi", {
+        description: "Beli token terlebih dahulu sebelum membuka profil baru.",
       });
       setConfirmOpen(false);
       return;
@@ -422,6 +483,32 @@ export default function TalentProfile() {
   };
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
+  const isShortlisted = shortlisted.includes(candidate.id);
+
+  const copyProfileLink = async () => {
+    const url = window.location.href;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API tidak tersedia");
+      await navigator.clipboard.writeText(url);
+      toast.success("Tautan profil berhasil disalin");
+    } catch {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        if (!document.execCommand("copy")) throw new Error("execCommand gagal");
+        toast.success("Tautan profil berhasil disalin");
+      } catch {
+        toast.error("Tautan gagal disalin", {
+          description: "Browser menolak akses clipboard. Salin manual dari address bar.",
+        });
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -467,18 +554,16 @@ export default function TalentProfile() {
                 variant="secondary"
                 size="icon"
                 onClick={() => toggleShortlist(candidate.id)}
-                aria-label="Toggle shortlist"
+                aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
+                aria-pressed={isShortlisted}
               >
-                <Bookmark className={shortlisted.includes(candidate.id) ? "fill-primary" : ""} />
+                <Bookmark className={isShortlisted ? "fill-primary" : ""} />
               </Button>
               <Button
                 variant="secondary"
                 size="icon"
-                onClick={() => {
-                  navigator.clipboard?.writeText(window.location.href);
-                  toast.success("Profile link copied");
-                }}
-                aria-label="Copy profile link"
+                onClick={() => void copyProfileLink()}
+                aria-label="Salin tautan profil"
               >
                 <Copy />
               </Button>
@@ -492,7 +577,7 @@ export default function TalentProfile() {
           <CardContent className="space-y-8 px-6 py-8 sm:px-10">
             {/* Overview / AI Summary Preview */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Summary / Overview</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Summary / Ringkasan Profil</h3>
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
 
@@ -545,10 +630,10 @@ export default function TalentProfile() {
                       <Check className="size-3.5 text-amber-700" /> Nomor Telepon / WA
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <Check className="size-3.5 text-amber-700" /> CV (PDF Download)
+                      <Check className="size-3.5 text-amber-700" /> CV (Unduh PDF)
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <Check className="size-3.5 text-amber-700" /> LinkedIn Profile
+                      <Check className="size-3.5 text-amber-700" /> Profil LinkedIn
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Check className="size-3.5 text-amber-700" /> Portofolio Lengkap
@@ -556,8 +641,9 @@ export default function TalentProfile() {
                   </div>
 
                   <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-amber-200/60 pt-4">
-                    <span className="font-mono text-sm font-semibold text-amber-950">
-                      Expected range: {candidate.salary}
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-amber-950">
+                      <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+                      Ekspektasi gaji: Tersembunyi — buka profil untuk melihat
                     </span>
                     <Button
                       size="lg"
@@ -578,7 +664,7 @@ export default function TalentProfile() {
             {/* Contact & Links Bar */}
             <div className="rounded-xl border bg-slate-50/80 p-5">
               <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Unlocked Contact &amp; Profiles
+                Kontak &amp; Profil Terbuka
               </p>
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 <div className="flex items-center gap-2 text-sm">
@@ -596,22 +682,22 @@ export default function TalentProfile() {
                 <div className="flex items-center gap-2 text-sm">
                   <Globe className="size-4 text-sky-600 shrink-0" />
                   <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
-                    LinkedIn Profile <ExternalLink className="size-3" />
+                    Profil LinkedIn <ExternalLink className="size-3" />
                   </a>
                 </div>
               </div>
 
               {/* Portfolio & CV buttons */}
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
-                {candidate.portfolio.map((url, idx) => (
-                  <Button key={idx} variant="outline" size="sm" asChild>
+              <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                {candidate.portfolio.map((url) => (
+                  <Button key={url} variant="outline" size="sm" asChild>
                     <a href={url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> Portfolio #{idx + 1}
+                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> {portfolioLabel(url)}
                     </a>
                   </Button>
                 ))}
-                <Button variant="outline" size="sm" onClick={() => toast.info("Mengunduh CV...", { description: `${candidate.name}_CV.pdf` })}>
-                  <FileText className="mr-1.5 size-3.5 text-primary" /> Download CV PDF
+                <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
+                  <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
                 </Button>
                 <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
                   <Link href={completed ? `/recruiter/screenings/${candidate.id}` : `/recruiter/screenings/new?candidateId=${candidate.id}`}>
@@ -631,7 +717,7 @@ export default function TalentProfile() {
             {/* Skills & Tools */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skills</p>
+                <p className="mb-2 text-sm font-semibold">Skill</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">
@@ -709,7 +795,7 @@ export default function TalentProfile() {
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, charge token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, pemotongan token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
                 </div>
                 <Button
                   disabled={openingConversation}
@@ -760,6 +846,93 @@ export default function TalentProfile() {
             <Button disabled={scanning || (tokens <= 0 && !devBypass)} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
               {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CV Preview Dialog */}
+      <Dialog open={cvPreviewOpen} onOpenChange={setCvPreviewOpen}>
+        <DialogContent id="cv-print-sheet" className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <style>{CV_PRINT_CSS}</style>
+          <DialogHeader>
+            <DialogTitle>Pratinjau CV (ATS)</DialogTitle>
+            <DialogDescription>
+              Format satu kolom siap diekspor. Ekspor memakai fitur cetak browser — aplikasi ini demo dan tidak membuat file PDF secara otomatis.
+            </DialogDescription>
+          </DialogHeader>
+
+          <article className="space-y-5 rounded-md border bg-white p-6 text-[#111827]">
+            <header>
+              <h3 className="text-xl font-bold tracking-tight">{candidate.name}</h3>
+              <p className="mt-1 text-sm text-[#374151]">
+                {candidate.role} · {candidate.location} · {candidate.experience} tahun pengalaman
+              </p>
+              <p className="mt-2 break-all text-sm text-[#374151]">
+                {candidate.email} · {candidate.phone} · {candidate.linkedin}
+              </p>
+            </header>
+
+            <div className="flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 font-mono text-xs text-[#374151]">
+              <span>Versi CV: 1.0 · Demo</span>
+              <span>
+                Dibuat:{" "}
+                {new Date().toLocaleString("id-ID", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Ringkasan</h4>
+              <p className="mt-2 text-sm leading-6 text-[#374151]">{candidate.summary}</p>
+            </section>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Skill &amp; Tools</h4>
+              <p className="mt-2 text-sm leading-6 text-[#374151]">
+                <span className="font-semibold">Skill:</span> {candidate.skills.join(", ")}
+              </p>
+              <p className="text-sm leading-6 text-[#374151]">
+                <span className="font-semibold">Tools:</span> {candidate.tools.join(", ")}
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-sm font-semibold uppercase tracking-wider">Pengalaman Kerja</h4>
+              <ul className="mt-2 space-y-2">
+                {candidate.history.map((item) => (
+                  <li key={`${item.company}-${item.role}`} className="text-sm leading-6">
+                    <span className="font-semibold">{item.role}</span>
+                    <span className="text-[#374151]"> — {item.company}</span>
+                    <span className="block font-mono text-xs text-[#374151]">{item.years}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <p className="border-t pt-3 text-xs text-[#374151]">
+              Dokumen demo yang dihasilkan ProofyLink berdasarkan data profil kandidat di aplikasi.
+            </p>
+          </article>
+
+          <DialogFooter data-print-hide className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setCvPreviewOpen(false)}>
+              Tutup
+            </Button>
+            <Button
+              onClick={() => {
+                toast.info("Dialog cetak dibuka", {
+                  description: "Pilih tujuan \u201CSave as PDF\u201D untuk menyimpan CV ini. Ekspor demo — tidak ada file PDF yang dibuat otomatis.",
+                });
+                window.print();
+              }}
+            >
+              <Printer className="mr-2 size-4" /> Cetak / Simpan sebagai PDF
             </Button>
           </DialogFooter>
         </DialogContent>

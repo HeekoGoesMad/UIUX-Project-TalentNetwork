@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, Download, FileText, Send, Trash2 } from "lucide-react";
+import { Bookmark, Check, Download, FileText, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { candidates } from "@/data/candidates";
 import { useApp } from "@/providers/app-provider";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/shared/empty-state";
 
 const consentLabels: Record<string, { label: string; className: string }> = {
   "pending-candidate-consent": { label: "Menunggu consent", className: "border-amber-200 bg-amber-50 text-amber-800" },
@@ -55,13 +56,13 @@ export default function Shortlist() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col justify-between gap-4 border-b pb-7 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Recruiter workspace</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Workspace Recruiter</p>
           <h1 className="mt-2 text-3xl font-bold">Shortlist</h1>
           <p className="mt-2 text-muted-foreground">Pilih kandidat untuk mengatur consent dan langkah screening berikutnya.</p>
         </div>
         {list.length > 0 && (
           <Button variant="outline" onClick={exportCsv}>
-            <Download className="size-4" /> Export CSV
+            <Download className="size-4" /> Ekspor CSV
           </Button>
         )}
       </div>
@@ -92,7 +93,7 @@ export default function Shortlist() {
                   <div>
                     <p className="font-semibold">{candidate.name}</p>
                     <p className="text-sm text-muted-foreground">{candidate.role} · {candidate.location}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{selectable ? "Shortlisted" : "Profile dibuka"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{selectable ? "Dalam Shortlist" : "Profil dibuka"}</p>
                   </div>
                   <div className="relative">
                     <FileText className="absolute left-3 top-3 size-4 text-muted-foreground" />
@@ -126,9 +127,11 @@ export default function Shortlist() {
           })}
         </div>
       ) : (
-        <div className="mt-8 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {dbMode && remoteItems.length ? "Profil kandidat shortlist tidak ditemukan di database." : "Belum ada kandidat di shortlist."}
-        </div>
+        <EmptyState
+          icon={Bookmark}
+          title={dbMode && remoteItems.length ? "Profil kandidat shortlist tidak ditemukan di database." : "Belum ada kandidat di shortlist."}
+          className="mt-8 border-dashed"
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

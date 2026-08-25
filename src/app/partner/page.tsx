@@ -21,7 +21,22 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { candidates } from "@/data/candidates";
+
+// ── Mock partner data ──────────────────────────────────────────────────────────
+const PARTNER_STATS = [
+  { label: "Total Mahasiswa Terdaftar", value: "1.847", icon: Users, color: "text-slate-700", bg: "bg-slate-100", trend: "+124 bulan ini" },
+  { label: "Campus Verified Talent", value: "412", icon: BadgeCheck, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+38 bulan ini" },
+  { label: "Employer Aktif Mengakses", value: "67", icon: Building2, color: "text-sky-600", bg: "bg-sky-50", trend: "+12 bulan ini" },
+  { label: "Tingkat Penempatan", value: "73%", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "+5% dari kuartal lalu" },
+];
+
+const RECENT_TALENT = [
+  { name: "Anya Fitriani", program: "Teknik Informatika", year: "2024", status: "Terverifikasi", unlocked: 3 },
+  { name: "Budi Hartono", program: "Manajemen Bisnis", year: "2024", status: "Terverifikasi", unlocked: 1 },
+  { name: "Citra Maharani", program: "Desain Komunikasi Visual", year: "2023", status: "Terverifikasi", unlocked: 5 },
+  { name: "Dian Purnomo", program: "Sistem Informasi", year: "2024", status: "Menunggu", unlocked: 0 },
+  { name: "Eko Prasetyo", program: "Akuntansi", year: "2023", status: "Terverifikasi", unlocked: 2 },
+];
 
 const RECENT_EMPLOYERS = [
   { name: "Gojek", industry: "Tech / Superapp", accessed: "2 jam lalu", talent: 12 },
@@ -80,7 +95,7 @@ export default function PartnerDashboardPage() {
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-slate-500">
-              <GraduationCap className="size-4 text-[#7C3AED]" /> Career Center Partnership
+              <GraduationCap className="size-4" /> Kemitraan Career Center
             </p>
             <h1 className="mt-3 text-3xl font-bold text-[#1A1A2E]">
               Selamat datang, {institutionName}
@@ -141,7 +156,7 @@ export default function PartnerDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <BadgeCheck className="size-4 text-emerald-600" /> Talent Kampus Terkini
+                <BadgeCheck className="size-4 text-emerald-600" /> Talent Kampus Terverifikasi
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/partner/talent" className="text-xs text-muted-foreground">
@@ -187,7 +202,7 @@ export default function PartnerDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Briefcase className="size-4 text-sky-600" /> Employer Access
+                <Briefcase className="size-4 text-sky-600" /> Akses Employer
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/partner/employers" className="text-xs text-muted-foreground">
@@ -226,7 +241,7 @@ export default function PartnerDashboardPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <BarChart3 className="size-4 text-slate-500" /> Placement Analytics
+                <BarChart3 className="size-4 text-slate-500" /> Analisis Penempatan Kerja
                 <Badge variant="outline" className="ml-auto text-xs text-muted-foreground">Periode: 2024</Badge>
               </CardTitle>
             </CardHeader>
@@ -305,7 +320,7 @@ export default function PartnerDashboardPage() {
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                 {[
-                  { href: "/partner/talent", icon: BadgeCheck, label: "Verifikasi Talent Baru", desc: "4 pending verifikasi", color: "text-emerald-600", bg: "bg-emerald-50" },
+                  { href: "/partner/talent", icon: BadgeCheck, label: "Verifikasi Talent Baru", desc: "4 menunggu verifikasi", color: "text-emerald-600", bg: "bg-emerald-50" },
                   { href: "/partner/employers", icon: Building2, label: "Employer Baru", desc: "2 employer mendaftar", color: "text-sky-600", bg: "bg-sky-50" },
                   { href: "/partner/analytics", icon: BarChart3, label: "Unduh Laporan", desc: "Placement Q2 2024", color: "text-slate-700", bg: "bg-slate-100" },
                   { href: "/search", icon: Users, label: "Jelajahi Talent Pool", desc: "Semua talent aktif", color: "text-amber-600", bg: "bg-amber-50" },
