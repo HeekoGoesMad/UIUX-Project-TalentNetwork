@@ -22,9 +22,10 @@ export function SiteHeader() {
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 20) {
+      const y = window.scrollY;
+      if (y > 35) {
         setScrolled(true);
-      } else {
+      } else if (y < 15) {
         setScrolled(false);
       }
     };
@@ -68,18 +69,18 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-500 ease-in-out px-3 sm:px-6 pt-2 sm:pt-3 pointer-events-none",
+        "sticky top-0 z-50 w-full transition-all duration-300 ease-out px-3 sm:px-6 pt-2 sm:pt-3 pointer-events-none",
         isLanding && "-mb-16 sm:-mb-20"
       )}
     >
       <div
         className={cn(
-          "mx-auto flex items-center justify-between transition-all duration-500 ease-in-out pointer-events-auto",
+          "mx-auto flex h-14 items-center justify-between transition-all duration-300 ease-out pointer-events-auto",
           scrolled
-            ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 py-2 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
+            ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
             : isOverDarkHeader
-            ? "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-dark-top text-white"
-            : "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-top text-[#0a1628]"
+            ? "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-dark-top text-white"
+            : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-[#0a1628]"
         )}
       >
         {/* Logo */}
