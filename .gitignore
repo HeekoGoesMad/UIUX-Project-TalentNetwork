@@ -10,8 +10,9 @@
 !.yarn/releases
 !.yarn/versions
 
-# agent skills
+# agents
 .agents/
+opencode.json
 
 # testing & playwright
 /coverage
