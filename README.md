@@ -43,7 +43,7 @@
 
 * **Framework:** [Next.js 16 (App Router)](https://nextjs.org) with React 19
 * **Styling:** [Tailwind CSS v4](https://tailwindcss.com) with `@tailwindcss/postcss` & CSS variables
-* **UI Components:** [Radix UI](https://www.radix-ui.com/), Custom Design System (Geist Font, Sonner Toasts, Lucide Icons)
+* **UI Components:** [Radix UI](https://www.radix-ui.com/), Custom Design System (Plus Jakarta Sans + JetBrains Mono, Sonner Toasts, Lucide Icons)
 * **AI & Machine Learning:** [Vercel AI SDK](https://sdk.vercel.ai/) integrated with [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) (`gpt-4o`) with automatic fallback to structured mock responses
 * **Validation & Types:** [Zod](https://zod.dev/), [TypeScript](https://www.typescriptlang.org/)
 
@@ -53,7 +53,7 @@
 
 ### Prerequisites
 * Node.js >= 20.0.0
-* npm, pnpm, or yarn
+* npm
 
 ### Installation
 
@@ -82,22 +82,39 @@
 
 ## 🔐 Environment Variables
 
-Create a `.env.local` file with the following keys:
+Create a `.env.local` file from `.env.example` with the keys below.
 
-```env
-# AI Provider ('azure' or 'mock')
-AI_PROVIDER=azure
+| Variable | Scope | Visibility | When Needed |
+| :--- | :--- | :--- | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Build + Runtime | Public (inlined into client bundle) | Always — Supabase auth & client |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Build + Runtime | Public (inlined into client bundle) | Always — Supabase auth & client |
+| `DATABASE_URL` | Runtime | Private (server-only) | Drizzle migrations, DB queries, `/api/health`; pooled Supabase Postgres connection string |
+| `DEV_AUTH_BYPASS` | Runtime | Private (server-only) | Dev only — bypasses email verification/token charges; hard-fails in production |
+| `NEXT_PUBLIC_DEMO_MODE` | Build + Runtime | Public (client demo affordances) | Dev only — free talent scans, instant demo registrations |
+| `DEV_TOKEN_GRANT_ENABLED` | Runtime | Private (server-only) | Dev only — enables `POST /api/dev/token-grant` |
+| `AI_PROVIDER` | Runtime | Private (server-only) | `mock` \| `local` \| `azure` (default: azure); falls back to mock data if unset |
+| `LOCAL_AI_BASE_URL` / `LOCAL_AI_MODEL` / `LOCAL_AI_API_KEY` | Runtime | Private (server-only) | Only when `AI_PROVIDER=local` (Ollama / LM Studio / OpenAI-compatible server) |
+| `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | Runtime | Private (server-only) | Only when `AI_PROVIDER=azure` |
+| `E2E_RECRUITER_EMAIL` / `E2E_RECRUITER_PASSWORD` | Local e2e only | Private | Running `npm run test:e2e` locally — never set in deployed environments |
+| `E2E_CANDIDATE_EMAIL` / `E2E_CANDIDATE_PASSWORD` | Local e2e only | Private | Running `npm run test:e2e` locally — never set in deployed environments |
+| `E2E_BASE_URL` | Local e2e only | Private | Target for e2e runs (defaults to `http://localhost:3000`) |
 
-# Azure OpenAI Credentials (Required if AI_PROVIDER=azure)
-AZURE_OPENAI_ENDPOINT=https://<your-resource-name>.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT=<your-deployment-name>
-AZURE_OPENAI_API_KEY=<your-api-key>
-AZURE_OPENAI_API_VERSION=2024-08-01-preview
-```
+> **Note:** If `AI_PROVIDER` is set to `mock` or credentials are missing, the system gracefully falls back to structured mock data powered by Zod schemas. The production build requires no env secrets (guards fail closed).
 
-> **Note:** If `AI_PROVIDER` is set to `mock` or credentials are missing, the system gracefully falls back to structured mock data powered by Zod schemas.
+---
 
-## Database and Authentication
+## ▲ Deployment (Vercel)
+
+Deployment is push-to-deploy via Vercel:
+
+1. Import the repository into Vercel (framework auto-detected as Next.js).
+2. Configure environment variables in **Project Settings → Environment Variables** (see table above).
+3. Every branch/PR gets an automatic **preview deployment**; merging to the production branch triggers a **production deployment**.
+4. CI (`.github/workflows/ci.yml`) runs lint, typecheck, and build on every push and PR — builds require no env secrets.
+
+---
+
+## 🗄️ Database and Authentication
 
 The first database phase uses Supabase Auth and PostgreSQL with Drizzle ORM.
 
@@ -156,6 +173,12 @@ Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations commit
 | `npm run build` | Builds the production bundle |
 | `npm run start` | Starts the production server |
 | `npm run lint` | Runs ESLint code quality checks |
+| `npm run db:generate` | Generates SQL migrations from the Drizzle schema |
+| `npm run db:migrate` | Applies pending migrations to the database |
+| `npm run db:check` | Validates migrations for drift/conflicts |
+| `npm run test:e2e` | Runs cross-account e2e flow tests (local, pre-release only) |
+
+> E2E tests need a live Supabase instance with a seeded database and `E2E_*` credentials — they are excluded from CI and must be run locally against staging before a release (see [docs/runbook.md](docs/runbook.md)).
 
 ---
 

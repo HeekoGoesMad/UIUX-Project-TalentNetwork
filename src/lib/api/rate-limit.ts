@@ -4,6 +4,7 @@ const MAX_ENTRIES = 1000;
 
 export const RATE_LIMITS = {
   ai: { limit: 30, windowMs: 60_000 },
+  aiDaily: { limit: 100, windowMs: 86_400_000 },
   cvExport: { limit: 5, windowMs: 60_000 },
   cvImport: { limit: 10, windowMs: 60_000 },
   messages: { limit: 30, windowMs: 60_000 },
