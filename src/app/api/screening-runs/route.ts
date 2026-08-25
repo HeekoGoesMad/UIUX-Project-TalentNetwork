@@ -23,7 +23,10 @@ export async function POST(request: Request) {
     const scope = await getRecruiterScope(current.db, current.user);
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
-    const result = await ScreeningService.startRun(current.db, current.user, scope, payload.data);
+    const result = await ScreeningService.startRun(current.db, current.user, scope, {
+      ...payload.data,
+      idempotencyKey: `${scope.membership.organizationId}:${payload.data.idempotencyKey}`,
+    });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
     return NextResponse.json(result, { status: result.idempotent ? 200 : 201 });

@@ -1,7 +1,0 @@
-[build]
-  command = "npm run build"
-  publish = ".next"
-
-[build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "AI_PROVIDER,AZURE_OPENAI_API_KEY,AZURE_OPENAI_ENDPOINT"
-  SECRETS_SCAN_OMIT_PATHS = ".next/**,.netlify/**,.agents/"

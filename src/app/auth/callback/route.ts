@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     if (role !== result.role) return NextResponse.redirect(new URL("/login?error=Role+akun+tidak+valid", requestUrl.origin));
     return NextResponse.redirect(new URL(destination, requestUrl.origin));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Verifikasi email gagal.";
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, requestUrl.origin));
+    console.error("Verifikasi email gagal:", error);
+    return NextResponse.redirect(new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin));
   }
 }

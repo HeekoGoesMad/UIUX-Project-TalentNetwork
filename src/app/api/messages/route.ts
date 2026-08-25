@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
 import { MessagingService } from "@/lib/services/messaging";
 
 const messageSchema = z.object({
@@ -46,6 +47,14 @@ export async function POST(request: Request) {
   try {
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    const rate = enforceRateLimit(`messages:${current.user.id}`, RATE_LIMITS.messages.limit, RATE_LIMITS.messages.windowMs);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Terlalu banyak permintaan. Coba lagi sebentar." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+      );
+    }
 
     const result = await MessagingService.sendMessage(
       current.db,
