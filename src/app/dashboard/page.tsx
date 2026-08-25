@@ -46,16 +46,16 @@ export default function Dashboard() {
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-slate-500">
-              <ShieldCheck className="size-4" /> Recruiter workspace
+              <ShieldCheck className="size-4" /> Workspace Recruiter
             </p>
             <h1 className="mt-3 text-3xl font-bold text-[#1A1A2E]">
               Selamat datang kembali, {user?.name || "Recruiter"}.
             </h1>
-            <p className="mt-2 text-muted-foreground">Pick up the thread with the right talent.</p>
+            <p className="mt-2 text-muted-foreground">Lanjutkan pencarian dengan talent yang tepat.</p>
           </div>
           <Button asChild>
             <Link href="/search">
-              <Search className="size-4" /> Search talent
+              <Search className="size-4" /> Cari Talent
             </Link>
           </Button>
         </div>
@@ -63,12 +63,12 @@ export default function Dashboard() {
         {tokens <= 5 && (
           <div className="mt-6 flex flex-col justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm sm:flex-row sm:items-center">
             <div>
-              <p className="font-semibold text-amber-950">Token balance hampir habis</p>
-              <p className="mt-1 text-amber-900/80">Tersisa {tokens} token untuk unlock profile.</p>
+              <p className="font-semibold text-amber-950">Saldo token hampir habis</p>
+              <p className="mt-1 text-amber-900/80">Tersisa {tokens} token untuk membuka profil.</p>
             </div>
             <Button variant="outline" asChild>
               <Link href="/pricing">
-                Add tokens <ArrowRight className="size-4" />
+                Beli token <ArrowRight className="size-4" />
               </Link>
             </Button>
           </div>
@@ -87,25 +87,25 @@ export default function Dashboard() {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <Card>
                 <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground">Token balance</p>
+                  <p className="text-sm text-muted-foreground">Saldo Token</p>
                   <p className="mt-2 flex items-center gap-2 font-mono text-4xl font-bold">
                     <WalletCards className="size-7 text-[#7C3AED]" />
                     {tokens}
                   </p>
                   <Link href="/pricing" className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">
-                    Get more tokens <ArrowRight className="ml-1 size-4" />
+                    Beli lebih banyak token <ArrowRight className="ml-1 size-4" />
                   </Link>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground">Profiles unlocked</p>
+                  <p className="text-sm text-muted-foreground">Profil Dibuka</p>
                   <p className="mt-2 text-4xl font-bold">{scans.length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground">Shortlisted</p>
+                  <p className="text-sm text-muted-foreground">Dalam Shortlist</p>
                   <p className="mt-2 text-4xl font-bold">{shortlisted.length}</p>
                 </CardContent>
               </Card>
@@ -114,7 +114,7 @@ export default function Dashboard() {
             <section className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_.8fr]">
               <Card>
                 <CardHeader>
-                  <CardTitle>Continue where you left off</CardTitle>
+                  <CardTitle>Lanjutkan Aktivitas Terakhir</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {recent.length ? (
@@ -137,12 +137,12 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="rounded-xl bg-slate-50 p-5">
-                      <p className="font-medium">Your workspace is ready.</p>
+                      <p className="font-medium">Workspace Anda sudah siap.</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Search the network to find candidates, then come back here to continue.
+                        Cari kandidat di jaringan talent, lalu kembali ke sini untuk melanjutkan.
                       </p>
                       <Button className="mt-4" size="sm" asChild>
-                        <Link href="/search">Start searching</Link>
+                        <Link href="/search">Mulai mencari</Link>
                       </Button>
                     </div>
                   )}
@@ -150,7 +150,7 @@ export default function Dashboard() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent scans</CardTitle>
+                  <CardTitle>Riwayat Buka Profil</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {scanned.length ? (
@@ -164,7 +164,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
-                      No scans yet. A preview is free; scan only when you need the full context.
+                      Belum ada profil yang dibuka. Pratinjau gratis; buka profil saat Anda membutuhkan konteks lengkap.
                     </p>
                   )}
                 </CardContent>
@@ -174,7 +174,7 @@ export default function Dashboard() {
             <section className="mt-5">
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent shortlist</CardTitle>
+                  <CardTitle>Shortlist Terbaru</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {shortlist.length ? (
@@ -188,7 +188,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">
-                      Nothing shortlisted yet. Save a promising preview or unlocked profile to build your working set.
+                      Belum ada kandidat di shortlist. Simpan pratinjau profil potensial untuk memudahkan proses rekrutmen.
                     </p>
                   )}
                 </CardContent>

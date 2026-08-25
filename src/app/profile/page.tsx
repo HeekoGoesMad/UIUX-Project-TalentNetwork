@@ -67,9 +67,9 @@ function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: numb
   if (!p.headline) missing.push("Headline");
   if (!p.experience.length) missing.push("Pengalaman Kerja");
   if (!p.education.length) missing.push("Pendidikan");
-  if (!p.skills.length) missing.push("Skills");
+  if (!p.skills.length) missing.push("Skill");
   if (!p.tools.length) missing.push("Tools");
-  if (!p.portfolio.length) missing.push("Portfolio");
+  if (!p.portfolio.length) missing.push("Portofolio");
   const total = 7;
   const filled = total - missing.length;
   return { pct: Math.round((filled / total) * 100), missing };
@@ -180,14 +180,14 @@ export default function ProfilePage() {
         {/* Page header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Candidate profile</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Profil Kandidat</p>
             <h1 className="mt-2 text-3xl font-bold text-[#111827]">Profil kamu</h1>
             <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
           </div>
           <Button variant="outline" asChild>
             <Link href="/candidate">
               <Pencil className="size-4" />
-              Edit profile
+              Edit profil
             </Link>
           </Button>
         </div>
@@ -248,7 +248,7 @@ export default function ProfilePage() {
                         className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border bg-white p-1.5 shadow-xl"
                       >
                         <p className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Career Status
+                          Status Karier
                         </p>
                         {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
                           const cfg = CAREER_STATUS_CONFIG[key];
@@ -344,7 +344,7 @@ export default function ProfilePage() {
             {/* Profile completeness */}
             <Card>
               <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">Profile completeness</p>
+                <p className="text-sm text-muted-foreground">Kelengkapan Profil</p>
                 <p className="mt-2 text-3xl font-bold text-[#111827]">{pct}%</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
@@ -362,7 +362,7 @@ export default function ProfilePage() {
 
             {/* Skills */}
             {p.skills.length > 0 && (
-              <ProfileSection title="Skills">
+              <ProfileSection title="Skill">
                 <div className="flex flex-wrap gap-2">
                   {p.skills.map((skill) => (
                     <span
@@ -394,7 +394,7 @@ export default function ProfilePage() {
             )}
 
             {/* Portfolio */}
-            <ProfileSection title="Portfolio">
+            <ProfileSection title="Portofolio">
               {p.portfolio.length > 0 ? (
                 <div className="space-y-2">
                   {p.portfolio.map((item, i) => (
@@ -414,10 +414,10 @@ export default function ProfilePage() {
               ) : (
                 <div className="rounded-xl border border-dashed p-5 text-center">
                   <BriefcaseBusiness className="mx-auto size-6 text-[#7C3AED]" />
-                  <p className="mt-2 text-sm font-semibold">Showcase your work</p>
+                  <p className="mt-2 text-sm font-semibold">Tampilkan karya terbaikmu</p>
                   <p className="mt-1 text-xs text-muted-foreground">Tambahkan case study terbaikmu.</p>
                   <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/candidate">Tambah portfolio</Link>
+                    <Link href="/candidate">Tambah portofolio</Link>
                   </Button>
                 </div>
               )}

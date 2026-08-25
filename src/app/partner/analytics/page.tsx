@@ -33,9 +33,9 @@ const PLACEMENT_BY_PROGRAM = [
 ];
 
 const BUSINESS_IMPACT = [
-  { term: "Short Term", color: "border-sky-200 bg-sky-50/60", dot: "bg-sky-500", items: ["Menambah supply fresh graduate ke talent pool", "Menambah jumlah talent aktif di platform"] },
-  { term: "Mid Term", color: "border-slate-200 bg-slate-50/60", dot: "bg-[#7C3AED]", items: ["Menjadi platform employability kampus", "Menarik recruiter fokus fresh graduate"] },
-  { term: "Long Term", color: "border-emerald-200 bg-emerald-50/60", dot: "bg-emerald-500", items: ["Menjadi jaringan talent nasional berbasis kampus", "Talent Intelligence & Employability Ecosystem"] },
+  { term: "Jangka Pendek", color: "border-sky-200 bg-sky-50/60", dot: "bg-sky-500", items: ["Menambah supply fresh graduate ke talent pool", "Menambah jumlah talent aktif di platform"] },
+  { term: "Jangka Menengah", color: "border-slate-200 bg-slate-50/60", dot: "bg-[#7C3AED]", items: ["Menjadi platform employability kampus", "Menarik recruiter fokus fresh graduate"] },
+  { term: "Jangka Panjang", color: "border-emerald-200 bg-emerald-50/60", dot: "bg-emerald-500", items: ["Menjadi jaringan talent nasional berbasis kampus", "Talent Intelligence & Employability Ecosystem"] },
 ];
 
 export default function PartnerAnalyticsPage() {
@@ -51,7 +51,7 @@ export default function PartnerAnalyticsPage() {
         <div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-slate-500">
-              <BarChart3 className="size-4" /> Placement Analytics
+              <BarChart3 className="size-4" /> Analisis Penempatan Kerja
             </p>
             <h1 className="mt-2 text-3xl font-bold text-[#1A1A2E]">Laporan Penempatan</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -111,7 +111,7 @@ export default function PartnerAnalyticsPage() {
                     </div>
                     <div>
                       <div className="mb-1 flex justify-between text-xs">
-                        <span className="text-muted-foreground">Verified</span>
+                        <span className="text-muted-foreground">Terverifikasi</span>
                         <span className="font-mono font-semibold text-sky-600">{d.verified}</span>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -120,7 +120,7 @@ export default function PartnerAnalyticsPage() {
                     </div>
                     <div className="pt-1 border-t">
                       <div className="flex justify-between text-xs">
-                        <span className="font-medium text-muted-foreground">Placement Rate</span>
+                        <span className="font-medium text-muted-foreground">Tingkat Penempatan</span>
                         <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-1.5">{d.rate}</Badge>
                       </div>
                     </div>
@@ -163,7 +163,7 @@ export default function PartnerAnalyticsPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="size-4 text-[#7C3AED]" /> Business Impact ProofyLink
+                <TrendingUp className="size-4 text-[#7C3AED]" /> Dampak Bisnis ProofyLink
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">

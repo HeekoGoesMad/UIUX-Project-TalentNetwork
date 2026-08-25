@@ -68,7 +68,7 @@ export function AiSummaryCard({
             className="h-8 px-3 text-xs text-[#DDD6FE] hover:bg-white/10 hover:text-white"
           >
             <RefreshCw className={cn("mr-1.5 size-3.5", loading && "animate-spin")} />
-            {loading ? "Generat..." : "Regenerate AI"}
+            {loading ? "Memproses..." : "Regenerasi AI"}
           </Button>
         )}
       </div>

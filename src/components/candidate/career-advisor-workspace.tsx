@@ -223,7 +223,7 @@ export function CareerAdvisorWorkspace() {
                     {cvProfile?.fullName || "Profil kamu"}
                   </h2>
                   <Badge variant="outline" className="border-[#19a974]/40 bg-[#e6f7f0] text-[#08744f]">
-                    Ready to Improve
+                    Siap Ditingkatkan
                   </Badge>
                 </div>
                 <p className="mt-1 text-sm font-medium text-[#0f2040]">{headline}</p>
@@ -235,7 +235,7 @@ export function CareerAdvisorWorkspace() {
 
             <Link href="/candidate/cv">
               <Button variant="outline" size="sm" className="gap-2 border-[#19a974] text-[#08744f] hover:bg-[#e6f7f0]">
-                <FileText className="size-4" /> Edit CV Workspace
+                <FileText className="size-4" /> Edit di CV Workspace
               </Button>
             </Link>
           </div>
@@ -320,11 +320,11 @@ export function CareerAdvisorWorkspace() {
           <div className="no-print flex items-center justify-between border-b pb-4">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-[#19a974]/40 bg-[#f0fdf9] text-[#08744f] gap-1 px-3 py-1">
-                <Sparkles className="size-3.5" /> Result Analysis Ready
+                <Sparkles className="size-3.5" /> Hasil Analisis Siap
               </Badge>
               {isStreaming && (
                 <span className="flex items-center gap-1.5 text-xs text-[#08744f] font-mono animate-pulse">
-                  <span className="inline-block size-2 rounded-full bg-[#19a974]" /> Generating live... ({streamProgress}%)
+                  <span className="inline-block size-2 rounded-full bg-[#19a974]" /> Menghasilkan... ({streamProgress}%)
                 </span>
               )}
             </div>
@@ -335,7 +335,7 @@ export function CareerAdvisorWorkspace() {
               size="sm"
               className="gap-2 border-[#0f2040]/30 text-[#0f2040] hover:bg-[#f0f6fd]"
             >
-              <Download className="size-4 text-[#08744f]" /> Unduh PDF Analysis
+              <Download className="size-4 text-[#08744f]" /> Unduh Analisis PDF
             </Button>
           </div>
 
@@ -421,7 +421,7 @@ export function CareerAdvisorWorkspace() {
               <h2 className="text-xl font-bold text-[#0f2040] flex items-center gap-2">
                 <TrendingUp className="size-5 text-[#19a974]" /> Evaluasi 5 Pilar Kesiapan Profil
               </h2>
-              <span className="text-xs text-muted-foreground">Standardized HR & ATS Benchmark</span>
+              <span className="text-xs text-muted-foreground">Standar Benchmark HR &amp; ATS</span>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -584,14 +584,14 @@ export function CareerAdvisorWorkspace() {
           <div className="rounded-xl border bg-muted/60 p-4 text-xs text-muted-foreground space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
               <span className="font-mono uppercase tracking-wider text-[#08744f] font-semibold flex items-center gap-1">
-                <Bot className="size-3.5" /> AI Draft Notice
+                <Bot className="size-3.5" /> Pemberitahuan Draf AI
               </span>
               <div className="flex items-center gap-2 text-[11px]">
-                <span>Source: <strong className="uppercase">{result.source}</strong></span>
+                <span>Sumber: <strong className="uppercase">{result.source}</strong></span>
                 <span>•</span>
                 <span>Model: <strong>{result.modelVersion}</strong></span>
                 <span>•</span>
-                <span>Coverage: <strong>Profile Context</strong></span>
+                <span>Cakupan: <strong>Konteks Profil</strong></span>
               </div>
             </div>
             <div className="space-y-1">

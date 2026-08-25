@@ -22,9 +22,10 @@ export function SiteHeader() {
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 20) {
+      const y = window.scrollY;
+      if (y > 35) {
         setScrolled(true);
-      } else {
+      } else if (y < 15) {
         setScrolled(false);
       }
     };
@@ -37,7 +38,7 @@ export function SiteHeader() {
   // Navigation links based on route and auth state
   const links = isPublicHeader
     ? [
-        { href: isLanding ? "#features" : "/#features", label: "Fitur Utuh" },
+        { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
         { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
         { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
         { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
@@ -45,20 +46,20 @@ export function SiteHeader() {
     : visibleUser?.role === "candidate"
     ? [
         { href: "/candidate", label: "Workspace" },
-        { href: "/candidate/cv", label: "CV & Profile" },
+        { href: "/candidate/cv", label: "CV & Profil" },
          { href: "/candidate/career-advisor", label: "Career Advisor" },
-         { href: "/candidate/contact-requests", label: "Permintaan kontak" },
+         { href: "/candidate/contact-requests", label: "Permintaan Kontak" },
          { href: "/messages", label: "Pesan" },
       ]
     : visibleUser?.role === "partner"
     ? [
         { href: "/partner", label: "Dashboard" },
-        { href: "/partner/talent", label: "Campus Talent" },
-        { href: "/partner/employers", label: "Employer Access" },
-        { href: "/partner/analytics", label: "Analytics" },
+        { href: "/partner/talent", label: "Talent Kampus" },
+        { href: "/partner/employers", label: "Akses Employer" },
+        { href: "/partner/analytics", label: "Analitik" },
       ]
     : [
-        { href: "/search", label: "Search talent" },
+        { href: "/search", label: "Cari Talent" },
          { href: "/shortlist", label: "Shortlist" },
          { href: "/recruiter/screenings/new", label: "Screening" },
          { href: "/messages", label: "Pesan" },
@@ -68,18 +69,18 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-500 ease-in-out px-3 sm:px-6 pt-2 sm:pt-3 pointer-events-none",
+        "sticky top-0 z-50 w-full transition-all duration-300 ease-out px-3 sm:px-6 pt-2 sm:pt-3 pointer-events-none",
         isLanding && "-mb-16 sm:-mb-20"
       )}
     >
       <div
         className={cn(
-          "mx-auto flex items-center justify-between transition-all duration-500 ease-in-out pointer-events-auto",
+          "mx-auto flex h-14 items-center justify-between transition-all duration-300 ease-out pointer-events-auto",
           scrolled
-            ? "max-w-4xl sm:max-w-5xl rounded-full px-4 sm:px-6 py-2.5 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
+            ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
             : isOverDarkHeader
-            ? "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-dark-top text-white"
-            : "max-w-7xl rounded-full px-4 sm:px-6 py-3.5 liquid-glass-top text-[#0a1628]"
+            ? "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-dark-top text-white"
+            : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-[#0a1628]"
         )}
       >
         {/* Logo */}
@@ -93,18 +94,18 @@ export function SiteHeader() {
                 : "/dashboard"
               : "/"
           }
-          className="flex items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
+          className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
         >
           <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
             <ShieldCheck className="size-5" />
           </span>
-          <span className={cn("text-lg font-bold", isOverDarkHeader ? "text-white" : "text-[#111827]")}>
+          <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-[#111827]")}>
             Proofy<span className="text-[#7C3AED]">Link</span>
           </span>
         </Link>
 
         {/* Desktop Nav Links */}
-        <nav className="hidden items-center gap-1 text-sm font-medium md:flex">
+        <nav className="hidden shrink-0 items-center gap-1 text-xs lg:text-sm font-medium md:flex">
           {links.map((link) => {
             const isAnchor = link.href.startsWith("#") || link.href.includes("#");
             return isAnchor ? (
@@ -112,7 +113,7 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-full px-4 py-2 transition-colors duration-200",
+                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-white"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
@@ -125,7 +126,7 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-full px-4 py-2 transition-colors duration-200",
+                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
@@ -139,12 +140,14 @@ export function SiteHeader() {
         </nav>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {!isPublicHeader && (
-            <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex" asChild>
-              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"}>
-                <Search className="size-4" />
-                {visibleUser?.role === "candidate" ? "Explore jobs" : "Search talent"}
+            <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
+              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"} className="flex items-center gap-1.5">
+                <Search className="size-3.5" />
+                <span className="hidden xl:inline text-xs">
+                  {visibleUser?.role === "candidate" ? "Eksplorasi lowongan" : "Cari talent"}
+                </span>
               </Link>
             </Button>
           )}
@@ -152,7 +155,7 @@ export function SiteHeader() {
           {visibleUser?.role === "partner" && (
             <Link
               href="/partner"
-              className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
+              className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
               <GraduationCap className="size-4 text-[#7C3AED]" />
               <span className="hidden text-muted-foreground sm:inline text-xs">Career Center</span>
@@ -162,18 +165,18 @@ export function SiteHeader() {
           {visibleUser?.role === "recruiter" && (
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
+              className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
               <WalletCards className="size-4 text-[#7C3AED]" />
               <span className="font-mono">{devBypass ? "∞" : tokens}</span>
-              <span className="hidden text-muted-foreground sm:inline">tokens</span>
+              <span className="hidden text-muted-foreground sm:inline">token</span>
             </Link>
           )}
 
           {visibleUser && (() => {
             const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href="/notifications" className="relative flex size-9 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+              <Link href="/notifications" className="relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-[#0a1628] shadow-xs transition-colors hover:bg-[#e3f5ed]" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
                 <Bell className="size-4" />
                 {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#19a974] text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
@@ -184,19 +187,19 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn("rounded-full", isOverDarkHeader && "text-white hover:bg-white/10")}
-              aria-label="Log out"
+              className={cn("rounded-full shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+              aria-label="Keluar dari akun"
               onClick={logout}
             >
               <LogOut className="size-4" />
             </Button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {pathname === "/login" ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full font-medium transition-all border-white/20 bg-white/10 text-slate-800 hover:bg-slate-100 px-4"
+                  className="rounded-full font-medium transition-all border-white/20 bg-white/10 text-slate-800 hover:bg-slate-100 px-4 whitespace-nowrap"
                   asChild
                 >
                   <Link href="/register">
@@ -209,7 +212,7 @@ export function SiteHeader() {
                   variant="default"
                   size="sm"
                   className={cn(
-                    "rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9",
+                    "rounded-full font-medium transition-all shadow-sm px-3 sm:px-4 text-xs sm:text-sm h-9 sm:h-9 whitespace-nowrap",
                     isOverDarkHeader
                       ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
                       : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
@@ -229,8 +232,8 @@ export function SiteHeader() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("rounded-full md:hidden", isOverDarkHeader && "text-white hover:bg-white/10")}
-            aria-label={open ? "Close menu" : "Open menu"}
+            className={cn("rounded-full md:hidden shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+            aria-label={open ? "Tutup menu" : "Buka menu"}
             onClick={() => setOpen(!open)}
           >
             {open ? <X /> : <Menu />}

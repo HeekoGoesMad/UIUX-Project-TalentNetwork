@@ -9,8 +9,8 @@ const STEPS = [
   },
   {
     step: "02",
-    title: "Unlock Dengan 1 Token",
-    desc: "Saat menemukan profil yang cocok, gunakan 1 token untuk membuka kontak lengkap dan resume terverifikasi.",
+    title: "Buka Profil dengan 1 Token",
+    desc: "Saat menemukan profil yang cocok, gunakan 1 token untuk membuka kontak lengkap dan portofolio terverifikasi.",
     icon: WalletCards,
   },
   {

@@ -4,4 +4,49 @@ import { Bot, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-export function AiTool({ title, description, endpoint }: { title: string; description: string; endpoint: string }) { const { cvProfile } = useApp(); const [result, setResult] = useState<Record<string, unknown> | null>(null); const [loading, setLoading] = useState(false); async function run() { setLoading(true); const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ headline: cvProfile?.headline || "Senior Product Designer", about: cvProfile?.about || "Product designer", targetRole: cvProfile?.targetRole || "Product Designer", skills: cvProfile?.skills || ["Product design", "Research"] }) }); setResult(await response.json()); setLoading(false); } return <div className="container mx-auto max-w-4xl px-4 py-8"><p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]"><Sparkles className="size-4" /> AI workspace</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 text-muted-foreground">{description}</p><Card className="mt-8"><CardContent className="p-6"><Button onClick={() => void run()} disabled={loading}>{loading ? "Menyiapkan..." : "Generate draft"} <Bot className="size-4" /></Button>{result && <div className="mt-6 space-y-4 rounded-xl bg-muted p-4 text-sm"><pre className="whitespace-pre-wrap font-sans">{JSON.stringify(result, null, 2)}</pre><p className="border-t pt-3 text-xs text-muted-foreground">Source dan limitations ditampilkan agar hasil bisa direview manusia.</p></div>}</CardContent></Card></div>; }
+export function AiTool({ title, description, endpoint }: { title: string; description: string; endpoint: string }) {
+  const { cvProfile } = useApp();
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function run() {
+    setLoading(true);
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        headline: cvProfile?.headline || "Senior Product Designer",
+        about: cvProfile?.about || "Product designer",
+        targetRole: cvProfile?.targetRole || "Product Designer",
+        skills: cvProfile?.skills || ["Product design", "Research"]
+      })
+    });
+    setResult(await response.json());
+    setLoading(false);
+  }
+
+  return (
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
+        <Sparkles className="size-4" /> AI Workspace
+      </p>
+      <h1 className="mt-2 text-3xl font-bold">{title}</h1>
+      <p className="mt-2 text-muted-foreground">{description}</p>
+      <Card className="mt-8">
+        <CardContent className="p-6">
+          <Button onClick={() => void run()} disabled={loading}>
+            {loading ? "Menyiapkan..." : "Buat Draf AI"} <Bot className="size-4" />
+          </Button>
+          {result && (
+            <div className="mt-6 space-y-4 rounded-xl bg-muted p-4 text-sm">
+              <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(result, null, 2)}</pre>
+              <p className="border-t pt-3 text-xs text-muted-foreground">
+                Sumber dan limitasi ditampilkan agar hasil bisa ditinjau manusia.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

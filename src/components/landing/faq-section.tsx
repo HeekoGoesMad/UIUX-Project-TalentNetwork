@@ -6,11 +6,11 @@ import { ChevronDown, HelpCircle } from "lucide-react";
 const FAQS = [
   {
     q: "Bagaimana sistem Token di ProofyLink bekerja?",
-    a: "Pencarian dan pemantauan profil kandidat 100% gratis. Anda hanya menggunakan 1 token saat ingin meng-unlock kontak langsung dan resume lengkap kandidat yang sesuai dengan kriteria rekomendasi Anda.",
+    a: "Pencarian dan pemantauan profil kandidat 100% gratis. Anda hanya menggunakan 1 token saat ingin membuka kontak langsung dan portofolio lengkap kandidat yang sesuai dengan kriteria kebutuhan Anda.",
   },
   {
     q: "Bagaimana ProofyLink menjaga privasi kandidat?",
-    a: "Secara default, profil kandidat ditampilkan dalam bentuk anonim (Private Candidate) dengan sinyal kompetensi & ekspektasi karir. Kontak dan nama lengkap hanya diberikan jika recruiter menggunakan token dan terdapat kualifikasi yang relevan.",
+    a: "Secara default, profil kandidat ditampilkan dalam bentuk anonim (Kandidat Privat) dengan sinyal kompetensi & ekspektasi karir. Kontak dan nama lengkap hanya diberikan jika recruiter menggunakan token dan terdapat kualifikasi yang relevan.",
   },
   {
     q: "Apa perbedaan ProofyLink dibanding platform rekrutmen biasa?",
