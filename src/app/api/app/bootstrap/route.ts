@@ -27,7 +27,7 @@ export async function GET() {
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const membership = current.user.role === "recruiter" ? await getRecruiterScope(current.db, current.user) : null;
-    if (membership && "error" in membership) return NextResponse.json({ error: membership.error }, { status: membership.status });
+    const activeOrgId = membership && !("error" in membership) ? membership.membership.organizationId : null;
 
     const [profile, candidateProfile, notifications] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
@@ -39,26 +39,26 @@ export async function GET() {
         .where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile[0].id))
       : [];
 
-    const organization = membership && !("error" in membership)
-      ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, membership.membership.organizationId)).limit(1))[0] ?? null
+    const organization = activeOrgId
+      ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, activeOrgId)).limit(1))[0] ?? null
       : null;
-    const shortlists = membership && !("error" in membership)
-      ? (await ShortlistService.list(current.db, membership.membership.organizationId)).shortlists
+    const shortlists = activeOrgId
+      ? (await ShortlistService.list(current.db, activeOrgId)).shortlists
       : [];
     const consents = current.user.role === "candidate" && candidateProfile[0]
       ? await current.db.select().from(schema.consentRequestItems).where(eq(schema.consentRequestItems.candidateProfileId, candidateProfile[0].id))
-      : membership && !("error" in membership)
-        ? await current.db.select().from(schema.consentRequestBatches).where(eq(schema.consentRequestBatches.organizationId, membership.membership.organizationId))
+      : activeOrgId
+        ? await current.db.select().from(schema.consentRequestBatches).where(eq(schema.consentRequestBatches.organizationId, activeOrgId))
         : [];
-    const screeningSummary = membership && !("error" in membership)
+    const screeningSummary = activeOrgId
       ? (await current.db.select({
         total: sql<number>`count(*)`,
         pending: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'pending')`,
         completed: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'completed')`,
-      }).from(schema.screeningRuns).where(eq(schema.screeningRuns.organizationId, membership.membership.organizationId)))[0]
+      }).from(schema.screeningRuns).where(eq(schema.screeningRuns.organizationId, activeOrgId)))[0]
       : { total: 0, pending: 0, completed: 0 };
-    const token = membership && !("error" in membership)
-      ? await getRecruiterTokenAccount(current.db, membership.membership.organizationId)
+    const token = activeOrgId
+      ? await getRecruiterTokenAccount(current.db, activeOrgId)
       : { accountId: null, balance: 0, updatedAt: null };
 
     return NextResponse.json({

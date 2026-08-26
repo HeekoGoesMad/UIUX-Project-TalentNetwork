@@ -204,6 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
+  const bootstrapUserKey = useRef<string | null>(null);
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
@@ -291,20 +292,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabaseConfigured) return;
     const supabase = createClient();
-    void supabase.auth.getSession().then(({ data }: { data: { session: { user: { email?: string; user_metadata?: Record<string, unknown> } } | null } }) => {
+    void supabase.auth.getSession().then(({ data }: { data: { session: { user: { email?: string; user_metadata?: Record<string, unknown>; id?: string } } | null } }) => {
       setSupabaseUser(data.session?.user ?? null);
-      if (data.session?.user) void loadBootstrap();
-      else setBootstrapped(true);
+      const userId = data.session?.user?.id ?? null;
+      if (!userId) {
+        setBootstrapped(true);
+        return;
+      }
+      if (bootstrapUserKey.current !== userId) {
+        bootstrapUserKey.current = userId;
+        void loadBootstrap();
+      }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { email?: string; user_metadata?: Record<string, unknown>; id?: string } } | null) => {
       setSupabaseUser(session?.user ?? null);
-      if (session?.user) void loadBootstrap();
-      else {
+      const userId = session?.user?.id ?? null;
+      if (!userId) {
+        bootstrapUserKey.current = null;
         setBootstrapped(true);
         setProfile(null);
         setNotifications([]);
         setShortlists([]);
+        return;
+      }
+      if (bootstrapUserKey.current !== userId) {
+        bootstrapUserKey.current = userId;
+        void loadBootstrap();
       }
     });
     return () => { listener.subscription.unsubscribe(); };
