@@ -205,6 +205,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
   const bootstrapUserKey = useRef<string | null>(null);
+  // Database is the source of truth for role/provisioning. Metadata freezes
+  // at signup and goes stale the moment an admin approves or SQL changes land.
+  const dbIdentity = useRef<{ role?: UserRole; provisioningStatus?: ProvisioningStatus }>({});
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
@@ -212,12 +215,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     const metadata = authUser.user_metadata ?? {};
-    const role = metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : pendingRole.current;
+    const role = dbIdentity.current.role ?? (metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : pendingRole.current);
     if (!role) {
       setUser(null);
       return;
     }
-    const provisioningStatus: ProvisioningStatus = role === "candidate" || role === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending";
+    const provisioningStatus: ProvisioningStatus =
+      role === "candidate" || role === "partner"
+        ? "active"
+        : dbIdentity.current.provisioningStatus ?? (metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending");
     setUser({
       role,
       provisioningStatus,
@@ -248,6 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
+      if (payload.identity?.role) dbIdentity.current = { role: payload.identity.role, provisioningStatus: payload.identity.provisioningStatus };
       if (payload.identity?.provisioningStatus) {
         setUser((current) => current?.role === "recruiter" ? { ...current, provisioningStatus: payload.identity!.provisioningStatus! } : current);
       }
@@ -478,6 +485,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const supabase = createClient();
       try { await supabase.auth.signOut(); } catch {}
     }
+    dbIdentity.current = {};
+    bootstrapUserKey.current = null;
     setUser(null);
     localStorage.removeItem(sessionKey);
   };
