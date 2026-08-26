@@ -20,6 +20,11 @@ export async function POST(request: Request) {
     if (error || !data.user?.email) return NextResponse.json({ error: "Sesi login tidak valid." }, { status: 401 });
 
     const result = await syncAuthenticatedUser(data.user, payload.data);
+    // Self-heal stale signup metadata so the client never disagrees with the DB role.
+    if (data.user.user_metadata?.role !== result.role) {
+      const { error: metadataError } = await supabase.auth.updateUser({ data: { role: result.role, provisioningStatus: result.provisioningStatus } });
+      if (metadataError) console.error("Gagal memperbarui metadata peran:", metadataError);
+    }
     return NextResponse.json(result);
   } catch (error) {
     console.error("Gagal menyinkronkan akun", error);

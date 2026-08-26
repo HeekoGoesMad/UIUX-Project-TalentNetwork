@@ -468,7 +468,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const supabase = createClient();
       try {
         const { data, error } = await withTimeout(supabase.auth.signUp({ email, password, options: { data: { name, role, companyName, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" } } }), 10000);
-        if (error) return { error: error.message };
+        if (error) {
+          const msg = /already registered|already exists/i.test(error.message)
+            ? "Email sudah terdaftar. Silakan masuk dengan akun tersebut, atau gunakan email lain."
+            : error.message;
+          return { error: msg };
+        }
         if (!data.session) return { needsConfirmation: true, role };
         setUser({ role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending", email, name, companyName });
         return { role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" };
