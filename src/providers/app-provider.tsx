@@ -212,7 +212,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const bootstrapUserKey = useRef<string | null>(null);
   // Database is the source of truth for role/provisioning. Metadata freezes
   // at signup and goes stale the moment an admin approves or SQL changes land.
-  const dbIdentity = useRef<{ role?: UserRole; provisioningStatus?: ProvisioningStatus }>({});
+  const dbIdentity = useRef<{ role?: UserRole; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null }>({});
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
@@ -228,10 +228,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const provisioningStatus: ProvisioningStatus =
       role === "candidate" || role === "partner"
         ? "active"
-        : dbIdentity.current.provisioningStatus ?? (metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending");
+        : dbIdentity.current.provisioningStatus ?? (metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" || metadata.provisioningStatus === "revision_required" ? metadata.provisioningStatus : "pending");
     setUser({
       role,
       provisioningStatus,
+      provisioningReason: dbIdentity.current.provisioningReason ?? null,
       email: authUser.email ?? "",
       name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : authUser.email ?? "Pengguna",
       companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
@@ -247,7 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; provisioningStatus?: ProvisioningStatus };
+        identity?: { role?: UserRole; email?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
         profile?: BootstrapProfile | null;
         candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
         candidateSections?: BootstrapSection[];
@@ -267,11 +268,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...current,
           role,
           provisioningStatus: status,
+          provisioningReason: payload.identity?.provisioningReason ?? current.provisioningReason ?? null,
         } : {
           email: payload.identity!.email ?? "",
           name: payload.identity!.email?.split("@")[0] ?? "Pengguna",
           role,
           provisioningStatus: status,
+          provisioningReason: payload.identity?.provisioningReason ?? null,
         });
       }
 

@@ -48,8 +48,9 @@ type FormState = {
   phone: string;
   experience: HistoryItem[];
   education: EducationItem[];
-  skills: string[];
+  skills: string[]; // Hard Competencies
   tools: string[];
+  softSkills: string[];
   workArrangement: CvProfile["workArrangement"];
 };
 
@@ -58,15 +59,34 @@ const steps = [
   { title: "Status karier", note: "Kesiapanmu saat ini", icon: Rocket },
   { title: "Tentang kamu", note: "Profil dasar & kontak", icon: UserRound },
   { title: "Lokasi & Peran", note: "Pilihan target kerja", icon: MapPin },
-  { title: "Pengalaman", note: "Cerita pekerjaanmu", icon: BriefcaseBusiness },
+  { title: "Pengalaman", note: "Riwayat pekerjaanmu", icon: BriefcaseBusiness },
   { title: "Pendidikan", note: "Latar belajar & kampus", icon: GraduationCap },
-  { title: "Keahlian", note: "Skill dan tools utama", icon: Hammer },
+  { title: "Kompetensi", note: "Hard, Tools & Soft Skills", icon: Hammer },
   { title: "Cara kerja", note: "Pengaturan kerja", icon: Sparkles },
   { title: "Review & Publikasikan", note: "Siap ditemukan", icon: ShieldCheck },
 ] as const;
 
-const emptyHistory: HistoryItem = { company: "", role: "", dates: "", achievements: [""] };
-const emptyEducation: EducationItem = { school: "", program: "", dates: "" };
+const emptyHistory: HistoryItem = {
+  company: "",
+  role: "",
+  employmentType: "Full Time",
+  startDate: "",
+  endDate: "",
+  currentPosition: false,
+  dates: "",
+  description: "",
+  achievements: [""],
+};
+const emptyEducation: EducationItem = {
+  level: "S1",
+  school: "",
+  program: "",
+  gpa: "",
+  startDate: "",
+  endDate: "",
+  currentlyStudying: false,
+  dates: "",
+};
 
 const careerLabels: Record<CareerStatus, string> = {
   "open-to-work": "Open to Work",
@@ -105,8 +125,9 @@ const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, emai
   phone: profile?.phone ?? "",
   experience: profile?.experience?.length ? profile.experience : [{ ...emptyHistory }],
   education: profile?.education?.length ? profile.education : [{ ...emptyEducation }],
-  skills: profile?.skills ?? [],
+  skills: profile?.hardCompetencies?.length ? profile.hardCompetencies : profile?.skills ?? [],
   tools: profile?.tools ?? [],
+  softSkills: profile?.softSkills ?? [],
   workArrangement: profile?.workArrangement ?? "hybrid",
 });
 
@@ -149,8 +170,8 @@ function isMeaningfulDraft(value: FormState) {
       value.phone.trim() ||
       value.skills.length ||
       value.tools.length ||
-      value.experience.some((item) => item.company.trim() || item.role.trim() || item.dates.trim() || item.achievements.some((entry) => entry.trim())) ||
-      value.education.some((item) => item.school.trim() || item.program.trim() || item.dates.trim()),
+      value.experience.some((item) => item.company.trim() || item.role.trim() || item.dates?.trim() || item.description?.trim() || item.achievements?.some((entry) => entry.trim())) ||
+      value.education.some((item) => item.school.trim() || item.program.trim() || item.dates?.trim() || item.gpa?.trim()),
   );
 }
 
@@ -169,7 +190,11 @@ export function CandidateOnboarding() {
     const initial = initialForm(profile, careerStatus, user?.email ?? "");
     return { ...initial, fullName: initial.fullName || user?.name || "" };
   });
-  const [tagInput, setTagInput] = useState({ skills: "", tools: "" });
+  const [tagInput, setTagInput] = useState<{ skills: string; tools: string; softSkills: string }>({
+    skills: "",
+    tools: "",
+    softSkills: "",
+  });
   const [errors, setErrors] = useState<Partial<Record<TextField, string>>>({});
   const [edits, setEdits] = useState(0);
   const restoredRef = useRef(false);
@@ -246,27 +271,51 @@ export function CandidateOnboarding() {
     if (key in requiredLabels) setErrors((current) => ({ ...current, [key as TextField]: undefined }));
   };
 
-  const updateHistory = (index: number, key: "company" | "role" | "dates" | "achievements", value: string) =>
+  const updateHistory = (index: number, key: keyof HistoryItem, value: unknown) =>
     setValue(
       "experience",
       form.experience.map((item, itemIndex) => {
         if (itemIndex !== index) return item;
-        if (key === "achievements") return { ...item, achievements: [value] };
-        return { ...item, [key]: value };
+        const updated = { ...item, [key]: value };
+        if (key === "achievements") return { ...item, achievements: [value as string] };
+        if (key === "startDate" || key === "endDate" || key === "currentPosition") {
+          const start = key === "startDate" ? (value as string) : updated.startDate || "";
+          const isCurrent = key === "currentPosition" ? (value as boolean) : updated.currentPosition;
+          const end = isCurrent ? "Sekarang" : key === "endDate" ? (value as string) : updated.endDate || "";
+          if (start || end) {
+            updated.dates = start && end ? `${start} — ${end}` : start || end;
+          }
+        }
+        return updated;
       })
     );
 
-  const updateEducation = (index: number, key: keyof EducationItem, value: string) =>
-    setValue("education", form.education.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+  const updateEducation = (index: number, key: keyof EducationItem, value: unknown) =>
+    setValue(
+      "education",
+      form.education.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+        const updated = { ...item, [key]: value };
+        if (key === "startDate" || key === "endDate" || key === "currentlyStudying") {
+          const start = key === "startDate" ? (value as string) : updated.startDate || "";
+          const isCurrent = key === "currentlyStudying" ? (value as boolean) : updated.currentlyStudying;
+          const end = isCurrent ? "Sekarang" : key === "endDate" ? (value as string) : updated.endDate || "";
+          if (start || end) {
+            updated.dates = start && end ? `${start} - ${end}` : start || end;
+          }
+        }
+        return updated;
+      })
+    );
 
-  const addTag = (kind: "skills" | "tools") => {
+  const addTag = (kind: "skills" | "tools" | "softSkills") => {
     const value = tagInput[kind].trim();
     if (!value || form[kind].includes(value)) return;
     setValue(kind, [...form[kind], value]);
     setTagInput((current) => ({ ...current, [kind]: "" }));
   };
 
-  const removeTag = (kind: "skills" | "tools", tag: string) => setValue(kind, form[kind].filter((item) => item !== tag));
+  const removeTag = (kind: "skills" | "tools" | "softSkills", tag: string) => setValue(kind, form[kind].filter((item) => item !== tag));
 
   const validateFields = (fields: TextField[]) => {
     const found: Partial<Record<TextField, string>> = {};
@@ -383,18 +432,6 @@ export function CandidateOnboarding() {
     setStep((current) => current + 1);
   };
 
-  const exitWithoutPublishing = () => {
-    if (edits > 0 && !publishedRef.current && isMeaningfulDraft(form)) {
-      try {
-        window.localStorage.setItem(draftKey, JSON.stringify({ form, step }));
-        toast.info("Draf tersimpan di perangkat ini", { description: "Buka kembali onboarding untuk melanjutkan dari langkah terakhirmu." });
-      } catch {
-        toast.warning("Draf tidak dapat disimpan", { description: "Penyimpanan lokal browser sedang tidak tersedia." });
-      }
-    }
-    router.push("/candidate");
-  };
-
   return (
     <ProtectedRoute role="candidate">
       <div className="fixed inset-0 z-10 overflow-hidden bg-background pt-20">
@@ -507,11 +544,18 @@ export function CandidateOnboarding() {
               </div>
 
               <div className="flex items-center justify-between border-t bg-card px-5 py-4 sm:px-10">
-                <Button type="button" variant="ghost" onClick={() => (step ? setStep((current) => current - 1) : exitWithoutPublishing())}>
-                  <ArrowLeft className="size-4" />
-                  {step ? "Kembali" : "Nanti saja"}
-                </Button>
-                <Button type="submit" size="lg" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs">
+                {step > 0 ? (
+                  <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)} className="rounded-xl text-xs font-semibold">
+                    <ArrowLeft className="size-4 mr-1.5" />
+                    Kembali
+                  </Button>
+                ) : (
+                  <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-[#7C3AED]" />
+                    <span>Langkah 1 dari {steps.length} (Wajib)</span>
+                  </div>
+                )}
+                <Button type="submit" size="lg" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm">
                   {step === steps.length - 1 ? "Publikasikan Profil" : "Lanjut"}
                   <ArrowRight className="size-4 ml-1.5" />
                 </Button>
@@ -728,22 +772,31 @@ function HistoryStep({
   remove,
 }: {
   items: HistoryItem[];
-  update: (index: number, key: "company" | "role" | "dates" | "achievements", value: string) => void;
+  update: (index: number, key: keyof HistoryItem, value: unknown) => void;
   add: () => void;
   remove: (index: number) => void;
 }) {
+  const employmentTypes = ["Full Time", "Internship", "Contract", "Freelance"];
+
   return (
     <Intro
-      title="Pengalaman yang membentukmu."
-      text="Tambahkan pekerjaan yang paling relevan. Boleh dikosongkan jika kamu adalah fresh graduate."
+      title="Pengalaman Kerja (Work Experience)"
+      text="Tambahkan pekerjaan yang paling relevan. Jika belum memiliki pengalaman kerja formal, kamu bisa menambahkan pengalaman magang, freelance, atau organisasi."
     >
       <div className="space-y-4">
         {items.map((item, index) => (
-          <Card key={index} className="p-5 border-border">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
-                Pengalaman {index + 1}
-              </span>
+          <Card key={index} className="p-5 border-border space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                  Pengalaman {index + 1}
+                </span>
+                {item.employmentType && (
+                  <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                    {item.employmentType}
+                  </span>
+                )}
+              </div>
               {items.length > 1 && (
                 <button
                   type="button"
@@ -754,49 +807,112 @@ function HistoryStep({
                 </button>
               )}
             </div>
+
+            {/* Row 1: Company Name & Position */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Perusahaan">
+              <Field label="Nama Perusahaan (Company Name) *">
                 <input
+                  required
                   className={inputClass}
                   value={item.company}
                   onChange={(event) => update(index, "company", event.target.value)}
-                  placeholder="Tokopedia (GoTo Group)"
+                  placeholder="Contoh: PT GoTo Gojek Tokopedia"
                 />
               </Field>
-              <Field label="Jabatan">
+              <Field label="Jabatan / Posisi (Position) *">
                 <input
+                  required
                   className={inputClass}
                   value={item.role}
                   onChange={(event) => update(index, "role", event.target.value)}
-                  placeholder="Senior Product Designer"
+                  placeholder="Contoh: Senior UI/UX Designer"
                 />
               </Field>
             </div>
-            <div className="mt-4">
-              <Field label="Periode">
+
+            {/* Row 2: Employment Type */}
+            <Field label="Tipe Pekerjaan (Employment Type) *">
+              <select
+                className={inputClass}
+                value={item.employmentType || "Full Time"}
+                onChange={(event) => update(index, "employmentType", event.target.value)}
+              >
+                {employmentTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {/* Row 3: Start Date, End Date, & Current Position Checkbox */}
+            <div className="space-y-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Tanggal / Tahun Mulai (Start Date) *">
+                  <input
+                    className={inputClass}
+                    value={item.startDate || ""}
+                    onChange={(event) => update(index, "startDate", event.target.value)}
+                    placeholder="Contoh: Jan 2021 atau 2021"
+                  />
+                </Field>
+
+                <Field label="Tanggal / Tahun Selesai (End Date)">
+                  <input
+                    className={inputClass}
+                    disabled={Boolean(item.currentPosition)}
+                    value={item.currentPosition ? "Sekarang" : item.endDate || ""}
+                    onChange={(event) => update(index, "endDate", event.target.value)}
+                    placeholder={item.currentPosition ? "Sekarang" : "Contoh: Des 2023 atau 2023"}
+                  />
+                </Field>
+              </div>
+
+              {/* Current Position Checkbox */}
+              <label className="flex items-center gap-2 pt-1 cursor-pointer select-none text-xs text-slate-700 font-medium">
                 <input
-                  className={inputClass}
-                  value={item.dates}
-                  onChange={(event) => update(index, "dates", event.target.value)}
-                  placeholder="Feb 2022 — Sekarang"
+                  type="checkbox"
+                  checked={Boolean(item.currentPosition)}
+                  onChange={(event) => update(index, "currentPosition", event.target.checked)}
+                  className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
                 />
-              </Field>
+                <span>Masih Bekerja di Sini (Current Position)</span>
+              </label>
             </div>
-            <div className="mt-4">
-              <Field label="Pencapaian utama" hint="Satu hasil yang paling ingin kamu tunjukkan">
-                <textarea
-                  className={`${textareaClass} min-h-20`}
-                  value={Array.isArray(item.achievements) ? item.achievements[0] ?? "" : (item.achievements ?? "")}
-                  onChange={(event) => update(index, "achievements", event.target.value)}
-                  placeholder="Contoh: Meningkatkan aktivasi pengguna sebesar 20%"
-                />
-              </Field>
-            </div>
+
+            {/* Row 4: Job Description (Mandatory) */}
+            <Field
+              label="Deskripsi Pekerjaan & Tanggung Jawab (Job Description) *"
+              hint="Jelaskan peran utama dan tanggung jawab harianmu (Wajib diisi)"
+            >
+              <textarea
+                required
+                rows={3}
+                className={`${textareaClass} min-h-24`}
+                value={item.description || ""}
+                onChange={(event) => update(index, "description", event.target.value)}
+                placeholder="Contoh: Bertanggung jawab merancang design system produk dari tahap discovery, wireframing, hingga usability testing bersama tim engineer dan product manager..."
+              />
+            </Field>
+
+            {/* Row 5: Achievement (Optional) */}
+            <Field
+              label="Pencapaian Utama (Achievement - Opsional)"
+              hint="Tuliskan hasil konkret, metrik atau capaian terbaik selama bekerja di sini (Opsional)"
+            >
+              <textarea
+                rows={2}
+                className={`${textareaClass} min-h-20`}
+                value={Array.isArray(item.achievements) ? item.achievements[0] ?? "" : (item.achievements ?? "")}
+                onChange={(event) => update(index, "achievements", event.target.value)}
+                placeholder="Contoh: Meningkatkan task completion rate sebesar 28% dan memangkas waktu onboarding pengguna hingga 15%"
+              />
+            </Field>
           </Card>
         ))}
         <Button type="button" variant="outline" onClick={add} className="border-border">
           <Plus className="size-4" />
-          Tambah pengalaman
+          Tambah Pengalaman Kerja
         </Button>
       </div>
     </Intro>
@@ -810,10 +926,12 @@ function EducationStep({
   remove,
 }: {
   items: EducationItem[];
-  update: (index: number, key: keyof EducationItem, value: string) => void;
+  update: (index: number, key: keyof EducationItem, value: unknown) => void;
   add: () => void;
   remove: (index: number) => void;
 }) {
+  const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
+
   return (
     <Intro
       title="Latar belajarmu *"
@@ -854,9 +972,16 @@ function EducationStep({
           return (
             <Card key={index} className="p-5 border-border">
               <div className="mb-4 flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
-                  Pendidikan {index + 1}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                    Pendidikan {index + 1}
+                  </span>
+                  {item.level && (
+                    <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                      {item.level}
+                    </span>
+                  )}
+                </div>
                 {items.length > 1 && (
                   <button
                     type="button"
@@ -867,35 +992,96 @@ function EducationStep({
                   </button>
                 )}
               </div>
+
               <div className="space-y-4">
-                <Field label="Institusi / Universitas *">
-                  <input
-                    required
-                    className={inputClass}
-                    value={item.school}
-                    onChange={(event) => update(index, "school", event.target.value)}
-                    placeholder="Contoh: Universitas Indonesia"
-                  />
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Program studi *">
-                    <input
-                      required
+                {/* Education Level & Institution */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Jenjang Pendidikan *">
+                    <select
                       className={inputClass}
-                      value={item.program}
-                      onChange={(event) => update(index, "program", event.target.value)}
-                      placeholder="Teknik Informatika"
-                    />
+                      value={item.level || "S1"}
+                      onChange={(event) => update(index, "level", event.target.value)}
+                    >
+                      {educationLevels.map((lvl) => (
+                        <option key={lvl} value={lvl}>
+                          {lvl}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
-                  <Field label="Periode">
+
+                  <div className="sm:col-span-2">
+                    <Field label="Institusi / Universitas *">
+                      <input
+                        required
+                        className={inputClass}
+                        value={item.school}
+                        onChange={(event) => update(index, "school", event.target.value)}
+                        placeholder="Contoh: Universitas Indonesia / SMKN 1 Jakarta"
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Major & GPA */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <Field label="Jurusan / Program Studi *">
+                      <input
+                        required
+                        className={inputClass}
+                        value={item.program}
+                        onChange={(event) => update(index, "program", event.target.value)}
+                        placeholder="Contoh: Teknik Informatika / Ilmu Komputer"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="IPK / Nilai Akhir (GPA)">
                     <input
                       className={inputClass}
-                      value={item.dates}
-                      onChange={(event) => update(index, "dates", event.target.value)}
-                      placeholder="2020 - 2024"
+                      value={item.gpa || ""}
+                      onChange={(event) => update(index, "gpa", event.target.value)}
+                      placeholder="Contoh: 3.85 / 4.00"
                     />
                   </Field>
                 </div>
+
+                {/* Dates & Currently Studying */}
+                <div className="space-y-2">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Tahun / Bulan Mulai (Start Date)">
+                      <input
+                        className={inputClass}
+                        value={item.startDate || ""}
+                        onChange={(event) => update(index, "startDate", event.target.value)}
+                        placeholder="Contoh: Agu 2020 atau 2020"
+                      />
+                    </Field>
+
+                    <Field label="Tahun / Bulan Selesai (End Date)">
+                      <input
+                        className={inputClass}
+                        disabled={Boolean(item.currentlyStudying)}
+                        value={item.currentlyStudying ? "Sekarang" : item.endDate || ""}
+                        onChange={(event) => update(index, "endDate", event.target.value)}
+                        placeholder={item.currentlyStudying ? "Sekarang" : "Contoh: Jul 2024 atau 2024"}
+                      />
+                    </Field>
+                  </div>
+
+                  {/* Currently Studying Checkbox */}
+                  <label className="flex items-center gap-2 pt-1 cursor-pointer select-none text-xs text-slate-700 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item.currentlyStudying)}
+                      onChange={(event) => update(index, "currentlyStudying", event.target.checked)}
+                      className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                    />
+                    <span>Masih Menempuh Pendidikan (Currently Studying)</span>
+                  </label>
+                </div>
+
                 {partnerMatch && (
                   <div className="flex items-center gap-2 rounded-lg bg-purple-50 p-2.5 text-xs text-[#7C3AED] font-medium border border-purple-100">
                     <GraduationCap className="size-4 shrink-0" />
@@ -925,13 +1111,13 @@ function TagsStep({
   removeTag,
 }: {
   form: FormState;
-  tagInput: { skills: string; tools: string };
-  setTagInput: React.Dispatch<React.SetStateAction<{ skills: string; tools: string }>>;
-  addTag: (kind: "skills" | "tools") => void;
-  removeTag: (kind: "skills" | "tools", tag: string) => void;
+  tagInput: { skills: string; tools: string; softSkills: string };
+  setTagInput: React.Dispatch<React.SetStateAction<{ skills: string; tools: string; softSkills: string }>>;
+  addTag: (kind: "skills" | "tools" | "softSkills") => void;
+  removeTag: (kind: "skills" | "tools" | "softSkills", tag: string) => void;
 }) {
-  const group = (kind: "skills" | "tools", label: string, placeholder: string, minNote?: string) => (
-    <Field label={label} hint={`Tekan Enter untuk menambahkan. ${minNote ?? ""}`}>
+  const group = (kind: "skills" | "tools" | "softSkills", label: string, placeholder: string, minNote?: string) => (
+    <Field label={label} hint={`Tekan Enter untuk menambahkan tag. ${minNote ?? ""}`}>
       <div className="rounded-md border bg-transparent p-2 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
         <div className="flex flex-wrap gap-2">
           {form[kind].map((tag) => (
@@ -964,12 +1150,26 @@ function TagsStep({
 
   return (
     <Intro
-      title="Apa yang kamu kuasai? *"
-      text="Pilih kata kunci yang membantu recruiter menemukan profilmu saat mencari kandidat yang cocok."
+      title="Framework Kompetensi (Competencies) *"
+      text="Klasifikasikan keahlianmu ke dalam Hard Competencies, Tools, dan Soft Skills untuk memudahkan pencocokan cerdas dengan kriteria rekruter."
     >
       <div className="space-y-6">
-        {group("skills", "Skill Utama *", "Ketik nama skill lalu Enter (Contoh: Product Design, UX Research)", "(Minimal 3 skill)")}
-        {group("tools", "Tools Pendukung", "Ketik nama tool lalu Enter (Contoh: Figma, Jira, Notion)")}
+        {group(
+          "skills",
+          "1. Hard Competencies (Kompetensi Teknis) *",
+          "Ketik kompetensi teknis lalu Enter (Contoh: UI/UX Design, Data Analysis, Backend Development)",
+          "(Wajib, minimal 3 kompetensi)"
+        )}
+        {group(
+          "tools",
+          "2. Tools & Teknologi Pendukung",
+          "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)"
+        )}
+        {group(
+          "softSkills",
+          "3. Soft Skills (Kompetensi Interpersonal)",
+          "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)"
+        )}
       </div>
     </Intro>
   );

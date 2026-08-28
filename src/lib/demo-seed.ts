@@ -40,6 +40,15 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
     "Visual Design",
     "Accessibility (WCAG)",
   ],
+  hardCompetencies: [
+    "Product Design (UI/UX)",
+    "Design Systems & Architecture",
+    "User Research & Usability Testing",
+    "Wireframing & Interactive Prototyping",
+    "Information Architecture",
+    "Visual Design",
+    "Accessibility (WCAG)",
+  ],
   tools: [
     "Figma",
     "FigJam",
@@ -52,12 +61,24 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
     "Zeplin",
     "Storybook",
   ],
+  softSkills: [
+    "Problem Solving",
+    "Cross-functional Collaboration",
+    "Leadership & Mentoring",
+    "Communication & Storytelling",
+    "Critical Thinking",
+  ],
   industries: ["product-design", "technology-software"],
   experience: [
     {
       company: "Tokopedia (GoTo Group)",
       role: "Senior Product Designer",
+      employmentType: "Full Time",
+      startDate: "Feb 2022",
+      endDate: "Sekarang",
+      currentPosition: true,
       dates: "Feb 2022 — Sekarang",
+      description: "Bertanggung jawab atas arsitektur desain pengalaman pengguna checkout utama, standarisasi Design System 3.0 multi-platform, serta memimpin inisiatif usability testing kuartalan bersama product manager dan engineering.",
       achievements: [
         "Memimpin redesign alur checkout utama yang meningkatkan conversion rate sebesar 28% dan mengurangi drop-off 15% dalam 3 bulan post-launch.",
         "Membangun Design System 3.0 (300+ komponen) bersama 4 engineer frontend, mempercepat delivery sprint rata-rata 35%.",
@@ -68,7 +89,12 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
     {
       company: "OVO (Lippo Digital Indonesia)",
       role: "Product Designer",
+      employmentType: "Full Time",
+      startDate: "Jun 2020",
+      endDate: "Jan 2022",
+      currentPosition: false,
       dates: "Jun 2020 — Jan 2022",
+      description: "Merancang antarmuka transaksi finansial transfer & pembayaran digital, integrasi personalisasi AI, dan menjadi PIC design untuk inisiatif PayLater.",
       achievements: [
         "Merancang ulang fitur transfer & pembayaran yang melayani 50+ juta pengguna aktif, meningkatkan task completion rate dari 71% ke 89%.",
         "Berkolaborasi dengan tim data science untuk mengintegrasikan personalisasi AI dalam rekomendasi fitur (CTR naik 22%).",
@@ -78,7 +104,12 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
     {
       company: "Studio Nusantara (Design Agency)",
       role: "UI/UX Designer",
+      employmentType: "Full Time",
+      startDate: "Aug 2019",
+      endDate: "May 2020",
+      currentPosition: false,
       dates: "Aug 2019 — May 2020",
+      description: "Mengerjakan proyek end-to-end design mobile app, dashboard web, dan landing page klien startup serta enterprise.",
       achievements: [
         "Mengerjakan proyek desain untuk 8 klien (startup & korporasi) mencakup mobile app, dashboard, dan landing page.",
         "Memenangkan pitch desain untuk klien FMCG senilai Rp 450 juta.",
@@ -87,13 +118,23 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
   ],
   education: [
     {
+      level: "S1",
       school: "Universitas Indonesia",
-      program: "S1 Desain Komunikasi Visual",
+      program: "Desain Komunikasi Visual",
+      gpa: "3.82 / 4.00",
+      startDate: "2015",
+      endDate: "2019",
+      currentlyStudying: false,
       dates: "2015 — 2019",
     },
     {
+      level: "Diploma",
       school: "Google UX Design Certificate",
       program: "Professional Certificate — Coursera",
+      gpa: "Honor Graduate",
+      startDate: "2020",
+      endDate: "2020",
+      currentlyStudying: false,
       dates: "2020",
     },
   ],

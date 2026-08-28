@@ -13,13 +13,13 @@ import {
   ShieldCheck,
   Trash2,
   User,
-  Wrench,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PARTNER_CAMPUSES, type CvProfile } from "@/types";
+import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { CvDownload } from "./cv-download";
 
 function blank(email = "", fullName = ""): CvProfile {
@@ -86,6 +86,89 @@ function FormSection({ title, icon, children }: { title: string; icon?: React.Re
   );
 }
 
+function CompetencyTagInput({
+  tags,
+  onChange,
+  placeholder,
+  colorScheme = "purple",
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder: string;
+  colorScheme?: "purple" | "slate" | "emerald";
+}) {
+  const [inputVal, setInputVal] = useState("");
+
+  const addCurrent = () => {
+    const trimmed = inputVal.trim();
+    if (!trimmed) return;
+    const parts = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    const updated = Array.from(new Set([...tags, ...parts]));
+    onChange(updated);
+    setInputVal("");
+  };
+
+  const removeTag = (index: number) => {
+    onChange(tags.filter((_, i) => i !== index));
+  };
+
+  const badgeStyles = {
+    purple: "bg-purple-50 text-[#7C3AED] border-purple-200",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+    emerald: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  };
+
+  return (
+    <div className="rounded-lg border bg-background p-2 transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {tags.map((tag, idx) => (
+          <span
+            key={`${tag}-${idx}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeStyles[colorScheme]}`}
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(idx)}
+              className="hover:opacity-75 focus:outline-none"
+              aria-label={`Hapus ${tag}`}
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          className="h-7 min-w-[150px] flex-1 border-0 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
+          value={inputVal}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val.includes(",")) {
+              const parts = val.split(",").map((s) => s.trim()).filter(Boolean);
+              if (parts.length > 0) {
+                onChange(Array.from(new Set([...tags, ...parts])));
+              }
+              setInputVal("");
+            } else {
+              setInputVal(val);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              addCurrent();
+            } else if (e.key === "Backspace" && !inputVal && tags.length > 0) {
+              removeTag(tags.length - 1);
+            }
+          }}
+          onBlur={addCurrent}
+          placeholder={tags.length === 0 ? placeholder : "+ ketik lalu tekan koma / enter..."}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────
 export function CvWorkspace() {
   const { cvProfile, user, dbMode, saveCvProfile } = useApp();
@@ -108,45 +191,101 @@ export function CvWorkspace() {
   const addExp = () =>
     setProfile((c) => ({
       ...c,
-      experience: [...c.experience, { company: "", role: "", dates: "", achievements: [] }],
+      experience: [
+        ...c.experience,
+        {
+          company: "",
+          role: "",
+          employmentType: "Full Time",
+          startDate: "",
+          endDate: "",
+          currentPosition: false,
+          dates: "",
+          description: "",
+          achievements: [],
+        },
+      ],
     }));
   const removeExp = (i: number) =>
     setProfile((c) => ({ ...c, experience: c.experience.filter((_, idx) => idx !== i) }));
-  const updateExp = (i: number, key: "company" | "role" | "dates", val: string) =>
+  const updateExp = (i: number, key: keyof ExperienceItem, val: unknown) =>
     setProfile((c) => {
       const exp = [...c.experience];
-      exp[i] = { ...exp[i], [key]: val };
+      const item = { ...exp[i], [key]: val };
+      if (key === "startDate" || key === "endDate" || key === "currentPosition") {
+        const start = key === "startDate" ? (val as string) : item.startDate || "";
+        const isCurrent = key === "currentPosition" ? (val as boolean) : item.currentPosition;
+        const end = isCurrent ? "Sekarang" : key === "endDate" ? (val as string) : item.endDate || "";
+        if (start || end) {
+          item.dates = start && end ? `${start} — ${end}` : start || end;
+        }
+      }
+      exp[i] = item;
       return { ...c, experience: exp };
     });
   const updateExpAchievement = (i: number, j: number, val: string) =>
     setProfile((c) => {
       const exp = [...c.experience];
-      exp[i] = { ...exp[i], achievements: exp[i].achievements.map((item, idx) => (idx === j ? val : item)) };
+      const target = exp[i];
+      if (!target) return c;
+      const achievements = Array.isArray(target.achievements) ? [...target.achievements] : [];
+      achievements[j] = val;
+      exp[i] = { ...target, achievements };
       return { ...c, experience: exp };
     });
   const addExpAchievement = (i: number) =>
     setProfile((c) => ({
       ...c,
-      experience: c.experience.map((exp, idx) => (idx === i ? { ...exp, achievements: [...exp.achievements, ""] } : exp)),
+      experience: c.experience.map((exp, idx) =>
+        idx === i ? { ...exp, achievements: [...(Array.isArray(exp.achievements) ? exp.achievements : []), ""] } : exp
+      ),
     }));
   const removeExpAchievement = (i: number, j: number) =>
     setProfile((c) => ({
       ...c,
-      experience: c.experience.map((exp, idx) => (idx === i ? { ...exp, achievements: exp.achievements.filter((_, aIdx) => aIdx !== j) } : exp)),
+      experience: c.experience.map((exp, idx) =>
+        idx === i
+          ? {
+              ...exp,
+              achievements: (Array.isArray(exp.achievements) ? exp.achievements : []).filter((_, aIdx) => aIdx !== j),
+            }
+          : exp
+      ),
     }));
 
   // Education helpers
   const addEdu = () =>
     setProfile((c) => ({
       ...c,
-      education: [...c.education, { school: "", program: "", dates: "" }],
+      education: [
+        ...c.education,
+        {
+          level: "S1",
+          school: "",
+          program: "",
+          gpa: "",
+          startDate: "",
+          endDate: "",
+          currentlyStudying: false,
+          dates: "",
+        },
+      ],
     }));
   const removeEdu = (i: number) =>
     setProfile((c) => ({ ...c, education: c.education.filter((_, idx) => idx !== i) }));
-  const updateEdu = (i: number, key: "school" | "program" | "dates", val: string) =>
+  const updateEdu = (i: number, key: keyof EducationItem, val: unknown) =>
     setProfile((c) => {
       const edu = [...c.education];
-      edu[i] = { ...edu[i], [key]: val };
+      const item = { ...edu[i], [key]: val };
+      if (key === "startDate" || key === "endDate" || key === "currentlyStudying") {
+        const start = key === "startDate" ? (val as string) : item.startDate || "";
+        const isCurrent = key === "currentlyStudying" ? (val as boolean) : item.currentlyStudying;
+        const end = isCurrent ? "Sekarang" : key === "endDate" ? (val as string) : item.endDate || "";
+        if (start || end) {
+          item.dates = start && end ? `${start} — ${end}` : start || end;
+        }
+      }
+      edu[i] = item;
       return { ...c, education: edu };
     });
 
@@ -396,51 +535,108 @@ export function CvWorkspace() {
             icon={<BriefcaseBusiness className="size-4 text-primary" />}
           >
             <div className="space-y-4">
-              {profile.experience.map((exp, i) => (
-                <div key={i} className="relative rounded-xl border bg-muted/40 p-4">
-                  <button
-                    type="button"
-                    onClick={() => removeExp(i)}
-                    className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus pengalaman"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  <div className="grid gap-3 md:grid-cols-2 pr-6">
+              {profile.experience.map((exp, i) => {
+                const employmentTypes = ["Full Time", "Internship", "Contract", "Freelance"];
+
+                return (
+                  <div key={i} className="relative rounded-xl border bg-muted/40 p-4 space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => removeExp(i)}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"
+                      aria-label="Hapus pengalaman"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+
+                    {/* Row 1: Company Name & Position */}
+                    <div className="grid gap-3 md:grid-cols-2 pr-6">
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Nama Perusahaan *
+                        <input
+                          className={inputCls}
+                          value={exp.company}
+                          onChange={(e) => updateExp(i, "company", e.target.value)}
+                          placeholder="Contoh: PT GoTo Gojek Tokopedia"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Posisi / Jabatan *
+                        <input
+                          className={inputCls}
+                          value={exp.role}
+                          onChange={(e) => updateExp(i, "role", e.target.value)}
+                          placeholder="Contoh: Senior UI/UX Designer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Row 2: Employment Type */}
                     <label className="flex flex-col gap-1 text-sm font-medium">
-                      Nama Perusahaan
-                      <input
+                      Tipe Pekerjaan (Employment Type)
+                      <select
                         className={inputCls}
-                        value={exp.company}
-                        onChange={(e) => updateExp(i, "company", e.target.value)}
-                        placeholder="Tokopedia"
+                        value={exp.employmentType || "Full Time"}
+                        onChange={(e) => updateExp(i, "employmentType", e.target.value)}
+                      >
+                        {employmentTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {/* Row 3: Start Date, End Date, Current Position */}
+                    <div className="space-y-2">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Tahun / Bulan Mulai
+                          <input
+                            className={inputCls}
+                            value={exp.startDate || ""}
+                            onChange={(e) => updateExp(i, "startDate", e.target.value)}
+                            placeholder="Contoh: Jan 2021 atau 2021"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Tahun / Bulan Selesai
+                          <input
+                            className={inputCls}
+                            disabled={Boolean(exp.currentPosition)}
+                            value={exp.currentPosition ? "Sekarang" : exp.endDate || ""}
+                            onChange={(e) => updateExp(i, "endDate", e.target.value)}
+                            placeholder={exp.currentPosition ? "Sekarang" : "Contoh: Des 2023 atau 2023"}
+                          />
+                        </label>
+                      </div>
+
+                      <label className="flex items-center gap-2 pt-1 cursor-pointer select-none text-xs text-slate-700 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(exp.currentPosition)}
+                          onChange={(e) => updateExp(i, "currentPosition", e.target.checked)}
+                          className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                        />
+                        <span>Masih Bekerja di Sini (Current Position)</span>
+                      </label>
+                    </div>
+
+                    {/* Row 4: Job Description (Mandatory) */}
+                    <label className="flex flex-col gap-1 text-sm font-medium">
+                      Deskripsi Pekerjaan &amp; Tanggung Jawab *
+                      <textarea
+                        className={`${textareaCls} min-h-20`}
+                        value={exp.description || ""}
+                        onChange={(e) => updateExp(i, "description", e.target.value)}
+                        placeholder="Deskripsikan peran utama, cakupan kerja, dan tanggung jawab..."
+                        rows={2}
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Posisi
-                      <input
-                        className={inputCls}
-                        value={exp.role}
-                        onChange={(e) => updateExp(i, "role", e.target.value)}
-                        placeholder="Senior Product Designer"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Durasi
-                      <input
-                        className={inputCls}
-                        value={exp.dates}
-                        onChange={(e) => updateExp(i, "dates", e.target.value)}
-                        placeholder="Jan 2021 — Present"
-                      />
-                    </label>
-                    <div className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-                      <span>Pencapaian</span>
-                      {(!Array.isArray(exp.achievements) || exp.achievements.length === 0) && (
-                        <span className="text-xs font-normal text-muted-foreground">
-                          Belum ada pencapaian. Tambahkan hasil terkuatmu di peran ini.
-                        </span>
-                      )}
+
+                    {/* Row 5: Achievements (Optional) */}
+                    <div className="flex flex-col gap-1 text-sm font-medium">
+                      <span>Pencapaian Utama (Opsional)</span>
                       {(Array.isArray(exp.achievements) ? exp.achievements : typeof exp.achievements === "string" && exp.achievements ? [exp.achievements] : []).map((achievement, j) => (
                         <div key={j} className="flex items-start gap-2">
                           <textarea
@@ -448,7 +644,7 @@ export function CvWorkspace() {
                             aria-label={`Pencapaian ${j + 1}`}
                             value={achievement}
                             onChange={(e) => updateExpAchievement(i, j, e.target.value)}
-                            placeholder={j === 0 ? "Apa yang kamu kerjakan dan capai di sini?" : "Tambahkan pencapaian lain"}
+                            placeholder={j === 0 ? "Apa hasil nyata / metrik terkuat yang kamu capai?" : "Tambahkan pencapaian lain"}
                             rows={2}
                           />
                           <button
@@ -472,8 +668,8 @@ export function CvWorkspace() {
                       </Button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <Button type="button" variant="outline" size="sm" onClick={addExp}>
                 <Plus className="size-4" /> Tambah Pengalaman
               </Button>
@@ -489,9 +685,10 @@ export function CvWorkspace() {
               {profile.education.map((edu, i) => {
                 const partnerMatch = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
                 const isVerified = profile.campusVerification?.institution === partnerMatch && profile.campusVerification?.status === "verified";
+                const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
 
                 return (
-                  <div key={i} className="relative rounded-xl border bg-slate-50/60 p-4">
+                  <div key={i} className="relative rounded-xl border bg-slate-50/60 p-4 space-y-3">
                     <button
                       type="button"
                       onClick={() => removeEdu(i)}
@@ -500,33 +697,88 @@ export function CvWorkspace() {
                     >
                       <Trash2 className="size-4" />
                     </button>
+
+                    {/* Row 1: Level & Institution */}
                     <div className="grid gap-3 md:grid-cols-3 pr-6">
-                      <label className="flex flex-col gap-1 text-sm font-medium md:col-span-1">
-                        Universitas / Institusi
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Jenjang Pendidikan
+                        <select
+                          className={inputCls}
+                          value={edu.level || "S1"}
+                          onChange={(e) => updateEdu(i, "level", e.target.value)}
+                        >
+                          {educationLevels.map((lvl) => (
+                            <option key={lvl} value={lvl}>
+                              {lvl}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
+                        Universitas / Institusi *
                         <input
                           className={inputCls}
                           value={edu.school}
                           onChange={(e) => updateEdu(i, "school", e.target.value)}
-                          placeholder="Universitas Indonesia"
+                          placeholder="Contoh: Universitas Indonesia / SMKN 1 Jakarta"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-sm font-medium">
-                        Jurusan / Program Studi
+                    </div>
+
+                    {/* Row 2: Major & GPA */}
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
+                        Jurusan / Program Studi *
                         <input
                           className={inputCls}
                           value={edu.program}
                           onChange={(e) => updateEdu(i, "program", e.target.value)}
-                          placeholder="Teknik Informatika"
+                          placeholder="Teknik Informatika / Ilmu Komputer"
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-sm font-medium">
-                        Tahun
+                        IPK / Nilai Akhir (GPA)
                         <input
                           className={inputCls}
-                          value={edu.dates}
-                          onChange={(e) => updateEdu(i, "dates", e.target.value)}
-                          placeholder="2018 — 2022"
+                          value={edu.gpa || ""}
+                          onChange={(e) => updateEdu(i, "gpa", e.target.value)}
+                          placeholder="3.85 / 4.00"
                         />
+                      </label>
+                    </div>
+
+                    {/* Row 3: Dates & Currently Studying */}
+                    <div className="space-y-2">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Tahun / Bulan Mulai
+                          <input
+                            className={inputCls}
+                            value={edu.startDate || ""}
+                            onChange={(e) => updateEdu(i, "startDate", e.target.value)}
+                            placeholder="Agu 2020 atau 2020"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Tahun / Bulan Selesai
+                          <input
+                            className={inputCls}
+                            disabled={Boolean(edu.currentlyStudying)}
+                            value={edu.currentlyStudying ? "Sekarang" : edu.endDate || ""}
+                            onChange={(e) => updateEdu(i, "endDate", e.target.value)}
+                            placeholder={edu.currentlyStudying ? "Sekarang" : "Jul 2024 atau 2024"}
+                          />
+                        </label>
+                      </div>
+
+                      <label className="flex items-center gap-2 pt-1 cursor-pointer select-none text-xs text-slate-700 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(edu.currentlyStudying)}
+                          onChange={(e) => updateEdu(i, "currentlyStudying", e.target.checked)}
+                          className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                        />
+                        <span>Masih Menempuh Pendidikan (Currently Studying)</span>
                       </label>
                     </div>
 
@@ -552,65 +804,64 @@ export function CvWorkspace() {
             </div>
           </FormSection>
 
-          {/* ── Skills ── */}
-          <FormSection title="Skill">
-            <Field
-              label="Daftar Skill"
-              hint="Pisahkan dengan koma. Contoh: Recruitment, Payroll, Digital Marketing"
-            >
-              <input
-                className={inputCls}
-                value={profile.skills.join(", ")}
-                onChange={(e) =>
-                  setProfile((c) => ({
-                    ...c,
-                    skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
-                  }))
-                }
-                placeholder="UI/UX, Sales, Public Speaking, Data Analysis"
-              />
-            </Field>
-            {profile.skills.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {profile.skills.map((s) => (
-                  <span key={s} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            )}
-          </FormSection>
+          {/* ── Competency Framework ── */}
+          <FormSection title="Framework Kompetensi (Competencies)">
+            <div className="space-y-4">
+              {/* 1. Hard Competencies */}
+              <Field
+                label="1. Hard Competencies (Kompetensi Teknis)"
+                hint="Ketik nama kompetensi teknis lalu tekan koma (,) atau Enter. Contoh: UI/UX Design, Data Analysis, SEO"
+              >
+                <CompetencyTagInput
+                  tags={profile.hardCompetencies?.length ? profile.hardCompetencies : profile.skills}
+                  onChange={(tags) =>
+                    setProfile((c) => ({
+                      ...c,
+                      skills: tags,
+                      hardCompetencies: tags,
+                    }))
+                  }
+                  colorScheme="purple"
+                  placeholder="Ketik kompetensi teknis lalu tekan koma / Enter..."
+                />
+              </Field>
 
-          {/* ── Tools ── */}
-          <FormSection title="Tools">
-            <Field
-              label="Daftar Tools"
-              hint="Pisahkan dengan koma. Contoh: Excel, Google Workspace, Figma, Meta Ads, Notion"
-            >
-              <input
-                className={inputCls}
-                value={profile.tools.join(", ")}
-                onChange={(e) =>
-                  setProfile((c) => ({
-                    ...c,
-                    tools: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
-                  }))
-                }
-                placeholder="Figma, Notion, Looker Studio, Jira"
-              />
-            </Field>
-            {profile.tools.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {profile.tools.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground"
-                  >
-                    <Wrench className="size-3.5" /> {t}
-                  </span>
-                ))}
-              </div>
-            )}
+              {/* 2. Tools */}
+              <Field
+                label="2. Tools &amp; Software Pendukung"
+                hint="Ketik nama software/tools lalu tekan koma (,) atau Enter. Contoh: Figma, VS Code, Notion, Docker"
+              >
+                <CompetencyTagInput
+                  tags={profile.tools}
+                  onChange={(tags) =>
+                    setProfile((c) => ({
+                      ...c,
+                      tools: tags,
+                    }))
+                  }
+                  colorScheme="slate"
+                  placeholder="Ketik tools lalu tekan koma / Enter..."
+                />
+              </Field>
+
+              {/* 3. Soft Skills */}
+              <Field
+                label="3. Soft Skills (Kompetensi Interpersonal)"
+                hint="Ketik soft skill lalu tekan koma (,) atau Enter. Contoh: Problem Solving, Leadership, Team Collaboration"
+              >
+                <CompetencyTagInput
+                  tags={profile.softSkills ?? []}
+                  onChange={(tags) =>
+                    setProfile((c) => ({
+                      ...c,
+                      softSkills: tags,
+                    }))
+                  }
+                  colorScheme="emerald"
+                  placeholder="Ketik soft skill lalu tekan koma / Enter..."
+                />
+              </Field>
+            </div>
           </FormSection>
 
           {/* ── Portfolio ── */}

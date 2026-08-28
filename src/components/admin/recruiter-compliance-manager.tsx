@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Building2,
   CheckCircle2,
   Clock,
@@ -32,7 +33,8 @@ export interface RecruiterItem {
     id: string;
     email: string;
     role: string;
-    recruiterProvisioningStatus: "pending" | "active" | "rejected";
+    recruiterProvisioningStatus: "pending" | "active" | "rejected" | "revision_required";
+    recruiterRejectionReason?: string | null;
     createdAt: string;
   };
   profile: {
@@ -50,12 +52,16 @@ export function RecruiterComplianceManager() {
   const [recruiters, setRecruiters] = useState<RecruiterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "active" | "rejected">("pending");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "active" | "revision_required" | "rejected">("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   // Document Viewer Modal State
   const [viewingDocs, setViewingDocs] = useState<RecruiterItem | null>(null);
   const [activeDocTab, setActiveDocTab] = useState<"nib" | "npwp" | "akta" | "ktp">("nib");
+
+  // Revision Modal State
+  const [revisingItem, setRevisingItem] = useState<RecruiterItem | null>(null);
+  const [revisionNotes, setRevisionNotes] = useState("");
 
   // Reject Modal State
   const [rejectingItem, setRejectingItem] = useState<RecruiterItem | null>(null);
@@ -85,7 +91,7 @@ export function RecruiterComplianceManager() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const handleAction = async (userId: string, action: "approve" | "reject", reason?: string) => {
+  const handleAction = async (userId: string, action: "approve" | "reject" | "request_revision", reason?: string) => {
     setBusyId(userId);
     try {
       const res = await fetch(`/api/admin/recruiters/${userId}`, {
@@ -93,24 +99,38 @@ export function RecruiterComplianceManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action,
-          reason: action === "reject" ? reason || "Dokumen belum memenuhi kualifikasi standar compliance." : undefined,
+          reason: reason || (action === "request_revision" ? "Dokumen perlu diperbaiki atau diunggah ulang." : "Dokumen belum memenuhi kualifikasi standar compliance."),
         }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Gagal memperbarui status.");
 
-      toast.success(
-        action === "approve"
-          ? "Akun rekruter & legalitas perusahaan berhasil disetujui!"
-          : "Permohonan rekruter ditolak dengan catatan."
-      );
+      if (action === "approve") {
+        toast.success("Akun rekruter & legalitas perusahaan berhasil disetujui!");
+      } else if (action === "request_revision") {
+        toast.warning("Instruksi revisi dokumen berhasil dikirim ke rekruter.");
+      } else {
+        toast.error("Permohonan rekruter ditolak.");
+      }
+
+      setRevisingItem(null);
+      setRevisionNotes("");
       setRejectingItem(null);
       setRejectReason("");
+
       // Optimistically update local state immediately
+      const nextStatus = action === "approve" ? "active" : action === "request_revision" ? "revision_required" : "rejected";
       setRecruiters((prev) =>
         prev.map((item) =>
           item.user.id === userId
-            ? { ...item, user: { ...item.user, recruiterProvisioningStatus: action === "approve" ? "active" : "rejected" } }
+            ? {
+                ...item,
+                user: {
+                  ...item.user,
+                  recruiterProvisioningStatus: nextStatus,
+                  recruiterRejectionReason: reason || null,
+                },
+              }
             : item
         )
       );
@@ -156,13 +176,14 @@ export function RecruiterComplianceManager() {
     all: recruiters.length,
     pending: recruiters.filter((r) => r.user.recruiterProvisioningStatus === "pending").length,
     active: recruiters.filter((r) => r.user.recruiterProvisioningStatus === "active").length,
+    revision_required: recruiters.filter((r) => r.user.recruiterProvisioningStatus === "revision_required").length,
     rejected: recruiters.filter((r) => r.user.recruiterProvisioningStatus === "rejected").length,
   };
 
   return (
     <div className="space-y-6">
       {/* Metrics Summary */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
         <Card className="border-slate-200 bg-white shadow-xs">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -205,6 +226,20 @@ export function RecruiterComplianceManager() {
           </CardContent>
         </Card>
 
+        <Card className="border-orange-200 bg-orange-50/50 shadow-xs">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-orange-800 font-medium">Perlu Revisi</p>
+                <h3 className="text-2xl font-bold text-orange-900 mt-1">{counts.revision_required}</h3>
+              </div>
+              <div className="size-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-700">
+                <AlertTriangle className="size-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="border-rose-200 bg-rose-50/50 shadow-xs">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -238,6 +273,14 @@ export function RecruiterComplianceManager() {
             className={statusFilter === "active" ? "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" : ""}
           >
             <CheckCircle2 className="size-3.5 mr-1.5" /> Disetujui ({counts.active})
+          </Button>
+          <Button
+            size="sm"
+            variant={statusFilter === "revision_required" ? "default" : "outline"}
+            onClick={() => setStatusFilter("revision_required")}
+            className={statusFilter === "revision_required" ? "bg-orange-600 hover:bg-orange-700 text-white font-semibold" : ""}
+          >
+            <AlertTriangle className="size-3.5 mr-1.5" /> Perlu Revisi ({counts.revision_required})
           </Button>
           <Button
             size="sm"
@@ -300,7 +343,7 @@ export function RecruiterComplianceManager() {
                 <CardContent className="p-5">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                     {/* Left: Entity & PIC Info */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-[#7C3AED] font-bold text-sm">
                           {companyName.charAt(0).toUpperCase()}
@@ -318,6 +361,11 @@ export function RecruiterComplianceManager() {
                                 <CheckCircle2 className="size-3 mr-1" /> Disetujui
                               </Badge>
                             )}
+                            {status === "revision_required" && (
+                              <Badge className="bg-orange-100 text-orange-800 border-orange-300 font-semibold text-[11px]">
+                                <AlertTriangle className="size-3 mr-1" /> Perlu Revisi
+                              </Badge>
+                            )}
                             {status === "rejected" && (
                               <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-semibold text-[11px]">
                                 <XCircle className="size-3 mr-1" /> Ditolak
@@ -329,6 +377,31 @@ export function RecruiterComplianceManager() {
                           </p>
                         </div>
                       </div>
+
+                      {/* Revision / Rejection Note Box */}
+                      {item.user.recruiterRejectionReason && (
+                        <div
+                          className={`rounded-xl p-3 text-xs border ${
+                            status === "revision_required"
+                              ? "bg-orange-50/80 border-orange-200 text-orange-950"
+                              : "bg-rose-50/80 border-rose-200 text-rose-950"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {status === "revision_required" ? (
+                              <AlertTriangle className="size-4 text-orange-600 shrink-0 mt-0.5" />
+                            ) : (
+                              <XCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                            )}
+                            <div>
+                              <p className="font-semibold">
+                                {status === "revision_required" ? "📝 Catatan / Instruksi Revisi Dokumen:" : "⚠️ Alasan Penolakan Akun:"}
+                              </p>
+                              <p className="mt-0.5 text-slate-700 leading-relaxed">{item.user.recruiterRejectionReason}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                         <div className="flex items-center gap-1.5">
@@ -381,7 +454,22 @@ export function RecruiterComplianceManager() {
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 rounded-xl font-bold shadow-xs"
                           >
                             {busyId === item.user.id ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <CheckCircle2 className="size-3.5 mr-1.5" />}
-                            Setujui (Approve)
+                            Setujui
+                          </Button>
+                        )}
+
+                        {status !== "revision_required" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setRevisingItem(item);
+                              setRevisionNotes(item.user.recruiterRejectionReason || "");
+                            }}
+                            disabled={busyId === item.user.id}
+                            className="text-xs h-9 rounded-xl font-semibold border-orange-300 text-orange-800 hover:bg-orange-50"
+                          >
+                            <AlertTriangle className="size-3.5 mr-1.5 text-orange-600" /> Minta Revisi
                           </Button>
                         )}
 
@@ -389,7 +477,10 @@ export function RecruiterComplianceManager() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => setRejectingItem(item)}
+                            onClick={() => {
+                              setRejectingItem(item);
+                              setRejectReason(item.user.recruiterRejectionReason || "");
+                            }}
                             disabled={busyId === item.user.id}
                             className="text-xs h-9 rounded-xl font-semibold"
                           >
@@ -536,9 +627,22 @@ export function RecruiterComplianceManager() {
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setRevisingItem(viewingDocs);
+                    setRevisionNotes(viewingDocs.user.recruiterRejectionReason || "");
+                    setViewingDocs(null);
+                  }}
+                  className="rounded-xl text-xs border-orange-300 text-orange-800 hover:bg-orange-50 font-semibold"
+                >
+                  <AlertTriangle className="size-3.5 mr-1 text-orange-600" /> Minta Revisi
+                </Button>
+                <Button
+                  size="sm"
                   variant="destructive"
                   onClick={() => {
                     setRejectingItem(viewingDocs);
+                    setRejectReason(viewingDocs.user.recruiterRejectionReason || "");
                     setViewingDocs(null);
                   }}
                   className="rounded-xl text-xs"
@@ -553,10 +657,88 @@ export function RecruiterComplianceManager() {
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold"
                 >
-                  <CheckCircle2 className="size-3.5 mr-1" /> Setujui Berkas &amp; Aktifkan Akun
+                  <CheckCircle2 className="size-3.5 mr-1" /> Setujui Berkas
                 </Button>
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Revision Modal */}
+      <Dialog open={Boolean(revisingItem)} onOpenChange={(open) => !open && setRevisingItem(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700 text-base font-bold">
+              <AlertTriangle className="size-5 text-amber-600" />
+              Minta Revisi Dokumen Legalitas
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Kirimkan instruksi perbaikan kepada <strong>{revisingItem?.organization?.name || revisingItem?.profile?.displayName}</strong> agar dapat memperbaiki dokumen di portal rekruter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 space-y-1">
+              <p><strong>PIC:</strong> {revisingItem?.profile?.displayName || "PIC"}</p>
+              <p><strong>Email:</strong> {revisingItem?.user.email}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-800">Instruksi / Catatan Revisi:</label>
+              <textarea
+                value={revisionNotes}
+                onChange={(e) => setRevisionNotes(e.target.value)}
+                placeholder="Contoh: Foto KTP PIC buram, mohon unggah ulang dengan hasil scan/foto yang jelas. Nomor NPWP juga harap disesuaikan dengan kartu..."
+                rows={4}
+                className="w-full text-xs rounded-xl border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="text-[11px] text-muted-foreground">Template cepat:</span>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRevisionNotes("Foto KTP PIC buram / terpotong. Mohon unggah ulang scan KTP asli yang jelas.")}
+                  className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md"
+                >
+                  KTP Buram
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevisionNotes("Nomor NIB tidak cocok dengan dokumen lampiran OSS. Mohon periksa kembali.")}
+                  className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md"
+                >
+                  NIB Tidak Cocok
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevisionNotes("NPWP Badan Usaha wajib menyertakan SKT / dokumen perpajakan resmi terbaru.")}
+                  className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md"
+                >
+                  NPWP Kurang Lengkap
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setRevisingItem(null)} className="rounded-xl text-xs">
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              disabled={!revisionNotes.trim() || busyId === revisingItem?.user.id}
+              onClick={() => {
+                if (revisingItem) {
+                  void handleAction(revisingItem.user.id, "request_revision", revisionNotes);
+                }
+              }}
+              className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {busyId === revisingItem?.user.id ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <AlertTriangle className="size-3.5 mr-1" />}
+              Kirim Permintaan Revisi
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

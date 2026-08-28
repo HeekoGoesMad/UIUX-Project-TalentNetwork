@@ -37,7 +37,7 @@ export const notificationType = pgEnum("notification_type", ["consent_requested"
 export const conversationStatus = pgEnum("conversation_status", ["active", "read_only", "blocked"]);
 export const attachmentScanStatus = pgEnum("attachment_scan_status", ["not_applicable", "pending", "clean", "quarantined"]);
 export const messageReportStatus = pgEnum("message_report_status", ["open", "reviewing", "resolved", "dismissed"]);
-export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected"]);
+export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected", "revision_required"]);
 export const tokenLedgerEntryType = pgEnum("token_ledger_entry_type", ["grant", "charge", "refund"]);
 export const tokenPurchaseStatus = pgEnum("token_purchase_status", ["pending", "paid", "failed", "refunded"]);
 export const notificationDeliveryChannel = pgEnum("notification_delivery_channel", ["email", "in_app"]);
@@ -114,6 +114,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   role: userRole("role").notNull(),
   recruiterProvisioningStatus: recruiterProvisioningStatus("recruiter_provisioning_status").notNull().default("pending"),
+  recruiterRejectionReason: text("recruiter_rejection_reason"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [

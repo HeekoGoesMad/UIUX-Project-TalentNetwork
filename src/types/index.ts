@@ -102,8 +102,42 @@ export type AppState = {
 };
 
 export type UserRole = "candidate" | "recruiter" | "partner";
-export type ProvisioningStatus = "pending" | "active" | "rejected";
-export type DemoUser = { name: string; email: string; role: UserRole; provisioningStatus?: ProvisioningStatus; companyName?: string };
+export type ProvisioningStatus = "pending" | "active" | "rejected" | "revision_required";
+export type DemoUser = {
+  name: string;
+  email: string;
+  role: UserRole;
+  provisioningStatus?: ProvisioningStatus;
+  provisioningReason?: string | null;
+  companyName?: string;
+};
+
+export type EducationLevel = "SMA/SMK" | "Diploma" | "S1" | "S2" | "S3";
+
+export type EducationItem = {
+  level?: EducationLevel | string;
+  school: string;
+  program: string;
+  gpa?: string;
+  startDate?: string;
+  endDate?: string;
+  currentlyStudying?: boolean;
+  dates: string;
+};
+
+export type EmploymentType = "Full Time" | "Internship" | "Contract" | "Freelance";
+
+export type ExperienceItem = {
+  company: string;
+  role: string;
+  employmentType?: EmploymentType | string;
+  startDate?: string;
+  endDate?: string;
+  currentPosition?: boolean;
+  dates: string;
+  description?: string;
+  achievements?: string[];
+};
 
 export type CvProfile = {
   id: string;
@@ -113,11 +147,13 @@ export type CvProfile = {
   location: string;
   email: string;
   phone: string;
-  skills: string[];
+  skills: string[]; // Hard Competencies fallback
+  hardCompetencies?: string[];
   tools: string[];
+  softSkills?: string[];
   industries: string[];
-  experience: { company: string; role: string; dates: string; achievements: string[] }[];
-  education: { school: string; program: string; dates: string }[];
+  experience: ExperienceItem[];
+  education: EducationItem[];
   certifications: string[];
   portfolio: string[];
   targetRole: string;

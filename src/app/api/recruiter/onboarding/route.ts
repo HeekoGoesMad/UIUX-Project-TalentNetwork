@@ -98,11 +98,12 @@ export async function POST(request: Request) {
           .where(eq(schema.organizations.id, orgId));
       }
 
-      // 3. Ensure recruiter status is pending review
+      // 3. Ensure recruiter status is pending review and clear previous rejection/revision reason
       await tx
         .update(schema.users)
         .set({
           recruiterProvisioningStatus: "pending",
+          recruiterRejectionReason: null,
           updatedAt: new Date(),
         })
         .where(eq(schema.users.id, user.id));

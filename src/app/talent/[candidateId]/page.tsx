@@ -584,7 +584,7 @@ export default function TalentProfile() {
             {/* Skills & Tools Preview */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skill</p>
+                <p className="mb-2 text-sm font-semibold">Hard Competencies</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">
@@ -717,7 +717,7 @@ export default function TalentProfile() {
             {/* Skills & Tools */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skill</p>
+                <p className="mb-2 text-sm font-semibold">Hard Competencies</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">

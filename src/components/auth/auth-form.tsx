@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleSelector } from "./role-selector";
 import { OtpVerificationModal } from "./otp-verification-modal";
+import { ConsentModal } from "./consent-modal";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
@@ -22,6 +23,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [partnerErrors, setPartnerErrors] = useState<{ email?: string; institution?: string }>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentAgreed, setConsentAgreed] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{
     email: string;
     role: UserRole;
@@ -52,6 +55,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const companyName = String(form.get("companyName") ?? "").trim();
+
+    if (mode === "register" && role !== "partner" && !consentAgreed) {
+      setConsentModalOpen(true);
+      setErrorMessage("Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.");
+      return;
+    }
 
     if (role === "partner") {
       const institution = String(form.get("institution") ?? "").trim();
@@ -316,26 +325,60 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           </div>
 
           {mode === "register" && (
-            <label htmlFor="terms" className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer pt-0.5">
-              <input
-                id="terms"
-                name="terms"
-                required
-                type="checkbox"
-                className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
-              />
-              <span>
-                Saya menyetujui{" "}
-                <Link href="/terms" className="font-semibold text-[#7C3AED] hover:underline">
-                  Syarat &amp; Ketentuan
-                </Link>{" "}
-                dan{" "}
-                <Link href="/privacy" className="font-semibold text-[#7C3AED] hover:underline">
-                  Kebijakan Privasi
-                </Link>
-                .
-              </span>
-            </label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+              <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  checked={consentAgreed}
+                  onChange={(e) => {
+                    if (!consentAgreed) {
+                      setConsentModalOpen(true);
+                    } else {
+                      setConsentAgreed(e.target.checked);
+                    }
+                  }}
+                  className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
+                />
+                <span className="leading-relaxed">
+                  Saya menyetujui{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setConsentModalOpen(true);
+                    }}
+                    className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                  >
+                    Syarat &amp; Ketentuan, Persetujuan Akses Data
+                  </button>{" "}
+                  dan{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setConsentModalOpen(true);
+                    }}
+                    className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                  >
+                    Kebijakan Privasi
+                  </button>
+                  .
+                </span>
+              </label>
+
+              {consentAgreed ? (
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                  <span>Persetujuan Akses Data, Syarat &amp; Kebijakan telah disetujui</span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 pl-6">
+                  💡 Wajib ditinjau &amp; disetujui sebelum membuat akun di ProofyLink.
+                </p>
+              )}
+            </div>
           )}
 
           <Button
@@ -485,6 +528,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           description="Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
         />
       )}
+
+      <ConsentModal
+        isOpen={consentModalOpen}
+        onClose={() => setConsentModalOpen(false)}
+        onAccept={() => {
+          setConsentAgreed(true);
+          setErrorMessage(null);
+        }}
+      />
     </form>
   );
 }

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
-import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
+import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary, type EducationItem } from "@/types";
 import {
     BriefcaseBusiness,
     Camera,
@@ -46,34 +46,63 @@ const DEMO = {
     {
       company: "Tokopedia",
       role: "Senior Product Designer",
+      employmentType: "Full Time",
+      startDate: "2021",
+      endDate: "Present",
+      currentPosition: true,
       dates: "2021 — Present",
+      description: "Memimpin arsitektur sistem desain multi-platform dan riset pengalaman pengguna.",
       achievements: ["Memimpin design system dan discovery untuk produk commerce."],
     },
     {
       company: "Independent Studio",
       role: "Product Designer",
+      employmentType: "Full Time",
+      startDate: "2019",
+      endDate: "2021",
+      currentPosition: false,
       dates: "2019 — 2021",
+      description: "Merancang desain antarmuka aplikasi mobile dan dashboard untuk berbagai klien.",
       achievements: [],
     },
   ],
   education: [
-    { school: "Institut Teknologi Bandung", program: "Desain Komunikasi Visual", dates: "2015 — 2019" },
-  ],
+    {
+      level: "S1",
+      school: "Institut Teknologi Bandung",
+      program: "Desain Komunikasi Visual",
+      gpa: "3.80 / 4.00",
+      startDate: "2015",
+      endDate: "2019",
+      currentlyStudying: false,
+      dates: "2015 — 2019",
+    },
+  ] as EducationItem[],
   skills: ["Figma", "Product strategy", "User research", "Design systems", "Prototyping"],
+  hardCompetencies: ["Figma", "Product strategy", "User research", "Design systems", "Prototyping"],
   tools: ["Notion", "Miro", "Jira", "Google Workspace"],
+  softSkills: ["Problem Solving", "Leadership", "Team Collaboration", "Communication"],
   portfolio: [] as string[],
 };
 
 // Completeness calculator
-function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: number; missing: string[] } {
+function calcCompleteness(p: {
+  about?: string;
+  headline?: string;
+  experience?: unknown[];
+  education?: unknown[];
+  skills?: string[];
+  tools?: string[];
+  portfolio?: string[];
+}): { pct: number; missing: string[] } {
   const missing: string[] = [];
   if (!p.about) missing.push("Tentang Saya");
   if (!p.headline) missing.push("Headline");
-  if (!p.experience.length) missing.push("Pengalaman Kerja");
-  if (!p.education.length) missing.push("Pendidikan");
-  if (!p.skills.length) missing.push("Skill");
-  if (!p.tools.length) missing.push("Tools");
-  if (!p.portfolio.length) missing.push("Portofolio");
+  if (!p.experience?.length) missing.push("Pengalaman Kerja");
+  if (!p.education?.length) missing.push("Pendidikan");
+  if (!p.skills?.length) missing.push("Skill");
+  if (!p.tools?.length) missing.push("Tools");
+  if (!p.portfolio?.length) missing.push("Portofolio");
   const total = 7;
   const filled = total - missing.length;
   return { pct: Math.round((filled / total) * 100), missing };
@@ -109,8 +138,10 @@ export default function ProfilePage() {
     about: source?.about ?? "",
     experience: source?.experience ?? [],
     education: source?.education ?? [],
-    skills: source?.skills ?? [],
+    skills: source?.hardCompetencies?.length ? source.hardCompetencies : source?.skills ?? [],
+    hardCompetencies: source?.hardCompetencies?.length ? source.hardCompetencies : source?.skills ?? [],
     tools: source?.tools ?? [],
+    softSkills: source?.softSkills ?? [],
     portfolio: source?.portfolio ?? [],
   };
 
@@ -440,24 +471,42 @@ export default function ProfilePage() {
               <ProfileSection title="Pengalaman Kerja">
                 <div className="space-y-6 border-l-2 border-slate-200 pl-5">
                   {p.experience.map((exp, i) => (
-                    <div key={i}>
-                      <p className="font-semibold text-[#111827]">
-                        {exp.role} · {exp.company}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">{exp.dates}</p>
-                      {Array.isArray(exp.achievements)
-                        ? exp.achievements.map((a, j) => (
-                            <p key={j} className="mt-2 text-sm leading-6 text-muted-foreground">
-                              {a}
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-[#111827]">
+                          {exp.role} · {exp.company}
+                        </p>
+                        {exp.employmentType && (
+                          <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                            {exp.employmentType}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs text-muted-foreground">{exp.dates}</p>
+
+                      {exp.description && (
+                        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line pt-0.5">
+                          {exp.description}
+                        </p>
+                      )}
+
+                      {Array.isArray(exp.achievements) && exp.achievements.length > 0 ? (
+                        <div className="space-y-1 pt-1">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
+                          {exp.achievements.map((a, j) => (
+                            <p key={j} className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                              • {a}
                             </p>
-                          ))
-                        : typeof exp.achievements === "string" && exp.achievements
-                        ? (
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                              {exp.achievements}
-                            </p>
-                          )
-                        : null}
+                          ))}
+                        </div>
+                      ) : typeof exp.achievements === "string" && exp.achievements ? (
+                        <div className="pt-1">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
+                          <p className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                            • {exp.achievements}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -471,12 +520,22 @@ export default function ProfilePage() {
                   {p.education.map((edu, i) => (
                     <div key={i} className="flex items-start gap-3">
                       <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#7C3AED]" />
-                      <div>
-                        <p className="font-semibold text-[#111827]">{edu.school}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-[#111827]">{edu.school}</p>
+                          {edu.level && (
+                            <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                              {edu.level}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-700 font-medium">
                           {edu.program}
-                          {edu.dates && ` · ${edu.dates}`}
+                          {edu.gpa && <span className="text-[#7C3AED] font-semibold"> · IPK: {edu.gpa}</span>}
                         </p>
+                        {edu.dates && (
+                          <p className="text-xs text-muted-foreground">{edu.dates}</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -506,38 +565,62 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Skills */}
-            {p.skills.length > 0 && (
-              <ProfileSection title="Skill">
-                <div className="flex flex-wrap gap-2">
-                  {p.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </ProfileSection>
-            )}
+            {/* Framework Kompetensi */}
+            <ProfileSection title="Framework Kompetensi">
+              <div className="space-y-4">
+                {/* 1. Hard Competencies */}
+                {p.skills.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Hard Competencies</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="rounded-full bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-[#7C3AED]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Tools */}
-            {p.tools.length > 0 && (
-              <ProfileSection title="Tools">
-                <div className="flex flex-wrap gap-2">
-                  {p.tools.map((tool) => (
-                    <span
-                      key={tool}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
-                    >
-                      <Wrench className="size-3" />
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-              </ProfileSection>
-            )}
+                {/* 2. Tools */}
+                {p.tools.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Tools &amp; Software</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.tools.map((tool) => (
+                        <span
+                          key={tool}
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          <Wrench className="size-3" />
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Soft Skills */}
+                {p.softSkills.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Soft Skills</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.softSkills.map((softSkill) => (
+                        <span
+                          key={softSkill}
+                          className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                        >
+                          {softSkill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ProfileSection>
 
             {/* Portfolio */}
             <ProfileSection title="Portofolio">

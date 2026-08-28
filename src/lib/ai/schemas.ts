@@ -97,6 +97,41 @@ export const advisorSchema = z.object({
 export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
-export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure", "local"]), });
+export const cvImportSchema = z.object({
+  fullName: z.string(),
+  headline: z.string(),
+  about: z.string(),
+  skills: z.array(z.string()),
+  hardCompetencies: z.array(z.string()).optional(),
+  tools: z.array(z.string()).optional(),
+  softSkills: z.array(z.string()).optional(),
+  experience: z.array(
+    z.object({
+      company: z.string(),
+      role: z.string(),
+      employmentType: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      currentPosition: z.boolean().optional(),
+      dates: z.string().optional().default(""),
+      description: z.string().optional(),
+      achievements: z.array(z.string()).default([]),
+    })
+  ),
+  education: z.array(
+    z.object({
+      level: z.string().optional(),
+      school: z.string(),
+      program: z.string(),
+      gpa: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      currentlyStudying: z.boolean().optional(),
+      dates: z.string().optional().default(""),
+    })
+  ),
+  suggestions: z.array(z.string()),
+  source: z.enum(["mock", "azure", "local"]),
+});
 
 export type ProfileContext = z.infer<typeof profileContextSchema>;

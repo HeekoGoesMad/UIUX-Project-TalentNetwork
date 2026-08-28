@@ -21,23 +21,33 @@ const html = (p: CvProfile, css: string, body: string): string =>
 const expBlock = (p: CvProfile, role: string, meta: string, ach: string, dash = false): string =>
   p.experience
     .map(
-      (e) => `
+      (e) => {
+        const empType = e.employmentType ? ` (${escapeHtml(e.employmentType)})` : "";
+        const desc = e.description ? `<div style="margin-top:3px;font-size:11px;color:#333;line-height:1.4">${escapeHtml(e.description)}</div>` : "";
+        const achList = e.achievements?.length ? `<div style="${ach}">${e.achievements.map(escapeHtml).join(", ")}</div>` : "";
+        return `
     <div style="margin-bottom:10px">
-      <div style="${role}">${dash ? `${escapeHtml(e.role)} — ${escapeHtml(e.company)}` : escapeHtml(e.role)}</div>
+      <div style="${role}">${dash ? `${escapeHtml(e.role)}${empType} — ${escapeHtml(e.company)}` : `${escapeHtml(e.role)}${empType}`}</div>
       <div style="${meta}">${dash ? escapeHtml(e.dates) : `${escapeHtml(e.company)} · ${escapeHtml(e.dates)}`}</div>
-      ${e.achievements?.length ? `<div style="${ach}">${e.achievements.map(escapeHtml).join(", ")}</div>` : ""}
-    </div>`
+      ${desc}
+      ${achList}
+    </div>`;
+      }
     )
     .join("");
 
 const eduBlock = (p: CvProfile, wrap: string, school: string, sub: string): string =>
   p.education
     .map(
-      (e) => `
+      (e) => {
+        const levelPrefix = e.level ? `[${escapeHtml(e.level)}] ` : "";
+        const gpaSuffix = e.gpa ? ` · IPK: ${escapeHtml(e.gpa)}` : "";
+        return `
     <div style="${wrap}">
-      <div style="${school}">${escapeHtml(e.school)}</div>
-      <div style="${sub}">${escapeHtml(e.program)} · ${escapeHtml(e.dates)}</div>
-    </div>`
+      <div style="${school}">${levelPrefix}${escapeHtml(e.school)}</div>
+      <div style="${sub}">${escapeHtml(e.program)}${gpaSuffix} · ${escapeHtml(e.dates || "")}</div>
+    </div>`;
+      }
     )
     .join("");
 
@@ -57,16 +67,20 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
   .section-title { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.5px solid #111; padding-bottom: 2px; margin: 14px 0 8px; }
   .about { font-size: 11.5px; color: #333; margin-bottom: 4px; }
 `,
-    body: (p) => `
+    body: (p) => {
+      const hardSkills = p.hardCompetencies?.length ? p.hardCompetencies : p.skills;
+      const allCompetencies = [...hardSkills, ...p.tools, ...(p.softSkills ?? [])];
+      return `
   <h1>${escapeHtml(p.fullName)}</h1>
   <div class="sub">${escapeHtml(p.headline ?? "")}</div>
-  <div class="contact">${escapeHtml(p.email)} ${p.phone ? "· " + escapeHtml(p.phone) : ""} ${p.location ? "· " + escapeHtml(p.location) : ""}</div>
-  ${p.about ? `<div class="section-title">TENTANG SAYA</div><div class="about">${escapeHtml(p.about)}</div>` : ""}
-  ${p.experience.length ? `<div class="section-title">PENGALAMAN KERJA</div>${expBlock(p, "font-weight:bold", "font-size:11px;color:#555", "margin-top:4px;font-size:11px", true)}` : ""}
+  <div class="contact">${escapeHtml(p.email)}${p.phone ? " · " + escapeHtml(p.phone) : ""}${p.location ? " · " + escapeHtml(p.location) : ""}</div>
+  ${p.about ? `<div class="section-title">PROFIL</div><div class="about">${escapeHtml(p.about)}</div>` : ""}
+  ${p.experience.length ? `<div class="section-title">PENGALAMAN KERJA</div>${expBlock(p, "font-weight:bold", "font-size:11px;color:#555", "margin-top:2px;font-size:11px", true)}` : ""}
   ${p.education.length ? `<div class="section-title">PENDIDIKAN</div>${eduBlock(p, "margin-bottom:8px", "font-weight:bold", "font-size:11px;color:#555")}` : ""}
-  ${[...p.skills, ...p.tools].length ? `<div class="section-title">SKILLS &amp; TOOLS</div><div style="font-size:11.5px">${[...p.skills, ...p.tools].map(escapeHtml).join(" · ")}</div>` : ""}
-  ${p.portfolio.length ? `<div class="section-title">PORTFOLIO</div><div style="font-size:11px;color:#555">${p.portfolio.map(portfolioLink).join(" · ")}</div>` : ""
-}`,
+  ${allCompetencies.length ? `<div class="section-title">KOMPETENSI &amp; TOOLS</div><div style="font-size:11.5px">${allCompetencies.map(escapeHtml).join(" · ")}</div>` : ""}
+  ${p.portfolio.length ? `<div class="section-title">PORTFOLIO</div><div style="font-size:11px;color:#555">${p.portfolio.map(portfolioLink).join(" · ")}</div>` : ""}
+`;
+    },
   },
   modern: {
     css: `
@@ -79,7 +93,9 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
   .section-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7C3AED; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #F3E8FF; }
   .about { font-size: 11.5px; color: #444; margin-bottom: 16px; line-height: 1.6; } .section { margin-bottom: 18px; }
 `,
-    body: (p) => `
+    body: (p) => {
+      const hardSkills = p.hardCompetencies?.length ? p.hardCompetencies : p.skills;
+      return `
   <div class="header"><h1>${escapeHtml(p.fullName)}</h1><div class="headline">${escapeHtml(p.headline ?? "")}</div><div class="contact">${escapeHtml(p.email)}${p.phone ? " · " + escapeHtml(p.phone) : ""}${p.location ? " · " + escapeHtml(p.location) : ""}</div></div>
   <div class="body">
     <div class="main">
@@ -88,12 +104,14 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
       ${p.education.length ? `<div class="section"><div class="section-title">Pendidikan</div>${eduBlock(p, "margin-bottom:8px", "font-weight:bold", "font-size:11px;color:#555")}</div>` : ""}
     </div>
     <div class="aside">
-      ${p.skills.length ? `<div class="section"><div class="section-title">Skills</div><div>${p.skills.map((s) => badge(s, "#F3E8FF", "#7C3AED")).join("")}</div></div>` : ""}
+      ${hardSkills.length ? `<div class="section"><div class="section-title">Hard Competencies</div><div>${hardSkills.map((s) => badge(s, "#F3E8FF", "#7C3AED")).join("")}</div></div>` : ""}
       ${p.tools.length ? `<div class="section"><div class="section-title">Tools</div><div>${p.tools.map((t) => badge(t, "#EDE9FE", "#6D28D9")).join("")}</div></div>` : ""}
+      ${(p.softSkills ?? []).length ? `<div class="section"><div class="section-title">Soft Skills</div><div>${(p.softSkills ?? []).map((s) => badge(s, "#DCFCE7", "#166534")).join("")}</div></div>` : ""}
       ${p.portfolio.length ? `<div class="section"><div class="section-title">Portfolio</div>${p.portfolio.map((u) => `<div style="font-size:10px;color:#7C3AED;word-break:break-all;margin-bottom:4px">${portfolioLink(u)}</div>`).join("")}</div>` : ""}
     </div>
   </div>
-`,
+`;
+    },
   },
   sidebar: {
     css: `
@@ -145,7 +163,7 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
 `,
     body: (p) => {
       const exp = p.experience.map((e) => minRow(e.dates, "10px", `<div style="font-weight:700;font-size:12px">${escapeHtml(e.role)}</div><div style="font-size:11px;color:#666">${escapeHtml(e.company)}</div>${e.achievements?.length ? `<div style="font-size:11px;color:#555;margin-top:2px">${e.achievements.map(escapeHtml).join(", ")}</div>` : ""}`)).join("");
-      const edu = p.education.map((e) => minRow(e.dates, "8px", `<div style="font-weight:700;font-size:12px">${escapeHtml(e.school)}</div><div style="font-size:11px;color:#666">${escapeHtml(e.program)}</div>`)).join("");
+      const edu = p.education.map((e) => minRow(e.dates || "", "8px", `<div style="font-weight:700;font-size:12px">${e.level ? `[${escapeHtml(e.level)}] ` : ""}${escapeHtml(e.school)}</div><div style="font-size:11px;color:#666">${escapeHtml(e.program)}${e.gpa ? ` · IPK: ${escapeHtml(e.gpa)}` : ""}</div>`)).join("");
       return `
   <div class="header"><div><h1>${escapeHtml(p.fullName)}</h1><div class="headline">${escapeHtml(p.headline ?? "")}</div></div><div class="contact">${escapeHtml(p.email)}<br/>${escapeHtml(p.phone ?? "")}<br/>${escapeHtml(p.location ?? "")}</div></div>
   ${p.about ? `<div class="about">${escapeHtml(p.about)}</div>` : ""}

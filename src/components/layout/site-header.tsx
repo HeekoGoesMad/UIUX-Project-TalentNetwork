@@ -60,6 +60,7 @@ export function SiteHeader() {
 
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
+  const isOnboarding = pathname?.startsWith("/candidate/onboarding") || pathname?.startsWith("/recruiter/onboarding");
   const isPublicHeader = (isLanding || isAuth) && !visibleUser;
   const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
@@ -108,6 +109,10 @@ export function SiteHeader() {
          { href: "/messages", label: "Pesan" },
          { href: "/dashboard", label: "Dashboard" },
       ];
+
+  if (isOnboarding) {
+    return null;
+  }
 
   return (
     <header

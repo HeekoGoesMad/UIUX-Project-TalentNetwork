@@ -24,16 +24,27 @@ export default function RecruiterPendingPage() {
   const { user } = useApp();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const isApproved = user?.provisioningStatus === "active";
+  const status = user?.provisioningStatus || "pending";
+  const isApproved = status === "active";
+  const isRevisionRequired = status === "revision_required";
+  const isRejected = status === "rejected";
 
   const checkStatus = async () => {
     setChecking(true);
     try {
       const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
       if (res.ok) {
-        const data = (await res.json()) as { identity?: { provisioningStatus?: string } };
+        const data = (await res.json()) as { identity?: { provisioningStatus?: string; provisioningReason?: string } };
         if (data.identity?.provisioningStatus === "active") {
           toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
+          window.location.reload();
+          return;
+        } else if (data.identity?.provisioningStatus === "revision_required") {
+          toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
+          window.location.reload();
+          return;
+        } else if (data.identity?.provisioningStatus === "rejected") {
+          toast.error("Permohonan akun Anda ditolak oleh compliance.");
           window.location.reload();
           return;
         }
@@ -46,34 +57,54 @@ export default function RecruiterPendingPage() {
     }
   };
 
-  // Live polling every 5 seconds to sync in real-time when Admin clicks Approve
+  // Live polling every 4 seconds to sync in real-time when Admin clicks Approve or Request Revision
   useEffect(() => {
     if (isApproved) return;
     const interval = setInterval(() => {
       void fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { identity?: { provisioningStatus?: string } } | null) => {
-          if (data?.identity?.provisioningStatus === "active") {
-            toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== status) {
+            if (data.identity.provisioningStatus === "active") {
+              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+            } else if (data.identity.provisioningStatus === "revision_required") {
+              toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+            }
             window.location.reload();
           }
         })
         .catch(() => null);
     }, 4000);
     return () => clearInterval(interval);
-  }, [isApproved]);
+  }, [isApproved, status]);
 
   const documents = [
-    { name: "Nomor Induk Berusaha (NIB)", status: isApproved ? "Terverifikasi" : "Dalam Antrean Peninjauan", file: "NIB_Perusahaan.pdf" },
-    { name: "NPWP Badan Usaha", status: isApproved ? "Terverifikasi" : "Dalam Antrean Peninjauan", file: "NPWP_Badan.pdf" },
-    { name: "Akta Pendirian / SK Kemenkumham", status: isApproved ? "Terverifikasi" : "Dalam Antrean Peninjauan", file: "Akta_SK_Kemenkumham.pdf" },
-    { name: "Foto KTP PIC Rekruter", status: isApproved ? "Terverifikasi" : "Dalam Antrean Peninjauan", file: "KTP_PIC.jpg" },
+    {
+      name: "Nomor Induk Berusaha (NIB)",
+      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
+      file: "NIB_Perusahaan.pdf",
+    },
+    {
+      name: "NPWP Badan Usaha",
+      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
+      file: "NPWP_Badan.pdf",
+    },
+    {
+      name: "Akta Pendirian / SK Kemenkumham",
+      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
+      file: "Akta_SK_Kemenkumham.pdf",
+    },
+    {
+      name: "Foto KTP PIC Rekruter",
+      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
+      file: "KTP_PIC.jpg",
+    },
   ];
 
   return (
     <main className="min-h-screen bg-slate-50/60 py-10 px-4">
       <div className="container mx-auto max-w-3xl space-y-6">
-        {/* Status Banner */}
+        {/* Status Banners for 4 Lifecycle States */}
         {isApproved ? (
           <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 shadow-sm">
             <CardContent className="p-6">
@@ -97,6 +128,105 @@ export default function RecruiterPendingPage() {
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-xs"
                     >
                       Masuk ke Dashboard Sekarang <ArrowRight className="size-3.5 ml-1.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isRevisionRequired ? (
+          <Card className="border-orange-300 bg-gradient-to-r from-orange-50/90 via-white to-orange-50/40 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-xs">
+                  <FileText className="size-6" />
+                </div>
+                <div className="space-y-3 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-bold text-orange-950">Dokumen Memerlukan Perbaikan / Revisi</h1>
+                      <Badge className="bg-orange-100 text-orange-800 border-orange-300 text-xs font-semibold">
+                        Revision Required
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void checkStatus()}
+                      disabled={checking}
+                      className="h-8 px-2.5 text-xs rounded-lg border-orange-300 hover:bg-orange-100/60 text-orange-950 font-medium"
+                    >
+                      {checking ? <Loader2 className="size-3.5 animate-spin mr-1.5 text-orange-700" /> : <RefreshCw className="size-3.5 mr-1.5 text-orange-700" />}
+                      Cek Status
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    Halo <strong>{user?.name || "Recruiter"}</strong>, tim compliance telah meninjau pengajuan pendaftaran Anda. Terdapat berkas yang belum sesuai dan perlu diperbaiki.
+                  </p>
+
+                  {/* Revision Notes Box */}
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 text-xs text-orange-950 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <span>📝 Catatan &amp; Instruksi dari Tim Compliance:</span>
+                    </p>
+                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                      {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan foto KTP PIC atau berkas NIB yang diunggah."}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    <Button
+                      onClick={() => router.push("/recruiter/onboarding")}
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs h-9 shadow-xs"
+                    >
+                      Perbaiki &amp; Unggah Ulang Dokumen <ArrowRight className="size-3.5 ml-1.5" />
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">
+                      Setelah diunggah ulang, berkas otomatis masuk antrean prioritas review.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isRejected ? (
+          <Card className="border-rose-300 bg-gradient-to-r from-rose-50/90 via-white to-rose-50/40 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-xs">
+                  <ShieldCheck className="size-6 text-white" />
+                </div>
+                <div className="space-y-3 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-xl font-bold text-rose-950">Permohonan Akun Rekruter Ditolak</h1>
+                    <Badge className="bg-rose-100 text-rose-800 border-rose-300 text-xs font-semibold">
+                      Rejected by Compliance
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    Mohon maaf, pendaftaran perusahaan Anda saat ini belum dapat disetujui untuk mengakses ProofyLink Talent Network berdasarkan standar kepatuhan dan verifikasi entitas legal.
+                  </p>
+
+                  {/* Rejection Reason Box */}
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs text-rose-950 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <span>⚠️ Alasan Penolakan:</span>
+                    </p>
+                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                      {user?.provisioningReason || "Entitas tidak memenuhi kualifikasi standar verifikasi kepatuhan ProofyLink."}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="border-rose-300 text-rose-900 hover:bg-rose-100/60 font-semibold rounded-xl text-xs h-9"
+                    >
+                      <a href="mailto:support@proofylink.com?subject=Bantuan Verifikasi Akun Rekruter">
+                        <MessageCircle className="size-3.5 mr-1.5" /> Hubungi Tim Bantuan / Support
+                      </a>
                     </Button>
                   </div>
                 </div>

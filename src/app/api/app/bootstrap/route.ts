@@ -63,7 +63,13 @@ export async function GET() {
       : { accountId: null, balance: 0, updatedAt: null };
 
     return NextResponse.json({
-      identity: { id: current.user.id, email: current.user.email, role: current.user.role, provisioningStatus: current.user.recruiterProvisioningStatus },
+      identity: {
+        id: current.user.id,
+        email: current.user.email,
+        role: current.user.role,
+        provisioningStatus: current.user.recruiterProvisioningStatus,
+        provisioningReason: current.user.recruiterRejectionReason ?? null,
+      },
       organization,
       profile: profile[0] ?? null,
       candidateProfile: candidateProfile[0] ?? null,

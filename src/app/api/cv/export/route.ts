@@ -13,9 +13,14 @@ const experienceItem = z.object({
 });
 
 const educationItem = z.object({
+  level: z.string().max(40).optional(),
   school: z.string().max(160),
   program: z.string().max(160),
-  dates: z.string().max(60),
+  gpa: z.string().max(40).optional(),
+  startDate: z.string().max(60).optional(),
+  endDate: z.string().max(60).optional(),
+  currentlyStudying: z.boolean().optional(),
+  dates: z.string().max(60).optional().default(""),
 });
 
 const profileSchema = z.object({

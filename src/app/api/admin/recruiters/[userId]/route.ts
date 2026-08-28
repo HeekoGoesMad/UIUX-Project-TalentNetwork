@@ -8,8 +8,8 @@ import { writeAuditLog } from "@/lib/audit";
 
 const bodySchema = z
   .object({
-    action: z.enum(["approve", "reject"]),
-    reason: z.string().trim().max(500).optional(),
+    action: z.enum(["approve", "reject", "request_revision"]),
+    reason: z.string().trim().max(1000).optional(),
     organizationId: z.string().uuid().optional(),
     organizationRole: z.enum(["owner", "admin", "recruiter", "viewer"]).optional(),
   })
@@ -33,18 +33,29 @@ export async function PATCH(
   }
 
   const parsed = bodySchema.safeParse(await request.json());
-  if (!parsed.success || (parsed.data.action === "reject" && !parsed.data.reason)) {
-    return NextResponse.json({ error: "Action recruiter tidak valid." }, { status: 400 });
+  if (
+    !parsed.success ||
+    ((parsed.data.action === "reject" || parsed.data.action === "request_revision") && !parsed.data.reason)
+  ) {
+    return NextResponse.json(
+      { error: "Action recruiter tidak valid atau catatan revisi/penolakan belum diisi." },
+      { status: 400 }
+    );
   }
 
   const db = "error" in current ? (await import("@/db")).getDb() : current.db;
   const actorUserId = "error" in current ? userId : current.user.id;
 
   const result = await db.transaction(async (tx) => {
+    let nextStatus: "active" | "rejected" | "revision_required" = "active";
+    if (parsed.data.action === "reject") nextStatus = "rejected";
+    if (parsed.data.action === "request_revision") nextStatus = "revision_required";
+
     const [user] = await tx
       .update(schema.users)
       .set({
-        recruiterProvisioningStatus: parsed.data.action === "approve" ? "active" : "rejected",
+        recruiterProvisioningStatus: nextStatus,
+        recruiterRejectionReason: parsed.data.action === "approve" ? null : (parsed.data.reason ?? null),
         updatedAt: new Date(),
       })
       .where(eq(schema.users.id, userId))
