@@ -9,7 +9,7 @@ import { ShortlistService } from "@/lib/services/shortlist";
 
 export async function GET() {
   try {
-    let current = await getCurrentAppUser();
+    let current = await getCurrentAppUser({ allowPending: true });
     if ("error" in current && current.status === 403) {
       // Fresh login race: auth session exists but the profile row is not
       // synced yet. Self-heal by syncing now instead of failing the call.
@@ -18,7 +18,7 @@ export async function GET() {
       if (data.user?.email) {
         try {
           await syncAuthenticatedUser(data.user, {});
-          current = await getCurrentAppUser();
+          current = await getCurrentAppUser({ allowPending: true });
         } catch {
           // fall through to the original error below
         }
@@ -26,7 +26,8 @@ export async function GET() {
     }
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-    const membership = current.user.role === "recruiter" ? await getRecruiterScope(current.db, current.user) : null;
+    const isRecruiterActive = current.user.role === "recruiter" && current.user.recruiterProvisioningStatus === "active";
+    const membership = isRecruiterActive ? await getRecruiterScope(current.db, current.user) : null;
     const activeOrgId = membership && !("error" in membership) ? membership.membership.organizationId : null;
 
     const [profile, candidateProfile, notifications] = await Promise.all([

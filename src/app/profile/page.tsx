@@ -1,29 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  BriefcaseBusiness,
-  Check,
-  ChevronDown,
-  ExternalLink,
-  FileText,
-  GraduationCap,
-  MapPin,
-  Pencil,
-  Wrench,
-} from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { ProfileSection } from "@/components/profile/profile-section";
+import { EmptyState } from "@/components/shared/empty-state";
+import { AiSummaryCard } from "@/components/talent/ai-summary-card";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
 import { VerifiedBadge } from "@/components/talent/verified-badge";
-import { AiSummaryCard } from "@/components/talent/ai-summary-card";
-import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/shared/empty-state";
+import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
-import { cn } from "@/lib/utils";
+import {
+    BriefcaseBusiness,
+    Camera,
+    Check,
+    ChevronDown,
+    ExternalLink,
+    FileText,
+    GraduationCap,
+    MapPin,
+    Pencil,
+    Wrench,
+} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
   "open-to-work": "Aktif mencari pekerjaan.",
@@ -88,8 +90,20 @@ export default function ProfilePage() {
 
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
+  const avatarUrl: string =
+    (source && "avatarUrl" in source && typeof source.avatarUrl === "string" && source.avatarUrl)
+      ? source.avatarUrl
+      : (source?.fullName?.includes("Nadia") ? "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop" : "");
+
+  const bannerUrl: string =
+    (source && "bannerUrl" in source && typeof source.bannerUrl === "string" && source.bannerUrl)
+      ? source.bannerUrl
+      : (source?.fullName?.includes("Nadia") ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop" : "");
+
   const p = {
     fullName: source?.fullName ?? "",
+    avatarUrl,
+    bannerUrl,
     headline: source?.headline ?? "",
     location: source?.location ?? "",
     about: source?.about ?? "",
@@ -98,6 +112,76 @@ export default function ProfilePage() {
     skills: source?.skills ?? [],
     tools: source?.tools ?? [],
     portfolio: source?.portfolio ?? [],
+  };
+
+  const { saveCvProfile } = useApp();
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ukuran foto profil maksimal 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        const base = cvProfile || {
+          ...DEMO,
+          id: "local-profile",
+          email: user?.email || "candidate@proofylink.dev",
+          phone: "0812-3456-7890",
+          industries: [],
+          certifications: [],
+          targetRole: "Product Designer",
+          workArrangement: "hybrid" as const,
+          openToWork: true,
+          careerStatus: "open-to-work" as CareerStatus,
+          updatedAt: new Date().toISOString(),
+        };
+        void saveCvProfile({
+          ...base,
+          avatarUrl: dataUrl,
+        });
+        toast.success("Foto profil berhasil diperbarui!");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Ukuran banner maksimal 8MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        const base = cvProfile || {
+          ...DEMO,
+          id: "local-profile",
+          email: user?.email || "candidate@proofylink.dev",
+          phone: "0812-3456-7890",
+          industries: [],
+          certifications: [],
+          targetRole: "Product Designer",
+          workArrangement: "hybrid" as const,
+          openToWork: true,
+          careerStatus: "open-to-work" as CareerStatus,
+          updatedAt: new Date().toISOString(),
+        };
+        void saveCvProfile({
+          ...base,
+          bannerUrl: dataUrl,
+        });
+        toast.success("Foto sampul profil berhasil diperbarui!");
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const summaryKey = JSON.stringify([
@@ -117,7 +201,7 @@ export default function ProfilePage() {
         string,
         string,
       ];
-      const response = await fetch("/api/ai/summary?strict=true", {
+      const response = await fetch("/api/ai/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -126,7 +210,6 @@ export default function ProfilePage() {
           skills,
           targetRole: targetRole || "Talent",
           location,
-          strict: true,
         }),
       });
       const payload = await response.json();
@@ -198,29 +281,78 @@ export default function ProfilePage() {
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="rounded-2xl border bg-white">
-              <div className="h-36 overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#201C45] via-[#4C1D95] to-[#7C3AED]" />
+            <section className="relative rounded-2xl border bg-white shadow-xs">
+              <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#1e1b4b] via-[#4c1d95] to-[#7c3aed]">
+                {/* Banner Photo Overlay */}
+                {p.bannerUrl ? (
+                  <img
+                    src={p.bannerUrl}
+                    alt="Foto Sampul"
+                    className="h-full w-full object-cover opacity-75"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
+                
+                {/* Button Ubah Foto Sampul */}
+                <label className="cursor-pointer absolute top-4 right-4 flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-black/60 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm">
+                  <Camera className="size-3.5" />
+                  <span>Ubah Foto Sampul</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleBannerUpload}
+                  />
+                </label>
+              </div>
+
               <div className="px-6 pb-6">
-                {/* Avatar */}
-                <div className="-mt-12 flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-slate-50 text-3xl font-bold text-[#7C3AED]">
-                  {initials}
+                {/* Avatar with Camera badge */}
+                <div className="-mt-16 sm:-mt-20 relative inline-block">
+                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-3xl border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
+                    {p.avatarUrl ? (
+                      <img
+                        src={p.avatarUrl}
+                        alt={p.fullName}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : null}
+                    <span className="absolute text-3xl font-bold text-[#7C3AED] -z-10">{initials}</span>
+                  </div>
+
+                  {/* Camera icon button to upload/edit avatar */}
+                  <label
+                    title="Ubah Foto Profil"
+                    className="cursor-pointer absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform hover:scale-105"
+                  >
+                    <Camera className="size-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleAvatarUpload}
+                    />
+                  </label>
                 </div>
 
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-bold text-[#111827]">{p.fullName || user?.name || "Profil kamu"}</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-[#111827]">{p.fullName || user?.name || "Profil kamu"}</h2>
                     <VerifiedBadge />
                   </div>
 
                   {/* Headline */}
                   {p.headline && (
-                    <p className="mt-1 font-medium text-[#7C3AED]">{p.headline}</p>
+                    <p className="mt-1 text-base font-semibold text-[#7C3AED]">{p.headline}</p>
                   )}
 
                   {/* Location */}
-                  <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="size-3.5" />
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <MapPin className="size-4 text-slate-400" />
                     {p.location}
                   </p>
 
@@ -313,11 +445,19 @@ export default function ProfilePage() {
                         {exp.role} · {exp.company}
                       </p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{exp.dates}</p>
-                      {exp.achievements?.map((a, j) => (
-                        <p key={j} className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {a}
-                        </p>
-                      ))}
+                      {Array.isArray(exp.achievements)
+                        ? exp.achievements.map((a, j) => (
+                            <p key={j} className="mt-2 text-sm leading-6 text-muted-foreground">
+                              {a}
+                            </p>
+                          ))
+                        : typeof exp.achievements === "string" && exp.achievements
+                        ? (
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                              {exp.achievements}
+                            </p>
+                          )
+                        : null}
                     </div>
                   ))}
                 </div>

@@ -18,7 +18,7 @@ function recruiterAccessError(status: AppUser["recruiterProvisioningStatus"]) {
   };
 }
 
-export async function getCurrentAppUser() {
+export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return { error: "Autentikasi diperlukan.", status: 401 as const };
@@ -26,7 +26,7 @@ export async function getCurrentAppUser() {
   const db = getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.authUserId, data.user.id)).limit(1);
   if (!user) return { error: "Profil pengguna tidak ditemukan.", status: 403 as const };
-  if (user.role === "recruiter" && user.recruiterProvisioningStatus !== "active") {
+  if (!options?.allowPending && user.role === "recruiter" && user.recruiterProvisioningStatus !== "active") {
     return recruiterAccessError(user.recruiterProvisioningStatus);
   }
 

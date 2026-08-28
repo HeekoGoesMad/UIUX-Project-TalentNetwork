@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
+  BriefcaseBusiness,
+  Camera,
+  ExternalLink,
   FileUp,
   GraduationCap,
   Loader2,
@@ -9,9 +12,8 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  User,
   Wrench,
-  BriefcaseBusiness,
-  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/providers/app-provider";
@@ -267,8 +269,70 @@ export function CvWorkspace() {
         </CardHeader>
         <CardContent className="space-y-8">
 
-          <FormSection title="Informasi Dasar">
+          <FormSection title="Informasi Dasar & Foto">
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Profil (Avatar)</span>
+                <div className="flex items-center gap-4">
+                  <div className="relative flex size-16 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-slate-200 shadow-2xs overflow-hidden">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="Foto Profil" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="size-8 text-slate-400" />
+                    )}
+                  </div>
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
+                    <Camera className="size-3.5 text-[#7C3AED]" />
+                    <span>Upload Foto Profil</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target?.result) update("avatarUrl", ev.target.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Sampul (Banner)</span>
+                <div className="flex items-center gap-4">
+                  <div className="relative h-16 w-32 shrink-0 rounded-xl border-2 border-white bg-gradient-to-r from-[#1e1b4b] to-[#7c3aed] shadow-2xs overflow-hidden">
+                    {profile.bannerUrl ? (
+                      <img src={profile.bannerUrl} alt="Foto Sampul" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
+                    <Camera className="size-3.5 text-[#7C3AED]" />
+                    <span>Upload Sampul</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target?.result) update("bannerUrl", ev.target.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <Field label="Nama Lengkap">
                 <input
                   className={inputCls}
@@ -277,12 +341,29 @@ export function CvWorkspace() {
                   placeholder="Nama lengkapmu"
                 />
               </Field>
-              <Field label="Lokasi" hint="Kota, Provinsi">
+              <Field label="Lokasi">
                 <input
                   className={inputCls}
                   value={profile.location}
                   onChange={(e) => update("location", e.target.value)}
-                  placeholder="Jakarta, DKI Jakarta"
+                  placeholder="Kota, Provinsi (contoh: Jakarta Selatan, DKI Jakarta)"
+                />
+              </Field>
+              <Field label="Email">
+                <input
+                  className={inputCls}
+                  type="email"
+                  value={profile.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  placeholder="nama@email.com"
+                />
+              </Field>
+              <Field label="Nomor Telepon / WhatsApp">
+                <input
+                  className={inputCls}
+                  value={profile.phone ?? ""}
+                  onChange={(e) => update("phone", e.target.value)}
+                  placeholder="0812-xxxx-xxxx"
                 />
               </Field>
               <Field
@@ -355,12 +436,12 @@ export function CvWorkspace() {
                     </label>
                     <div className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
                       <span>Pencapaian</span>
-                      {exp.achievements.length === 0 && (
+                      {(!Array.isArray(exp.achievements) || exp.achievements.length === 0) && (
                         <span className="text-xs font-normal text-muted-foreground">
                           Belum ada pencapaian. Tambahkan hasil terkuatmu di peran ini.
                         </span>
                       )}
-                      {exp.achievements.map((achievement, j) => (
+                      {(Array.isArray(exp.achievements) ? exp.achievements : typeof exp.achievements === "string" && exp.achievements ? [exp.achievements] : []).map((achievement, j) => (
                         <div key={j} className="flex items-start gap-2">
                           <textarea
                             className={`${textareaCls} flex-1`}

@@ -2,24 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GitFork, Sparkles, Target } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const aiNavItems = [
   {
     href: "/candidate/career-advisor",
-    label: "Career Advisor",
+    label: "Penasihat Profil Karier AI",
     icon: Sparkles,
-  },
-  {
-    href: "/candidate/career-gaps",
-    label: "Gap Analysis",
-    icon: Target,
-  },
-  {
-    href: "/candidate/career-roadmap",
-    label: "Career Roadmap",
-    icon: GitFork,
   },
 ];
 

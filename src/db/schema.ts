@@ -17,7 +17,7 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).defaultNow().notNull();
 
-export const userRole = pgEnum("user_role", ["candidate", "recruiter", "admin"]);
+export const userRole = pgEnum("user_role", ["candidate", "recruiter", "partner", "admin"]);
 export const organizationMemberRole = pgEnum("organization_member_role", ["owner", "admin", "recruiter", "viewer"]);
 export const profileSectionType = pgEnum("profile_section_type", [
   "headline",

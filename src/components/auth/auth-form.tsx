@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Info, Send, Sparkles } from "lucide-react";
+import { Building2, Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Info, Send, Sparkles } from "lucide-react";
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
@@ -9,23 +9,32 @@ import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoleSelector } from "./role-selector";
+import { OtpVerificationModal } from "./otp-verification-modal";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const { user, hydrated, login, register, loginAsDemoCandidate } = useApp();
+  const { user, hydrated, login, register, loginAsDemoCandidate, loginAsFreshCandidate } = useApp();
   const [role, setRole] = useState<UserRole>("recruiter");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submittedPartner, setSubmittedPartner] = useState(false);
   const [partnerErrors, setPartnerErrors] = useState<{ email?: string; institution?: string }>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [pendingRegistration, setPendingRegistration] = useState<{
+    email: string;
+    role: UserRole;
+    destinationPath: string;
+    name?: string;
+    companyName?: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (hydrated && user && !loading) {
-      router.replace(destination(user.role, getNext(), mode === "register"));
+    if (hydrated && user && !loading && !otpModalOpen && mode === "login") {
+      router.replace(destination(user.role, getNext(), false));
     }
-  }, [hydrated, user, loading, router, mode]);
+  }, [hydrated, user, loading, router, mode, otpModalOpen]);
 
   useEffect(() => {
     const error = new URLSearchParams(window.location.search).get("error");
@@ -71,11 +80,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setErrorMessage(`Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${result.error}`);
       return;
     }
-    if (result.needsConfirmation) {
+    
+    // When registering, ALWAYS pop up the 6-digit OTP verification modal immediately
+    if (mode === "register") {
       setLoading(false);
-      setErrorMessage("Akun dibuat. Periksa email untuk mengonfirmasi akun sebelum masuk melalui tautan di email.");
+      const chosenRole = result.role ?? role;
+      const dest = chosenRole === "recruiter" ? "/recruiter/onboarding" : chosenRole === "partner" ? "/partner" : "/candidate/onboarding";
+      setPendingRegistration({ email, role: chosenRole, destinationPath: dest, name, companyName });
+      setOtpModalOpen(true);
       return;
     }
+    
     let synced: { role?: UserRole; provisioningStatus?: ProvisioningStatus } | null = null;
     if (supabaseConfigured) {
       synced = await fetch("/api/auth/sync", {
@@ -89,7 +104,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         return;
       }
     }
-    router.push(destination(synced?.role ?? result.role ?? role, getNext(), mode === "register", synced?.provisioningStatus ?? result.provisioningStatus));
+    router.push(destination(synced?.role ?? result.role ?? role, getNext(), false, synced?.provisioningStatus ?? result.provisioningStatus));
   };
 
   const signInWithGoogle = async () => {
@@ -253,15 +268,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </div>
           )}
 
-          {mode === "register" && role === "recruiter" && (
-            <div>
-              <label htmlFor="company-name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                Nama Perusahaan
-              </label>
-              <Input id="company-name" name="companyName" className="h-10 sm:h-11 rounded-xl text-xs sm:text-sm" autoComplete="organization" placeholder="Nama perusahaan" required />
-            </div>
-          )}
-
           <div>
             <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
               Alamat Email
@@ -378,29 +384,62 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           )}
 
           {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "candidate" && (
-            <div className="mt-2 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                  <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
-                </span>
-                <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
-                  Profil Lengkap
-                </span>
+            <div className="mt-2 space-y-2">
+              <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
+                    <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
+                  </span>
+                  <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
+                    Profil Lengkap
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Masuk sebagai <strong>Nadia Putri Rahayu</strong> (Senior Product Designer) dengan riwayat Tokopedia & OVO.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+                  onClick={() => {
+                    loginAsDemoCandidate();
+                    router.refresh();
+                    router.push("/candidate");
+                  }}
+                >
+                  <User className="size-3.5" /> Masuk Akun Demo (Nadia)
+                </Button>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Masuk sebagai <strong>Nadia Putri Rahayu</strong> (Senior Product Designer). Terisi penuh dengan riwayat Tokopedia & OVO untuk pengujian Career Advisor & Roadmap.
-              </p>
+
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+                className="w-full h-9 text-xs font-medium border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl gap-1.5"
                 onClick={() => {
-                  loginAsDemoCandidate();
-                  router.push("/candidate");
+                  loginAsFreshCandidate();
+                  router.refresh();
+                  router.push("/candidate/onboarding");
                 }}
               >
-                <User className="size-3.5" /> Masuk Akun Demo Kandidat (Nadia)
+                <Sparkles className="size-3.5 text-emerald-600" /> Uji Coba Daftar Kandidat Baru (Mulai Step 0)
+              </Button>
+            </div>
+          )}
+
+          {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "recruiter" && (
+            <div className="mt-2 space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-9 text-xs font-semibold border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100 rounded-xl gap-1.5"
+                onClick={() => {
+                  router.push("/recruiter/onboarding");
+                }}
+              >
+                <Building2 className="size-3.5 text-[#0b2342]" /> Uji Coba Onboarding Rekruter (3 Tahap)
               </Button>
             </div>
           )}
@@ -421,6 +460,31 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         <CheckCircle2 className="size-3.5 text-[#7C3AED]" />
         <span>{supabaseConfigured ? "Autentikasi Supabase aktif" : "Lingkungan demo terverifikasi"}</span>
       </div>
+
+      {pendingRegistration && (
+        <OtpVerificationModal
+          isOpen={otpModalOpen}
+          email={pendingRegistration.email}
+          onClose={() => setOtpModalOpen(false)}
+          onSuccess={async () => {
+            if (supabaseConfigured && pendingRegistration) {
+              await fetch("/api/auth/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  role: pendingRegistration.role,
+                  name: pendingRegistration.name || pendingRegistration.email.split("@")[0],
+                  companyName: pendingRegistration.companyName || undefined,
+                }),
+              }).catch(() => null);
+            }
+            setOtpModalOpen(false);
+            router.push(pendingRegistration.destinationPath);
+          }}
+          title="Verifikasi Akun Baru"
+          description="Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
+        />
+      )}
     </form>
   );
 }
@@ -435,8 +499,12 @@ function destination(role: UserRole, next: string | null, isRegistration = false
   if (role === "partner") {
     return "/partner";
   }
-  if (provisioningStatus !== "active") return "/recruiter/pending";
-  if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
+  if (role === "recruiter") {
+    if (isRegistration) return "/recruiter/onboarding";
+    if (provisioningStatus !== "active") return "/recruiter/pending";
+    if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
+    return "/dashboard";
+  }
   return "/dashboard";
 }
 

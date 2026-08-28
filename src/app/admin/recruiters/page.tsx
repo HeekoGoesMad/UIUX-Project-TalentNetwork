@@ -1,3 +1,10 @@
-import { AdminDataPage } from "@/components/admin/admin-data-page";
 import { AdminShell } from "@/components/admin/admin-shell";
-export default function AdminRecruitersPage() { return <AdminShell title="Recruiter provisioning"><AdminDataPage endpoint="/api/admin/recruiters" kind="recruiters" /></AdminShell>; }
+import { RecruiterComplianceManager } from "@/components/admin/recruiter-compliance-manager";
+
+export default function AdminRecruitersPage() {
+  return (
+    <AdminShell title="Verifikasi & Compliance Legalitas Rekruter">
+      <RecruiterComplianceManager />
+    </AdminShell>
+  );
+}

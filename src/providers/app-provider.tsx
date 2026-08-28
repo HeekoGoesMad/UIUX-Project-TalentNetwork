@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, ContactRequest, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -83,6 +83,7 @@ type Context = AppState & {
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
   loginAsDemoCandidate: () => void;
+  loginAsFreshCandidate: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   scan: (id: string) => boolean;
@@ -127,6 +128,8 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     certifications: [],
     portfolio: items<string>("portfolio"),
     targetRole: candidate?.targetRole ?? "",
+    avatarUrl: ((candidate as Record<string, unknown> | null)?.avatarUrl as string | undefined) ?? "",
+    bannerUrl: ((candidate as Record<string, unknown> | null)?.bannerUrl as string | undefined) ?? "",
     workArrangement: preferences.workArrangement === "remote" || preferences.workArrangement === "onsite" ? preferences.workArrangement : "hybrid",
     openToWork: status !== "not-available",
     careerStatus: status,
@@ -164,6 +167,8 @@ function parseState(value: string | null): AppState {
   }
 }
 
+const emptySubscribe = () => () => {};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -182,7 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
-  const [hydrated] = useState(true);
+  const hydrated = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [bootstrapped, setBootstrapped] = useState(() => !supabaseConfigured);
   const [profile, setProfile] = useState<BootstrapProfile | null>(null);
   const [tokenAccount, setTokenAccount] = useState<BootstrapTokenAccount>({ accountId: null, balance: 0, updatedAt: null });
@@ -254,9 +259,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
-      if (payload.identity?.role) dbIdentity.current = { role: payload.identity.role, provisioningStatus: payload.identity.provisioningStatus };
-      if (payload.identity?.provisioningStatus) {
-        setUser((current) => current?.role === "recruiter" ? { ...current, provisioningStatus: payload.identity!.provisioningStatus! } : current);
+      if (payload.identity?.role) {
+        dbIdentity.current = { role: payload.identity.role, provisioningStatus: payload.identity.provisioningStatus };
+        const role = payload.identity.role;
+        const status: ProvisioningStatus = payload.identity.provisioningStatus ?? (role === "recruiter" ? "pending" : "active");
+        setUser((current) => current ? {
+          ...current,
+          role,
+          provisioningStatus: status,
+        } : {
+          email: payload.identity!.email ?? "",
+          name: payload.identity!.email?.split("@")[0] ?? "Pengguna",
+          role,
+          provisioningStatus: status,
+        });
       }
 
       const consentResponse = await fetch("/api/consent-requests", { cache: "no-store" });
@@ -456,10 +472,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUser(DEMO_CANDIDATE_USER);
     setState((current) => ({
       ...current,
-      cvProfile: current.cvProfile ?? DEMO_CANDIDATE_CV,
-      careerStatus: current.careerStatus ?? "open-to-work",
+      cvProfile: DEMO_CANDIDATE_CV,
+      careerStatus: "open-to-work",
+      talentCategory: "djoin-verified",
     }));
-    toast.success("Masuk sebagai Candidate Demo");
+    try {
+      localStorage.removeItem("proofylink-onboarding-draft");
+      localStorage.setItem(sessionKey, JSON.stringify(DEMO_CANDIDATE_USER));
+    } catch {}
+    toast.success("Masuk sebagai Candidate Demo (Nadia)");
+  };
+
+  const loginAsFreshCandidate = () => {
+    const freshUser: DemoUser = {
+      name: "Kandidat Baru",
+      email: `kandidat.baru+${Date.now()}@example.com`,
+      role: "candidate",
+      provisioningStatus: "active",
+    };
+    setUser(freshUser);
+    setState((current) => ({
+      ...current,
+      cvProfile: null,
+      careerStatus: "open-to-work",
+      talentCategory: "public",
+    }));
+    try {
+      localStorage.removeItem("proofylink-onboarding-draft");
+      localStorage.setItem(sessionKey, JSON.stringify(freshUser));
+    } catch {}
+    toast.success("Masuk sebagai Kandidat Baru (Mulai Step 0)");
   };
 
   const register = async (name: string, role: UserRole, email: string, password: string, companyName?: string): Promise<AuthResult> => {
@@ -582,6 +624,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...current,
       cvProfile: saved,
       careerStatus: saved.careerStatus,
+      talentCategory: saved.talentCategory,
       partnerVerifications: campusVerification
         ? { ...current.partnerVerifications, [profile.id || "my-candidate"]: campusVerification }
         : current.partnerVerifications,
@@ -747,7 +790,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, loginAsFreshCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

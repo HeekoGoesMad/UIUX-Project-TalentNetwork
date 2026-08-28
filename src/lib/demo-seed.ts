@@ -18,6 +18,8 @@ export const DEMO_CANDIDATE_USER: DemoUser = {
 export const DEMO_CANDIDATE_CV: CvProfile = {
   id: "demo-candidate-cv-001",
   fullName: "Nadia Putri Rahayu",
+  avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop",
+  bannerUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop",
   headline: "Senior Product Designer | UX Research & Design Systems | Fintech & E-Commerce",
   about:
     "Product designer dengan 5+ tahun pengalaman merancang pengalaman digital yang berdampak di industri fintech dan e-commerce. " +
@@ -110,5 +112,6 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
   workArrangement: "hybrid",
   openToWork: true,
   careerStatus: "open-to-work",
+  talentCategory: "djoin-verified",
   updatedAt: new Date().toISOString(),
 };

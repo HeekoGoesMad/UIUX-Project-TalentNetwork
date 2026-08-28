@@ -26,7 +26,7 @@ export default function Dashboard() {
       })
       .catch(() => setRemoteCandidates([]))
       .finally(() => setRemoteLoaded(true));
-  }, [dbMode, bootstrapped]);
+  }, [dbMode, bootstrapped, user?.email]);
 
   const candidatesList = dbMode && remoteCandidates.length > 0 ? remoteCandidates : demoCandidates;
   const databaseEmpty = dbMode && bootstrapped && !databaseError && remoteLoaded && remoteCandidates.length === 0;

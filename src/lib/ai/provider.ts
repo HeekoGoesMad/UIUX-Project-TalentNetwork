@@ -147,7 +147,7 @@ export async function careerAdvisor(input: unknown) {
   let answerText = "";
 
   const atsData = {
-    score: Math.min(95, 60 + context.skills.length * 4),
+    readinessLevel: (context.skills.length >= 8 ? "Sangat Siap ATS" : context.skills.length >= 4 ? "Cukup Siap" : "Perlu Penguatan") as "Sangat Siap ATS" | "Cukup Siap" | "Perlu Penguatan",
     detectedKeywords: context.skills.length ? context.skills.slice(0, 5) : ["Product Design", "UX Research", "Figma"],
     missingKeywords: ["Cross-functional Leadership", "Design Systems at Scale", "Conversion Rate Optimization (CRO)", "Product Analytics", "A/B Testing"],
     sectionAudits: [
@@ -282,7 +282,7 @@ export async function careerAdvisor(input: unknown) {
   };
 
   if (focus === "ats") {
-    summaryText = `Analisis Kompatibilitas ATS untuk target role ${role}: Skor keterbacaan ${atsData.score}/100. Kerapian keyword inti sudah baik, namun perlu pengayaan metrik kuantitatif dan keyword domain spesifik.`;
+    summaryText = `Analisis Kompatibilitas ATS untuk target role ${role}: Predikat Kesiapan adalah ${atsData.readinessLevel}. Kerapian kata kunci inti sudah baik, namun perlu pengayaan metrik kuantitatif dan kata kunci domain spesifik.`;
     answerText = `Optimasi ATS: Pastikan istilah role (${role}) dan skill utama muncul secara alami di Headline, About, dan Experience. Gunakan format standar tanpa jargon yang membingungkan.`;
   } else if (focus === "headline") {
     summaryText = `Crafting Headline Profesional untuk ${role}: 3 usulan headline berbobot tinggi dengan formula 3-bagian (Role + Spesialisasi + Dampak Terukur).`;

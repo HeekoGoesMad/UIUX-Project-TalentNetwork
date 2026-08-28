@@ -5,7 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { getDb, schema } from "@/db";
 import { ShortlistService } from "@/lib/services/shortlist";
 
-type PersistedRole = "candidate" | "recruiter";
+type PersistedRole = "candidate" | "recruiter" | "partner" | "admin";
 
 export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string; role?: PersistedRole }) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
@@ -25,13 +25,23 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     }).from(schema.users).where(eq(schema.users.email, authEmail)).limit(1);
     const existing = existingByAuthId ?? existingByEmail;
 
-    const metadataRole = authUser.user_metadata?.role;
-    const role = existing?.role ?? (metadataRole === "candidate" || metadataRole === "recruiter" ? metadataRole : input.role ?? null);
-    if (!role) throw new Error("ROLE_UNVERIFIED");
+    const metadataRole = authUser.user_metadata?.role as PersistedRole | undefined;
+    const role: PersistedRole = input.role ?? metadataRole ?? existing?.role ?? "candidate";
 
     const [user] = existing
-      ? await tx.update(schema.users).set({ authUserId: authUser.id, email: authEmail, updatedAt: new Date() }).where(eq(schema.users.id, existing.id)).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus })
-      : await tx.insert(schema.users).values({ authUserId: authUser.id, email: authEmail, role, recruiterProvisioningStatus: role === "candidate" ? "active" : "pending" }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
+      ? await tx.update(schema.users).set({
+          authUserId: authUser.id,
+          email: authEmail,
+          role,
+          recruiterProvisioningStatus: role === "recruiter" ? (existing.recruiterProvisioningStatus ?? "pending") : "active",
+          updatedAt: new Date(),
+        }).where(eq(schema.users.id, existing.id)).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus })
+      : await tx.insert(schema.users).values({
+          authUserId: authUser.id,
+          email: authEmail,
+          role,
+          recruiterProvisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending",
+        }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
 
     await tx.insert(schema.profiles).values({
       userId: user.id,

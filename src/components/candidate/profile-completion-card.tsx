@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 export function ProfileCompletionCard() {
   const { cvProfile } = useApp();

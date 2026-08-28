@@ -39,7 +39,7 @@ export const advisorSchema = z.object({
     conclusion: z.string(),
   }).optional(),
   atsDetails: z.object({
-    score: z.number().min(0).max(100),
+    readinessLevel: z.enum(["Sangat Siap ATS", "Cukup Siap", "Perlu Penguatan"]).default("Cukup Siap"),
     detectedKeywords: z.array(z.string()),
     missingKeywords: z.array(z.string()),
     sectionAudits: z.array(z.object({

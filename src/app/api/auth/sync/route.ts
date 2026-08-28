@@ -6,6 +6,7 @@ import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 const syncSchema = z.object({
   name: z.string().trim().min(2).max(160),
   companyName: z.string().trim().max(160).optional(),
+  role: z.enum(["candidate", "recruiter", "partner"]).optional(),
 });
 
 export async function POST(request: Request) {

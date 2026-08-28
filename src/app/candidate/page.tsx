@@ -1,16 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, FileText, Map, MessageCircle, Sparkles, User } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowRight, FileText, MessageCircle, Sparkles, User } from "lucide-react";
+import Link from "next/link";
 
 const items = [
-  ["/candidate/cv", "CV & Profil", "Impor PDF dan tinjau profil", FileText],
-  ["/candidate/career-advisor", "Career Advisor", "Saran cerdas berbasis profil", Sparkles],
-  ["/candidate/career-roadmap", "Career Roadmap", "Langkah terarah yang bisa kamu sesuaikan", Map],
-  ["/candidate/contact-requests", "Permintaan Kontak", "Kelola percakapan dengan recruiter", MessageCircle],
+  ["/candidate/cv", "CV & Profil", "Lengkapi atau impor CV dan tinjau profil profesional", FileText],
+  ["/candidate/career-advisor", "Penasihat Profil Karier AI", "Evaluasi ATS, racik headline, dan poles pencapaian", Sparkles],
+  ["/candidate/contact-requests", "Permintaan Kontak", "Kelola izin kontak dan percakapan dengan recruiter", MessageCircle],
 ] as const;
 
 export default function CandidateHome() {
@@ -50,24 +49,29 @@ export default function CandidateHome() {
         </div>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          {items.map(([href, title, desc, Icon]) => (
-            <Link key={href} href={href}>
-              <Card className="card-interactive h-full transition-all hover:border-[#7C3AED]/40 hover:shadow-md">
-                <CardContent className="flex h-full flex-col justify-between p-6">
-                  <div>
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
-                      <Icon className="size-5" />
+          {items.map(([href, title, desc, Icon], idx) => {
+            const isFullWidth = idx === 2;
+            return (
+              <Link key={href} href={href} className={isFullWidth ? "sm:col-span-2" : ""}>
+                <Card className="card-interactive h-full transition-all hover:border-[#7C3AED]/40 hover:shadow-md">
+                  <CardContent className={`p-6 flex ${isFullWidth ? "flex-col sm:flex-row sm:items-center sm:justify-between" : "flex-col justify-between"} h-full gap-4`}>
+                    <div className={isFullWidth ? "flex items-start sm:items-center gap-4" : ""}>
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
+                        <Icon className="size-5" />
+                      </div>
+                      <div>
+                        <h2 className={`font-semibold text-[#111827] ${isFullWidth ? "text-lg" : "mt-4 text-lg"}`}>{title}</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+                      </div>
                     </div>
-                    <h2 className="mt-4 text-lg font-semibold text-[#111827]">{title}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-                  </div>
-                  <span className="mt-6 inline-flex items-center text-xs font-semibold text-[#7C3AED]">
-                    Akses <ArrowRight className="ml-1 size-3.5" />
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                    <span className="inline-flex items-center text-xs font-semibold text-[#7C3AED] shrink-0">
+                      Akses <ArrowRight className="ml-1 size-3.5" />
+                    </span>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       </main>
     </ProtectedRoute>

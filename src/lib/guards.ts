@@ -9,6 +9,7 @@ export type Role = AppUser["role"];
 const ROLE_HOME: Record<Role, string> = {
   candidate: "/candidate",
   recruiter: "/dashboard",
+  partner: "/partner",
   admin: "/dashboard",
 };
 
@@ -28,8 +29,13 @@ async function resolveAccess(): Promise<Resolution> {
     return process.env.NODE_ENV === "production" ? { kind: "unavailable" } : { kind: "demo" };
   }
   try {
-    const res = await getCurrentAppUser();
-    if (!("error" in res)) return { kind: "user", user: res.user };
+    const res = await getCurrentAppUser({ allowPending: true });
+    if (!("error" in res)) {
+      if (res.user.role === "recruiter" && res.user.recruiterProvisioningStatus !== "active") {
+        return { kind: "provisioning" };
+      }
+      return { kind: "user", user: res.user };
+    }
     if ("reason" in res) return { kind: "provisioning" };
     return { kind: "unavailable" };
   } catch {

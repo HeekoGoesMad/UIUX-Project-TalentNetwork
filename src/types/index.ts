@@ -97,6 +97,7 @@ export type AppState = {
   contactRequests?: Record<string, ContactRequest>;
   cvProfile: CvProfile | null;
   careerStatus: CareerStatus;
+  talentCategory?: TalentCategory;
   partnerVerifications?: Record<string, CampusVerification>;
 };
 
@@ -123,6 +124,9 @@ export type CvProfile = {
   workArrangement: "remote" | "hybrid" | "onsite";
   openToWork: boolean;
   careerStatus: CareerStatus;
+  talentCategory?: TalentCategory;
+  avatarUrl?: string;
+  bannerUrl?: string;
   campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
@@ -133,5 +137,31 @@ export type ConsentState = "not-requested" | "pending-candidate-consent" | "cons
 export function asCareerStatus(value: unknown): CareerStatus {
   return typeof value === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(value) ? (value as CareerStatus) : "open-to-work";
 }
+
+export type RecruiterOnboardingData = {
+  // Step 1: PIC / Recruiter
+  picName: string;
+  picTitle: string;
+  picPhone: string;
+  picEmail: string;
+  // Step 2: Company Profile
+  companyName: string;
+  industry: string;
+  companySize: string;
+  description: string;
+  websiteUrl: string;
+  linkedinUrl: string;
+  officeAddress: string;
+  city: string;
+  // Step 3: Legal Documents & KTP
+  nibNumber: string;
+  nibFileName?: string;
+  npwpNumber: string;
+  npwpFileName?: string;
+  aktaFileName?: string;
+  ktpFileName?: string;
+  submittedAt?: string;
+  verificationStatus: "draft" | "pending_review" | "verified" | "needs_revision";
+};
 
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
