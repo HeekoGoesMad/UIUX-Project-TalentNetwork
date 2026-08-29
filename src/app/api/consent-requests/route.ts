@@ -17,10 +17,14 @@ const requestSchema = z.object({
 
 export async function GET() {
   try {
-    const current = await getCurrentAppUser();
+    const current = await getCurrentAppUser({ allowPending: true });
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const isCandidate = current.user.role === "candidate";
+    const isPendingRecruiter = current.user.role === "recruiter" && current.user.recruiterProvisioningStatus !== "active";
+    if (isPendingRecruiter) {
+      return NextResponse.json({ requests: [] });
+    }
     const scope = isCandidate ? null : await getRecruiterScope(current.db, current.user);
     if (scope && "error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 

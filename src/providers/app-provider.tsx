@@ -229,14 +229,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       role === "candidate" || role === "partner"
         ? "active"
         : dbIdentity.current.provisioningStatus ?? (metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" || metadata.provisioningStatus === "revision_required" ? metadata.provisioningStatus : "pending");
-    setUser({
+    setUser((current) => ({
       role,
       provisioningStatus,
       provisioningReason: dbIdentity.current.provisioningReason ?? null,
       email: authUser.email ?? "",
-      name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : authUser.email ?? "Pengguna",
-      companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
-    });
+      name: typeof metadata.name === "string" && metadata.name.trim()
+        ? metadata.name
+        : current?.name && current.name !== current.email?.split("@")[0]
+          ? current.name
+          : authUser.email?.split("@")[0] ?? "Pengguna",
+      companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
+    }));
     if (typeof metadata.companyName === "string" && metadata.companyName.trim()) {
       setActivePartnerInstitution(metadata.companyName);
     }
@@ -248,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
         profile?: BootstrapProfile | null;
         candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
         candidateSections?: BootstrapSection[];
@@ -264,18 +268,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dbIdentity.current = { role: payload.identity.role, provisioningStatus: payload.identity.provisioningStatus };
         const role = payload.identity.role;
         const status: ProvisioningStatus = payload.identity.provisioningStatus ?? (role === "recruiter" ? "pending" : "active");
-        setUser((current) => current ? {
-          ...current,
+        const resolvedName = payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || payload.identity?.email?.split("@")[0] || "Pengguna";
+        setUser((current) => ({
+          email: payload.identity?.email ?? current?.email ?? "",
+          name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
           role,
           provisioningStatus: status,
-          provisioningReason: payload.identity?.provisioningReason ?? current.provisioningReason ?? null,
-        } : {
-          email: payload.identity!.email ?? "",
-          name: payload.identity!.email?.split("@")[0] ?? "Pengguna",
-          role,
-          provisioningStatus: status,
-          provisioningReason: payload.identity?.provisioningReason ?? null,
-        });
+          provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
+          companyName: current?.companyName,
+        }));
       }
 
       const consentResponse = await fetch("/api/consent-requests", { cache: "no-store" });
@@ -623,6 +624,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     const saved = { ...profile, campusVerification, updatedAt: new Date().toISOString() };
+    if (saved.fullName?.trim()) {
+      setUser((current) => current ? { ...current, name: saved.fullName } : null);
+    }
     setState((current) => ({
       ...current,
       cvProfile: saved,

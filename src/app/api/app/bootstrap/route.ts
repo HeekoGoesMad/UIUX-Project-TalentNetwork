@@ -66,6 +66,7 @@ export async function GET() {
       identity: {
         id: current.user.id,
         email: current.user.email,
+        name: profile[0]?.displayName ?? current.user.email?.split("@")[0] ?? "Pengguna",
         role: current.user.role,
         provisioningStatus: current.user.recruiterProvisioningStatus,
         provisioningReason: current.user.recruiterRejectionReason ?? null,
