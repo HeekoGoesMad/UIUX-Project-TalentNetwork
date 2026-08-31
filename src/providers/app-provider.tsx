@@ -170,9 +170,9 @@ function parseState(value: string | null): AppState {
 const emptySubscribe = () => () => {};
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  const configError = process.env.NODE_ENV === "production" && !supabaseConfigured;
+  const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !supabaseConfigured;
+  const configError = false;
   const [state, setState] = useState<AppState>(() => {
     if (typeof window === "undefined") return initial;
     return parseState(localStorage.getItem(storageKey));

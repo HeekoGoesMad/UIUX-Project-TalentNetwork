@@ -24,9 +24,7 @@ async function resolveAccess(): Promise<Resolution> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
-    // Intentional demo mode outside production: guarded segments render,
-    // data APIs stay unused by the demo UI. Production fails closed instead.
-    return process.env.NODE_ENV === "production" ? { kind: "unavailable" } : { kind: "demo" };
+    return { kind: "demo" };
   }
   try {
     const res = await getCurrentAppUser({ allowPending: true });
