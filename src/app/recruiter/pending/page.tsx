@@ -179,11 +179,6 @@ export default function RecruiterPendingPage() {
       file: "NPWP_Badan.pdf",
     },
     {
-      name: "Akta Pendirian / SK Kemenkumham",
-      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
-      file: "Akta_SK_Kemenkumham.pdf",
-    },
-    {
       name: "Foto KTP PIC Rekruter",
       status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
       file: "KTP_PIC.jpg",

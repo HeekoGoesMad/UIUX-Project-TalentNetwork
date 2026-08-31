@@ -51,10 +51,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setErrorMessage(null);
 
     const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") ?? "").trim();
+    const rawName = String(form.get("name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const companyName = String(form.get("companyName") ?? "").trim();
+    const companyName = role === "recruiter" ? rawName : String(form.get("companyName") ?? "").trim();
+    const name = rawName;
 
     if (mode === "register" && role !== "partner" && !consentAgreed) {
       setConsentModalOpen(true);
@@ -261,17 +262,21 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "register" && (
             <div>
               <label htmlFor="full-name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                Nama Lengkap
+                {role === "recruiter" ? "Nama Perusahaan" : "Nama Lengkap"}
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                {role === "recruiter" ? (
+                  <Building2 className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                ) : (
+                  <User className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                )}
                 <Input
                   id="full-name"
                   name="name"
                   className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
                   required
-                  autoComplete="name"
-                  placeholder="Alex Wijaya"
+                  autoComplete={role === "recruiter" ? "organization" : "name"}
+                  placeholder={role === "recruiter" ? "PT Inovasi Digital Nusantara" : "Alex Wijaya"}
                 />
               </div>
             </div>

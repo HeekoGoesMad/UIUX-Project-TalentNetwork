@@ -144,7 +144,7 @@ export function RecruiterComplianceManager() {
 
   // Document Viewer Modal State
   const [viewingDocs, setViewingDocs] = useState<RecruiterItem | null>(null);
-  const [activeDocTab, setActiveDocTab] = useState<"nib" | "npwp" | "akta" | "ktp">("nib");
+  const [activeDocTab, setActiveDocTab] = useState<"nib" | "npwp" | "ktp">("nib");
 
   // Revision Modal State
   const [revisingItem, setRevisingItem] = useState<RecruiterItem | null>(null);
@@ -683,14 +683,13 @@ export function RecruiterComplianceManager() {
             {[
               { id: "nib", label: "NIB Perusahaan" },
               { id: "npwp", label: "NPWP Badan Usaha" },
-              { id: "akta", label: "Akta & SK Kemenkumham" },
               { id: "ktp", label: "KTP PIC Rekruter" },
             ].map((tab) => (
               <Button
                 key={tab.id}
                 size="sm"
                 variant={activeDocTab === tab.id ? "default" : "ghost"}
-                onClick={() => setActiveDocTab(tab.id as "nib" | "npwp" | "akta" | "ktp")}
+                onClick={() => setActiveDocTab(tab.id as "nib" | "npwp" | "ktp")}
                 className={`text-xs h-8 rounded-lg ${activeDocTab === tab.id ? "bg-[#7C3AED] text-white" : "text-slate-600"}`}
               >
                 {tab.label}
@@ -733,25 +732,6 @@ export function RecruiterComplianceManager() {
                 <div className="pt-2">
                   <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
                     ✓ Nomor Pokok Wajib Pajak Valid
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {activeDocTab === "akta" && (
-              <div className="space-y-3 max-w-md">
-                <div className="size-12 rounded-2xl bg-purple-100 text-[#7C3AED] mx-auto flex items-center justify-center">
-                  <FileText className="size-6" />
-                </div>
-                <h4 className="font-bold text-slate-900 text-sm">Akta Pendirian / SK Kemenkumham</h4>
-                <p className="text-xs text-slate-500 leading-relaxed font-mono">
-                  No. SK: AHU-0012345.AH.01.01.TAHUN 2023<br />
-                  Notaris: Notaris Rekanan Resmi, S.H., M.Kn.<br />
-                  Bentuk Entitas: Perseroan Terbatas (PT)
-                </p>
-                <div className="pt-2">
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
-                    ✓ SK Pengesahan Badan Hukum Terlampir
                   </Badge>
                 </div>
               </div>
