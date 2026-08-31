@@ -16,7 +16,7 @@ export const screeningSchema = z.object({
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const advisorSchema = z.object({
-  focus: z.enum(["ats", "headline", "star", "role", "general"]).default("ats"),
+  focus: z.enum(["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
   summary: z.string(),
   headlineSuggestions: z.array(z.string()).default([]),
   starBullets: z.array(z.object({
@@ -87,6 +87,53 @@ export const advisorSchema = z.object({
     })),
     criticalGaps: z.array(z.string()),
     strategicRecommendations: z.array(z.string()),
+  }).optional(),
+  cvReviewDetails: z.object({
+    readinessLevel: z.string(),
+    overallScore: z.number().min(0).max(100),
+    executiveSummary: z.string(),
+    sectionAudits: z.array(z.object({
+      section: z.string(),
+      status: z.enum(["good", "needs_improvement"]),
+      notes: z.array(z.string()),
+      recommendation: z.string(),
+    })),
+    formatChecks: z.array(z.object({
+      check: z.string(),
+      passed: z.boolean(),
+      tip: z.string(),
+    })),
+    priorityActionItems: z.array(z.string()),
+  }).optional(),
+  gapAnalysisDetails: z.object({
+    targetRole: z.string(),
+    matchScore: z.number().min(0).max(100),
+    matchLevel: z.string(),
+    coreCompetencies: z.array(z.object({
+      competency: z.string(),
+      candidateLevel: z.string(),
+      requiredLevel: z.string(),
+      status: z.enum(["match", "gap", "exceeds"]),
+      recommendation: z.string().optional(),
+    })),
+    criticalGaps: z.array(z.string()),
+    transferableStrengths: z.array(z.string()),
+    strategicRecommendations: z.array(z.string()),
+  }).optional(),
+  careerRoadmapDetails: z.object({
+    targetRole: z.string(),
+    targetTimeline: z.string(),
+    targetLevel: z.string(),
+    phases: z.array(z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })),
+    recommendedCertifications: z.array(z.string()),
+    strategicAdvice: z.array(z.string()),
   }).optional(),
   answer: z.string(),
   nextSteps: z.array(z.string()),
