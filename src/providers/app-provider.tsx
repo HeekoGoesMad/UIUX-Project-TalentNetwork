@@ -225,22 +225,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return;
     }
-    const provisioningStatus: ProvisioningStatus =
-      role === "candidate" || role === "partner"
-        ? "active"
-        : dbIdentity.current.provisioningStatus ?? (metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" || metadata.provisioningStatus === "revision_required" ? metadata.provisioningStatus : "pending");
-    setUser((current) => ({
-      role,
-      provisioningStatus,
-      provisioningReason: dbIdentity.current.provisioningReason ?? null,
-      email: authUser.email ?? "",
-      name: typeof metadata.name === "string" && metadata.name.trim()
-        ? metadata.name
-        : current?.name && current.name !== current.email?.split("@")[0]
-          ? current.name
-          : authUser.email?.split("@")[0] ?? "Pengguna",
-      companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
-    }));
+    setUser((current) => {
+      const provisioningStatus: ProvisioningStatus =
+        role === "candidate" || role === "partner"
+          ? "active"
+          : dbIdentity.current.provisioningStatus ??
+            (current?.provisioningStatus === "active"
+              ? "active"
+              : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" || metadata.provisioningStatus === "revision_required"
+              ? (metadata.provisioningStatus as ProvisioningStatus)
+              : "pending");
+
+      return {
+        role,
+        provisioningStatus,
+        provisioningReason: dbIdentity.current.provisioningReason ?? current?.provisioningReason ?? null,
+        email: authUser.email ?? "",
+        name: typeof metadata.name === "string" && metadata.name.trim()
+          ? metadata.name
+          : current?.name && current.name !== current.email?.split("@")[0]
+            ? current.name
+            : authUser.email?.split("@")[0] ?? "Pengguna",
+        companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
+      };
+    });
     if (typeof metadata.companyName === "string" && metadata.companyName.trim()) {
       setActivePartnerInstitution(metadata.companyName);
     }

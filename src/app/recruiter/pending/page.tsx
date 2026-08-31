@@ -71,17 +71,39 @@ export default function RecruiterPendingPage() {
 
       if (effectiveStatus === "active") {
         setLocalStatus("active");
+        try {
+          const session = localStorage.getItem("proofylink_session");
+          if (session) {
+            const parsed = JSON.parse(session);
+            parsed.provisioningStatus = "active";
+            parsed.provisioningReason = null;
+            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
+          }
+        } catch {}
         toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
         return;
       } else if (effectiveStatus === "revision_required") {
         setLocalStatus("revision_required");
+        try {
+          const session = localStorage.getItem("proofylink_session");
+          if (session) {
+            const parsed = JSON.parse(session);
+            parsed.provisioningStatus = "revision_required";
+            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
+          }
+        } catch {}
         toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
         return;
       } else if (effectiveStatus === "rejected") {
         setLocalStatus("rejected");
+        try {
+          const session = localStorage.getItem("proofylink_session");
+          if (session) {
+            const parsed = JSON.parse(session);
+            parsed.provisioningStatus = "rejected";
+            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
+          }
+        } catch {}
         toast.error("Permohonan akun Anda ditolak oleh compliance.");
         return;
       }
@@ -121,6 +143,14 @@ export default function RecruiterPendingPage() {
         .then((data: { identity?: { provisioningStatus?: string } } | null) => {
           if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== status) {
             setLocalStatus(data.identity.provisioningStatus);
+            try {
+              const session = localStorage.getItem("proofylink_session");
+              if (session) {
+                const parsed = JSON.parse(session);
+                parsed.provisioningStatus = data.identity.provisioningStatus;
+                localStorage.setItem("proofylink_session", JSON.stringify(parsed));
+              }
+            } catch {}
             if (data.identity.provisioningStatus === "active") {
               toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
             } else if (data.identity.provisioningStatus === "revision_required") {
