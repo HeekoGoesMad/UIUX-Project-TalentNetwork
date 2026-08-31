@@ -24,7 +24,20 @@ export default function RecruiterPendingPage() {
   const { user } = useApp();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const status = user?.provisioningStatus || "pending";
+  const [localStatus, setLocalStatus] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const session = localStorage.getItem("proofylink_session");
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (parsed.provisioningStatus) return parsed.provisioningStatus;
+        }
+      } catch {}
+    }
+    return user?.provisioningStatus || "pending";
+  });
+
+  const status = localStatus || user?.provisioningStatus || "pending";
   const isApproved = status === "active";
   const isRevisionRequired = status === "revision_required";
   const isRejected = status === "rejected";
@@ -32,24 +45,47 @@ export default function RecruiterPendingPage() {
   const checkStatus = async () => {
     setChecking(true);
     try {
-      const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
-      if (res.ok) {
-        const data = (await res.json()) as { identity?: { provisioningStatus?: string; provisioningReason?: string } };
-        if (data.identity?.provisioningStatus === "active") {
-          toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
-          window.location.reload();
-          return;
-        } else if (data.identity?.provisioningStatus === "revision_required") {
-          toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
-          window.location.reload();
-          return;
-        } else if (data.identity?.provisioningStatus === "rejected") {
-          toast.error("Permohonan akun Anda ditolak oleh compliance.");
-          window.location.reload();
-          return;
+      // 1. Check API first
+      let serverStatus: string | null = null;
+      try {
+        const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as { identity?: { provisioningStatus?: string; provisioningReason?: string } };
+          if (data.identity?.provisioningStatus) {
+            serverStatus = data.identity.provisioningStatus;
+          }
         }
-        toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
+      } catch {}
+
+      // 2. Check localStorage session
+      let localSessionStatus: string | null = null;
+      try {
+        const session = localStorage.getItem("proofylink_session");
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (parsed.provisioningStatus) localSessionStatus = parsed.provisioningStatus;
+        }
+      } catch {}
+
+      const effectiveStatus = serverStatus || localSessionStatus || status;
+
+      if (effectiveStatus === "active") {
+        setLocalStatus("active");
+        toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+        return;
+      } else if (effectiveStatus === "revision_required") {
+        setLocalStatus("revision_required");
+        toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
+        return;
+      } else if (effectiveStatus === "rejected") {
+        setLocalStatus("rejected");
+        toast.error("Permohonan akun Anda ditolak oleh compliance.");
+        return;
       }
+      toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
     } catch {
       toast.error("Gagal memeriksa status ke server.");
     } finally {
@@ -57,25 +93,48 @@ export default function RecruiterPendingPage() {
     }
   };
 
-  // Live polling every 4 seconds to sync in real-time when Admin clicks Approve or Request Revision
+  // Live polling every 3 seconds and on storage change to sync in real-time when Admin clicks Approve or Request Revision
   useEffect(() => {
-    if (isApproved) return;
+    const handleStorage = () => {
+      try {
+        const session = localStorage.getItem("proofylink_session");
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (parsed.provisioningStatus && parsed.provisioningStatus !== status) {
+            setLocalStatus(parsed.provisioningStatus);
+            if (parsed.provisioningStatus === "active") {
+              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+            }
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    if (isApproved) return () => window.removeEventListener("storage", handleStorage);
+
     const interval = setInterval(() => {
+      handleStorage();
       void fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { identity?: { provisioningStatus?: string } } | null) => {
           if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== status) {
+            setLocalStatus(data.identity.provisioningStatus);
             if (data.identity.provisioningStatus === "active") {
               toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
             } else if (data.identity.provisioningStatus === "revision_required") {
               toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
             }
-            window.location.reload();
           }
         })
         .catch(() => null);
-    }, 4000);
-    return () => clearInterval(interval);
+    }, 3000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
   }, [isApproved, status]);
 
   const documents = [
@@ -293,8 +352,20 @@ export default function RecruiterPendingPage() {
                       <span className="text-[11px] text-muted-foreground font-mono">{doc.file}</span>
                     </div>
                   </div>
-                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[11px] self-start sm:self-center font-medium">
-                    🟡 {doc.status}
+                  <Badge
+                    variant="outline"
+                    className={`text-[11px] self-start sm:self-center font-medium ${
+                      isApproved
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                        : isRevisionRequired
+                        ? "border-orange-300 bg-orange-50 text-orange-800"
+                        : isRejected
+                        ? "border-rose-300 bg-rose-50 text-rose-800"
+                        : "border-amber-300 bg-amber-50 text-amber-800"
+                    }`}
+                  >
+                    {isApproved ? "🟢 " : isRevisionRequired ? "🟠 " : isRejected ? "🔴 " : "🟡 "}
+                    {doc.status}
                   </Badge>
                 </div>
               ))}
