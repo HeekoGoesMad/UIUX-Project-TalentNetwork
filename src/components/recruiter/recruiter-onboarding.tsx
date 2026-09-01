@@ -141,7 +141,7 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
 
 export function RecruiterOnboarding() {
   const router = useRouter();
-  const { user, logout } = useApp();
+  const { user, logout, setProvisioningStatus } = useApp();
 
   const [step, setStep] = useState<number>(() => {
     const draft = getSavedDraft();
@@ -255,6 +255,7 @@ export function RecruiterOnboarding() {
       } catch {
         // ignore
       }
+      setProvisioningStatus("pending");
       toast.success("Dokumen legalitas berhasil dikirim ke antrean review compliance!");
       router.push("/recruiter/pending");
     } catch (err) {

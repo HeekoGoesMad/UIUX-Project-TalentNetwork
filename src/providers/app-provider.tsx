@@ -99,6 +99,8 @@ type Context = AppState & {
   approvePendingRequests: () => Promise<boolean>;
   startScreening: (candidateId: string) => Promise<boolean>;
   previewCandidate: (candidateId: string) => boolean;
+  reloadBootstrap: () => Promise<void>;
+  setProvisioningStatus: (status: ProvisioningStatus, reason?: string | null) => void;
 };
 
 function remoteCvProfile(payload: { identity?: { email?: string }; profile?: BootstrapProfile | null; candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null; candidateSections?: BootstrapSection[] }): CvProfile | null {
@@ -475,9 +477,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { error: e instanceof Error ? e.message : "Gagal masuk." };
       }
     }
-    const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: role === "recruiter" ? "active" : "active", companyName: role === "partner" ? "Universitas Indonesia" : undefined };
+    const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
+    const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: fallbackStatus, companyName: role === "partner" ? "Universitas Indonesia" : undefined };
     setUser(nextUser);
-    return { role, provisioningStatus: "active" };
+    return { role, provisioningStatus: fallbackStatus };
   };
 
   const loginAsDemoCandidate = () => {
@@ -535,8 +538,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { error: e instanceof Error ? e.message : "Gagal mendaftar." };
       }
     }
-    setUser({ name, role, email, provisioningStatus: "active", companyName });
-    return { role, provisioningStatus: "active" };
+    const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
+    setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName });
+    return { role, provisioningStatus: fallbackStatus };
   };
 
   const logout = async () => {
@@ -794,9 +798,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const reloadBootstrap = async () => {
+    await loadBootstrap();
+  };
 
+  const setProvisioningStatus = (status: ProvisioningStatus, reason?: string | null) => {
+    dbIdentity.current.provisioningStatus = status;
+    dbIdentity.current.provisioningReason = reason ?? null;
+    setUser((curr) => curr ? { ...curr, provisioningStatus: status, provisioningReason: reason ?? null } : null);
+    try {
+      const session = localStorage.getItem(sessionKey);
+      if (session) {
+        const parsed = JSON.parse(session);
+        parsed.provisioningStatus = status;
+        parsed.provisioningReason = reason ?? null;
+        localStorage.setItem(sessionKey, JSON.stringify(parsed));
+      }
+      localStorage.setItem("proofylink_session", JSON.stringify({
+        role: "recruiter",
+        provisioningStatus: status,
+        provisioningReason: reason ?? null,
+      }));
+      window.dispatchEvent(new Event("storage"));
+    } catch {}
+  };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, loginAsFreshCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, loginAsFreshCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate, reloadBootstrap, setProvisioningStatus }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

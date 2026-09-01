@@ -19,111 +19,90 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/providers/app-provider";
+import { ProvisioningStatus } from "@/types";
 
 export default function RecruiterPendingPage() {
-  const { user } = useApp();
+  const { user, setProvisioningStatus, reloadBootstrap } = useApp();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const [localStatus, setLocalStatus] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const session = localStorage.getItem("proofylink_session");
-        if (session) {
-          const parsed = JSON.parse(session);
-          if (parsed.provisioningStatus) return parsed.provisioningStatus;
-        }
-      } catch {}
-    }
-    return user?.provisioningStatus || "pending";
-  });
+  const [redirecting, setRedirecting] = useState(false);
+  const [localStatus, setLocalStatus] = useState<ProvisioningStatus>(() => user?.provisioningStatus || "pending");
 
   const status = localStatus || user?.provisioningStatus || "pending";
   const isApproved = status === "active";
   const isRevisionRequired = status === "revision_required";
   const isRejected = status === "rejected";
 
-  const checkStatus = async () => {
+  const checkStatus = async (showToasts = true) => {
     setChecking(true);
     try {
-      // 1. Check API first
-      let serverStatus: string | null = null;
-      try {
-        const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
-        if (res.ok) {
-          const data = (await res.json()) as { identity?: { provisioningStatus?: string; provisioningReason?: string } };
-          if (data.identity?.provisioningStatus) {
-            serverStatus = data.identity.provisioningStatus;
+      const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
+      if (res.ok) {
+        const data = (await res.json()) as { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } };
+        if (data.identity?.provisioningStatus) {
+          const next = data.identity.provisioningStatus;
+          setLocalStatus(next);
+          setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+
+          if (showToasts) {
+            if (next === "active") {
+              toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
+            } else if (next === "revision_required") {
+              toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
+            } else if (next === "rejected") {
+              toast.error("Permohonan akun Anda ditolak oleh compliance.");
+            } else {
+              toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
+            }
           }
+          return;
         }
-      } catch {}
-
-      // 2. Check localStorage session
-      let localSessionStatus: string | null = null;
-      try {
-        const session = localStorage.getItem("proofylink_session");
-        if (session) {
-          const parsed = JSON.parse(session);
-          if (parsed.provisioningStatus) localSessionStatus = parsed.provisioningStatus;
-        }
-      } catch {}
-
-      const effectiveStatus = serverStatus || localSessionStatus || status;
-
-      if (effectiveStatus === "active") {
-        setLocalStatus("active");
-        try {
-          const session = localStorage.getItem("proofylink_session");
-          if (session) {
-            const parsed = JSON.parse(session);
-            parsed.provisioningStatus = "active";
-            parsed.provisioningReason = null;
-            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
-          }
-        } catch {}
-        toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
-        return;
-      } else if (effectiveStatus === "revision_required") {
-        setLocalStatus("revision_required");
-        try {
-          const session = localStorage.getItem("proofylink_session");
-          if (session) {
-            const parsed = JSON.parse(session);
-            parsed.provisioningStatus = "revision_required";
-            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
-          }
-        } catch {}
-        toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
-        return;
-      } else if (effectiveStatus === "rejected") {
-        setLocalStatus("rejected");
-        try {
-          const session = localStorage.getItem("proofylink_session");
-          if (session) {
-            const parsed = JSON.parse(session);
-            parsed.provisioningStatus = "rejected";
-            localStorage.setItem("proofylink_session", JSON.stringify(parsed));
-          }
-        } catch {}
-        toast.error("Permohonan akun Anda ditolak oleh compliance.");
-        return;
       }
-      toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
+      if (showToasts) {
+        toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
+      }
     } catch {
-      toast.error("Gagal memeriksa status ke server.");
+      if (showToasts) {
+        toast.error("Gagal memeriksa status ke server.");
+      }
     } finally {
       setChecking(false);
     }
   };
 
-  // Live polling every 3 seconds and on storage change to sync in real-time when Admin clicks Approve or Request Revision
+  // Immediate check on mount & live polling every 3s
   useEffect(() => {
+    let active = true;
+
+    const poll = () => {
+      fetch("/api/app/bootstrap", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } } | null) => {
+          if (!active) return;
+          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== localStatus) {
+            const next = data.identity.provisioningStatus;
+            setLocalStatus(next);
+            setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+            if (next === "active") {
+              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+            } else if (next === "revision_required") {
+              toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+            }
+          }
+        })
+        .catch(() => null);
+    };
+
+    poll();
+
     const handleStorage = () => {
       try {
         const session = localStorage.getItem("proofylink_session");
         if (session) {
           const parsed = JSON.parse(session);
-          if (parsed.provisioningStatus && parsed.provisioningStatus !== status) {
+          if (parsed.provisioningStatus && parsed.provisioningStatus !== localStatus) {
             setLocalStatus(parsed.provisioningStatus);
+            setProvisioningStatus(parsed.provisioningStatus, parsed.provisioningReason ?? null);
             if (parsed.provisioningStatus === "active") {
               toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
             }
@@ -133,39 +112,21 @@ export default function RecruiterPendingPage() {
     };
 
     window.addEventListener("storage", handleStorage);
-
-    if (isApproved) return () => window.removeEventListener("storage", handleStorage);
-
-    const interval = setInterval(() => {
-      handleStorage();
-      void fetch("/api/app/bootstrap", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data: { identity?: { provisioningStatus?: string } } | null) => {
-          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== status) {
-            setLocalStatus(data.identity.provisioningStatus);
-            try {
-              const session = localStorage.getItem("proofylink_session");
-              if (session) {
-                const parsed = JSON.parse(session);
-                parsed.provisioningStatus = data.identity.provisioningStatus;
-                localStorage.setItem("proofylink_session", JSON.stringify(parsed));
-              }
-            } catch {}
-            if (data.identity.provisioningStatus === "active") {
-              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
-            } else if (data.identity.provisioningStatus === "revision_required") {
-              toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
-            }
-          }
-        })
-        .catch(() => null);
-    }, 3000);
+    const interval = setInterval(poll, 3000);
 
     return () => {
+      active = false;
       window.removeEventListener("storage", handleStorage);
       clearInterval(interval);
     };
-  }, [isApproved, status]);
+  }, [localStatus, setProvisioningStatus]);
+
+  const handleGoToDashboard = async () => {
+    setRedirecting(true);
+    setProvisioningStatus("active");
+    await reloadBootstrap();
+    router.replace("/dashboard");
+  };
 
   const documents = [
     {
@@ -208,10 +169,20 @@ export default function RecruiterPendingPage() {
                   </p>
                   <div className="pt-2">
                     <Button
-                      onClick={() => router.replace("/dashboard")}
+                      onClick={handleGoToDashboard}
+                      disabled={redirecting}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-xs"
                     >
-                      Masuk ke Dashboard Sekarang <ArrowRight className="size-3.5 ml-1.5" />
+                      {redirecting ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                          Membuka Workspace...
+                        </>
+                      ) : (
+                        <>
+                          Masuk ke Dashboard Sekarang <ArrowRight className="size-3.5 ml-1.5" />
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
