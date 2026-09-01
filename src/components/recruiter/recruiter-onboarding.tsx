@@ -32,7 +32,7 @@ import type { RecruiterOnboardingData } from "@/types";
 const recruiterSteps = [
   { title: "Akun PIC Rekruter", note: "Identitas perwakilan", icon: User },
   { title: "Profil Perusahaan", note: "Entitas & operasional", icon: Building2 },
-  { title: "Dokumen Legalitas", note: "NIB, NPWP, Akta & KTP", icon: FileCheck },
+  { title: "Dokumen Legalitas", note: "NIB, NPWP & KTP", icon: FileCheck },
   { title: "Review & Pengajuan", note: "Antrean compliance", icon: ShieldCheck },
 ] as const;
 
@@ -117,7 +117,6 @@ const defaultForm: RecruiterOnboardingData = {
   nibFileName: "NIB_PT_Inovasi_Digital.pdf",
   npwpNumber: "01.234.567.8-012.000",
   npwpFileName: "NPWP_Badan_Usaha.pdf",
-  aktaFileName: "Akta_Pendirian_SK_Kemenkumham.pdf",
   ktpFileName: "KTP_PIC_Budi_Santoso.jpg",
   verificationStatus: "draft",
 };
@@ -142,7 +141,7 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
 
 export function RecruiterOnboarding() {
   const router = useRouter();
-  const { user } = useApp();
+  const { user, logout, setProvisioningStatus } = useApp();
 
   const [step, setStep] = useState<number>(() => {
     const draft = getSavedDraft();
@@ -153,7 +152,8 @@ export function RecruiterOnboarding() {
     const draft = getSavedDraft();
     return {
       ...(draft?.form ?? defaultForm),
-      picName: draft?.form?.picName || user?.name || defaultForm.picName,
+      companyName: draft?.form?.companyName || user?.companyName || (user?.role === "recruiter" && user?.name ? user.name : defaultForm.companyName),
+      picName: draft?.form?.picName || (user?.role === "recruiter" ? defaultForm.picName : user?.name || defaultForm.picName),
       picEmail: draft?.form?.picEmail || user?.email || defaultForm.picEmail,
     };
   });
@@ -190,8 +190,7 @@ export function RecruiterOnboarding() {
     }
   };
 
-
-  const handleFileUpload = (field: "nibFileName" | "npwpFileName" | "aktaFileName" | "ktpFileName", file: File | null) => {
+  const handleFileUpload = (field: "nibFileName" | "npwpFileName" | "ktpFileName", file: File | null) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Ukuran berkas maksimal 10MB");
@@ -206,17 +205,16 @@ export function RecruiterOnboarding() {
     if (s === 0) {
       if (!form.picName.trim()) errs.picName = "Nama lengkap PIC wajib diisi.";
       if (!form.picTitle.trim()) errs.picTitle = "Jabatan PIC wajib diisi.";
-      if (!form.picPhone.trim()) errs.picPhone = "Nomor telepon aktif wajib diisi.";
-      if (!form.picEmail.trim() || !form.picEmail.includes("@")) errs.picEmail = "Email resmi perusahaan wajib diisi.";
     } else if (s === 1) {
       if (!form.companyName.trim()) errs.companyName = "Nama resmi entitas bisnis (PT/CV) wajib diisi.";
+      if (!form.picEmail.trim() || !form.picEmail.includes("@")) errs.picEmail = "Email resmi perusahaan wajib diisi.";
+      if (!form.picPhone.trim()) errs.picPhone = "Nomor WhatsApp / telepon perusahaan wajib diisi.";
       if (!form.description.trim()) errs.description = "Deskripsi operasional bisnis wajib diisi.";
       if (!form.city.trim()) errs.city = "Kota kantor wajib diisi.";
       if (!form.officeAddress.trim()) errs.officeAddress = "Alamat kantor operasional wajib diisi.";
     } else if (s === 2) {
       if (!form.nibNumber.trim() || !form.nibFileName) errs.nibNumber = "Nomor dan berkas NIB wajib dilampirkan.";
       if (!form.npwpNumber.trim() || !form.npwpFileName) errs.npwpNumber = "Nomor dan berkas NPWP wajib dilampirkan.";
-      if (!form.aktaFileName) errs.aktaFileName = "Berkas Akta Pendirian / SK Kemenkumham wajib diunggah.";
       if (!form.ktpFileName) errs.ktpFileName = "Foto KTP PIC wajib diunggah.";
     }
 
@@ -257,6 +255,7 @@ export function RecruiterOnboarding() {
       } catch {
         // ignore
       }
+      setProvisioningStatus("pending");
       toast.success("Dokumen legalitas berhasil dikirim ke antrean review compliance!");
       router.push("/recruiter/pending");
     } catch (err) {
@@ -266,14 +265,15 @@ export function RecruiterOnboarding() {
     }
   };
 
-  const exitWithoutPublishing = () => {
+  const handleExit = async () => {
     try {
       window.localStorage.setItem(draftKey, JSON.stringify({ form, step }));
-      toast.info("Draf onboarding tersimpan");
+      toast.info("Draf onboarding tersimpan di browser.");
     } catch {
       // ignore
     }
-    router.push("/recruiter/pending");
+    await logout();
+    router.push("/login");
   };
 
   return (
@@ -394,39 +394,6 @@ export function RecruiterOnboarding() {
                         />
                       </Field>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Nomor WhatsApp / Telepon *" error={errors.picPhone}>
-                          <div className="relative">
-                            <Phone className="absolute left-3 top-3 size-4 text-slate-400" />
-                            <input
-                              required
-                              className={`${inputClass} pl-9`}
-                              value={form.picPhone}
-                              onChange={(e) => update("picPhone", e.target.value)}
-                              placeholder="0812-xxxx-xxxx"
-                            />
-                          </div>
-                        </Field>
-
-                        <Field
-                          label="Email Resmi Perusahaan *"
-                          hint="Gunakan email domain perusahaan"
-                          error={errors.picEmail}
-                        >
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-3 size-4 text-slate-400" />
-                            <input
-                              required
-                              type="email"
-                              className={`${inputClass} pl-9`}
-                              value={form.picEmail}
-                              onChange={(e) => update("picEmail", e.target.value)}
-                              placeholder="nama@perusahaan.com"
-                            />
-                          </div>
-                        </Field>
-                      </div>
-
                       <Field label="Kata Sandi Akun *">
                         <div className="relative">
                           <Lock className="absolute left-3 top-3 size-4 text-slate-400" />
@@ -453,7 +420,7 @@ export function RecruiterOnboarding() {
                         <div>
                           <strong className="text-[#0b2342] block font-semibold">Verifikasi Email OTP 6-Digit</strong>
                           <span className="text-slate-600">
-                            Kode OTP 6-digit akan diminta secara otomatis saat Anda mengirimkan pengajuan di langkah terakhir untuk mengaktifkan workspace.
+                            Kode OTP 6-digit akan dikirimkan ke email resmi perusahaan pada pengajuan di langkah terakhir untuk mengaktifkan workspace.
                           </span>
                         </div>
                       </div>
@@ -465,10 +432,10 @@ export function RecruiterOnboarding() {
                 {step === 1 && (
                   <Intro
                     title="Profil Entitas Perusahaan *"
-                    text="Informasi badan usaha sesuai akta pendirian, NIB, dan operasional bisnis aktif."
+                    text="Informasi badan usaha sesuai NIB, kontak operasional, dan profil bisnis aktif."
                   >
                     <div className="space-y-4">
-                      <Field label="Nama Resmi Entitas Bisnis (Sesuai NIB / Akta PT/CV) *" error={errors.companyName}>
+                      <Field label="Nama Resmi Entitas Bisnis (Sesuai NIB / PT/CV) *" error={errors.companyName}>
                         <input
                           required
                           className={inputClass}
@@ -505,6 +472,39 @@ export function RecruiterOnboarding() {
                               </option>
                             ))}
                           </select>
+                        </Field>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field
+                          label="Email Resmi Perusahaan *"
+                          hint="Gunakan email domain perusahaan"
+                          error={errors.picEmail}
+                        >
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-3 size-4 text-slate-400" />
+                            <input
+                              required
+                              type="email"
+                              className={`${inputClass} pl-9`}
+                              value={form.picEmail}
+                              onChange={(e) => update("picEmail", e.target.value)}
+                              placeholder="nama@perusahaan.com"
+                            />
+                          </div>
+                        </Field>
+
+                        <Field label="Nomor WhatsApp / Telepon *" error={errors.picPhone}>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-3 size-4 text-slate-400" />
+                            <input
+                              required
+                              className={`${inputClass} pl-9`}
+                              value={form.picPhone}
+                              onChange={(e) => update("picPhone", e.target.value)}
+                              placeholder="0812-xxxx-xxxx"
+                            />
+                          </div>
                         </Field>
                       </div>
 
@@ -634,35 +634,11 @@ export function RecruiterOnboarding() {
                         </label>
                       </Card>
 
-                      {/* Akta / SK */}
-                      <Card className="p-4 border-border shadow-2xs space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <FileText className="size-4 text-[#0b2342]" /> 3. Akta Pendirian / SK Kemenkumham *
-                          </span>
-                          {form.aktaFileName && (
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              Terunggah
-                            </span>
-                          )}
-                        </div>
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.aktaFileName || "Pilih Berkas Akta / SK Kemenkumham (PDF)"}</span>
-                          <input
-                            type="file"
-                            accept=".pdf,image/*"
-                            className="sr-only"
-                            onChange={(e) => handleFileUpload("aktaFileName", e.target.files?.[0] || null)}
-                          />
-                        </label>
-                      </Card>
-
                       {/* KTP PIC */}
                       <Card className="p-4 border-border shadow-2xs space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <User className="size-4 text-[#0b2342]" /> 4. Foto KTP PIC / Rekruter ({form.picName}) *
+                            <User className="size-4 text-[#0b2342]" /> 3. Foto KTP PIC / Rekruter ({form.picName}) *
                           </span>
                           {form.ktpFileName && (
                             <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -723,11 +699,11 @@ export function RecruiterOnboarding() {
 
                         <div className="grid gap-4 p-6 sm:grid-cols-2 text-xs border-b">
                           <div>
-                            <p className="text-muted-foreground">Email PIC</p>
+                            <p className="text-muted-foreground">Email Resmi Perusahaan</p>
                             <p className="font-semibold text-foreground mt-0.5">{form.picEmail}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">WhatsApp PIC</p>
+                            <p className="text-muted-foreground">Nomor WhatsApp / Telepon</p>
                             <p className="font-semibold text-foreground mt-0.5">{form.picPhone}</p>
                           </div>
                           <div>
@@ -742,15 +718,12 @@ export function RecruiterOnboarding() {
 
                         <div className="p-6 bg-slate-50/50 space-y-2 text-xs">
                           <strong className="text-foreground block">Berkas Terlampir:</strong>
-                          <div className="grid sm:grid-cols-2 gap-2 text-slate-700">
+                          <div className="grid sm:grid-cols-3 gap-2 text-slate-700">
                             <p className="flex items-center gap-1.5">
                               <Check className="size-3.5 text-emerald-600" /> NIB: {form.nibFileName}
                             </p>
                             <p className="flex items-center gap-1.5">
                               <Check className="size-3.5 text-emerald-600" /> NPWP: {form.npwpFileName}
-                            </p>
-                            <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> Akta / SK: {form.aktaFileName}
                             </p>
                             <p className="flex items-center gap-1.5">
                               <Check className="size-3.5 text-emerald-600" /> KTP PIC: {form.ktpFileName}
@@ -782,10 +755,10 @@ export function RecruiterOnboarding() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={exitWithoutPublishing}
-                  className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  onClick={handleExit}
+                  className="text-xs font-semibold text-muted-foreground hover:text-destructive"
                 >
-                  Simpan &amp; Keluar
+                  Keluar Akun
                 </Button>
 
                 <div className="flex items-center gap-3">

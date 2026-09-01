@@ -35,6 +35,7 @@ async function resolveAccess(): Promise<Resolution> {
       return { kind: "user", user: res.user };
     }
     if ("reason" in res) return { kind: "provisioning" };
+    if ("status" in res && res.status === 401) return { kind: "unauthenticated" };
     return { kind: "unavailable" };
   } catch {
     return { kind: "unavailable" };

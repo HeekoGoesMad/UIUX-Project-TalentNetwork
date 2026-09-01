@@ -1,17 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { Building2, Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Info, Send, Sparkles } from "lucide-react";
-import { FormEvent, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useApp } from "@/providers/app-provider";
-import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RoleSelector } from "./role-selector";
-import { OtpVerificationModal } from "./otp-verification-modal";
-import { ConsentModal } from "./consent-modal";
 import { createClient } from "@/lib/supabase/client";
+import { useApp } from "@/providers/app-provider";
+import { ProvisioningStatus, UserRole } from "@/types";
+import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, Send, Sparkles, User } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { ConsentModal } from "./consent-modal";
+import { OtpVerificationModal } from "./otp-verification-modal";
+import { RoleSelector } from "./role-selector";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -51,10 +51,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setErrorMessage(null);
 
     const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") ?? "").trim();
+    const rawName = String(form.get("name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const companyName = String(form.get("companyName") ?? "").trim();
+    const companyName = role === "recruiter" ? rawName : String(form.get("companyName") ?? "").trim();
+    const name = rawName;
 
     if (mode === "register" && role !== "partner" && !consentAgreed) {
       setConsentModalOpen(true);
@@ -261,17 +262,21 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "register" && (
             <div>
               <label htmlFor="full-name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                Nama Lengkap
+                {role === "recruiter" ? "Nama Perusahaan" : "Nama Lengkap"}
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                {role === "recruiter" ? (
+                  <Building2 className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                ) : (
+                  <User className="absolute left-3.5 top-3 sm:top-3.5 size-4 text-slate-400" />
+                )}
                 <Input
                   id="full-name"
                   name="name"
                   className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
                   required
-                  autoComplete="name"
-                  placeholder="Alex Wijaya"
+                  autoComplete={role === "recruiter" ? "organization" : "name"}
+                  placeholder={role === "recruiter" ? "PT Inovasi Digital Nusantara" : "Alex Wijaya"}
                 />
               </div>
             </div>

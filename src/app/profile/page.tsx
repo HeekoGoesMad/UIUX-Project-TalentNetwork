@@ -3,14 +3,15 @@
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { ProfileSection } from "@/components/profile/profile-section";
 import { EmptyState } from "@/components/shared/empty-state";
-import { AiSummaryCard } from "@/components/talent/ai-summary-card";
+import { ProfessionalSummaryModal } from "@/components/candidate/professional-summary-modal";
+import { ProfessionalSummaryCard } from "@/components/talent/professional-summary-card";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
 import { VerifiedBadge } from "@/components/talent/verified-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
-import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary, type EducationItem } from "@/types";
+import { CAREER_STATUS_CONFIG, CareerStatus, type EducationItem } from "@/types";
 import {
     BriefcaseBusiness,
     Camera,
@@ -24,7 +25,7 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
@@ -109,13 +110,9 @@ function calcCompleteness(p: {
 }
 
 export default function ProfilePage() {
-  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode } = useApp();
+  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
-
-  // AI Summary state
-  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
-  const [aiLoading, setAiLoading] = useState(true);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
 
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
@@ -144,8 +141,6 @@ export default function ProfilePage() {
     softSkills: source?.softSkills ?? [],
     portfolio: source?.portfolio ?? [],
   };
-
-  const { saveCvProfile } = useApp();
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -215,70 +210,25 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  const summaryKey = JSON.stringify([
-    source?.headline ?? "",
-    source?.about ?? "",
-    source?.skills ?? [],
-    source?.location ?? "",
-    source && "targetRole" in source ? source.targetRole : (source?.headline ?? ""),
-  ]);
-
-  const requestAiSummary = useCallback(async (): Promise<{ ok: boolean; data?: AiSummary; error?: string }> => {
-    try {
-      const [headline, about, skills, location, targetRole] = JSON.parse(summaryKey) as [
-        string,
-        string,
-        string[],
-        string,
-        string,
-      ];
-      const response = await fetch("/api/ai/summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          headline,
-          about,
-          skills,
-          targetRole: targetRole || "Talent",
-          location,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "Gagal memuat AI Summary.");
-      }
-      return { ok: true, data: payload as AiSummary };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "Gagal memuat AI Summary." };
-    }
-  }, [summaryKey]);
-
-  const regenerateAiSummary = useCallback(() => {
-    setAiLoading(true);
-    setAiError(null);
-    void requestAiSummary().then((outcome) => {
-      if (outcome.ok && outcome.data) setAiSummary(outcome.data);
-      else setAiError(outcome.error ?? "Gagal memuat AI Summary.");
-      setAiLoading(false);
-    });
-  }, [requestAiSummary]);
-
-  useEffect(() => {
-    let active = true;
-    requestAiSummary().then((outcome) => {
-      if (!active) return;
-      if (outcome.ok && outcome.data) {
-        setAiSummary(outcome.data);
-        setAiError(null);
-      } else {
-        setAiError(outcome.error ?? "Gagal memuat AI Summary.");
-      }
-      setAiLoading(false);
-    });
-    return () => {
-      active = false;
+  const handleApplySummary = async (newSummary: string) => {
+    const base = cvProfile || {
+      ...DEMO,
+      id: "local-profile",
+      email: user?.email || "candidate@proofylink.dev",
+      phone: "0812-3456-7890",
+      industries: [],
+      certifications: [],
+      targetRole: "Product Designer",
+      workArrangement: "hybrid" as const,
+      openToWork: true,
+      careerStatus: "open-to-work" as CareerStatus,
+      updatedAt: new Date().toISOString(),
     };
-  }, [requestAiSummary]);
+    await saveCvProfile({
+      ...base,
+      about: newSummary,
+    });
+  };
 
   const { pct, missing } = calcCompleteness(p);
 
@@ -455,14 +405,11 @@ export default function ProfilePage() {
               />
             )}
 
-            {/* Tentang Saya & AI Summary */}
-            <ProfileSection title="Tentang Saya & AI Summary">
-              {p.about && <p className="max-w-2xl leading-7 text-slate-600 mb-4">{p.about}</p>}
-              <AiSummaryCard
-                data={aiSummary}
-                loading={aiLoading}
-                error={aiError}
-                onRegenerate={() => void regenerateAiSummary()}
+            {/* Professional Summary */}
+            <ProfileSection title="Professional Summary">
+              <ProfessionalSummaryCard
+                summary={p.about}
+                onOpenHelper={() => setSummaryModalOpen(true)}
               />
             </ProfileSection>
 
@@ -657,6 +604,14 @@ export default function ProfilePage() {
           </aside>
         </div>
       </div>
+
+      <ProfessionalSummaryModal
+        open={summaryModalOpen}
+        onOpenChange={setSummaryModalOpen}
+        currentSummary={p.about}
+        cvProfile={cvProfile}
+        onApply={handleApplySummary}
+      />
     </ProtectedRoute>
   );
 }

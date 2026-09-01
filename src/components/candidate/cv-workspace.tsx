@@ -11,6 +11,7 @@ import {
   Plus,
   Save,
   ShieldCheck,
+  Sparkles,
   Trash2,
   User,
   X,
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { CvDownload } from "./cv-download";
+import { ProfessionalSummaryModal } from "./professional-summary-modal";
 
 function blank(email = "", fullName = ""): CvProfile {
  return {
@@ -176,6 +178,7 @@ export function CvWorkspace() {
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
 
   useEffect(() => {
     if (!cvProfile) return;
@@ -517,7 +520,25 @@ export function CvWorkspace() {
                   placeholder="Posisi | Keahlian | Spesialisasi"
                 />
               </Field>
-              <Field label="Tentang Saya" span2>
+              <div className="md:col-span-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Tentang Saya
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSummaryModalOpen(true)}
+                    className="h-7 gap-1.5 border-primary/30 text-xs font-medium text-primary hover:bg-primary/5"
+                  >
+                    <Sparkles className="size-3" />
+                    Panduan Summary
+                  </Button>
+                </div>
+                <p className="text-xs font-normal text-muted-foreground">
+                  Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa.
+                </p>
                 <textarea
                   className={textareaCls}
                   value={profile.about}
@@ -525,7 +546,7 @@ export function CvWorkspace() {
                   placeholder="Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa."
                   rows={4}
                 />
-              </Field>
+              </div>
             </div>
           </FormSection>
 
@@ -925,6 +946,22 @@ export function CvWorkspace() {
           <CvDownload profile={profile} />
         </CardContent>
       </Card>
+
+      <ProfessionalSummaryModal
+        open={summaryModalOpen}
+        onOpenChange={setSummaryModalOpen}
+        currentSummary={profile.about}
+        cvProfile={profile}
+        onApply={async (newSummary) => {
+          update("about", newSummary);
+          if (profile.id && profile.id !== "new-cv") {
+            await saveCvProfile({
+              ...profile,
+              about: newSummary,
+            });
+          }
+        }}
+      />
     </div>
   );
 }

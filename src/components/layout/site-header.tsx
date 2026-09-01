@@ -110,7 +110,9 @@ export function SiteHeader() {
          { href: "/dashboard", label: "Dashboard" },
       ];
 
-  if (isOnboarding) {
+  const isAdmin = pathname?.startsWith("/admin");
+  const isPending = pathname?.startsWith("/recruiter/pending");
+  if (isOnboarding || isAdmin || isPending) {
     return null;
   }
 

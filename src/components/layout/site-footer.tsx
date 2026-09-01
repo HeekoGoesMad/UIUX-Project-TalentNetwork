@@ -10,8 +10,9 @@ export function SiteFooter() {
   const { user, hydrated } = useApp();
   const visibleUser = hydrated ? user : null;
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isAdmin = pathname?.startsWith("/admin");
 
-  if (isAuthPage) {
+  if (isAuthPage || isAdmin) {
     return null;
   }
 

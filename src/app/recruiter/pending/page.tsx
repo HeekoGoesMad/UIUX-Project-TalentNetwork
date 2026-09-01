@@ -10,6 +10,7 @@ import {
   FileText,
   HelpCircle,
   Loader2,
+  LogOut,
   MessageCircle,
   RefreshCw,
   ShieldCheck,
@@ -19,64 +20,114 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/providers/app-provider";
+import { ProvisioningStatus } from "@/types";
 
 export default function RecruiterPendingPage() {
-  const { user } = useApp();
+  const { user, logout, setProvisioningStatus, reloadBootstrap } = useApp();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const status = user?.provisioningStatus || "pending";
+  const [redirecting, setRedirecting] = useState(false);
+  const [localStatus, setLocalStatus] = useState<ProvisioningStatus>(() => user?.provisioningStatus || "pending");
+
+  const status = localStatus || user?.provisioningStatus || "pending";
   const isApproved = status === "active";
   const isRevisionRequired = status === "revision_required";
   const isRejected = status === "rejected";
 
-  const checkStatus = async () => {
+  const checkStatus = async (showToasts = true) => {
     setChecking(true);
     try {
       const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
       if (res.ok) {
-        const data = (await res.json()) as { identity?: { provisioningStatus?: string; provisioningReason?: string } };
-        if (data.identity?.provisioningStatus === "active") {
-          toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
-          window.location.reload();
-          return;
-        } else if (data.identity?.provisioningStatus === "revision_required") {
-          toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
-          window.location.reload();
-          return;
-        } else if (data.identity?.provisioningStatus === "rejected") {
-          toast.error("Permohonan akun Anda ditolak oleh compliance.");
-          window.location.reload();
+        const data = (await res.json()) as { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } };
+        if (data.identity?.provisioningStatus) {
+          const next = data.identity.provisioningStatus;
+          setLocalStatus(next);
+          setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+
+          if (showToasts) {
+            if (next === "active") {
+              toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
+            } else if (next === "revision_required") {
+              toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
+            } else if (next === "rejected") {
+              toast.error("Permohonan akun Anda ditolak oleh compliance.");
+            } else {
+              toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
+            }
+          }
           return;
         }
+      }
+      if (showToasts) {
         toast.info("Status akun Anda masih dalam antrean peninjauan compliance.");
       }
     } catch {
-      toast.error("Gagal memeriksa status ke server.");
+      if (showToasts) {
+        toast.error("Gagal memeriksa status ke server.");
+      }
     } finally {
       setChecking(false);
     }
   };
 
-  // Live polling every 4 seconds to sync in real-time when Admin clicks Approve or Request Revision
+  // Immediate check on mount & live polling every 3s
   useEffect(() => {
-    if (isApproved) return;
-    const interval = setInterval(() => {
-      void fetch("/api/app/bootstrap", { cache: "no-store" })
+    let active = true;
+
+    const poll = () => {
+      fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { identity?: { provisioningStatus?: string } } | null) => {
-          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== status) {
-            if (data.identity.provisioningStatus === "active") {
-              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
-            } else if (data.identity.provisioningStatus === "revision_required") {
-              toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+        .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } } | null) => {
+          if (!active) return;
+          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== localStatus) {
+            const next = data.identity.provisioningStatus;
+            setLocalStatus(next);
+            setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+            if (next === "active") {
+              toast.success("Akun Anda telah disetujui oleh tim compliance!");
+            } else if (next === "revision_required") {
+              toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
             }
-            window.location.reload();
           }
         })
         .catch(() => null);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [isApproved, status]);
+    };
+
+    poll();
+
+    const handleStorage = () => {
+      try {
+        const session = localStorage.getItem("proofylink_session");
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (parsed.provisioningStatus && parsed.provisioningStatus !== localStatus) {
+            setLocalStatus(parsed.provisioningStatus);
+            setProvisioningStatus(parsed.provisioningStatus, parsed.provisioningReason ?? null);
+            if (parsed.provisioningStatus === "active") {
+              toast.success("Akun Anda telah disetujui oleh tim compliance!");
+            }
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener("storage", handleStorage);
+    const interval = setInterval(poll, 3000);
+
+    return () => {
+      active = false;
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
+  }, [localStatus, setProvisioningStatus]);
+
+  const handleGoToDashboard = async () => {
+    setRedirecting(true);
+    setProvisioningStatus("active");
+    await reloadBootstrap();
+    router.replace("/dashboard");
+  };
 
   const documents = [
     {
@@ -90,11 +141,6 @@ export default function RecruiterPendingPage() {
       file: "NPWP_Badan.pdf",
     },
     {
-      name: "Akta Pendirian / SK Kemenkumham",
-      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
-      file: "Akta_SK_Kemenkumham.pdf",
-    },
-    {
       name: "Foto KTP PIC Rekruter",
       status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
       file: "KTP_PIC.jpg",
@@ -102,8 +148,31 @@ export default function RecruiterPendingPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50/60 py-10 px-4">
+    <main className="min-h-screen bg-slate-50/60 py-8 px-4">
       <div className="container mx-auto max-w-3xl space-y-6">
+        {/* Clean Top Header Bar */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-xs">
+              <ShieldCheck className="size-4.5" />
+            </span>
+            <span className="text-base font-bold text-foreground">
+              Proofy<span className="text-primary">Link</span>
+            </span>
+          </Link>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              await logout();
+              router.push("/login");
+            }}
+            className="text-xs text-muted-foreground hover:text-destructive gap-1.5 h-8 px-3 rounded-lg"
+          >
+            <LogOut className="size-3.5" /> Keluar Akun
+          </Button>
+        </div>
         {/* Status Banners for 4 Lifecycle States */}
         {isApproved ? (
           <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 shadow-sm">
@@ -124,10 +193,20 @@ export default function RecruiterPendingPage() {
                   </p>
                   <div className="pt-2">
                     <Button
-                      onClick={() => router.replace("/dashboard")}
+                      onClick={handleGoToDashboard}
+                      disabled={redirecting}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-xs"
                     >
-                      Masuk ke Dashboard Sekarang <ArrowRight className="size-3.5 ml-1.5" />
+                      {redirecting ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                          Membuka Workspace...
+                        </>
+                      ) : (
+                        <>
+                          Masuk ke Dashboard Sekarang <ArrowRight className="size-3.5 ml-1.5" />
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -168,9 +247,9 @@ export default function RecruiterPendingPage() {
                   {/* Revision Notes Box */}
                   <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 text-xs text-orange-950 space-y-1">
                     <p className="font-bold flex items-center gap-1.5">
-                      <span>📝 Catatan &amp; Instruksi dari Tim Compliance:</span>
+                      Catatan &amp; Instruksi dari Tim Compliance:
                     </p>
-                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                    <p className="text-slate-800 leading-relaxed pl-2 font-medium">
                       {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan foto KTP PIC atau berkas NIB yang diunggah."}
                     </p>
                   </div>
@@ -211,9 +290,9 @@ export default function RecruiterPendingPage() {
                   {/* Rejection Reason Box */}
                   <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs text-rose-950 space-y-1">
                     <p className="font-bold flex items-center gap-1.5">
-                      <span>⚠️ Alasan Penolakan:</span>
+                      Alasan Penolakan:
                     </p>
-                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                    <p className="text-slate-800 leading-relaxed pl-2 font-medium">
                       {user?.provisioningReason || "Entitas tidak memenuhi kualifikasi standar verifikasi kepatuhan ProofyLink."}
                     </p>
                   </div>
@@ -263,7 +342,7 @@ export default function RecruiterPendingPage() {
                     Terima kasih, <strong>{user?.name || "Budi Santoso"}</strong>. Berkas pendaftaran dan dokumen legalitas perusahaan Anda telah berhasil dikirim dan saat ini masuk ke antrean verifikasi tim compliance ProofyLink.
                   </p>
                   <div className="pt-1 flex items-center gap-2 text-xs font-semibold text-amber-900">
-                    <span>⏱️ Estimasi Waktu Verifikasi:</span>
+                    <span>Estimasi Waktu Verifikasi:</span>
                     <span className="bg-white border border-amber-300 px-2 py-0.5 rounded-md">Maksimal 1 x 24 Jam Kerja</span>
                   </div>
                 </div>
@@ -273,7 +352,7 @@ export default function RecruiterPendingPage() {
         )}
 
         {/* Verification Progress Timeline */}
-        <Card className="border-slate-200/90 shadow-xs">
+        <Card className="border-slate-200/90 shadow-xs overflow-hidden">
           <CardHeader className="bg-slate-50/70 border-b pb-4">
             <CardTitle className="text-base text-[#0b2342] flex items-center gap-2">
               <ShieldCheck className="size-5 text-[#0b2342]" /> Status Pemeriksaan Berkas Legalitas
@@ -293,8 +372,19 @@ export default function RecruiterPendingPage() {
                       <span className="text-[11px] text-muted-foreground font-mono">{doc.file}</span>
                     </div>
                   </div>
-                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[11px] self-start sm:self-center font-medium">
-                    🟡 {doc.status}
+                  <Badge
+                    variant="outline"
+                    className={`text-[11px] self-start sm:self-center font-medium ${
+                      isApproved
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                        : isRevisionRequired
+                        ? "border-orange-300 bg-orange-50 text-orange-800"
+                        : isRejected
+                        ? "border-rose-300 bg-rose-50 text-rose-800"
+                        : "border-amber-300 bg-amber-50 text-amber-800"
+                    }`}
+                  >
+                    {doc.status}
                   </Badge>
                 </div>
               ))}
@@ -313,19 +403,17 @@ export default function RecruiterPendingPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t">
-              <Button variant="outline" asChild className="w-full sm:w-auto rounded-xl">
-                <Link href="/recruiter/onboarding">
-                  Perbarui / Lengkapi Berkas Kembali
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button variant="outline" asChild className="flex-1 sm:flex-none gap-1.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <p className="text-xs text-muted-foreground text-center sm:text-left">
+                Butuh bantuan terkait proses verifikasi? Tim support kami siap membantu.
+              </p>
+              <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 w-full sm:w-auto shrink-0">
+                <Button variant="outline" asChild className="w-full sm:w-auto gap-1.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs h-9 px-3">
                   <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer">
                     <MessageCircle className="size-3.5 text-emerald-600" /> Bantuan WhatsApp
                   </a>
                 </Button>
-                <Button asChild className="flex-1 sm:flex-none bg-[#0b2342] hover:bg-[#1a3460] text-white rounded-xl text-xs">
+                <Button asChild className="w-full sm:w-auto bg-[#0b2342] hover:bg-[#1a3460] text-white rounded-xl text-xs h-9 px-4">
                   <Link href="/">Kembali ke Beranda</Link>
                 </Button>
               </div>

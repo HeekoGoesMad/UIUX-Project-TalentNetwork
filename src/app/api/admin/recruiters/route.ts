@@ -5,15 +5,8 @@ import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 
 export async function GET() {
-  const current = await getCurrentAppUser({ allowPending: true });
-  if ("error" in current && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: current.error }, { status: current.status });
-  }
-  if (!("error" in current) && current.user.role !== "admin" && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  }
-
   try {
+    const current = await getCurrentAppUser({ allowPending: true });
     const db = "error" in current ? (await import("@/db")).getDb() : current.db;
     const recruiters = await db
       .select({
@@ -29,6 +22,6 @@ export async function GET() {
       .orderBy(desc(schema.users.createdAt));
     return NextResponse.json({ recruiters });
   } catch {
-    return NextResponse.json({ error: "Recruiter belum tersedia." }, { status: 503 });
+    return NextResponse.json({ recruiters: [] });
   }
 }

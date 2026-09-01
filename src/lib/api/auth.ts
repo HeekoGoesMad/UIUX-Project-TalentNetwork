@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb, schema, type Database } from "@/db";
 import { createClient } from "@/lib/supabase/server";
+import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 
 export type AppUser = typeof schema.users.$inferSelect;
 
@@ -24,7 +25,29 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
   if (error || !data.user) return { error: "Autentikasi diperlukan.", status: 401 as const };
 
   const db = getDb();
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.authUserId, data.user.id)).limit(1);
+  let [user] = await db.select().from(schema.users).where(eq(schema.users.authUserId, data.user.id)).limit(1);
+
+  if (!user && data.user.email) {
+    const [byEmail] = await db.select().from(schema.users).where(eq(schema.users.email, data.user.email)).limit(1);
+    if (byEmail) {
+      await db.update(schema.users).set({ authUserId: data.user.id, updatedAt: new Date() }).where(eq(schema.users.id, byEmail.id));
+      user = byEmail;
+    } else {
+      try {
+        const metadataRole = data.user.user_metadata?.role;
+        const resolvedRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" || metadataRole === "admin" ? metadataRole : "candidate";
+        const synced = await syncAuthenticatedUser(data.user, {
+          name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : data.user.email.split("@")[0],
+          role: resolvedRole,
+        });
+        const [created] = await db.select().from(schema.users).where(eq(schema.users.id, synced.userId)).limit(1);
+        user = created;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   if (!user) return { error: "Profil pengguna tidak ditemukan.", status: 403 as const };
   if (!options?.allowPending && user.role === "recruiter" && user.recruiterProvisioningStatus !== "active") {
     return recruiterAccessError(user.recruiterProvisioningStatus);
