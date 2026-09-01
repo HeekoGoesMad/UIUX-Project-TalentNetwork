@@ -10,6 +10,7 @@ import {
   FileText,
   HelpCircle,
   Loader2,
+  LogOut,
   MessageCircle,
   RefreshCw,
   ShieldCheck,
@@ -22,7 +23,7 @@ import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus } from "@/types";
 
 export default function RecruiterPendingPage() {
-  const { user, setProvisioningStatus, reloadBootstrap } = useApp();
+  const { user, logout, setProvisioningStatus, reloadBootstrap } = useApp();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
@@ -147,8 +148,31 @@ export default function RecruiterPendingPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50/60 py-10 px-4">
+    <main className="min-h-screen bg-slate-50/60 py-8 px-4">
       <div className="container mx-auto max-w-3xl space-y-6">
+        {/* Clean Top Header Bar */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-xs">
+              <ShieldCheck className="size-4.5" />
+            </span>
+            <span className="text-base font-bold text-foreground">
+              Proofy<span className="text-primary">Link</span>
+            </span>
+          </Link>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              await logout();
+              router.push("/login");
+            }}
+            className="text-xs text-muted-foreground hover:text-destructive gap-1.5 h-8 px-3 rounded-lg"
+          >
+            <LogOut className="size-3.5" /> Keluar Akun
+          </Button>
+        </div>
         {/* Status Banners for 4 Lifecycle States */}
         {isApproved ? (
           <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 shadow-sm">
@@ -328,7 +352,7 @@ export default function RecruiterPendingPage() {
         )}
 
         {/* Verification Progress Timeline */}
-        <Card className="border-slate-200/90 shadow-xs">
+        <Card className="border-slate-200/90 shadow-xs overflow-hidden">
           <CardHeader className="bg-slate-50/70 border-b pb-4">
             <CardTitle className="text-base text-[#0b2342] flex items-center gap-2">
               <ShieldCheck className="size-5 text-[#0b2342]" /> Status Pemeriksaan Berkas Legalitas
@@ -379,17 +403,17 @@ export default function RecruiterPendingPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <p className="text-xs text-muted-foreground text-center sm:text-left">
                 Butuh bantuan terkait proses verifikasi? Tim support kami siap membantu.
               </p>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button variant="outline" asChild className="flex-1 sm:flex-none gap-1.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs">
+              <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 w-full sm:w-auto shrink-0">
+                <Button variant="outline" asChild className="w-full sm:w-auto gap-1.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs h-9 px-3">
                   <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer">
                     <MessageCircle className="size-3.5 text-emerald-600" /> Bantuan WhatsApp
                   </a>
                 </Button>
-                <Button asChild className="flex-1 sm:flex-none bg-[#0b2342] hover:bg-[#1a3460] text-white rounded-xl text-xs">
+                <Button asChild className="w-full sm:w-auto bg-[#0b2342] hover:bg-[#1a3460] text-white rounded-xl text-xs h-9 px-4">
                   <Link href="/">Kembali ke Beranda</Link>
                 </Button>
               </div>

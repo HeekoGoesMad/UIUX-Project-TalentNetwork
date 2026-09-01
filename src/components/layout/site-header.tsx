@@ -111,7 +111,8 @@ export function SiteHeader() {
       ];
 
   const isAdmin = pathname?.startsWith("/admin");
-  if (isOnboarding || isAdmin) {
+  const isPending = pathname?.startsWith("/recruiter/pending");
+  if (isOnboarding || isAdmin || isPending) {
     return null;
   }
 
