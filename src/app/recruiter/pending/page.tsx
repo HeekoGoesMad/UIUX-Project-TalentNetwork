@@ -84,9 +84,9 @@ export default function RecruiterPendingPage() {
             setLocalStatus(next);
             setProvisioningStatus(next, data.identity.provisioningReason ?? null);
             if (next === "active") {
-              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+              toast.success("Akun Anda telah disetujui oleh tim compliance!");
             } else if (next === "revision_required") {
-              toast.warning("⚠️ Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+              toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
             }
           }
         })
@@ -104,7 +104,7 @@ export default function RecruiterPendingPage() {
             setLocalStatus(parsed.provisioningStatus);
             setProvisioningStatus(parsed.provisioningStatus, parsed.provisioningReason ?? null);
             if (parsed.provisioningStatus === "active") {
-              toast.success("🎉 Akun Anda telah disetujui oleh tim compliance!");
+              toast.success("Akun Anda telah disetujui oleh tim compliance!");
             }
           }
         }
@@ -223,9 +223,9 @@ export default function RecruiterPendingPage() {
                   {/* Revision Notes Box */}
                   <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 text-xs text-orange-950 space-y-1">
                     <p className="font-bold flex items-center gap-1.5">
-                      <span>📝 Catatan &amp; Instruksi dari Tim Compliance:</span>
+                      Catatan &amp; Instruksi dari Tim Compliance:
                     </p>
-                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                    <p className="text-slate-800 leading-relaxed pl-2 font-medium">
                       {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan foto KTP PIC atau berkas NIB yang diunggah."}
                     </p>
                   </div>
@@ -266,9 +266,9 @@ export default function RecruiterPendingPage() {
                   {/* Rejection Reason Box */}
                   <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs text-rose-950 space-y-1">
                     <p className="font-bold flex items-center gap-1.5">
-                      <span>⚠️ Alasan Penolakan:</span>
+                      Alasan Penolakan:
                     </p>
-                    <p className="text-slate-800 leading-relaxed pl-5 font-medium">
+                    <p className="text-slate-800 leading-relaxed pl-2 font-medium">
                       {user?.provisioningReason || "Entitas tidak memenuhi kualifikasi standar verifikasi kepatuhan ProofyLink."}
                     </p>
                   </div>
@@ -318,7 +318,7 @@ export default function RecruiterPendingPage() {
                     Terima kasih, <strong>{user?.name || "Budi Santoso"}</strong>. Berkas pendaftaran dan dokumen legalitas perusahaan Anda telah berhasil dikirim dan saat ini masuk ke antrean verifikasi tim compliance ProofyLink.
                   </p>
                   <div className="pt-1 flex items-center gap-2 text-xs font-semibold text-amber-900">
-                    <span>⏱️ Estimasi Waktu Verifikasi:</span>
+                    <span>Estimasi Waktu Verifikasi:</span>
                     <span className="bg-white border border-amber-300 px-2 py-0.5 rounded-md">Maksimal 1 x 24 Jam Kerja</span>
                   </div>
                 </div>
@@ -360,7 +360,6 @@ export default function RecruiterPendingPage() {
                         : "border-amber-300 bg-amber-50 text-amber-800"
                     }`}
                   >
-                    {isApproved ? "🟢 " : isRevisionRequired ? "🟠 " : isRejected ? "🔴 " : "🟡 "}
                     {doc.status}
                   </Badge>
                 </div>
@@ -381,11 +380,9 @@ export default function RecruiterPendingPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t">
-              <Button variant="outline" asChild className="w-full sm:w-auto rounded-xl">
-                <Link href="/recruiter/onboarding">
-                  Perbarui / Lengkapi Berkas Kembali
-                </Link>
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                Butuh bantuan terkait proses verifikasi? Tim support kami siap membantu.
+              </p>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button variant="outline" asChild className="flex-1 sm:flex-none gap-1.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs">
                   <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer">
