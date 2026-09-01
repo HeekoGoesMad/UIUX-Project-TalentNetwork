@@ -1,17 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { Building2, Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, GraduationCap, Info, Send, Sparkles } from "lucide-react";
-import { FormEvent, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useApp } from "@/providers/app-provider";
-import { ProvisioningStatus, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RoleSelector } from "./role-selector";
-import { OtpVerificationModal } from "./otp-verification-modal";
-import { ConsentModal } from "./consent-modal";
 import { createClient } from "@/lib/supabase/client";
+import { useApp } from "@/providers/app-provider";
+import { ProvisioningStatus, UserRole } from "@/types";
+import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, Send, Sparkles, User } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { ConsentModal } from "./consent-modal";
+import { OtpVerificationModal } from "./otp-verification-modal";
+import { RoleSelector } from "./role-selector";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();

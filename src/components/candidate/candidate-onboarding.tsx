@@ -23,6 +23,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { ProfessionalSummaryModal } from "./professional-summary-modal";
 import {
   CAREER_STATUS_CONFIG,
   TALENT_CATEGORY_CONFIG,
@@ -650,6 +651,8 @@ function BasicStep({
   errors: Partial<Record<TextField, string>>;
   setValue: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
 }) {
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+
   return (
     <Intro title="Mari kenalan lebih dekat." text="Tulis ringkasan singkat agar recruiter langsung memahami kontak dan arah kariermu.">
       <div className="space-y-5">
@@ -702,7 +705,22 @@ function BasicStep({
             />
           </Field>
         </div>
-        <Field label="Tentang kamu *" error={errors.about} hint="Ceritakan pengalaman, cara berpikir, atau hal yang sedang kamu cari">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Tentang kamu *
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSummaryModalOpen(true)}
+              className="h-6 gap-1 border-primary/30 px-2 text-[11px] font-medium text-primary hover:bg-primary/5"
+            >
+              <Sparkles className="size-3" />
+              Panduan Summary
+            </Button>
+          </div>
           <textarea
             required
             aria-invalid={Boolean(errors.about)}
@@ -710,9 +728,26 @@ function BasicStep({
             value={form.about}
             onChange={(event) => setValue("about", event.target.value)}
             placeholder="Ceritakan gambaran singkat profil profesionalmu..."
+            rows={4}
           />
-        </Field>
+          {errors.about ? (
+            <p className="text-xs text-destructive">{errors.about}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Ceritakan pengalaman, cara berpikir, atau hal yang sedang kamu cari
+            </p>
+          )}
+        </div>
       </div>
+
+      <ProfessionalSummaryModal
+        open={summaryModalOpen}
+        onOpenChange={setSummaryModalOpen}
+        currentSummary={form.about}
+        onApply={(newSummary) => {
+          setValue("about", newSummary);
+        }}
+      />
     </Intro>
   );
 }
