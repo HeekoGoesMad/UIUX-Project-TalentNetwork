@@ -141,7 +141,7 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
 
 export function RecruiterOnboarding() {
   const router = useRouter();
-  const { user } = useApp();
+  const { user, logout } = useApp();
 
   const [step, setStep] = useState<number>(() => {
     const draft = getSavedDraft();
@@ -264,14 +264,15 @@ export function RecruiterOnboarding() {
     }
   };
 
-  const exitWithoutPublishing = () => {
+  const handleExit = async () => {
     try {
       window.localStorage.setItem(draftKey, JSON.stringify({ form, step }));
-      toast.info("Draf onboarding tersimpan");
+      toast.info("Draf onboarding tersimpan di browser.");
     } catch {
       // ignore
     }
-    router.push("/recruiter/pending");
+    await logout();
+    router.push("/login");
   };
 
   return (
@@ -753,10 +754,10 @@ export function RecruiterOnboarding() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={exitWithoutPublishing}
-                  className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  onClick={handleExit}
+                  className="text-xs font-semibold text-muted-foreground hover:text-destructive"
                 >
-                  Simpan &amp; Keluar
+                  Keluar Akun
                 </Button>
 
                 <div className="flex items-center gap-3">
