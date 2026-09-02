@@ -1,10 +1,5 @@
-import { AdminShell } from "@/components/admin/admin-shell";
-import { RecruiterComplianceManager } from "@/components/admin/recruiter-compliance-manager";
+import { redirect } from "next/navigation";
 
 export default function AdminRecruitersPage() {
-  return (
-    <AdminShell title="Verifikasi & Compliance Legalitas Rekruter">
-      <RecruiterComplianceManager />
-    </AdminShell>
-  );
+  redirect("/admin/companies");
 }
