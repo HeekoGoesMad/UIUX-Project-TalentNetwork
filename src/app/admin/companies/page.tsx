@@ -190,13 +190,19 @@ function AdminCompaniesContent() {
             openReviewModal(target);
           }
         }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Companies API error:", res.status, errData);
+        toast.error(`Gagal memuat data perusahaan (${res.status}): ${errData.error ?? "Unknown error"}`);
       }
-    } catch {
+    } catch (err) {
+      console.error("fetchCompanies exception:", err);
       toast.error("Gagal memuat daftar perusahaan.");
     } finally {
       setLoading(false);
     }
   }, [initialReviewId, openReviewModal]);
+
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

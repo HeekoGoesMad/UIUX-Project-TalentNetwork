@@ -6,7 +6,7 @@ import { type Database } from "@/db";
 import { getCurrentAppUser, getRecruiterScope, type AppUser } from "@/lib/api/auth";
 
 export async function currentUserOrError() {
-  return getCurrentAppUser();
+  return getCurrentAppUser({ allowPending: true });
 }
 
 export type BillingScope = { db: Database; user: AppUser; organizationId: string | null; organizationRole: string };
