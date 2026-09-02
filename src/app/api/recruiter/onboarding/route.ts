@@ -75,6 +75,16 @@ export async function POST(request: Request) {
             name: data.companyName,
             slug,
             createdBy: user.id,
+            nib: data.nibNumber || null,
+            npwp: data.npwpNumber || null,
+            industry: (data.industry as "Technology") || null,
+            companyScale: (data.companySize as "1-10 Karyawan") || null,
+            city: data.city || null,
+            officeAddress: data.officeAddress || null,
+            companyEmail: data.picEmail,
+            website: data.website || null,
+            description: data.description || null,
+            verificationStatus: "pending",
           })
           .returning({ id: schema.organizations.id });
         orgId = newOrg.id;
@@ -93,6 +103,16 @@ export async function POST(request: Request) {
           .update(schema.organizations)
           .set({
             name: data.companyName,
+            nib: data.nibNumber || null,
+            npwp: data.npwpNumber || null,
+            industry: (data.industry as "Technology") || null,
+            companyScale: (data.companySize as "1-10 Karyawan") || null,
+            city: data.city || null,
+            officeAddress: data.officeAddress || null,
+            companyEmail: data.picEmail,
+            website: data.website || null,
+            description: data.description || null,
+            verificationStatus: "pending",
             updatedAt: new Date(),
           })
           .where(eq(schema.organizations.id, orgId));

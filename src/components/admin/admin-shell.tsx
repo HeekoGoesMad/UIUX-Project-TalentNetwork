@@ -9,8 +9,8 @@ import {
   Coins,
   LayoutDashboard,
   ScrollText,
+  Settings,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,15 @@ interface NavLinkItem {
   href: string;
   icon: typeof LayoutDashboard;
   badge?: string;
+  disabled?: boolean;
 }
 
 const adminNavLinks: NavLinkItem[] = [
-  { label: "Overview", href: "/admin", icon: LayoutDashboard },
-  { label: "Recruiters", href: "/admin/recruiters", icon: Building2 },
-  { label: "Organizations", href: "/admin/organizations", icon: Users },
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { label: "Companies", href: "/admin/companies", icon: Building2 },
   { label: "Tokens", href: "/admin/tokens", icon: Coins },
-  { label: "Verifications", href: "/admin/verifications", icon: ShieldCheck },
-  { label: "Audit Log", href: "/admin/audit-log", icon: ScrollText },
+  { label: "Audit Logs", href: "/admin/audit-log", icon: ScrollText },
+  { label: "Settings", href: "#", icon: Settings, badge: "Soon", disabled: true },
 ];
 
 export function AdminShell({ title, children }: { title: string; children: ReactNode }) {
@@ -47,7 +47,7 @@ export function AdminShell({ title, children }: { title: string; children: React
           </Link>
           <span className="text-slate-300">/</span>
           <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 text-xs font-semibold px-2.5 py-0.5">
-            Admin Panel
+            Admin Portal
           </Badge>
         </div>
 
@@ -90,7 +90,26 @@ export function AdminShell({ title, children }: { title: string; children: React
               const isActive =
                 item.href === "/admin"
                   ? pathname === "/admin"
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : pathname === item.href || (item.href !== "#" && pathname.startsWith(`${item.href}/`));
+
+              if (item.disabled) {
+                return (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-400 opacity-60 cursor-not-allowed select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="size-4 text-slate-400" />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <Link
@@ -124,7 +143,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 text-xs">
               <span className="font-semibold text-slate-700 block">Mode Administrator</span>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Akses penuh ke verifikasi, compliance &amp; provisioning sistem.
+                Akses penuh verifikasi perusahaan, kuota token, dan audit aktivitas.
               </p>
             </div>
           </div>
@@ -133,7 +152,7 @@ export function AdminShell({ title, children }: { title: string; children: React
         {/* ─── Main Content ─── */}
         <main className="min-w-0">
           <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#7C3AED]">Operations</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#7C3AED]">Portal Admin</p>
             <h1 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{title}</h1>
           </div>
           {children}

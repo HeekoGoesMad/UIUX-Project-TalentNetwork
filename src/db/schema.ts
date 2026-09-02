@@ -38,6 +38,43 @@ export const conversationStatus = pgEnum("conversation_status", ["active", "read
 export const attachmentScanStatus = pgEnum("attachment_scan_status", ["not_applicable", "pending", "clean", "quarantined"]);
 export const messageReportStatus = pgEnum("message_report_status", ["open", "reviewing", "resolved", "dismissed"]);
 export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected", "revision_required"]);
+export const companyVerificationStatus = pgEnum("company_verification_status", [
+  "pending",
+  "approved",
+  "need_revision",
+  "rejected",
+  "suspended",
+]);
+export const industrySector = pgEnum("industry_sector", [
+  "Technology",
+  "Financial Services",
+  "Hospitality",
+  "Retail",
+  "Manufacturing",
+  "Education",
+  "Healthcare",
+  "Logistics",
+  "Professional Services",
+  "Other",
+]);
+export const companyScale = pgEnum("company_scale", [
+  "1-10 Karyawan",
+  "11-50 Karyawan",
+  "51-200 Karyawan",
+  "201-500 Karyawan",
+  "500+ Karyawan",
+]);
+export const subscriptionTier = pgEnum("subscription_tier", [
+  "trial",
+  "starter",
+  "professional",
+  "enterprise",
+]);
+export const subscriptionStatus = pgEnum("subscription_status", [
+  "active",
+  "expired",
+  "suspended",
+]);
 export const tokenLedgerEntryType = pgEnum("token_ledger_entry_type", ["grant", "charge", "refund"]);
 export const tokenPurchaseStatus = pgEnum("token_purchase_status", ["pending", "paid", "failed", "refunded"]);
 export const notificationDeliveryChannel = pgEnum("notification_delivery_channel", ["email", "in_app"]);
@@ -137,9 +174,36 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   createdBy: uuid("created_by").notNull().references(() => users.id),
+  // Legalitas
+  nib: text("nib").unique(),
+  npwp: text("npwp").unique(),
+  // Informasi Bisnis
+  industry: industrySector("industry"),
+  companyScale: companyScale("company_scale"),
+  province: text("province"),
+  city: text("city"),
+  officeAddress: text("office_address"),
+  companyEmail: text("company_email"),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  description: text("description"),
+  // Informasi Verifikasi Admin
+  verificationStatus: companyVerificationStatus("verification_status").notNull().default("pending"),
+  verificationNotes: text("verification_notes"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  // Informasi Langganan
+  subscriptionTier: subscriptionTier("subscription_tier").notNull().default("trial"),
+  subscriptionStatus: subscriptionStatus("subscription_status").notNull().default("active"),
+  subscriptionStartDate: timestamp("subscription_start_date", { withTimezone: true }),
+  subscriptionEndDate: timestamp("subscription_end_date", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (table) => [index("organizations_created_by_idx").on(table.createdBy)]);
+}, (table) => [
+  index("organizations_created_by_idx").on(table.createdBy),
+  index("organizations_verification_status_idx").on(table.verificationStatus),
+  index("organizations_subscription_status_idx").on(table.subscriptionStatus),
+]);
 
 export const organizationMembers = pgTable("organization_members", {
   id: id(),
