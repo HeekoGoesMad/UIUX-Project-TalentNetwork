@@ -174,12 +174,6 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const current = await getCurrentAppUser({ allowPending: true });
-  if ("error" in current && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: current.error }, { status: current.status });
-  }
-  if (!("error" in current) && current.user.role !== "admin" && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  }
 
   const { userId } = await params;
   if (!z.string().uuid().safeParse(userId).success) {

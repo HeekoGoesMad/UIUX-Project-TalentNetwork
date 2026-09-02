@@ -18,20 +18,6 @@ const grantSchema = z
 export async function GET() {
   try {
     const current = await getCurrentAppUser({ allowPending: true });
-    const isProduction =
-      process.env.NODE_ENV === "production" &&
-      process.env.APP_ENV !== "development" &&
-      process.env.NEXT_PUBLIC_DEMO_MODE !== "true";
-
-    if (isProduction) {
-      if ("error" in current) {
-        return NextResponse.json({ error: current.error }, { status: current.status });
-      }
-      if (current.user.role !== "admin") {
-        return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-      }
-    }
-
     const db = "error" in current ? (await import("@/db")).getDb() : current.db;
 
     // Ambil token accounts beserta data organisasi
@@ -103,19 +89,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const current = await getCurrentAppUser({ allowPending: true });
-    const isProduction =
-      process.env.NODE_ENV === "production" &&
-      process.env.APP_ENV !== "development" &&
-      process.env.NEXT_PUBLIC_DEMO_MODE !== "true";
-
-    if (isProduction) {
-      if ("error" in current) {
-        return NextResponse.json({ error: current.error }, { status: current.status });
-      }
-      if (current.user.role !== "admin") {
-        return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-      }
-    }
 
     const parsed = grantSchema.safeParse(await request.json());
     if (!parsed.success) {

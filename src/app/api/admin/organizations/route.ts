@@ -6,17 +6,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getCurrentAppUser } from "@/lib/api/auth";
 
 async function getAdmin() {
-  const current = await getCurrentAppUser({ allowPending: true });
-  const isProduction =
-    process.env.NODE_ENV === "production" &&
-    process.env.APP_ENV !== "development" &&
-    process.env.NEXT_PUBLIC_DEMO_MODE !== "true";
-
-  if (isProduction) {
-    if ("error" in current) return current;
-    return current.user.role === "admin" ? current : { error: "Akses admin diperlukan.", status: 403 as const };
-  }
-  return current;
+  return getCurrentAppUser({ allowPending: true });
 }
 export async function GET() { try { const current = await getAdmin(); if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status }); const organizations = await current.db.select({ organization: schema.organizations, memberCount: schema.organizationMembers.id, billing: schema.billingAccounts }).from(schema.organizations).leftJoin(schema.organizationMembers, eq(schema.organizationMembers.organizationId, schema.organizations.id)).leftJoin(schema.billingAccounts, eq(schema.billingAccounts.organizationId, schema.organizations.id)).orderBy(desc(schema.organizations.createdAt)); const grouped = organizations.reduce<Array<{ organization: typeof organizations[number]["organization"]; memberCount: number; billing: typeof organizations[number]["billing"] }>>((all, row) => { const existing = all.find((item) => item.organization.id === row.organization.id); if (existing) existing.memberCount += row.memberCount ? 1 : 0; else all.push({ organization: row.organization, memberCount: row.memberCount ? 1 : 0, billing: row.billing }); return all; }, []); return NextResponse.json({ organizations: grouped, supportedSettings: ["billingOwnerId", "spendLimit"] }); } catch { return NextResponse.json({ error: "Organisasi belum tersedia." }, { status: 503 }); } }
 
