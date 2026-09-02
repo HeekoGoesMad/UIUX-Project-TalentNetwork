@@ -1,16 +1,23 @@
 import { desc, eq, sql, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
-import { currentUserOrError } from "@/lib/billing/access";
+import { getCurrentAppUser } from "@/lib/api/auth";
 
 export async function GET() {
   try {
-    const current = await currentUserOrError();
-    if ("error" in current && process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: current.error }, { status: current.status });
-    }
-    if (!("error" in current) && current.user.role !== "admin" && process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
+    const current = await getCurrentAppUser({ allowPending: true });
+    const isProduction =
+      process.env.NODE_ENV === "production" &&
+      process.env.APP_ENV !== "development" &&
+      process.env.NEXT_PUBLIC_DEMO_MODE !== "true";
+
+    if (isProduction) {
+      if ("error" in current) {
+        return NextResponse.json({ error: current.error }, { status: current.status });
+      }
+      if (current.user.role !== "admin") {
+        return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
+      }
     }
 
     const db = "error" in current ? (await import("@/db")).getDb() : current.db;
