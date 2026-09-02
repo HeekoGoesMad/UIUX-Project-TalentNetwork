@@ -45,10 +45,13 @@ export default function RecruiterPendingPage() {
           setLocalStatus(next);
           setProvisioningStatus(next, data.identity.provisioningReason ?? null);
 
+          if (next === "active") {
+            toast.success("Akun Anda telah disetujui! Membuka Dashboard...");
+            window.location.href = "/dashboard";
+            return;
+          }
           if (showToasts) {
-            if (next === "active") {
-              toast.success("Akun Anda telah disetujui! Anda sekarang dapat masuk ke Dashboard.");
-            } else if (next === "revision_required") {
+            if (next === "revision_required") {
               toast.warning("Terdapat instruksi revisi dokumen dari tim compliance.");
             } else if (next === "rejected") {
               toast.error("Permohonan akun Anda ditolak oleh compliance.");
@@ -80,14 +83,20 @@ export default function RecruiterPendingPage() {
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } } | null) => {
           if (!active) return;
-          if (data?.identity?.provisioningStatus && data.identity.provisioningStatus !== localStatus) {
+          if (data?.identity?.provisioningStatus) {
             const next = data.identity.provisioningStatus;
-            setLocalStatus(next);
-            setProvisioningStatus(next, data.identity.provisioningReason ?? null);
             if (next === "active") {
-              toast.success("Akun Anda telah disetujui oleh tim compliance!");
-            } else if (next === "revision_required") {
-              toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+              setLocalStatus("active");
+              setProvisioningStatus("active", null);
+              window.location.href = "/dashboard";
+              return;
+            }
+            if (next !== localStatus) {
+              setLocalStatus(next);
+              setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+              if (next === "revision_required") {
+                toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
+              }
             }
           }
         })

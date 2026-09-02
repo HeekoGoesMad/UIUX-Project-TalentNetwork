@@ -488,10 +488,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus };
-        const metadata = data.user.user_metadata ?? {};
-        const actualRole = synced.role ?? (metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : role);
-        const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" || actualRole === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending");
+        const actualRole = synced.role ?? role;
+        const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" || actualRole === "partner" ? "active" : "pending");
+        dbIdentity.current = { role: actualRole, provisioningStatus };
 
+        const metadata = data.user.user_metadata ?? {};
         setUser({
           role: actualRole,
           provisioningStatus,

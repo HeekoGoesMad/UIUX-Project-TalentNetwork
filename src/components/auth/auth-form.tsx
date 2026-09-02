@@ -35,9 +35,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
   useEffect(() => {
     if (hydrated && user && !loading && !otpModalOpen && mode === "login") {
-      router.replace(destination(user.role, getNext(), false));
+      const dest = destination(user.role, getNext(), false, user.provisioningStatus);
+      window.location.href = dest;
     }
-  }, [hydrated, user, loading, router, mode, otpModalOpen]);
+  }, [hydrated, user, loading, mode, otpModalOpen]);
 
   useEffect(() => {
     const error = new URLSearchParams(window.location.search).get("error");
@@ -125,7 +126,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       if (!synced) return;
     }
-    router.push(destination(synced?.role ?? result.role ?? role, getNext(), false, synced?.provisioningStatus ?? result.provisioningStatus));
+    const dest = destination(
+      synced?.role ?? result.role ?? role,
+      getNext(),
+      false,
+      synced?.provisioningStatus ?? result.provisioningStatus
+    );
+    window.location.href = dest;
   };
 
   const signInWithGoogle = async () => {
