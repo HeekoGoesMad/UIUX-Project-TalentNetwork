@@ -64,7 +64,7 @@ export default function RecruiterPendingPage() {
       }
     } catch {
       if (showToasts) {
-        toast.error("Gagal memeriksa status ke server.");
+        toast.info("Sedang menyinkronkan status dengan server...");
       }
     } finally {
       setChecking(false);

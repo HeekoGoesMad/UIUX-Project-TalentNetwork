@@ -62,24 +62,65 @@ export async function PATCH(
       return { error: "Recruiter tidak ditemukan.", status: 404 as const };
     }
 
+    // Sinkronisasi status organisasi terkait milik recruiter
+    const membership = await tx
+      .select({ organizationId: schema.organizationMembers.organizationId })
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, user.id))
+      .limit(1);
+    let organizationId = membership[0]?.organizationId;
+
     if (parsed.data.action === "approve") {
-      const membership = await tx.select({ organizationId: schema.organizationMembers.organizationId })
-        .from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, user.id)).limit(1);
-      let organizationId = membership[0]?.organizationId;
       if (!organizationId) {
         const slug = `org-${user.authUserId}`;
-        const [org] = await tx.insert(schema.organizations).values({
-          name: `${user.email.split("@")[0]} Organization`,
-          slug,
-          createdBy: user.id,
-        }).onConflictDoUpdate({
-          target: schema.organizations.slug,
-          set: { updatedAt: new Date() },
-        }).returning({ id: schema.organizations.id });
+        const [org] = await tx
+          .insert(schema.organizations)
+          .values({
+            name: `${user.email.split("@")[0]} Organization`,
+            slug,
+            createdBy: user.id,
+            verificationStatus: "approved",
+            reviewedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: schema.organizations.slug,
+            set: { verificationStatus: "approved", updatedAt: new Date(), reviewedAt: new Date() },
+          })
+          .returning({ id: schema.organizations.id });
         organizationId = org.id;
         await tx.insert(schema.organizationMembers).values({ organizationId: org.id, userId: user.id, role: "owner" }).onConflictDoNothing();
         await tx.insert(schema.tokenAccounts).values({ organizationId: org.id }).onConflictDoNothing();
+      } else {
+        await tx
+          .update(schema.organizations)
+          .set({
+            verificationStatus: "approved",
+            reviewedAt: new Date(),
+            verificationNotes: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.organizations.id, organizationId));
       }
+    } else if (parsed.data.action === "reject" && organizationId) {
+      await tx
+        .update(schema.organizations)
+        .set({
+          verificationStatus: "rejected",
+          verificationNotes: parsed.data.reason || "Pendaftaran ditolak oleh compliance.",
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.organizations.id, organizationId));
+    } else if (parsed.data.action === "request_revision" && organizationId) {
+      await tx
+        .update(schema.organizations)
+        .set({
+          verificationStatus: "need_revision",
+          verificationNotes: parsed.data.reason || "Dokumen perlu diperbaiki.",
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.organizations.id, organizationId));
     }
 
     let membershipChanged = false;

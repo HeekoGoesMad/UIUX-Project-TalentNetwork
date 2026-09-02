@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { desc, eq, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
-import { getCurrentAppUser, getRecruiterScope, getRecruiterTokenAccount } from "@/lib/api/auth";
+import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 import { createClient } from "@/lib/supabase/server";
 import { ShortlistService } from "@/lib/services/shortlist";
@@ -26,9 +26,20 @@ export async function GET() {
     }
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-    const isRecruiterActive = current.user.role === "recruiter" && current.user.recruiterProvisioningStatus === "active";
-    const membership = isRecruiterActive ? await getRecruiterScope(current.db, current.user) : null;
-    const activeOrgId = membership && !("error" in membership) ? membership.membership.organizationId : null;
+    const isRecruiter = current.user.role === "recruiter";
+    const isRecruiterActive = isRecruiter && current.user.recruiterProvisioningStatus === "active";
+    
+    // Untuk rekruter (baik active maupun pending review), cari organisasi miliknya
+    let resolvedOrgId: string | null = null;
+    if (isRecruiter) {
+      const [member] = await current.db
+        .select({ organizationId: schema.organizationMembers.organizationId })
+        .from(schema.organizationMembers)
+        .where(eq(schema.organizationMembers.userId, current.user.id))
+        .limit(1);
+      resolvedOrgId = member?.organizationId ?? null;
+    }
+    const activeOrgId = isRecruiterActive ? resolvedOrgId : null;
 
     const [profile, candidateProfile, notifications] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
@@ -40,8 +51,8 @@ export async function GET() {
         .where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile[0].id))
       : [];
 
-    const organization = activeOrgId
-      ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, activeOrgId)).limit(1))[0] ?? null
+    const organization = resolvedOrgId
+      ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1))[0] ?? null
       : null;
     const shortlists = activeOrgId
       ? (await ShortlistService.list(current.db, activeOrgId)).shortlists
@@ -85,7 +96,8 @@ export async function GET() {
         completed: Number(screeningSummary?.completed ?? 0),
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("Error in /api/app/bootstrap:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

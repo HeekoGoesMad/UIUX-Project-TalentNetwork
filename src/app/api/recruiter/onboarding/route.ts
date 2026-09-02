@@ -4,6 +4,53 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 
+type IndustrySector = typeof schema.industrySector.enumValues[number];
+type CompanyScale = typeof schema.companyScale.enumValues[number];
+
+function normalizeIndustry(val?: string | null): IndustrySector | null {
+  if (!val) return null;
+  const s = val.toLowerCase();
+  if (s.includes("teknologi") || s.includes("saas") || s.includes("it") || s.includes("software") || s.includes("technology")) {
+    return "Technology";
+  }
+  if (s.includes("fintech") || s.includes("keuangan") || s.includes("financial") || s.includes("bank")) {
+    return "Financial Services";
+  }
+  if (s.includes("hospitality") || s.includes("hotel") || s.includes("pariwisata")) {
+    return "Hospitality";
+  }
+  if (s.includes("retail") || s.includes("commerce") || s.includes("dagang")) {
+    return "Retail";
+  }
+  if (s.includes("manufaktur") || s.includes("fmcg") || s.includes("manufacturing") || s.includes("pabrik")) {
+    return "Manufacturing";
+  }
+  if (s.includes("edutech") || s.includes("pendidikan") || s.includes("education") || s.includes("sekolah")) {
+    return "Education";
+  }
+  if (s.includes("kesehatan") || s.includes("medtech") || s.includes("farmasi") || s.includes("healthcare")) {
+    return "Healthcare";
+  }
+  if (s.includes("logistik") || s.includes("transport") || s.includes("supply chain") || s.includes("logistics")) {
+    return "Logistics";
+  }
+  if (s.includes("konsultan") || s.includes("profesional") || s.includes("professional") || s.includes("bisnis") || s.includes("layanan")) {
+    return "Professional Services";
+  }
+  return "Other";
+}
+
+function normalizeCompanyScale(val?: string | null): CompanyScale | null {
+  if (!val) return null;
+  const s = val.trim();
+  if (s === "1-10" || s.startsWith("1 ") || s.includes("1-10")) return "1-10 Karyawan";
+  if (s === "11-50" || s.includes("11-50") || s.includes("11 — 50")) return "11-50 Karyawan";
+  if (s === "51-200" || s.includes("51-200") || s.includes("51 — 200")) return "51-200 Karyawan";
+  if (s === "201-500" || s.includes("201-500") || s.includes("201 — 500")) return "201-500 Karyawan";
+  if (s === "500+" || s.includes("500+") || s.includes("500")) return "500+ Karyawan";
+  return "1-10 Karyawan";
+}
+
 const onboardingSchema = z.object({
   picName: z.string().trim().min(2),
   picEmail: z.string().email(),
@@ -67,6 +114,9 @@ export async function POST(request: Request) {
         .where(eq(schema.organizationMembers.userId, user.id))
         .limit(1);
 
+      const normalizedIndustry = normalizeIndustry(data.industry);
+      const normalizedScale = normalizeCompanyScale(data.companySize);
+
       let orgId = existingOrgMember?.organizationId;
       if (!orgId) {
         const [newOrg] = await tx
@@ -77,8 +127,8 @@ export async function POST(request: Request) {
             createdBy: user.id,
             nib: data.nibNumber || null,
             npwp: data.npwpNumber || null,
-            industry: (data.industry as "Technology") || null,
-            companyScale: (data.companySize as "1-10 Karyawan") || null,
+            industry: normalizedIndustry,
+            companyScale: normalizedScale,
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
@@ -105,8 +155,8 @@ export async function POST(request: Request) {
             name: data.companyName,
             nib: data.nibNumber || null,
             npwp: data.npwpNumber || null,
-            industry: (data.industry as "Technology") || null,
-            companyScale: (data.companySize as "1-10 Karyawan") || null,
+            industry: normalizedIndustry,
+            companyScale: normalizedScale,
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
@@ -134,6 +184,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Gagal menyimpan data onboarding:", error);
-    return NextResponse.json({ error: "Gagal menyimpan data ke database." }, { status: 500 });
+    const detail = error instanceof Error ? error.message : "Gagal menyimpan data ke database.";
+    return NextResponse.json({ error: detail }, { status: 500 });
   }
 }
