@@ -28,6 +28,16 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("ROLE_MISMATCH:")) {
+      const [, actualRole] = error.message.split(":");
+      const actualRoleLabel = actualRole === "candidate" ? "Talent / Candidate" : actualRole === "recruiter" ? "Recruiter / Hiring" : "Partner";
+      return NextResponse.json({
+        code: "ROLE_MISMATCH",
+        actualRole,
+        error: `Akun ini terdaftar sebagai ${actualRoleLabel}. Silakan pilih peran ${actualRoleLabel} untuk masuk.`,
+      }, { status: 403 });
+    }
+
     console.error("Gagal menyinkronkan akun", error);
     return NextResponse.json({
       error: "Akun belum dapat disinkronkan ke database.",

@@ -106,13 +106,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       synced = await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name || email.split("@")[0], companyName: companyName || undefined }),
-      }).then((response) => response.ok ? response.json() : null).catch(() => null);
-      if (!synced) {
+        body: JSON.stringify({
+          role,
+          name: name || undefined,
+          companyName: companyName || undefined,
+        }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Gagal menyinkronkan profil akun.");
+        }
+        return response.json();
+      }).catch((err) => {
         setLoading(false);
-        setErrorMessage("Tidak dapat menyiapkan profil akun Anda. Periksa koneksi Anda dan coba lagi.");
-        return;
-      }
+        setErrorMessage(err instanceof Error ? err.message : "Tidak dapat menyiapkan profil akun Anda.");
+        return null;
+      });
+
+      if (!synced) return;
     }
     router.push(destination(synced?.role ?? result.role ?? role, getNext(), false, synced?.provisioningStatus ?? result.provisioningStatus));
   };
@@ -161,7 +172,39 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         />
       </div>
 
-      {errorMessage && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{errorMessage}</div>}
+      {errorMessage && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-700 space-y-2">
+          <p className="font-medium">{errorMessage}</p>
+          {errorMessage.includes("Talent / Candidate") && role !== "candidate" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRole("candidate");
+                setErrorMessage(null);
+              }}
+              className="border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800 text-xs h-7 px-2.5 rounded-lg"
+            >
+              Beralih ke Tab Kandidat
+            </Button>
+          )}
+          {errorMessage.includes("Recruiter / Hiring") && role !== "recruiter" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRole("recruiter");
+                setErrorMessage(null);
+              }}
+              className="border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800 text-xs h-7 px-2.5 rounded-lg"
+            >
+              Beralih ke Tab Rekruter
+            </Button>
+          )}
+        </div>
+      )}
 
       {role === "partner" ? (
         submittedPartner ? (

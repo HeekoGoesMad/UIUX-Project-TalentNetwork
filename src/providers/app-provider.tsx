@@ -468,10 +468,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
         if (error) return { error: error.message };
+
+        // Sync with expected role to check role match against database
+        const syncResponse = await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role, name: email.split("@")[0] }),
+        });
+
+        if (!syncResponse.ok) {
+          const syncData = await syncResponse.json().catch(() => ({}));
+          // If role mismatch or other sync error, sign out immediately
+          await supabase.auth.signOut().catch(() => {});
+          setUser(null);
+          localStorage.removeItem(sessionKey);
+          return {
+            error: syncData.error || "Gagal memverifikasi peran akun.",
+          };
+        }
+
+        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus };
         const metadata = data.user.user_metadata ?? {};
-        const actualRole = metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : role;
-        const provisioningStatus: ProvisioningStatus = actualRole === "candidate" || actualRole === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending";
-        setUser({ role: actualRole, provisioningStatus, email, name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email, companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined });
+        const actualRole = synced.role ?? (metadata.role === "candidate" || metadata.role === "recruiter" || metadata.role === "partner" ? metadata.role : role);
+        const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" || actualRole === "partner" ? "active" : metadata.provisioningStatus === "active" || metadata.provisioningStatus === "rejected" ? metadata.provisioningStatus : "pending");
+
+        setUser({
+          role: actualRole,
+          provisioningStatus,
+          email,
+          name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
+          companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
+        });
         return { role: actualRole, provisioningStatus };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Gagal masuk." };

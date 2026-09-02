@@ -26,14 +26,24 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     const existing = existingByAuthId ?? existingByEmail;
 
     const metadataRole = authUser.user_metadata?.role as PersistedRole | undefined;
-    const role: PersistedRole = input.role ?? metadataRole ?? existing?.role ?? "candidate";
+    const requestedRole: PersistedRole | undefined = input.role ?? metadataRole;
+
+    // Strict 1 Email = 1 Role check:
+    // If the user already exists in the database with an assigned role, do NOT allow changing roles.
+    if (existing && requestedRole && existing.role !== requestedRole) {
+      const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
+      err.name = "RoleMismatchError";
+      throw err;
+    }
+
+    const role: PersistedRole = existing?.role ?? requestedRole ?? "candidate";
 
     const [user] = existing
       ? await tx.update(schema.users).set({
           authUserId: authUser.id,
           email: authEmail,
-          role,
-          recruiterProvisioningStatus: role === "recruiter" ? (existing.recruiterProvisioningStatus ?? "pending") : "active",
+          role: existing.role, // Never mutate an existing account's role
+          recruiterProvisioningStatus: existing.role === "recruiter" ? (existing.recruiterProvisioningStatus ?? "pending") : "active",
           updatedAt: new Date(),
         }).where(eq(schema.users.id, existing.id)).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus })
       : await tx.insert(schema.users).values({
@@ -43,12 +53,26 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           recruiterProvisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending",
         }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
 
+    // Ensure displayName is NOT overwritten with an email prefix if an existing profile already has a name
+    const [existingProfile] = await tx.select({
+      displayName: schema.profiles.displayName,
+    }).from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
+
+    const providedName = input.name?.trim();
+    const isDefaultFallback = !providedName || providedName === authEmail.split("@")[0];
+    const resolvedName = existingProfile?.displayName?.trim()
+      ? (isDefaultFallback ? existingProfile.displayName : providedName)
+      : (providedName || (typeof authUser.user_metadata?.name === "string" ? authUser.user_metadata.name : authEmail.split("@")[0]));
+
     await tx.insert(schema.profiles).values({
       userId: user.id,
-      displayName: input.name?.trim() || (typeof authUser.user_metadata?.name === "string" ? authUser.user_metadata.name : authEmail.split("@")[0]),
+      displayName: resolvedName,
     }).onConflictDoUpdate({
       target: schema.profiles.userId,
-      set: { displayName: input.name?.trim() || undefined, updatedAt: new Date() },
+      set: {
+        displayName: resolvedName,
+        updatedAt: new Date(),
+      },
     });
 
     if (role === "recruiter" && user.recruiterProvisioningStatus === "active") {
