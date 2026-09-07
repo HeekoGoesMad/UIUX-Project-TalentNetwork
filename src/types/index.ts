@@ -189,7 +189,7 @@ export type RecruiterOnboardingData = {
   linkedinUrl: string;
   officeAddress: string;
   city: string;
-  // Step 3: Legal Documents & KTP
+  // Step 3: Legal Documents (NIB & NPWP)
   nibNumber: string;
   nibFileName?: string;
   npwpNumber: string;
