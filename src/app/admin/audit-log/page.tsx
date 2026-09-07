@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,7 @@ export default function AdminAuditLogPage() {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setDenied(null);
+    const startedAt = Date.now();
     try {
       const res = await fetch(new URL("/api/admin/audit-log", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -61,6 +62,7 @@ export default function AdminAuditLogPage() {
     } catch {
       toast.error("Gagal memuat riwayat audit log.");
     } finally {
+      await settleAdminCheck(startedAt);
       setLoading(false);
     }
   }, []);
@@ -111,9 +113,11 @@ export default function AdminAuditLogPage() {
 
   if (denied) {
     return (
-      <AdminShell title="Riwayat Jejak Aktivitas (Audit Logs)">
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
-      </AdminShell>
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+        <div className="w-full max-w-md">
+          <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        </div>
+      </div>
     );
   }
 

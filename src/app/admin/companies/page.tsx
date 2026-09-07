@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,6 +181,7 @@ function AdminCompaniesContent() {
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
     setDenied(null);
+    const startedAt = Date.now();
     try {
       const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -206,6 +207,7 @@ function AdminCompaniesContent() {
       console.error("fetchCompanies exception:", err);
       toast.error("Gagal memuat daftar perusahaan.");
     } finally {
+      await settleAdminCheck(startedAt);
       setLoading(false);
     }
   }, [initialReviewId, openReviewModal]);
@@ -283,9 +285,11 @@ function AdminCompaniesContent() {
 
   if (denied) {
     return (
-      <AdminShell title="Manajemen & Verifikasi Perusahaan">
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
-      </AdminShell>
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+        <div className="w-full max-w-md">
+          <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        </div>
+      </div>
     );
   }
 

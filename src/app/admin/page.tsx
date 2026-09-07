@@ -16,7 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,7 @@ export default function AdminDashboardPage() {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     setDenied(null);
+    const startedAt = Date.now();
     try {
       const res = await fetch(new URL("/api/admin/dashboard", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -72,6 +73,7 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.error("Failed to load dashboard:", err);
     } finally {
+      await settleAdminCheck(startedAt);
       setLoading(false);
     }
   }, []);
@@ -96,9 +98,11 @@ export default function AdminDashboardPage() {
 
   if (denied) {
     return (
-      <AdminShell title="Ringkasan Performa Platform">
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
-      </AdminShell>
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+        <div className="w-full max-w-md">
+          <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        </div>
+      </div>
     );
   }
 

@@ -4,6 +4,15 @@ import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
+export const ADMIN_CHECK_MIN_MS = 1200;
+
+export async function settleAdminCheck(startedAt: number) {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed < ADMIN_CHECK_MIN_MS) {
+    await new Promise((resolve) => setTimeout(resolve, ADMIN_CHECK_MIN_MS - elapsed));
+  }
+}
+
 export function AdminChecking() {
   return (
     <Card className="border border-slate-200/80 bg-white shadow-xs">
