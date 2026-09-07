@@ -395,13 +395,21 @@ function SearchPageContent() {
   const source = dbMode ? remoteCandidates : candidates;
   const allLocations = useMemo(() => [...new Set(source.map((candidate) => candidate.location))].sort(), [source]);
 
+  // Pre-index lowercase search strings for each candidate once when the source array changes
+  const candidateSearchTextMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of source) {
+      map.set(c.id, `${c.name} ${c.role} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase());
+    }
+    return map;
+  }, [source]);
+
   const filtered = useMemo(() => {
-    const haystack = (c: Candidate) =>
-      `${c.name} ${c.role} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase();
+    const query = filters.q.trim().toLowerCase();
 
     return source
       .filter((c) => {
-        const qMatch = !filters.q || haystack(c).includes(filters.q.toLowerCase());
+        const qMatch = !query || (candidateSearchTextMap.get(c.id) ?? "").includes(query);
         const catMatch = !filters.talentCategories.length || filters.talentCategories.includes(c.talentCategory);
         const statusMatch = !filters.careerStatuses.length || (c.careerStatus && filters.careerStatuses.includes(c.careerStatus));
         const indMatch = !filters.industries.length || filters.industries.includes(c.industry);
@@ -421,7 +429,7 @@ function SearchPageContent() {
         }
         return 0;
       });
-  }, [filters, source, partnerVerifications]);
+  }, [filters, source, candidateSearchTextMap, partnerVerifications]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(filters.page, totalPages);

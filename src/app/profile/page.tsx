@@ -315,6 +315,8 @@ export default function ProfilePage() {
                   <img
                     src={p.bannerUrl}
                     alt="Foto Sampul"
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover opacity-75"
                   />
                 ) : null}
@@ -354,6 +356,8 @@ export default function ProfilePage() {
                       <img
                         src={p.avatarUrl}
                         alt={p.fullName}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";
