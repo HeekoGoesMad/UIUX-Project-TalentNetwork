@@ -218,6 +218,7 @@ export async function PATCH(request: Request) {
             companyScale: normalizeCompanyScale(data.companySize),
             description: data.description || null,
             website: data.websiteUrl || null,
+            linkedinUrl: data.linkedinUrl || null,
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             nib: data.nibNumber || null,
