@@ -273,6 +273,10 @@ export class MessagingService {
         body: schema.messages.body,
         createdAt: schema.messages.createdAt,
         editedAt: schema.messages.editedAt,
+        attachmentName: schema.messages.attachmentName,
+        attachmentMimeType: schema.messages.attachmentMimeType,
+        attachmentSize: schema.messages.attachmentSize,
+        attachmentScanStatus: schema.messages.attachmentScanStatus,
       })
       .from(schema.messages)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.messages.senderId))
@@ -299,7 +303,18 @@ export class MessagingService {
   /**
    * Send a message and dispatch recipient notifications.
    */
-  static async sendMessage(db: Database, userId: string, conversationId: string, body: string) {
+  static async sendMessage(
+    db: Database,
+    userId: string,
+    conversationId: string,
+    body: string,
+    attachment?: {
+      name: string;
+      mimeType: string;
+      sizeBytes: number;
+      storagePath: string;
+    } | null
+  ) {
     const [participant] = await db
       .select({
         id: schema.conversationParticipants.id,
@@ -330,7 +345,16 @@ export class MessagingService {
     return db.transaction(async (tx) => {
       const [message] = await tx
         .insert(schema.messages)
-        .values({ conversationId, senderId: userId, body })
+        .values({
+          conversationId,
+          senderId: userId,
+          body,
+          attachmentName: attachment?.name ?? null,
+          attachmentMimeType: attachment?.mimeType ?? null,
+          attachmentSize: attachment?.sizeBytes ?? null,
+          attachmentStoragePath: attachment?.storagePath ?? null,
+          attachmentScanStatus: attachment ? "pending" : "not_applicable",
+        })
         .returning();
 
       await tx
@@ -367,7 +391,10 @@ export class MessagingService {
         action: "message.sent",
         entityType: "message",
         entityId: message.id,
-        metadata: { conversationId },
+        metadata: {
+          conversationId,
+          ...(attachment ? { hasAttachment: true, attachmentName: attachment.name } : {}),
+        },
       });
 
       return { message: { ...message, isMine: true } };
