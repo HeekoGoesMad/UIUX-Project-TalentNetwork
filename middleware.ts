@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  return updateSession(request, NextResponse.next());
+  const response = await updateSession(request, NextResponse.next());
+  response.headers.set("X-Request-Id", crypto.randomUUID());
+  return response;
 }
 
 export const config = {

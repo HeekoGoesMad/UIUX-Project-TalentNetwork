@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 
 export async function GET(request: Request) {
   try {
@@ -119,7 +120,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ companies });
   } catch (error) {
-    console.error("GET companies error:", error);
-    return NextResponse.json({ error: "Gagal memuat daftar perusahaan." }, { status: 500 });
+    return apiError("Gagal memuat daftar perusahaan.", 500, error);
   }
 }
