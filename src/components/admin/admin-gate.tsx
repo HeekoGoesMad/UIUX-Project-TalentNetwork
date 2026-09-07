@@ -34,7 +34,8 @@ export function AdminGateProvider({ children }: { children: ReactNode }) {
     const startedAt = Date.now();
     void (async () => {
       await settleAdminCheck(startedAt);
-      if (!cancelled) setPhase("passed");
+      // Never override a denial recorded by a page-level 401/403.
+      if (!cancelled) setPhase((current) => (current === "checking" ? "passed" : current));
     })();
     return () => {
       cancelled = true;
