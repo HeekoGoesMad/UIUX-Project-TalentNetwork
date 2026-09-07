@@ -160,7 +160,7 @@ export function RecruiterComplianceManager() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/recruiters", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/recruiters", window.location.origin), { cache: "no-store" });
       const data = (await res.json()) as { recruiters?: RecruiterItem[]; error?: string };
       if (res.ok && Array.isArray(data.recruiters) && data.recruiters.length > 0) {
         setRecruiters(data.recruiters);
@@ -238,7 +238,7 @@ export function RecruiterComplianceManager() {
     setBusyId(userId);
     try {
       try {
-        await fetch(`/api/admin/recruiters/${userId}`, {
+        await fetch(new URL(`/api/admin/recruiters/${userId}`, window.location.origin), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -303,7 +303,7 @@ export function RecruiterComplianceManager() {
   const handleDelete = async (userId: string) => {
     setBusyId(userId);
     try {
-      const res = await fetch(`/api/admin/recruiters/${userId}`, {
+      const res = await fetch(new URL(`/api/admin/recruiters/${userId}`, window.location.origin), {
         method: "DELETE",
       });
       const data = (await res.json()) as { error?: string };

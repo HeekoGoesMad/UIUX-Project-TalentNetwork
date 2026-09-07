@@ -16,6 +16,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminChecking, AdminDenied, AdminPopup } from "@/components/admin/admin-denied";
+import { useAdminGate } from "@/components/admin/admin-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,21 +55,26 @@ interface DashboardData {
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/dashboard", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         setData(json);
+      } else if (res.status === 401) {
+        failGate(401);
+      } else if (res.status === 403) {
+        failGate(403);
       }
     } catch (err) {
       console.error("Failed to load dashboard:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [failGate]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -86,6 +93,22 @@ export default function AdminDashboardPage() {
     totalActiveTokens: 0,
     monthlyGrowth: 0,
   };
+
+  if (gatePhase === "checking") {
+    return (
+      <AdminPopup>
+        <AdminChecking />
+      </AdminPopup>
+    );
+  }
+
+  if (gatePhase === "denied") {
+    return (
+      <AdminPopup>
+        <AdminDenied code={gateCode ?? 403} />
+      </AdminPopup>
+    );
+  }
 
   return (
     <AdminShell title="Ringkasan Performa Platform">

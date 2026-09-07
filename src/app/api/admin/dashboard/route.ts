@@ -1,12 +1,13 @@
 import { desc, eq, sql, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
 
 export async function GET() {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = current.db;
 
     // 1. Hitung Perusahaan Berdasarkan Status
     const orgs = await db

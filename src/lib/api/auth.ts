@@ -35,7 +35,7 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
     } else {
       try {
         const metadataRole = data.user.user_metadata?.role;
-        const resolvedRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" || metadataRole === "admin" ? metadataRole : "candidate";
+        const resolvedRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" ? metadataRole : "candidate";
         const synced = await syncAuthenticatedUser(data.user, {
           name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : data.user.email.split("@")[0],
           role: resolvedRole,
@@ -56,7 +56,22 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
   return { user, db, authUser: data.user };
 }
 
-export async function getRecruiterScope(db: Database, user: AppUser) {
+export async function requireAdmin() {
+  const current = await getCurrentAppUser({ allowPending: true });
+  if ("error" in current) return current;
+  if (current.user.role !== "admin") return { error: "Akses admin diperlukan.", status: 403 as const };
+  return { user: current.user, db: current.db };
+}
+
+export type RecruiterMembership = {
+  organizationId: string;
+  organizationRole: (typeof schema.organizationMembers.$inferSelect)["role"];
+};
+
+export async function getRecruiterScope(
+  db: Database,
+  user: AppUser
+): Promise<{ membership: RecruiterMembership } | { error: string; status: 403 }> {
   if (user.role !== "recruiter") return { error: "Hanya recruiter yang dapat mengakses data ini.", status: 403 as const };
   if (user.recruiterProvisioningStatus !== "active") return recruiterAccessError(user.recruiterProvisioningStatus);
 
