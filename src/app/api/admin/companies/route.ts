@@ -4,6 +4,9 @@ import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const current = await requireAdmin();
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search")?.trim() || "";
     const status = searchParams.get("status")?.trim() || "";
 
-    // Ambil data organisasi beserta info token dan owner
+    // Ambil data organisasi beserta info token dan owner (hanya yang pemiliknya terdaftar)
     const query = db
       .select({
         organization: schema.organizations,
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
       })
       .from(schema.organizations)
       .leftJoin(schema.tokenAccounts, eq(schema.tokenAccounts.organizationId, schema.organizations.id))
-      .leftJoin(schema.users, eq(schema.users.id, schema.organizations.createdBy))
+      .innerJoin(schema.users, eq(schema.users.id, schema.organizations.createdBy))
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.organizations.createdBy))
       .orderBy(desc(schema.organizations.createdAt));
 

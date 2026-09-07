@@ -4,20 +4,24 @@ import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const current = await requireAdmin();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     const db = current.db;
 
-    // 1. Hitung Perusahaan Berdasarkan Status
+    // 1. Hitung Perusahaan Berdasarkan Status (hanya organisasi yang pemiliknya terdaftar)
     const orgs = await db
       .select({
         id: schema.organizations.id,
         verificationStatus: schema.organizations.verificationStatus,
         createdAt: schema.organizations.createdAt,
       })
-      .from(schema.organizations);
+      .from(schema.organizations)
+      .innerJoin(schema.users, eq(schema.users.id, schema.organizations.createdBy));
 
     const totalCompanies = orgs.length;
     const verifiedCompanies = orgs.filter((o) => o.verificationStatus === "approved").length;
@@ -74,6 +78,7 @@ export async function GET() {
         verificationStatus: schema.organizations.verificationStatus,
       })
       .from(schema.organizations)
+      .innerJoin(schema.users, eq(schema.users.id, schema.organizations.createdBy))
       .where(eq(schema.organizations.verificationStatus, "pending"))
       .orderBy(desc(schema.organizations.createdAt))
       .limit(5);

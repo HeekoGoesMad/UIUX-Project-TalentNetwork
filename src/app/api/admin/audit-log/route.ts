@@ -4,6 +4,9 @@ import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const current = await requireAdmin();
