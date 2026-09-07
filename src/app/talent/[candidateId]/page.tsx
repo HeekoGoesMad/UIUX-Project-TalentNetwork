@@ -489,6 +489,24 @@ export default function TalentProfile() {
   const screeningStatus = screeningRunStatuses[candidate.id];
   const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
 
+  // startScreening only reports success/failure, so attribute dbMode failures via
+  // the single-balance endpoint: token shortage is claimed only when the balance
+  // is actually empty (the screening API signals that with 402). Consent is
+  // optional since phase 6, so it is never blamed for a failure.
+  const describeScreeningFailure = async (): Promise<string> => {
+    if (!dbMode) return "Token screening tidak mencukupi.";
+    try {
+      const balanceResponse = await fetch("/api/tokens", { cache: "no-store" });
+      const balanceData = (await balanceResponse.json()) as { token?: { balance?: number } };
+      if (balanceResponse.ok && typeof balanceData.token?.balance === "number" && balanceData.token.balance <= 0) {
+        return "Saldo token screening tidak mencukupi. Beli token lalu coba lagi.";
+      }
+    } catch {
+      // Balance check is best-effort; fall through to the generic message.
+    }
+    return "Screening belum dapat dijalankan (consent bersifat opsional, bukan penyebabnya). Coba lagi.";
+  };
+
   const startScan = () => {
     if (tokens <= 0 && !devBypass) {
       toast.error("Token tidak mencukupi", {
@@ -500,15 +518,15 @@ export default function TalentProfile() {
     setScreeningError(null);
     setScanning(true);
     window.setTimeout(async () => {
-      const unlocked = scan(candidate.id);
-      if (!unlocked) {
+      const opened = scan(candidate.id);
+      if (!opened) {
         setScanning(false);
         return;
       }
       setConfirmOpen(false);
       const started = await startScreening(candidate.id);
       if (dbMode && started) setRemoteScreeningCompleted(true);
-      if (!started) setScreeningError("Saldo token screening tidak mencukupi atau layanan sedang tidak tersedia.");
+      if (!started) setScreeningError(await describeScreeningFailure());
       setScanning(false);
     }, 650);
   };
@@ -517,7 +535,7 @@ export default function TalentProfile() {
     setScreeningError(null);
     const started = await startScreening(candidate.id);
     if (dbMode && started) setRemoteScreeningCompleted(true);
-    if (!started) setScreeningError("Screening belum dapat dijalankan. Periksa token lalu coba lagi.");
+    if (!started) setScreeningError(await describeScreeningFailure());
   };
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
@@ -828,7 +846,7 @@ export default function TalentProfile() {
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, pemotongan token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Pemotongan token dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
                 </div>
                 <Button
                   disabled={openingConversation}

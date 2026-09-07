@@ -112,6 +112,12 @@ export function SiteHeader() {
 
   const isAdmin = pathname?.startsWith("/admin");
   const isPending = pathname?.startsWith("/recruiter/pending");
+  const settingsHref =
+    visibleUser?.role === "candidate"
+      ? "/candidate/settings"
+      : visibleUser?.role === "recruiter"
+        ? "/recruiter/settings"
+        : null;
   if (isOnboarding || isAdmin || isPending) {
     return null;
   }
@@ -233,23 +239,20 @@ export function SiteHeader() {
             );
           })()}
 
-          {visibleUser && (() => {
-            const settingsHref = visibleUser.role === "candidate" ? "/candidate/settings" : "/recruiter/settings";
-            return (
-              <Link
-                href={settingsHref}
-                className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
-                  pathname === settingsHref && "border-primary bg-primary/10 text-primary",
-                  isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
-                )}
-                aria-label="Pengaturan Akun"
-                title="Pengaturan Akun"
-              >
-                <Settings className="size-4" />
-              </Link>
-            );
-          })()}
+          {settingsHref && (
+            <Link
+              href={settingsHref}
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
+                pathname === settingsHref && "border-primary bg-primary/10 text-primary",
+                isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
+              )}
+              aria-label="Pengaturan Akun"
+              title="Pengaturan Akun"
+            >
+              <Settings className="size-4" />
+            </Link>
+          )}
 
           {visibleUser ? (
             <Button
@@ -340,22 +343,19 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            {visibleUser && (() => {
-              const settingsHref = visibleUser.role === "candidate" ? "/candidate/settings" : "/recruiter/settings";
-              return (
-                <Link
-                  href={settingsHref}
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
-                    pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  <Settings className="size-4 text-primary" />
-                  Pengaturan
-                </Link>
-              );
-            })()}
+            {settingsHref && (
+              <Link
+                href={settingsHref}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                  pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
+                )}
+                onClick={() => setOpen(false)}
+              >
+                <Settings className="size-4 text-primary" />
+                Pengaturan
+              </Link>
+            )}
             {!visibleUser && (
               <div className="mt-2 border-t pt-3 flex flex-col gap-2">
                 {pathname !== "/login" && (

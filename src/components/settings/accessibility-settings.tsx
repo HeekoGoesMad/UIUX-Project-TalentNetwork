@@ -150,14 +150,15 @@ export function AccessibilitySettings() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 { id: "normal" as const, label: "Standar (100%)", desc: "Ukuran bawaan sistem", size: "text-sm" },
-                { id: "large" as const, label: "Sedang (110%)", desc: "Teks sedikit lebih besar", size: "text-base" },
-                { id: "xlarge" as const, label: "Besar (120%)", desc: "Sangat mudah dibaca", size: "text-lg" },
+                { id: "large" as const, label: "Sedang (106.25%)", desc: "Teks sedikit lebih besar", size: "text-base" },
+                { id: "xlarge" as const, label: "Besar (112.5%)", desc: "Sangat mudah dibaca", size: "text-lg" },
               ].map((opt) => {
                 const active = prefs.textScale === opt.id;
                 return (
                   <button
                     key={opt.id}
                     type="button"
+                    aria-pressed={active}
                     onClick={() => updatePreference("textScale", opt.id)}
                     className={`flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
                       active

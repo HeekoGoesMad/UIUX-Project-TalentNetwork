@@ -62,6 +62,11 @@ export function SecuritySettings() {
       return;
     }
 
+    if (!hasUppercaseOrSpecial) {
+      toast.error("Kata sandi baru harus mengandung huruf kapital atau simbol.");
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       toast.error("Konfirmasi kata sandi tidak cocok.");
       return;
@@ -74,7 +79,7 @@ export function SecuritySettings() {
       if (devBypass || !user) {
         // Simulate delay
         await new Promise((res) => setTimeout(res, 800));
-        toast.success("Kata sandi akun berhasil diperbarui! (Demo Mode)");
+        toast.success("Demo Mode — tidak tersimpan: kata sandi tidak benar-benar diperbarui.");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -82,6 +87,24 @@ export function SecuritySettings() {
       }
 
       const supabase = createClient();
+      const email =
+        user?.email ?? (await supabase.auth.getUser()).data.user?.email ?? null;
+
+      if (!email) {
+        toast.error("Sesi tidak ditemukan. Silakan masuk kembali lalu coba lagi.");
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        toast.error("Kata sandi saat ini salah.");
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -145,6 +168,8 @@ export function SecuritySettings() {
                   <div className="relative">
                     <input
                       id="current-password"
+                      name="current-password"
+                      autoComplete="current-password"
                       type={showCurrent ? "text" : "password"}
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
@@ -155,6 +180,8 @@ export function SecuritySettings() {
                     <button
                       type="button"
                       onClick={() => setShowCurrent(!showCurrent)}
+                      aria-label={showCurrent ? "Sembunyikan kata sandi saat ini" : "Tampilkan kata sandi saat ini"}
+                      aria-pressed={showCurrent}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showCurrent ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -173,6 +200,8 @@ export function SecuritySettings() {
                   <div className="relative">
                     <input
                       id="new-password"
+                      name="new-password"
+                      autoComplete="new-password"
                       type={showNew ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -183,6 +212,8 @@ export function SecuritySettings() {
                     <button
                       type="button"
                       onClick={() => setShowNew(!showNew)}
+                      aria-label={showNew ? "Sembunyikan kata sandi baru" : "Tampilkan kata sandi baru"}
+                      aria-pressed={showNew}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showNew ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -218,6 +249,8 @@ export function SecuritySettings() {
                   <div className="relative">
                     <input
                       id="confirm-password"
+                      name="confirm-password"
+                      autoComplete="new-password"
                       type={showConfirm ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -228,6 +261,8 @@ export function SecuritySettings() {
                     <button
                       type="button"
                       onClick={() => setShowConfirm(!showConfirm)}
+                      aria-label={showConfirm ? "Sembunyikan konfirmasi kata sandi" : "Tampilkan konfirmasi kata sandi"}
+                      aria-pressed={showConfirm}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

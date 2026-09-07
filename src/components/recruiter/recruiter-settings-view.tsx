@@ -13,65 +13,82 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
 
+// Nilai value selaras dengan enum API (industry_sector / company_scale); label tetap Bahasa Indonesia.
 const INDUSTRY_OPTIONS = [
-  "Teknologi & Perangkat Lunak (SaaS / IT)",
-  "Fintech & Layanan Keuangan",
-  "E-Commerce & Retail Modern",
-  "FMCG & Manufaktur",
-  "Kesehatan, Farmasi & Medtech",
-  "Logistik, Transportasi & Supply Chain",
-  "Konsultan & Layanan Bisnis Profesional",
-  "Media, Entertainment & Kreatif",
-  "Pendidikan & Edutech",
-  "Lainnya",
+  { value: "Technology", label: "Teknologi & Perangkat Lunak (SaaS / IT)" },
+  { value: "Financial Services", label: "Fintech & Layanan Keuangan" },
+  { value: "Retail", label: "E-Commerce & Retail Modern" },
+  { value: "Manufacturing", label: "FMCG & Manufaktur" },
+  { value: "Healthcare", label: "Kesehatan, Farmasi & Medtech" },
+  { value: "Logistics", label: "Logistik, Transportasi & Supply Chain" },
+  { value: "Professional Services", label: "Konsultan & Layanan Bisnis Profesional" },
+  { value: "Education", label: "Pendidikan & Edutech" },
+  { value: "Hospitality", label: "Hospitality & Pariwisata" },
+  { value: "Other", label: "Lainnya" },
 ];
 
 const COMPANY_SIZE_OPTIONS = [
-  { id: "1-10", label: "1 — 10 Karyawan (Startup / Usaha Rintisan)" },
-  { id: "11-50", label: "11 — 50 Karyawan (Pertumbuhan Awal)" },
-  { id: "51-200", label: "51 — 200 Karyawan (Menengah / Mid-Sized)" },
-  { id: "201-500", label: "201 — 500 Karyawan (Perusahaan Besar)" },
-  { id: "500+", label: "500+ Karyawan (Korporasi / Enterprise)" },
+  { id: "1-10 Karyawan", label: "1 — 10 Karyawan (Startup / Usaha Rintisan)" },
+  { id: "11-50 Karyawan", label: "11 — 50 Karyawan (Pertumbuhan Awal)" },
+  { id: "51-200 Karyawan", label: "51 — 200 Karyawan (Menengah / Mid-Sized)" },
+  { id: "201-500 Karyawan", label: "201 — 500 Karyawan (Perusahaan Besar)" },
+  { id: "500+ Karyawan", label: "500+ Karyawan (Korporasi / Enterprise)" },
 ];
+
+// Form kosong: jangan pernah tampilkan data demo seolah data asli.
+const EMPTY_FORM = {
+  picName: "",
+  picEmail: "",
+  picTitle: "",
+  picPhone: "",
+  companyName: "",
+  industry: "",
+  companySize: "",
+  description: "",
+  websiteUrl: "",
+  linkedinUrl: "",
+  officeAddress: "",
+  city: "",
+  nibNumber: "",
+  npwpNumber: "",
+  verificationStatus: "",
+};
 
 export function RecruiterSettingsView() {
   const [activeTab, setActiveTab] = useState<"profile" | "accessibility" | "security">("profile");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
 
-  const [form, setForm] = useState({
-    picName: "Budi Santoso",
-    picEmail: "budi@perusahaan.com",
-    picTitle: "Head of Talent Acquisition",
-    picPhone: "0812-9876-5432",
-    companyName: "PT Berkah Sinarindo",
-    industry: "Teknologi & Perangkat Lunak (SaaS / IT)",
-    companySize: "51-200",
-    description: "Perusahaan teknologi penyedia platform digital & ekosistem automasi bisnis terintegrasi.",
-    websiteUrl: "https://berkahsinarindo.co.id",
-    linkedinUrl: "https://linkedin.com/company/berkah-sinarindo",
-    officeAddress: "Gedung Cyber 2 Lt. 18, Jl. HR Rasuna Said Blok X-5",
-    city: "Jakarta Selatan, DKI Jakarta",
-    nibNumber: "9120001234567",
-    npwpNumber: "01.234.567.8-012.000",
-    verificationStatus: "approved",
-  });
+  const [form, setForm] = useState({ ...EMPTY_FORM });
 
   useEffect(() => {
     async function loadData() {
       try {
         const res = await fetch("/api/recruiter/profile");
-        const json = await res.json();
-        if (json?.data) {
-          setForm((prev) => ({ ...prev, ...json.data }));
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(json?.error || "Gagal memuat profil perusahaan.");
+        setIsDemo(json?.isDemo === true);
+        if (json?.data && typeof json.data === "object") {
+          setForm((prev) => {
+            const next = { ...prev };
+            for (const key of Object.keys(prev) as (keyof typeof prev)[]) {
+              const v = json.data[key];
+              next[key] = typeof v === "string" ? v : "";
+            }
+            return next;
+          });
         }
-      } catch {
-        // use fallback initial
+        setLoadError(null);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : "Gagal memuat profil perusahaan.");
       } finally {
         setLoading(false);
       }
@@ -91,7 +108,11 @@ export function RecruiterSettingsView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan perubahan");
 
-      toast.success("Profil dan data perusahaan berhasil diperbarui!");
+      if (data?.isDemo) {
+        toast.success("Tersimpan sebagai demo (tanpa database).");
+      } else {
+        toast.success("Profil dan data perusahaan berhasil diperbarui!");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan.");
     } finally {
@@ -112,6 +133,13 @@ export function RecruiterSettingsView() {
     );
   }
 
+  const verificationStatus = form.verificationStatus;
+  const isVerified = verificationStatus === "approved";
+  const isPendingVerification =
+    verificationStatus === "" ||
+    verificationStatus === "pending" ||
+    verificationStatus === "need_revision";
+
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:py-10">
       {/* Header Halaman */}
@@ -126,6 +154,22 @@ export function RecruiterSettingsView() {
           Kelola informasi perwakilan PIC, profil entitas bisnis, aksesibilitas antarmuka, dan keamanan akun.
         </p>
       </div>
+
+      {loadError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50/70 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-red-800">Profil belum dapat dimuat.</p>
+          <p className="mt-0.5 text-xs text-red-700">{loadError}</p>
+        </div>
+      )}
+
+      {isDemo && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-amber-800">Mode demo aktif.</p>
+          <p className="mt-0.5 text-xs text-amber-700">
+            Data yang tampil bukan data asli dan perubahan tidak disimpan ke database.
+          </p>
+        </div>
+      )}
 
       {/* Tabs Navigasi */}
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border/80 pb-3">
@@ -167,12 +211,24 @@ export function RecruiterSettingsView() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-foreground">Status Kepatuhan Perusahaan:</h3>
-                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                      Terverifikasi Resmi
-                    </span>
+                    {isVerified ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                        Terverifikasi Resmi
+                      </span>
+                    ) : isPendingVerification ? (
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                        Menunggu Verifikasi
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                        Verifikasi Bermasalah
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Dokumen legalitas entitas Anda telah disetujui untuk membuka profil kandidat berbasis consent.
+                    {isVerified
+                      ? "Dokumen legalitas entitas Anda telah disetujui untuk membuka profil kandidat berbasis consent."
+                      : "Status verifikasi mengikuti hasil peninjauan dokumen legalitas entitas Anda."}
                   </p>
                 </div>
               </div>
@@ -196,8 +252,9 @@ export function RecruiterSettingsView() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Nama Lengkap PIC</label>
-                <input
+                <label htmlFor="picName" className="text-xs font-semibold text-foreground">Nama Lengkap PIC</label>
+                <Input
+                  id="picName"
                   type="text"
                   required
                   value={form.picName}
@@ -208,8 +265,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Jabatan / Role PIC</label>
-                <input
+                <label htmlFor="picTitle" className="text-xs font-semibold text-foreground">Jabatan / Role PIC</label>
+                <Input
+                  id="picTitle"
                   type="text"
                   value={form.picTitle}
                   onChange={(e) => setForm({ ...form, picTitle: e.target.value })}
@@ -219,8 +277,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Email Akun PIC</label>
-                <input
+                <label htmlFor="picEmail" className="text-xs font-semibold text-foreground">Email Akun PIC</label>
+                <Input
+                  id="picEmail"
                   type="email"
                   disabled
                   value={form.picEmail}
@@ -232,8 +291,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Nomor Telepon / WhatsApp</label>
-                <input
+                <label htmlFor="picPhone" className="text-xs font-semibold text-foreground">Nomor Telepon / WhatsApp</label>
+                <Input
+                  id="picPhone"
                   type="tel"
                   required
                   value={form.picPhone}
@@ -263,8 +323,9 @@ export function RecruiterSettingsView() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Nama Resmi Perusahaan (PT/CV)</label>
-                  <input
+                  <label htmlFor="companyName" className="text-xs font-semibold text-foreground">Nama Resmi Perusahaan (PT/CV)</label>
+                  <Input
+                    id="companyName"
                     type="text"
                     required
                     value={form.companyName}
@@ -275,27 +336,31 @@ export function RecruiterSettingsView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Sektor Industri</label>
+                  <label htmlFor="industry" className="text-xs font-semibold text-foreground">Sektor Industri</label>
                   <select
+                    id="industry"
                     value={form.industry}
                     onChange={(e) => setForm({ ...form, industry: e.target.value })}
                     className={inputClass}
                   >
+                    <option value="">Pilih sektor industri</option>
                     {INDUSTRY_OPTIONS.map((ind) => (
-                      <option key={ind} value={ind}>
-                        {ind}
+                      <option key={ind.value} value={ind.value}>
+                        {ind.label}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Skala / Ukuran Perusahaan</label>
+                  <label htmlFor="companySize" className="text-xs font-semibold text-foreground">Skala / Ukuran Perusahaan</label>
                   <select
+                    id="companySize"
                     value={form.companySize}
                     onChange={(e) => setForm({ ...form, companySize: e.target.value })}
                     className={inputClass}
                   >
+                    <option value="">Pilih skala perusahaan</option>
                     {COMPANY_SIZE_OPTIONS.map((sz) => (
                       <option key={sz.id} value={sz.id}>
                         {sz.label}
@@ -305,8 +370,9 @@ export function RecruiterSettingsView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Kota Kantor</label>
-                  <input
+                  <label htmlFor="city" className="text-xs font-semibold text-foreground">Kota Kantor</label>
+                  <Input
+                    id="city"
                     type="text"
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
@@ -317,8 +383,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Deskripsi Perusahaan</label>
-                <textarea
+                <label htmlFor="description" className="text-xs font-semibold text-foreground">Deskripsi Perusahaan</label>
+                <Textarea
+                  id="description"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className={textareaClass}
@@ -328,8 +395,9 @@ export function RecruiterSettingsView() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Website Resmi</label>
-                  <input
+                  <label htmlFor="websiteUrl" className="text-xs font-semibold text-foreground">Website Resmi</label>
+                  <Input
+                    id="websiteUrl"
                     type="url"
                     value={form.websiteUrl}
                     onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
@@ -339,8 +407,9 @@ export function RecruiterSettingsView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Profil LinkedIn Perusahaan</label>
-                  <input
+                  <label htmlFor="linkedinUrl" className="text-xs font-semibold text-foreground">Profil LinkedIn Perusahaan</label>
+                  <Input
+                    id="linkedinUrl"
                     type="url"
                     value={form.linkedinUrl}
                     onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
@@ -351,8 +420,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Alamat Kantor Lengkap</label>
-                <input
+                <label htmlFor="officeAddress" className="text-xs font-semibold text-foreground">Alamat Kantor Lengkap</label>
+                <Input
+                  id="officeAddress"
                   type="text"
                   value={form.officeAddress}
                   onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
@@ -380,8 +450,9 @@ export function RecruiterSettingsView() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Nomor Induk Berusaha (NIB)</label>
-                <input
+                <label htmlFor="nibNumber" className="text-xs font-semibold text-foreground">Nomor Induk Berusaha (NIB)</label>
+                <Input
+                  id="nibNumber"
                   type="text"
                   value={form.nibNumber}
                   onChange={(e) => setForm({ ...form, nibNumber: e.target.value })}
@@ -394,8 +465,9 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Nomor Pokok Wajib Pajak (NPWP)</label>
-                <input
+                <label htmlFor="npwpNumber" className="text-xs font-semibold text-foreground">Nomor Pokok Wajib Pajak (NPWP)</label>
+                <Input
+                  id="npwpNumber"
                   type="text"
                   value={form.npwpNumber}
                   onChange={(e) => setForm({ ...form, npwpNumber: e.target.value })}
