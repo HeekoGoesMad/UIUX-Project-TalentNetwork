@@ -23,10 +23,14 @@ export function getDb(): Database {
     throw new Error("DATABASE_URL is required to access the database.");
   }
 
+  const maxConnections = process.env.DB_MAX_CONNECTIONS
+    ? Math.max(1, parseInt(process.env.DB_MAX_CONNECTIONS, 10) || 5)
+    : 5;
+
   database = drizzle(
     postgres(connectionString, {
       prepare: false,
-      max: 1,
+      max: maxConnections,
       idle_timeout: 20,
       connect_timeout: 10,
     }),

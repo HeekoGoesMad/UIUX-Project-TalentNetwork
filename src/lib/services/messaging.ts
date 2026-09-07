@@ -59,42 +59,44 @@ export class MessagingService {
 
     const conversationIds = rows.map((row) => row.id);
 
-    // Single query: Batch fetch all participants for all retrieved conversations
-    const allParticipants = await db
-      .select({
-        conversationId: schema.conversationParticipants.conversationId,
-        id: schema.conversationParticipants.userId,
-        name: schema.profiles.displayName,
-        avatarUrl: schema.profiles.avatarUrl,
-        email: schema.users.email,
-      })
-      .from(schema.conversationParticipants)
-      .innerJoin(schema.users, eq(schema.users.id, schema.conversationParticipants.userId))
-      .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.conversationParticipants.userId))
-      .where(
-        and(
-          inArray(schema.conversationParticipants.conversationId, conversationIds),
-          isNull(schema.conversationParticipants.leftAt)
-        )
-      );
-
-    // Single bounded query: newest non-deleted message per conversation
-    // (DISTINCT ON returns at most one row per conversation in the page).
     const idList = sql.join(
       conversationIds.map((id) => sql`${id}`),
       sql`, `
     );
-    const latestMessages = (await db.execute(sql`
-      SELECT DISTINCT ON (m."conversation_id")
-        m."id" AS "id",
-        m."conversation_id" AS "conversationId",
-        m."body" AS "body",
-        m."sender_id" AS "senderId",
-        m."created_at" AS "createdAt"
-      FROM "messages" m
-      WHERE m."conversation_id" IN (${idList}) AND m."deleted_at" IS NULL
-      ORDER BY m."conversation_id", m."created_at" DESC, m."id" DESC
-    `)) as unknown as {
+
+    // Concurrently fetch all participants and newest non-deleted message per conversation
+    const [allParticipants, latestMessagesRaw] = await Promise.all([
+      db
+        .select({
+          conversationId: schema.conversationParticipants.conversationId,
+          id: schema.conversationParticipants.userId,
+          name: schema.profiles.displayName,
+          avatarUrl: schema.profiles.avatarUrl,
+          email: schema.users.email,
+        })
+        .from(schema.conversationParticipants)
+        .innerJoin(schema.users, eq(schema.users.id, schema.conversationParticipants.userId))
+        .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.conversationParticipants.userId))
+        .where(
+          and(
+            inArray(schema.conversationParticipants.conversationId, conversationIds),
+            isNull(schema.conversationParticipants.leftAt)
+          )
+        ),
+      db.execute(sql`
+        SELECT DISTINCT ON (m."conversation_id")
+          m."id" AS "id",
+          m."conversation_id" AS "conversationId",
+          m."body" AS "body",
+          m."sender_id" AS "senderId",
+          m."created_at" AS "createdAt"
+        FROM "messages" m
+        WHERE m."conversation_id" IN (${idList}) AND m."deleted_at" IS NULL
+        ORDER BY m."conversation_id", m."created_at" DESC, m."id" DESC
+      `),
+    ]);
+
+    const latestMessages = latestMessagesRaw as unknown as {
       id: string;
       conversationId: string;
       body: string;
