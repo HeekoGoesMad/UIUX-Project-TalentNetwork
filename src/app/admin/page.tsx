@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,14 +54,20 @@ interface DashboardData {
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
+    setDenied(null);
     try {
       const res = await fetch(new URL("/api/admin/dashboard", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         setData(json);
+      } else if (res.status === 401) {
+        setDenied("unauthenticated");
+      } else if (res.status === 403) {
+        setDenied("forbidden");
       }
     } catch (err) {
       console.error("Failed to load dashboard:", err);
@@ -86,6 +93,14 @@ export default function AdminDashboardPage() {
     totalActiveTokens: 0,
     monthlyGrowth: 0,
   };
+
+  if (denied) {
+    return (
+      <AdminShell title="Ringkasan Performa Platform">
+        <AdminDenied reason={denied} />
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell title="Ringkasan Performa Platform">

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,16 +41,22 @@ const ACTION_CATEGORIES = [
 export default function AdminAuditLogPage() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
+    setDenied(null);
     try {
       const res = await fetch(new URL("/api/admin/audit-log", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);
+      } else if (res.status === 401) {
+        setDenied("unauthenticated");
+      } else if (res.status === 403) {
+        setDenied("forbidden");
       }
     } catch {
       toast.error("Gagal memuat riwayat audit log.");
@@ -101,6 +108,14 @@ export default function AdminAuditLogPage() {
     }
     return <Badge className="bg-slate-100 text-slate-700 border-slate-200">{action}</Badge>;
   };
+
+  if (denied) {
+    return (
+      <AdminShell title="Riwayat Jejak Aktivitas (Audit Logs)">
+        <AdminDenied reason={denied} />
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell title="Riwayat Jejak Aktivitas (Audit Logs)">

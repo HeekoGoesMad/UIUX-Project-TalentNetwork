@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +134,7 @@ function AdminCompaniesContent() {
 
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
 
@@ -178,6 +180,7 @@ function AdminCompaniesContent() {
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
+    setDenied(null);
     try {
       const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -190,6 +193,10 @@ function AdminCompaniesContent() {
             openReviewModal(target);
           }
         }
+      } else if (res.status === 401) {
+        setDenied("unauthenticated");
+      } else if (res.status === 403) {
+        setDenied("forbidden");
       } else {
         const errData = await res.json().catch(() => ({}));
         console.error("Companies API error:", res.status, errData);
@@ -222,7 +229,7 @@ function AdminCompaniesContent() {
 
     setUpdating(true);
     try {
-      const res = await fetch(`/api/admin/companies/${selectedCompany.id}`, {
+      const res = await fetch(new URL(`/api/admin/companies/${selectedCompany.id}`, window.location.origin), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -273,6 +280,14 @@ function AdminCompaniesContent() {
       return matchesStatus && matchesSearch;
     });
   }, [companies, statusFilter, search]);
+
+  if (denied) {
+    return (
+      <AdminShell title="Manajemen & Verifikasi Perusahaan">
+        <AdminDenied reason={denied} />
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell title="Manajemen & Verifikasi Perusahaan">

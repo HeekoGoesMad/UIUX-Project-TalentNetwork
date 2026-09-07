@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ interface TokenAccountItem {
 export default function AdminTokensPage() {
   const [accounts, setAccounts] = useState<TokenAccountItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
   const [search, setSearch] = useState("");
 
   // Grant / Adjust Modal
@@ -50,11 +52,16 @@ export default function AdminTokensPage() {
 
   const fetchTokens = useCallback(async () => {
     setLoading(true);
+    setDenied(null);
     try {
       const res = await fetch(new URL("/api/admin/tokens", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
+      } else if (res.status === 401) {
+        setDenied("unauthenticated");
+      } else if (res.status === 403) {
+        setDenied("forbidden");
       }
     } catch {
       toast.error("Gagal memuat data token.");
@@ -123,6 +130,14 @@ export default function AdminTokensPage() {
       return !s || acc.organizationName.toLowerCase().includes(s) || acc.subscriptionTier.toLowerCase().includes(s);
     });
   }, [accounts, search]);
+
+  if (denied) {
+    return (
+      <AdminShell title="Pemantauan & Kuota Token Perusahaan">
+        <AdminDenied reason={denied} />
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell title="Pemantauan & Kuota Token Perusahaan">
