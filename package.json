@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "node scripts/tests/e2e-flow.mjs",
+    "worker:outbox": "node scripts/outbox-worker.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check"
