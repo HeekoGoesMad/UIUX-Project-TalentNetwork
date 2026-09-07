@@ -312,7 +312,7 @@ export const screeningRuns = pgTable("screening_runs", {
   id: id(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   candidateProfileId: uuid("candidate_profile_id").notNull().references(() => candidateProfiles.id),
-  consentRequestItemId: uuid("consent_request_item_id").notNull().references(() => consentRequestItems.id),
+  consentRequestItemId: uuid("consent_request_item_id").references(() => consentRequestItems.id, { onDelete: "set null" }),
   requestedBy: uuid("requested_by").notNull().references(() => users.id),
   status: screeningStatus("status").notNull().default("pending"),
   tokenCost: integer("token_cost").notNull().default(1),

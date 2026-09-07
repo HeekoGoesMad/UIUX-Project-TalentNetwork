@@ -105,7 +105,7 @@ export function SiteHeader() {
     : [
         { href: "/search", label: "Cari Talent" },
          { href: "/shortlist", label: "Shortlist" },
-         { href: "/recruiter/screenings/new", label: "Screening" },
+          { href: "/recruiter/screenings", label: "Screening" },
          { href: "/messages", label: "Pesan" },
          { href: "/dashboard", label: "Dashboard" },
       ];

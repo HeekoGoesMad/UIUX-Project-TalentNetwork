@@ -122,17 +122,23 @@ function ScreeningResults({
   candidateId,
   candidate,
   completed,
+  screeningStatus,
+  screeningError,
+  onRetry,
   result,
   saveResult,
 }: {
   candidateId: string;
   candidate: Candidate;
   completed: boolean;
+  screeningStatus?: string;
+  screeningError?: string | null;
+  onRetry?: () => void;
   result?: ScreeningResult;
   saveResult: (candidateId: string, result: ScreeningResult) => void;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "error">(
-    result ? "idle" : completed ? "loading" : "idle",
+    result ? "idle" : completed || screeningStatus === "processing" || screeningStatus === "in_progress" ? "loading" : "idle",
   );
   const [error, setError] = useState("");
 
@@ -221,7 +227,7 @@ function ScreeningResults({
             Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Insight berbasis role fit dan kualitas data, ditampilkan setelah consent kandidat dan screening selesai.
+             Insight berbasis role fit dan kualitas data, ditampilkan setelah screening run selesai. Consent tetap disimpan untuk pemeriksaan finansial atau credit di masa depan.
           </p>
         </div>
         {completed && (
@@ -231,15 +237,29 @@ function ScreeningResults({
         )}
       </div>
 
-      {!completed && (
+      {screeningError && !completed ? (
+        <Card className="mt-5 border-amber-200 bg-amber-50/50">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between" role="alert">
+            <div>
+              <p className="font-semibold text-amber-950">Profil terbuka, screening belum selesai</p>
+              <p className="mt-1 text-sm text-amber-900/80">{screeningError}</p>
+            </div>
+            {onRetry && <Button variant="outline" onClick={onRetry}><RefreshCw className="mr-2 size-4" /> Coba lagi</Button>}
+          </CardContent>
+        </Card>
+      ) : !completed && (screeningStatus === "processing" || screeningStatus === "in_progress") ? (
+        <Card className="mt-5 border-purple-100 bg-purple-50/50">
+          <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground" role="status">
+            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan skor dan AI Summary...
+          </CardContent>
+        </Card>
+      ) : !completed && (
         <Card className="mt-5 border-dashed bg-muted/30">
           <CardContent className="flex gap-3 p-5">
             <CircleHelp className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
             <div>
               <p className="font-semibold text-[#111827]">Hasil belum tersedia</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profil sudah dibuka.
-              </p>
+               <p className="mt-1 text-sm text-muted-foreground">Screening role fit akan dimulai otomatis setelah profil berhasil dibuka.</p>
             </div>
           </CardContent>
         </Card>
@@ -390,7 +410,8 @@ export default function TalentProfile() {
     viewed,
     user,
     hydrated,
-    screeningConsents,
+    screeningRunStatuses,
+    startScreening,
     screeningResults,
     saveScreeningResult,
     devBypass,
@@ -406,6 +427,7 @@ export default function TalentProfile() {
   const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
@@ -464,7 +486,8 @@ export default function TalentProfile() {
     );
 
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
-  const completed = hydrated && (dbMode ? remoteScreeningCompleted : screeningConsents[candidate.id] === "screening-completed");
+  const screeningStatus = screeningRunStatuses[candidate.id];
+  const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
 
   const startScan = () => {
     if (tokens <= 0 && !devBypass) {
@@ -474,12 +497,27 @@ export default function TalentProfile() {
       setConfirmOpen(false);
       return;
     }
+    setScreeningError(null);
     setScanning(true);
-    window.setTimeout(() => {
-      scan(candidate.id);
-      setScanning(false);
+    window.setTimeout(async () => {
+      const unlocked = scan(candidate.id);
+      if (!unlocked) {
+        setScanning(false);
+        return;
+      }
       setConfirmOpen(false);
+      const started = await startScreening(candidate.id);
+      if (dbMode && started) setRemoteScreeningCompleted(true);
+      if (!started) setScreeningError("Saldo token screening tidak mencukupi atau layanan sedang tidak tersedia.");
+      setScanning(false);
     }, 650);
+  };
+
+  const retryScreening = async () => {
+    setScreeningError(null);
+    const started = await startScreening(candidate.id);
+    if (dbMode && started) setRemoteScreeningCompleted(true);
+    if (!started) setScreeningError("Screening belum dapat dijalankan. Periksa token lalu coba lagi.");
   };
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
@@ -699,12 +737,7 @@ export default function TalentProfile() {
                 <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
                   <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
                 </Button>
-                <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
-                  <Link href={completed ? `/recruiter/screenings/${candidate.id}` : `/recruiter/screenings/new?candidateId=${candidate.id}`}>
-                    <ShieldCheck className="mr-1.5 size-3.5" />
-                    {completed ? "Lihat Screening Selesai" : "Minta Screening"}
-                  </Link>
-                </Button>
+                {completed ? <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild><Link href={`/recruiter/screenings/${candidate.id}`}><ShieldCheck className="mr-1.5 size-3.5" />Lihat Screening Selesai</Link></Button> : screeningError ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge> : <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]"><Loader2 className="mr-1.5 size-3 animate-spin" />Screening otomatis</Badge>}
               </div>
             </div>
 
@@ -823,6 +856,9 @@ export default function TalentProfile() {
             candidateId={candidate.id}
             candidate={candidate}
             completed={completed}
+            screeningStatus={screeningStatus}
+            screeningError={screeningError}
+            onRetry={() => void retryScreening()}
             result={screeningResults[candidate.id]}
             saveResult={saveScreeningResult}
           />
@@ -835,7 +871,7 @@ export default function TalentProfile() {
           <DialogHeader>
             <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
-               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio.
+               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit akan otomatis dijalankan.
                {devBypass ? " Mode development: token scan tidak digunakan." : ` Sisa token Anda: ${tokens} token.`}
             </DialogDescription>
           </DialogHeader>
@@ -845,7 +881,7 @@ export default function TalentProfile() {
             </Button>
             <Button disabled={scanning || (tokens <= 0 && !devBypass)} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
-              {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
+              {scanning ? "Membuka profil & menyiapkan screening..." : "Konfirmasi Buka Profil · 1 Token"}
             </Button>
           </DialogFooter>
         </DialogContent>
