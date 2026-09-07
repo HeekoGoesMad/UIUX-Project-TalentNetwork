@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { Loader2, ShieldAlert } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-export const ADMIN_CHECK_MIN_MS = 1200;
+export const ADMIN_CHECK_MIN_MS = 3000;
 
 export async function settleAdminCheck(startedAt: number) {
   const elapsed = Date.now() - startedAt;
   if (elapsed < ADMIN_CHECK_MIN_MS) {
     await new Promise((resolve) => setTimeout(resolve, ADMIN_CHECK_MIN_MS - elapsed));
   }
+}
+
+export function AdminPopup({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+      <div className="w-full max-w-md">{children}</div>
+    </div>
+  );
 }
 
 export function AdminChecking() {

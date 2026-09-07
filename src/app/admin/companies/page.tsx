@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied, settleAdminCheck } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, AdminPopup, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -285,19 +285,17 @@ function AdminCompaniesContent() {
 
   if (denied) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-        <div className="w-full max-w-md">
-          <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
-        </div>
-      </div>
+      <AdminPopup>
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+      </AdminPopup>
     );
   }
 
   if (loading && companies.length === 0) {
     return (
-      <AdminShell title="Manajemen & Verifikasi Perusahaan">
+      <AdminPopup>
         <AdminChecking />
-      </AdminShell>
+      </AdminPopup>
     );
   }
 
