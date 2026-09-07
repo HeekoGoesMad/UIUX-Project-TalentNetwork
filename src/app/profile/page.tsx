@@ -142,72 +142,100 @@ export default function ProfilePage() {
     portfolio: source?.portfolio ?? [],
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Ukuran foto profil maksimal 5MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        const base = cvProfile || {
-          ...DEMO,
-          id: "local-profile",
-          email: user?.email || "candidate@proofylink.dev",
-          phone: "0812-3456-7890",
-          industries: [],
-          certifications: [],
-          targetRole: "Product Designer",
-          workArrangement: "hybrid" as const,
-          openToWork: true,
-          careerStatus: "open-to-work" as CareerStatus,
-          updatedAt: new Date().toISOString(),
-        };
-        void saveCvProfile({
-          ...base,
-          avatarUrl: dataUrl,
-        });
-        toast.success("Foto profil berhasil diperbarui!");
+    const toastId = toast.loading("Mengunggah foto profil...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "avatar");
+
+      const res = await fetch("/api/profile/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? "Gagal mengunggah foto profil.");
       }
-    };
-    reader.readAsDataURL(file);
+
+      const base = cvProfile || {
+        ...DEMO,
+        id: "local-profile",
+        email: user?.email || "candidate@proofylink.dev",
+        phone: "0812-3456-7890",
+        industries: [],
+        certifications: [],
+        targetRole: "Product Designer",
+        workArrangement: "hybrid" as const,
+        openToWork: true,
+        careerStatus: "open-to-work" as CareerStatus,
+        updatedAt: new Date().toISOString(),
+      };
+      await saveCvProfile({
+        ...base,
+        avatarUrl: data.url,
+      });
+      toast.success("Foto profil berhasil diperbarui!", { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah foto profil", { id: toastId });
+    } finally {
+      e.target.value = "";
+    }
   };
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) {
       toast.error("Ukuran banner maksimal 8MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        const base = cvProfile || {
-          ...DEMO,
-          id: "local-profile",
-          email: user?.email || "candidate@proofylink.dev",
-          phone: "0812-3456-7890",
-          industries: [],
-          certifications: [],
-          targetRole: "Product Designer",
-          workArrangement: "hybrid" as const,
-          openToWork: true,
-          careerStatus: "open-to-work" as CareerStatus,
-          updatedAt: new Date().toISOString(),
-        };
-        void saveCvProfile({
-          ...base,
-          bannerUrl: dataUrl,
-        });
-        toast.success("Foto sampul profil berhasil diperbarui!");
+    const toastId = toast.loading("Mengunggah foto banner...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "banner");
+
+      const res = await fetch("/api/profile/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? "Gagal mengunggah banner.");
       }
-    };
-    reader.readAsDataURL(file);
+
+      const base = cvProfile || {
+        ...DEMO,
+        id: "local-profile",
+        email: user?.email || "candidate@proofylink.dev",
+        phone: "0812-3456-7890",
+        industries: [],
+        certifications: [],
+        targetRole: "Product Designer",
+        workArrangement: "hybrid" as const,
+        openToWork: true,
+        careerStatus: "open-to-work" as CareerStatus,
+        updatedAt: new Date().toISOString(),
+      };
+      await saveCvProfile({
+        ...base,
+        bannerUrl: data.url,
+      });
+      toast.success("Foto sampul profil berhasil diperbarui!", { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah banner", { id: toastId });
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const handleApplySummary = async (newSummary: string) => {

@@ -430,14 +430,27 @@ export function CvWorkspace() {
                       type="file"
                       accept="image/*"
                       className="sr-only"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            if (ev.target?.result) update("avatarUrl", ev.target.result as string);
-                          };
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error("Ukuran foto profil maksimal 5MB");
+                          return;
+                        }
+                        const toastId = toast.loading("Mengunggah foto profil...");
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          formData.append("type", "avatar");
+                          const res = await fetch("/api/profile/media", { method: "POST", body: formData });
+                          const data = (await res.json()) as { url?: string; error?: string };
+                          if (!res.ok || !data.url) throw new Error(data.error ?? "Gagal mengunggah foto profil.");
+                          update("avatarUrl", data.url);
+                          toast.success("Foto profil berhasil diunggah!", { id: toastId });
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Gagal mengunggah foto profil", { id: toastId });
+                        } finally {
+                          e.target.value = "";
                         }
                       }}
                     />
@@ -460,14 +473,27 @@ export function CvWorkspace() {
                       type="file"
                       accept="image/*"
                       className="sr-only"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            if (ev.target?.result) update("bannerUrl", ev.target.result as string);
-                          };
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        if (file.size > 8 * 1024 * 1024) {
+                          toast.error("Ukuran banner maksimal 8MB");
+                          return;
+                        }
+                        const toastId = toast.loading("Mengunggah foto banner...");
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          formData.append("type", "banner");
+                          const res = await fetch("/api/profile/media", { method: "POST", body: formData });
+                          const data = (await res.json()) as { url?: string; error?: string };
+                          if (!res.ok || !data.url) throw new Error(data.error ?? "Gagal mengunggah banner.");
+                          update("bannerUrl", data.url);
+                          toast.success("Foto banner berhasil diunggah!", { id: toastId });
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Gagal mengunggah banner", { id: toastId });
+                        } finally {
+                          e.target.value = "";
                         }
                       }}
                     />
