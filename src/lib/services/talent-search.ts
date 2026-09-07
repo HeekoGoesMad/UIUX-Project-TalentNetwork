@@ -21,19 +21,26 @@ export function serializeCandidate(
   },
   sections: Section[]
 ): Candidate {
-  const skills = getSectionItems<string>(sections, "skills");
-  const tools = getSectionItems<string>(sections, "tools");
-  const experience = getSectionItems<{
+  const sectionMap = new Map<string, Record<string, unknown>>();
+  for (const s of sections) {
+    sectionMap.set(s.type, s.content);
+  }
+
+  const getItems = <T,>(type: string): T[] => {
+    const items = sectionMap.get(type)?.items;
+    return Array.isArray(items) ? (items as T[]) : [];
+  };
+
+  const skills = getItems<string>("skills");
+  const tools = getItems<string>("tools");
+  const experience = getItems<{
     company: string;
     role: string;
     dates?: string;
     achievements?: string[];
-  }>(sections, "experience");
-  const education = getSectionItems<{ school: string; program: string; dates?: string }>(
-    sections,
-    "education"
-  );
-  const preferences = sections.find((section) => section.type === "preferences")?.content ?? {};
+  }>("experience");
+  const education = getItems<{ school: string; program: string; dates?: string }>("education");
+  const preferences = sectionMap.get("preferences") ?? {};
   const status = asCareerStatus(preferences.careerStatus);
 
   const name = row.name?.trim() || "Kandidat anonim";
@@ -169,10 +176,20 @@ export class TalentSearchService {
       .from(schema.candidateProfileSections)
       .where(inArray(schema.candidateProfileSections.candidateProfileId, candidateIds));
 
+    const sectionsByCandidateId = new Map<string, Section[]>();
+    for (const section of sections) {
+      let list = sectionsByCandidateId.get(section.candidateProfileId);
+      if (!list) {
+        list = [];
+        sectionsByCandidateId.set(section.candidateProfileId, list);
+      }
+      list.push(section);
+    }
+
     const candidates = rows.map((row) =>
       serializeCandidate(
         row,
-        sections.filter((section) => section.candidateProfileId === row.id)
+        sectionsByCandidateId.get(row.id) ?? []
       )
     );
 

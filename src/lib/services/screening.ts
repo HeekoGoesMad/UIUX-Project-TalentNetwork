@@ -239,31 +239,32 @@ export class ScreeningService {
       return { error: "Screening run tidak ditemukan.", status: 404 as const };
     }
 
-    const [profile] = await db
-      .select({
-        headline: schema.candidateProfiles.headline,
-        summary: schema.candidateProfiles.summary,
-        targetRole: schema.candidateProfiles.targetRole,
-        location: schema.candidateProfiles.location,
-      })
-      .from(schema.candidateProfiles)
-      .where(eq(schema.candidateProfiles.id, run.candidateProfileId))
-      .limit(1);
+    const [[profile], sections] = await Promise.all([
+      db
+        .select({
+          headline: schema.candidateProfiles.headline,
+          summary: schema.candidateProfiles.summary,
+          targetRole: schema.candidateProfiles.targetRole,
+          location: schema.candidateProfiles.location,
+        })
+        .from(schema.candidateProfiles)
+        .where(eq(schema.candidateProfiles.id, run.candidateProfileId))
+        .limit(1),
+      db
+        .select({ content: schema.candidateProfileSections.content })
+        .from(schema.candidateProfileSections)
+        .where(
+          and(
+            eq(schema.candidateProfileSections.candidateProfileId, run.candidateProfileId),
+            eq(schema.candidateProfileSections.type, "skills")
+          )
+        )
+        .limit(1),
+    ]);
 
     if (!profile) {
       return { error: "Profile kandidat tidak ditemukan.", status: 404 as const };
     }
-
-    const sections = await db
-      .select({ content: schema.candidateProfileSections.content })
-      .from(schema.candidateProfileSections)
-      .where(
-        and(
-          eq(schema.candidateProfileSections.candidateProfileId, run.candidateProfileId),
-          eq(schema.candidateProfileSections.type, "skills")
-        )
-      )
-      .limit(1);
 
     const storedSkills = sections[0]?.content.items;
     const skills = Array.isArray(storedSkills)

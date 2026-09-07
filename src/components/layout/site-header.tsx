@@ -65,12 +65,20 @@ export function SiteHeader() {
   const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const y = window.scrollY;
-      if (y > 35) {
-        setScrolled(true);
-      } else if (y < 15) {
-        setScrolled(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY;
+          if (y > 35) {
+            setScrolled(true);
+          } else if (y < 15) {
+            setScrolled(false);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 

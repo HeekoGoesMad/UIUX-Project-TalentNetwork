@@ -494,7 +494,7 @@ export function CvWorkspace() {
                 <div className="flex items-center gap-4">
                   <div className="relative flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-white bg-slate-200 shadow-2xs overflow-hidden">
                     {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt="Foto Profil" className="h-full w-full object-cover" />
+                      <img src={profile.avatarUrl} alt="Foto Profil" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (
                       <User className="size-8 text-slate-400" />
                     )}
@@ -529,7 +529,7 @@ export function CvWorkspace() {
                 <div className="flex items-center gap-4">
                   <div className="relative h-16 w-32 shrink-0 rounded-xl border-2 border-white bg-gradient-to-r from-[#1e1b4b] to-[#7c3aed] shadow-2xs overflow-hidden">
                     {profile.bannerUrl ? (
-                      <img src={profile.bannerUrl} alt="Foto Sampul" className="h-full w-full object-cover" />
+                      <img src={profile.bannerUrl} alt="Foto Sampul" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

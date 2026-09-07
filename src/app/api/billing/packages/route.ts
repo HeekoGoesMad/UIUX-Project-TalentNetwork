@@ -11,7 +11,14 @@ export async function GET() {
   try {
     const db = getDb();
     const packages = await db.select().from(schema.tokenPackages).where(eq(schema.tokenPackages.active, true)).orderBy(asc(schema.tokenPackages.priceMinor));
-    return NextResponse.json({ packages });
+    return NextResponse.json(
+      { packages },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error) {
     console.error("Billing packages failed", error);
     return NextResponse.json({ error: "Paket token belum tersedia." }, { status: 503 });

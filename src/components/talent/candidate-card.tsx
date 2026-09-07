@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
+export const CandidateCard = memo(function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
   const { shortlisted, toggleShortlist, scans, partnerVerifications } = useApp();
   const unlocked = scans.some((scan) => scan.candidateId === candidate.id);
   const isShortlisted = shortlisted.includes(candidate.id);
@@ -121,4 +122,4 @@ export function CandidateCard({ candidate, list = false }: { candidate: Candidat
       </CardContent>
     </Card>
   );
-}
+});
