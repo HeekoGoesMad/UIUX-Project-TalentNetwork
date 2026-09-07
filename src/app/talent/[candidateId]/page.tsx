@@ -419,6 +419,8 @@ export default function TalentProfile() {
     bootstrapped,
     databaseError,
     partnerVerifications,
+    screeningConsents,
+    reloadBootstrap,
   } = useApp();
 
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
@@ -429,6 +431,7 @@ export default function TalentProfile() {
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
+  const [requestingContactConsent, setRequestingContactConsent] = useState(false);
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
   const verif = candidate ? (partnerVerifications?.[candidate.id] ?? candidate.campusVerification) : undefined;
@@ -488,6 +491,7 @@ export default function TalentProfile() {
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
   const screeningStatus = screeningRunStatuses[candidate.id];
   const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
+  const contactConsent = screeningConsents[candidate.id];
 
   // startScreening only reports success/failure, so attribute dbMode failures via
   // the single-balance endpoint: token shortage is claimed only when the balance
@@ -846,27 +850,61 @@ export default function TalentProfile() {
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Pemotongan token dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pemotongan token dan skor sudah tercatat. Kandidat tetap perlu menyetujui permintaan kontak sebelum percakapan dimulai.
+                  </p>
                 </div>
-                <Button
-                  disabled={openingConversation}
-                  onClick={async () => {
-                    setOpeningConversation(true);
-                    try {
-                      const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
-                      const payload = await response.json() as { conversationId?: string; error?: string };
-                      if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-                      router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
-                    } catch (error) {
-                      toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
-                    } finally {
-                      setOpeningConversation(false);
-                    }
-                  }}
-                >
-                  {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                  {openingConversation ? "Membuka..." : "Mulai percakapan"}
-                </Button>
+                {contactConsent === "consented" ? (
+                  <Button
+                    disabled={openingConversation}
+                    onClick={async () => {
+                      setOpeningConversation(true);
+                      try {
+                        const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
+                        const payload = await response.json() as { conversationId?: string; error?: string };
+                        if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
+                        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
+                      } catch (error) {
+                        toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
+                      } finally {
+                        setOpeningConversation(false);
+                      }
+                    }}
+                  >
+                    {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                    {openingConversation ? "Membuka..." : "Mulai percakapan"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    disabled={requestingContactConsent || contactConsent === "pending-candidate-consent"}
+                    onClick={async () => {
+                      setRequestingContactConsent(true);
+                      try {
+                        const response = await fetch("/api/consent-requests", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            candidateProfileIds: [candidate.id],
+                            purpose: "Diskusi peluang setelah screening",
+                            message: "Recruiter ingin mendiskusikan hasil screening dan peluang yang relevan.",
+                          }),
+                        });
+                        const payload = await response.json() as { error?: string };
+                        if (!response.ok) throw new Error(payload.error ?? "Permintaan kontak belum dapat dikirim.");
+                        await reloadBootstrap();
+                        toast.success("Permintaan kontak dikirim", { description: "Tunggu persetujuan kandidat sebelum memulai percakapan." });
+                      } catch (error) {
+                        toast.error("Permintaan kontak gagal", { description: error instanceof Error ? error.message : "Coba lagi." });
+                      } finally {
+                        setRequestingContactConsent(false);
+                      }
+                    }}
+                  >
+                    {requestingContactConsent ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                    {requestingContactConsent ? "Mengirim..." : contactConsent === "pending-candidate-consent" ? "Menunggu persetujuan kandidat" : "Minta izin menghubungi"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

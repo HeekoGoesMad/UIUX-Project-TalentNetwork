@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
-import { Archive, Check, FileText, MessageCircle, MoreHorizontal, Paperclip, Send, ShieldCheck, X } from "lucide-react";
+import { Flag, LoaderCircle, MessageCircle, MoreHorizontal, Pencil, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
@@ -21,12 +22,11 @@ const demoMessages: Message[] = [
   { id: "demo-1", senderId: "other", senderName: "Nadia Pratama", body: "Halo, terima kasih sudah menghubungi saya. Saya terbuka untuk berdiskusi tentang posisi ini.", createdAt: "2026-08-12T09:30:00Z", isMine: false },
   { id: "demo-2", senderId: "me", senderName: "Anda", body: "Halo Nadia, kami ingin berbagi detail peran dan jadwal proses selanjutnya.", createdAt: "2026-08-12T09:35:00Z", isMine: true },
 ];
-const templates = ["Halo, terima kasih sudah menghubungi saya.", "Apakah Anda tersedia untuk berdiskusi minggu ini?", "Saya akan meninjau detailnya dan segera kembali."];
 
 function MessagesContent({ routeConversationId }: { routeConversationId?: string }) {
-  const { user: appUser, hydrated, dbMode, bootstrapped, databaseError } = useApp();
+  const { user: appUser, profile, hydrated, dbMode, bootstrapped, databaseError } = useApp();
   const databaseMode = dbMode;
-  const user = appUser as typeof appUser & { id: string };
+  const user = appUser;
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedConversationId = routeConversationId ?? searchParams.get("conversationId");
@@ -41,12 +41,19 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [peerReadAt, setPeerReadAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const currentUserId = profile?.userId;
 
   useEffect(() => { if (hydrated && !user) router.replace(`/login?next=${encodeURIComponent("/messages")}`); }, [hydrated, user, router]);
   useEffect(() => {
     if (!dbMode || !user) return;
+    // This effect starts an external request; the loading state is reset when it resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
     void fetch("/api/conversations?limit=100", { cache: "no-store" }).then(async (response) => {
       const payload = await response.json() as { conversations?: Conversation[]; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Gagal memuat percakapan.");
@@ -60,12 +67,19 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
 
   async function loadMessages(before?: string | null) {
     if (!dbMode || !user || !selectedId || selectedId === "demo") return;
+    if (messagesLoading) return;
     setMessagesLoading(true); setError(null);
+    if (!before) {
+      setMessages([]);
+      setEditingId(null);
+      setDraft("");
+      setAttachment(null);
+    }
     try {
       const query = new URLSearchParams({ conversationId: selectedId, limit: "30" }); if (before) query.set("before", before);
       const response = await fetch(`/api/messages?${query}`, { cache: "no-store" }); const payload = await response.json() as { messages?: Message[]; readAt?: string | null; hasMore?: boolean; nextCursor?: string | null; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Gagal memuat pesan.");
-      setMessages((current) => before ? [...(payload.messages ?? []), ...current] : payload.messages ?? []); setHasMore(Boolean(payload.hasMore)); setNextCursor(payload.nextCursor ?? null); setPeerReadAt(payload.readAt ?? null);
+      setMessages((current) => before ? [...(payload.messages ?? []), ...current] : payload.messages ?? []); setHasMore(Boolean(payload.hasMore)); setNextCursor(payload.nextCursor ?? null);
       if (!before) void fetch(`/api/conversations/${selectedId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read" }) });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Gagal memuat pesan."); } finally { setMessagesLoading(false); }
   }
@@ -73,12 +87,17 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { void loadMessages(); }, [dbMode, selectedId, user]);
   useEffect(() => {
-    if (!dbMode || !selectedId || !process.env.NEXT_PUBLIC_SUPABASE_URL) return;
+    if (!dbMode || !selectedId || !currentUserId || !process.env.NEXT_PUBLIC_SUPABASE_URL) return;
     try {
-      const client = createClient(); const channel = client.channel(`messages:${selectedId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${selectedId}` }, (payload) => { const incoming = payload.new as Message; if (incoming.senderId !== user?.email) setMessages((current) => current.some((item) => item.id === incoming.id) ? current : [...current, incoming]); }).subscribe();
+      const client = createClient(); const channel = client.channel(`messages:${selectedId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${selectedId}` }, (payload) => {
+        const row = payload.new as { id?: string; sender_id?: string; body?: string; created_at?: string; edited_at?: string | null };
+        if (!row.id || !row.sender_id || !row.body || !row.created_at || row.sender_id === currentUserId) return;
+        const incoming: Message = { id: row.id, senderId: row.sender_id, senderName: null, body: row.body, createdAt: row.created_at, editedAt: row.edited_at ?? null, isMine: false };
+        setMessages((current) => current.some((item) => item.id === incoming.id) ? current : [...current, incoming]);
+      }).subscribe();
       return () => { void client.removeChannel(channel); };
     } catch { return undefined; }
-  }, [dbMode, selectedId, user?.email]);
+  }, [dbMode, selectedId, currentUserId]);
 
   if (!hydrated || !user) return <StateMessage text="Menyiapkan pesan..." />;
   if (databaseModeUnavailable(dbMode, bootstrapped)) return <StateMessage text="Memuat pesan..." />;
@@ -89,28 +108,46 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   async function sendMessage(event: FormEvent) {
     event.preventDefault(); const body = draft.trim(); if (!body || (dbMode && !selectedId)) return;
     if (!dbMode) { setMessages((current) => [...current, { id: `demo-${Date.now()}`, senderId: "me", senderName: "Anda", body, createdAt: new Date().toISOString(), isMine: true }]); setDraft(""); return; }
-    const endpoint = editingId ? `/api/messages/${editingId}` : "/api/messages"; const method = editingId ? "PATCH" : "POST"; const payload = editingId ? { body } : { conversationId: selectedId, body, ...(attachment ? { attachment } : {}) };
-    const response = await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const result = await response.json() as { message?: Message; error?: string };
-    if (!response.ok || (!editingId && !result.message)) { setError(result.error ?? "Pesan gagal disimpan."); return; }
-    setMessages((current) => editingId ? current.map((item) => item.id === editingId ? { ...item, ...result.message } : item) : [...current, result.message!]); setDraft(""); setAttachment(null); setEditingId(null);
+    setSending(true); setError(null);
+    try {
+      const endpoint = editingId ? `/api/messages/${editingId}` : "/api/messages"; const method = editingId ? "PATCH" : "POST"; const payload = editingId ? { body } : { conversationId: selectedId, body, ...(attachment ? { attachment } : {}) };
+      const response = await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const result = await response.json() as { message?: Message; error?: string };
+      if (!response.ok || (!editingId && !result.message)) { setError(result.error ?? "Pesan gagal disimpan."); return; }
+      setMessages((current) => editingId ? current.map((item) => item.id === editingId ? { ...item, ...result.message } : item) : [...current, result.message!]); setDraft(""); setAttachment(null); setEditingId(null);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Pesan gagal disimpan."); } finally { setSending(false); }
   }
   async function messageAction(message: Message, action: "edit" | "delete" | "report") {
     if (action === "edit") { setEditingId(message.id); setDraft(message.body); return; }
     const reason = action === "report" ? window.prompt("Jelaskan alasan laporan ini") : null; if (action === "report" && !reason) return;
-    const response = await fetch(`/api/messages/${message.id}`, { method: action === "delete" ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: action === "report" ? JSON.stringify({ reason }) : undefined });
-    if (!response.ok) { const result = await response.json() as { error?: string }; setError(result.error ?? "Aksi belum dapat dilakukan."); return; }
-    if (action === "delete") setMessages((current) => current.filter((item) => item.id !== message.id));
+    if (action === "delete" && !window.confirm("Hapus pesan ini?")) return;
+    setActionLoading(`${message.id}:${action}`); setError(null);
+    try {
+      const response = await fetch(`/api/messages/${message.id}`, { method: action === "delete" ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: action === "report" ? JSON.stringify({ reason }) : undefined });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Aksi belum dapat dilakukan.");
+      if (action === "delete") setMessages((current) => current.filter((item) => item.id !== message.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Aksi belum dapat dilakukan."); } finally { setActionLoading(null); }
   }
-  async function toggleBlock() { if (!selectedId) return; const action = selected?.status === "blocked" ? "unblock" : "block"; const response = await fetch(`/api/conversations/${selectedId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); if (response.ok) setConversations((current) => current.map((item) => item.id === selectedId ? { ...item, status: action === "block" ? "blocked" : "active" } : item)); }
+  async function toggleBlock() {
+    if (!databaseMode || !selectedId || !selected) return;
+    const action = selected.status === "blocked" ? "unblock" : "block";
+    setBlockLoading(true); setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${selectedId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Percakapan belum dapat diperbarui.");
+      setConversations((current) => current.map((item) => item.id === selectedId ? { ...item, status: action === "block" ? "blocked" : "active" } : item));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Percakapan belum dapat diperbarui."); } finally { setBlockLoading(false); }
+  }
 
   return <main className="container mx-auto px-4 py-8 sm:py-12"><div className="mx-auto max-w-6xl space-y-8">
     <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">Komunikasi aman</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Pesan</h1><p className="mt-2 max-w-2xl text-muted-foreground">Percakapan hanya tersedia selama consent aktif dan masa penyimpanan belum berakhir.</p></div>
-    {visibleError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Pesan belum dapat dimuat. {visibleError}</div>}
+    {visibleError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Gagal memuat atau memperbarui pesan. {visibleError}</div>}
     <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
       <Card className="overflow-hidden"><CardHeader className="border-b bg-[#f0f6fd]/70"><CardTitle className="flex items-center gap-2 text-lg"><MessageCircle className="size-5 text-[#19a974]" /> Percakapan</CardTitle></CardHeader><CardContent className="space-y-1 p-2">
-        {loading ? <p className="p-4 text-sm text-muted-foreground">Memuat percakapan...</p> : databaseMode && conversations.length === 0 ? <EmptyState icon={MessageCircle} title="Belum ada percakapan." className="border-0 bg-transparent p-6 shadow-none" /> : (databaseMode ? conversations : [{ id: "demo", status: "active", updatedAt: "", participants: [{ id: "other", name: "Nadia Pratama" }], lastMessage: { body: "Percakapan demo untuk pratinjau", createdAt: "" } }]).map((conversation) => { const participant = conversation.participants.find((item) => item.email !== user.email && item.id !== user.email); return <button key={conversation.id} onClick={() => { setSelectedId(conversation.id); if (databaseMode) router.replace(`/messages?conversationId=${encodeURIComponent(conversation.id)}`); }} className={cn("w-full rounded-xl p-4 text-left transition-colors hover:bg-[#f0f6fd]", selectedId === conversation.id && "bg-[#e3f5ed]")}><p className="font-semibold">{participant?.name ?? "Kontak"}</p><p className="mt-1 truncate text-sm text-muted-foreground">{conversation.lastMessage?.body ?? "Belum ada pesan"}</p></button>; })}
+        {loading ? <p role="status" className="p-4 text-sm text-muted-foreground">Memuat percakapan...</p> : databaseMode && conversations.length === 0 ? <EmptyState icon={MessageCircle} title="Belum ada percakapan." className="border-0 bg-transparent p-6 shadow-none" /> : (databaseMode ? conversations : [{ id: "demo", status: "active", updatedAt: "", participants: [{ id: "other", name: "Nadia Pratama" }], lastMessage: { body: "Percakapan demo untuk pratinjau", createdAt: "" } }]).map((conversation) => { const participant = conversation.participants.find((item) => item.email !== user.email && item.id !== user.email); return <button type="button" key={conversation.id} onClick={() => { setSelectedId(conversation.id); if (databaseMode) router.replace(`/messages?conversationId=${encodeURIComponent(conversation.id)}`); }} className={cn("w-full rounded-xl p-4 text-left transition-colors hover:bg-[#f0f6fd]", selectedId === conversation.id && "bg-[#e3f5ed]")}><p className="font-semibold">{participant?.name ?? "Kontak"}</p><p className="mt-1 truncate text-sm text-muted-foreground">{conversation.lastMessage?.body ?? "Belum ada pesan"}</p></button>; })}
       </CardContent></Card>
-      <Card className="flex min-h-[32rem] flex-col"><CardHeader className="border-b"><CardTitle className="flex items-center gap-2 text-lg"><span className="flex size-9 items-center justify-center rounded-full bg-[#d7f5e8] text-[#08744f]"><ShieldCheck className="size-4" /></span>{other}</CardTitle><p className="text-sm text-muted-foreground">Percakapan hanya tersedia untuk peserta yang berwenang.</p></CardHeader><CardContent className="flex flex-1 flex-col justify-end gap-4 p-4 sm:p-6"><div className="space-y-3">{messagesLoading ? <p role="status" className="text-center text-sm text-muted-foreground">Memuat pesan...</p> : databaseMode && !selected ? <p className="text-center text-sm text-muted-foreground">Pilih percakapan untuk melihat pesan.</p> : messages.length === 0 ? <EmptyState icon={MessageCircle} title="Belum ada pesan dalam percakapan ini." className="border-0 bg-transparent shadow-none" /> : messages.map((message) => { const mine = message.isMine ?? message.senderId === user.email; return <div key={message.id} className={cn("flex", mine && "justify-end")}><div className={cn("max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6", mine ? "rounded-br-md bg-[#0f2040] text-white" : "rounded-bl-md bg-[#f0f6fd] text-[#0a1628]")}><p>{message.body}</p><time className="mt-1 block text-[11px] opacity-60">{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</time></div></div>; })}</div><form onSubmit={sendMessage} className="flex gap-2 border-t pt-4"><Textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Tulis pesan dalam Bahasa Indonesia..." aria-label="Isi pesan" className="min-h-12 resize-none" disabled={databaseMode && !selectedId} /><Button type="submit" size="icon" aria-label="Kirim pesan" disabled={databaseMode && !selectedId}><Send className="size-4" /></Button></form></CardContent></Card>
+      <Card className="flex min-h-[32rem] min-w-0 flex-col"><CardHeader className="border-b"><div className="flex flex-wrap items-start justify-between gap-3"><CardTitle className="flex min-w-0 items-center gap-2 text-lg"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#d7f5e8] text-[#08744f]"><ShieldCheck className="size-4" /></span><span className="truncate">{other}</span></CardTitle>{databaseMode && selected && <Button type="button" variant="outline" size="sm" onClick={() => void toggleBlock()} disabled={blockLoading} aria-label={selected.status === "blocked" ? "Buka blokir percakapan" : "Blokir percakapan"} className="shrink-0">{blockLoading ? <LoaderCircle className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}<span>{selected.status === "blocked" ? "Buka blokir" : "Blokir"}</span></Button>}</div><p className="text-sm text-muted-foreground">Percakapan hanya tersedia untuk peserta yang berwenang.</p>{databaseMode && selected?.status === "blocked" && <p role="status" className="text-xs font-medium text-amber-700">Percakapan diblokir. Buka blokir untuk mengirim pesan kembali.</p>}</CardHeader><CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6"><div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">{messagesLoading && messages.length === 0 ? <p role="status" className="py-8 text-center text-sm text-muted-foreground"><LoaderCircle className="mx-auto mb-2 size-5 animate-spin" />Memuat pesan...</p> : databaseMode && !selected ? <p className="py-8 text-center text-sm text-muted-foreground">Pilih percakapan untuk melihat pesan.</p> : messages.length === 0 ? <EmptyState icon={MessageCircle} title="Belum ada pesan dalam percakapan ini." className="border-0 bg-transparent shadow-none" /> : <>{hasMore && nextCursor && <div className="flex justify-center pb-1"><Button type="button" variant="outline" size="sm" onClick={() => void loadMessages(nextCursor)} disabled={messagesLoading}>{messagesLoading ? <LoaderCircle className="size-4 animate-spin" /> : null}{messagesLoading ? "Memuat pesan..." : "Muat pesan sebelumnya"}</Button></div>}{messages.map((message) => { const mine = message.isMine ?? message.senderId === currentUserId; const actionPending = actionLoading?.startsWith(`${message.id}:`) ?? false; const actionMenu = databaseMode ? <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label={`Aksi untuk pesan ${mine ? "Anda" : "ini"}`} disabled={Boolean(actionLoading)} className="mt-1 size-8 shrink-0 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">{actionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}</Button></DropdownMenuTrigger><DropdownMenuContent align={mine ? "end" : "start"}>{mine ? <><DropdownMenuItem onSelect={() => void messageAction(message, "edit")}><Pencil className="size-4" />Edit pesan</DropdownMenuItem><DropdownMenuItem destructive onSelect={() => void messageAction(message, "delete")}><Trash2 className="size-4" />Hapus pesan</DropdownMenuItem></> : <DropdownMenuItem onSelect={() => void messageAction(message, "report")}><Flag className="size-4" />Laporkan pesan</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu> : null; return <div key={message.id} className={cn("group flex items-start gap-2", mine ? "justify-end" : "justify-start")}>{!mine && actionMenu}<div className={cn("max-w-[85%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-6", mine ? "rounded-br-md bg-[#0f2040] text-white" : "rounded-bl-md bg-[#f0f6fd] text-[#0a1628]")}><p className="whitespace-pre-wrap break-words">{message.body}</p><div className="mt-1 flex items-center justify-end gap-1 text-[11px] opacity-60"><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</time>{message.editedAt && <span>(diedit)</span>}</div></div>{mine && actionMenu}</div>; })}</>}</div><form onSubmit={sendMessage} className="border-t pt-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"> <div className="min-w-0 flex-1">{editingId && <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>Mengedit pesan</span><Button type="button" variant="ghost" size="sm" onClick={() => { setEditingId(null); setDraft(""); }}><X className="size-3.5" />Batal</Button></div>}<Textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Tulis pesan dalam Bahasa Indonesia..." aria-label="Isi pesan" className="min-h-12 resize-none" disabled={sending || (databaseMode && (!selectedId || !selected || selected.status === "blocked"))} /></div><Button type="submit" size="default" aria-label={editingId ? "Simpan perubahan pesan" : "Kirim pesan"} disabled={sending || !draft.trim() || (databaseMode && (!selectedId || !selected || selected.status === "blocked"))} className="w-full shrink-0 sm:w-auto">{sending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}<span>{editingId ? "Simpan perubahan" : "Kirim"}</span></Button></div>{databaseMode && selected?.status === "blocked" && <p className="mt-2 text-xs text-muted-foreground">Buka blokir percakapan untuk mengirim pesan baru.</p>}</form></CardContent></Card>
     </div>
   </div></main>;
 }
