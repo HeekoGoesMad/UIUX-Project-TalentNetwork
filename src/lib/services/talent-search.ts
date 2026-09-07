@@ -80,7 +80,7 @@ export type TalentSearchParams = {
   page?: number;
   limit?: number;
   locations?: string[];
-  sort?: "relevance" | "name" | "experience";
+  sort?: "relevance" | "name";
 };
 
 export class TalentSearchService {
@@ -118,10 +118,11 @@ export class TalentSearchService {
 
     const total = Number(totalResult?.count ?? 0);
 
-    // Determine pagination bounds
-    const isPaginated = params?.page !== undefined || params?.limit !== undefined;
-    const page = Math.max(1, Number(params?.page ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(params?.limit ?? 12)));
+    // Always paginated: default limit 24, capped at 100 so direct callers can never trigger unbounded scans.
+    const rawPage = Number(params?.page ?? 1);
+    const rawLimit = Number(params?.limit ?? 24);
+    const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1;
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.floor(rawLimit))) : 24;
     const offset = (page - 1) * limit;
 
     let orderBy: SQL;
@@ -145,9 +146,7 @@ export class TalentSearchService {
       .where(whereClause)
       .orderBy(orderBy);
 
-    const rows = isPaginated
-      ? await selectQuery.limit(limit).offset(offset)
-      : await selectQuery;
+    const rows = await selectQuery.limit(limit).offset(offset);
 
     if (rows.length === 0) {
       return {

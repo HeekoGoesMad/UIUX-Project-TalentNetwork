@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminChecking, AdminDenied, AdminPopup } from "@/components/admin/admin-denied";
+import { useAdminGate } from "@/components/admin/admin-gate";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +135,7 @@ function AdminCompaniesContent() {
 
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
 
@@ -179,7 +182,7 @@ function AdminCompaniesContent() {
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/companies", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setCompanies(data.companies || []);
@@ -190,6 +193,10 @@ function AdminCompaniesContent() {
             openReviewModal(target);
           }
         }
+      } else if (res.status === 401) {
+        failGate(401);
+      } else if (res.status === 403) {
+        failGate(403);
       } else {
         const errData = await res.json().catch(() => ({}));
         console.error("Companies API error:", res.status, errData);
@@ -201,7 +208,7 @@ function AdminCompaniesContent() {
     } finally {
       setLoading(false);
     }
-  }, [initialReviewId, openReviewModal]);
+  }, [initialReviewId, openReviewModal, failGate]);
 
 
   useEffect(() => {
@@ -222,7 +229,7 @@ function AdminCompaniesContent() {
 
     setUpdating(true);
     try {
-      const res = await fetch(`/api/admin/companies/${selectedCompany.id}`, {
+      const res = await fetch(new URL(`/api/admin/companies/${selectedCompany.id}`, window.location.origin), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -273,6 +280,22 @@ function AdminCompaniesContent() {
       return matchesStatus && matchesSearch;
     });
   }, [companies, statusFilter, search]);
+
+  if (gatePhase === "checking") {
+    return (
+      <AdminPopup>
+        <AdminChecking />
+      </AdminPopup>
+    );
+  }
+
+  if (gatePhase === "denied") {
+    return (
+      <AdminPopup>
+        <AdminDenied code={gateCode ?? 403} />
+      </AdminPopup>
+    );
+  }
 
   return (
     <AdminShell title="Manajemen & Verifikasi Perusahaan">

@@ -612,6 +612,9 @@ function destination(role: UserRole, next: string | null, isRegistration = false
     if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
     return "/dashboard";
   }
+  if (role === "admin") {
+    return next?.startsWith("/admin") ? next : "/admin";
+  }
   return "/dashboard";
 }
 

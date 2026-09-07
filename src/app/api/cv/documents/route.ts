@@ -9,6 +9,7 @@ import { candidateProfileForUser } from "@/lib/cv/api";
 import { getCvExtractionStatus } from "@/lib/cv/extraction";
 import { DocumentStorageConfigurationError, storeCvDocument } from "@/lib/cv/storage";
 import { getDemoDocuments, getDemoCandidateProfileId } from "@/lib/cv/demo";
+import { isDevBypassEnabled } from "@/lib/config/server";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const metadataSchema = z.object({ originalFileName: z.string().trim().min(1).max(255), mimeType: z.literal("application/pdf"), sizeBytes: z.number().int().positive().max(MAX_BYTES) });
@@ -21,7 +22,7 @@ function pageCount(bytes: Uint8Array) {
 
 export async function GET() {
   try {
-    if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") return NextResponse.json({ documents: getDemoDocuments(), demo: true });
+    if (isDevBypassEnabled()) return NextResponse.json({ documents: getDemoDocuments(), demo: true });
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     if (current.user.role !== "candidate") return NextResponse.json({ error: "Hanya kandidat yang dapat melihat CV." }, { status: 403 });
@@ -37,7 +38,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") {
+    if (isDevBypassEnabled()) {
       const form = await request.formData();
       const file = form.get("file");
       if (!(file instanceof File)) return NextResponse.json({ error: "File PDF wajib diunggah." }, { status: 400 });

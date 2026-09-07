@@ -2,6 +2,8 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 
+import { NextRequest, NextResponse } from "next/server";
+
 import { getDb, schema, type Database } from "@/db";
 import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
@@ -35,7 +37,7 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
     } else {
       try {
         const metadataRole = data.user.user_metadata?.role;
-        const resolvedRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" || metadataRole === "admin" ? metadataRole : "candidate";
+        const resolvedRole = metadataRole === "candidate" || metadataRole === "recruiter" || metadataRole === "partner" ? metadataRole : "candidate";
         const synced = await syncAuthenticatedUser(data.user, {
           name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : data.user.email.split("@")[0],
           role: resolvedRole,
@@ -56,7 +58,49 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
   return { user, db, authUser: data.user };
 }
 
-export async function getRecruiterScope(db: Database, user: AppUser) {
+export async function requireRoles(
+  roles?: Array<AppUser["role"]>,
+  options?: { allowPending?: boolean; forbiddenError?: string },
+) {
+  const current = await getCurrentAppUser({ allowPending: options?.allowPending });
+  if ("error" in current) return current;
+  if (roles && !roles.includes(current.user.role)) {
+    return { error: options?.forbiddenError ?? "Akses ditolak untuk peran ini.", status: 403 as const };
+  }
+  return { user: current.user, db: current.db, authUser: current.authUser };
+}
+
+export type AuthContext = Extract<Awaited<ReturnType<typeof requireRoles>>, { user: AppUser }>;
+
+export async function requireAdmin() {
+  return requireRoles(["admin"], { allowPending: true, forbiddenError: "Akses admin diperlukan." });
+}
+
+// Cookbook: 1.GET=withAuth(async({user,db})=>{...}) 2.roles:{roles:["recruiter"]}
+// 3.pending:{allowPending:true}(default blocks) 4.401/403 JSON automatic,drop manual checks
+// 5.params:extra args forwarded (auth,req,...args) 6.admin:{roles:["admin"],allowPending:true}
+// 7.AI keeps getAiEndpointAuth(rate-limit+bypass) 8.layouts keep guards requireRole(redirect)
+// 9.do NOT mass-migrate ~55 routes; adopt per-route on touch.
+export function withAuth(
+  handler: (auth: AuthContext, req: NextRequest, ...args: unknown[]) => Promise<NextResponse> | NextResponse,
+  opts?: { roles?: Array<AppUser["role"]>; allowPending?: boolean; forbiddenError?: string },
+) {
+  return async (req: NextRequest, ...args: unknown[]) => {
+    const current = await requireRoles(opts?.roles, { allowPending: opts?.allowPending, forbiddenError: opts?.forbiddenError });
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    return handler(current, req, ...args);
+  };
+}
+
+export type RecruiterMembership = {
+  organizationId: string;
+  organizationRole: (typeof schema.organizationMembers.$inferSelect)["role"];
+};
+
+export async function getRecruiterScope(
+  db: Database,
+  user: AppUser
+): Promise<{ membership: RecruiterMembership } | { error: string; status: 403 }> {
   if (user.role !== "recruiter") return { error: "Hanya recruiter yang dapat mengakses data ini.", status: 403 as const };
   if (user.recruiterProvisioningStatus !== "active") return recruiterAccessError(user.recruiterProvisioningStatus);
 

@@ -23,7 +23,7 @@ type Resolution =
 async function resolveAccess(): Promise<Resolution> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
+  if ((!url || !key) && process.env.NODE_ENV !== "production" && process.env.APP_ENV !== "production") {
     return { kind: "demo" };
   }
   try {

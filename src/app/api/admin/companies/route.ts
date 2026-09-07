@@ -1,12 +1,14 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 
 export async function GET(request: Request) {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = current.db;
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() || "";
@@ -118,7 +120,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ companies });
   } catch (error) {
-    console.error("GET companies error:", error);
-    return NextResponse.json({ error: "Gagal memuat daftar perusahaan." }, { status: 500 });
+    return apiError("Gagal memuat daftar perusahaan.", 500, error);
   }
 }

@@ -317,7 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
       setBootstrapped(true);
     } catch (error) {
-      setState({ ...initial, tokens: 0 });
+      setState({ ...initial, tokens: 0, screeningTokens: 0 });
       setProfile(null);
       setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
        setNotifications([]);
@@ -594,6 +594,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,
+      // ponytail: single-balance mirror in dbMode — scan spends the same server
+      // balance as screening, so decrement both; demo keeps separate currencies.
+      screeningTokens: supabaseConfigured ? current.screeningTokens - 1 : current.screeningTokens,
       scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
     toast.success("Profil berhasil dibuka", { description: "1 token telah digunakan." });
@@ -704,7 +707,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const uniqueIds = [...new Set(candidateIds)];
     if (!uniqueIds.length) return false;
     if (supabaseConfigured && uniqueIds.every((candidateId) => UUID_RE.test(candidateId))) {
-      const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: uniqueIds, purpose: "Pemeriksaan finansial kandidat" }) });
+      const response = await fetch("/api/consent-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileIds: uniqueIds, purpose: "Screening kandidat" }) });
       if (!response.ok) { toast.error("Permintaan consent gagal dikirim", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
       await loadBootstrap();
       toast.success(`Permintaan consent dikirim ke ${uniqueIds.length} kandidat`);
@@ -718,7 +721,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         contactRequests: { ...(current.contactRequests ?? {}), [id]: { candidateId: id, recruiterName: user?.name ?? "Recruiter Demo", company: user?.companyName ?? "Perusahaan Demo", email: user?.email ?? "recruiter@example.com", requestedAt: now, history: [{ state: "pending-candidate-consent", at: now }] } },
       };
     }));
-    toast.success(`Permintaan consent dikirim ke ${uniqueIds.length} kandidat`);
+    toast.success("Permintaan consent terkirim", { description: "Kandidat perlu menyetujui sebelum screening dimulai." });
     return true;
   };
 
@@ -734,7 +737,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         contactRequests: { ...(current.contactRequests ?? {}), [candidateId]: { candidateId, recruiterName: user?.name ?? "Recruiter Demo", company: user?.companyName ?? "Perusahaan Demo", email: user?.email ?? "recruiter@example.com", requestedAt: now, history: [{ state: "pending-candidate-consent", at: now }] } },
       };
     });
-    toast.success("Permintaan consent financial terkirim", { description: "Persetujuan ini disiapkan untuk pemeriksaan finansial mendatang; role-fit screening tidak terpengaruh." });
+    toast.success("Permintaan consent terkirim", { description: "Kandidat perlu menyetujui sebelum screening dimulai." });
     return true;
   };
 
@@ -780,23 +783,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const startScreening = async (candidateId: string) => {
-    if (screeningRunStatuses[candidateId] === "completed" || screeningRunStatuses[candidateId] === "processing") return true;
-    if (state.screeningTokens <= 0) {
-      toast.error("Screening token habis", { description: "Tambahkan token sebelum menjalankan screening." });
-      return false;
-    }
     if (supabaseConfigured && UUID_RE.test(candidateId)) {
       try {
+        const consentResponse = await fetch(`/api/consent-requests?candidateProfileId=${encodeURIComponent(candidateId)}`);
+        const consentData = (await consentResponse.json()) as { requests?: { itemId: string; candidateProfileId: string; consentState?: ConsentState }[] };
+        const consent = consentResponse.ok
+          ? consentData.requests?.find((item) => item.candidateProfileId === candidateId && item.consentState === "consented")
+          : undefined;
+        // Consent is OPTIONAL for financial screening: link the consented item
+        // when one exists, otherwise proceed without consent (backend supports null).
+        const consentRequestItemId = consent?.itemId ?? null;
         const response = await fetch("/api/screening-runs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidateProfileId: candidateId, idempotencyKey: `screening:${user?.email ?? "recruiter"}:${candidateId}` }),
+          body: JSON.stringify({ candidateProfileId: candidateId, consentRequestItemId, idempotencyKey: `screening:${user?.email ?? "recruiter"}:${candidateId}` }),
         });
         const data = (await response.json()) as { runId?: string; balance?: number; error?: string };
         if (!response.ok || !data.runId) throw new Error(data.error ?? "Screening belum dapat dimulai.");
         screeningRunIds.current.set(candidateId, data.runId);
         if (typeof data.balance === "number") {
-          setState((current) => ({ ...current, screeningTokens: data.balance ?? current.screeningTokens }));
+          // ponytail: single-balance mirror — tokens and screeningTokens reflect
+          // the same server balance; keep both in sync on every refresh.
+          setState((current) => ({ ...current, tokens: data.balance ?? current.tokens, screeningTokens: data.balance ?? current.screeningTokens }));
         }
         setScreeningRunStatuses((current) => ({ ...current, [candidateId]: "processing" }));
         const resultResponse = await fetch(`/api/screening-runs/${data.runId}/result`, {
@@ -809,7 +817,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const runResponse = await fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(candidateId)}`, { cache: "no-store" });
         const runData = (await runResponse.json()) as { run?: { status?: string } };
         setScreeningRunStatuses((current) => ({ ...current, [candidateId]: runData.run?.status ?? "processing" }));
-        toast.success("Screening selesai", { description: "Token dan skor tersimpan di database." });
+        setState((current) => ({ ...current, screeningConsents: { ...current.screeningConsents, [candidateId]: "screening-completed" } }));
+        toast.success("Screening selesai", { description: consentRequestItemId ? "Token dan skor tersimpan di database." : "Berjalan tanpa consent (opsional). Token dan skor tersimpan di database." });
         return true;
       } catch (error) {
         toast.error("Screening belum dapat dimulai", { description: error instanceof Error ? error.message : "Coba lagi." });
@@ -817,9 +826,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     if (screeningStarts.current.has(candidateId)) return true;
+    if (state.screeningConsents[candidateId] === "screening-completed" || state.screeningConsents[candidateId] === "screening-in-progress") return true;
+    // Consent is optional: demo runs proceed without a consented state and only require a token.
+    if (state.screeningTokens <= 0) { toast.error("Screening token habis"); return false; }
     screeningStarts.current.add(candidateId);
     setScreeningRunStatuses((current) => ({ ...current, [candidateId]: "processing" }));
-    setState((current) => ({ ...current, screeningTokens: current.screeningTokens - 1 }));
+    setState((current) => ({ ...current, screeningTokens: current.screeningTokens - 1, screeningConsents: { ...current.screeningConsents, [candidateId]: "screening-completed" } }));
     setScreeningRunStatuses((current) => ({ ...current, [candidateId]: "completed" }));
     toast.success("Screening dimulai", { description: "Tepat satu token digunakan." });
     return true;
@@ -827,7 +839,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const previewCandidate = (candidateId: string) => {
     if (state.scans.some((scan) => scan.candidateId === candidateId)) return true;
-    if (state.previewsUsed >= 5) { toast.error("Pratinjau gratis trial habis", { description: "Screening tetap membutuhkan token." }); return false; }
+    if (state.previewsUsed >= 5) { toast.error("Pratinjau gratis trial habis", { description: "Screening membutuhkan token." }); return false; }
     setState((current) => ({ ...current, previewsUsed: current.previewsUsed + 1 }));
     return true;
   };

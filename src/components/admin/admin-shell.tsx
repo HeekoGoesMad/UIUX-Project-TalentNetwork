@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ReactNode } from "react";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useApp } from "@/providers/app-provider";
 
 interface NavLinkItem {
   label: string;
@@ -33,6 +34,8 @@ const adminNavLinks: NavLinkItem[] = [
 
 export function AdminShell({ title, children }: { title: string; children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useApp();
 
   return (
     <div className="min-h-screen bg-slate-50/60 antialiased">
@@ -52,12 +55,18 @@ export function AdminShell({ title, children }: { title: string; children: React
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl">
-              <ArrowLeft className="size-3.5" />
-              Kembali ke Web
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl"
+            onClick={async () => {
+              await logout();
+              router.push("/login");
+            }}
+          >
+            <ArrowLeft className="size-3.5" />
+            Kembali ke Web
+          </Button>
           <div className="h-4 w-px bg-slate-200" />
           <div className="flex items-center gap-2 text-xs">
             <div className="flex size-7 items-center justify-center rounded-full bg-purple-100 font-bold text-[#7C3AED]">
@@ -65,7 +74,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             </div>
             <div className="hidden sm:block text-left">
               <p className="font-semibold text-slate-900 leading-tight">Admin System</p>
-              <p className="text-[10px] text-muted-foreground">superadmin@proofylink.id</p>
+              <p className="text-[10px] text-muted-foreground">superadmin@talentnetwork.id</p>
             </div>
           </div>
         </div>

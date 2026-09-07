@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 import { writeAuditLog } from "@/lib/audit";
 
 const updateCompanySchema = z
@@ -53,7 +54,8 @@ export async function PATCH(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     const { companyId } = await params;
     const body = await request.json().catch(() => null);
     const parsed = updateCompanySchema.safeParse(body);
@@ -64,8 +66,8 @@ export async function PATCH(
       );
     }
 
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
-    const adminUser = "error" in current ? null : current.user;
+    const db = current.db;
+    const adminUser = current.user;
 
     const [existingOrg] = await db
       .select()
@@ -83,9 +85,7 @@ export async function PATCH(
     if (parsed.data.verificationStatus !== undefined) {
       updateData.verificationStatus = parsed.data.verificationStatus;
       updateData.reviewedAt = new Date();
-      if (adminUser) {
-        updateData.reviewedBy = adminUser.id;
-      }
+      updateData.reviewedBy = adminUser.id;
     }
     if (parsed.data.verificationNotes !== undefined) {
       updateData.verificationNotes = parsed.data.verificationNotes;
@@ -139,25 +139,22 @@ export async function PATCH(
     }
 
     // Catat ke Audit Log
-    if (adminUser) {
-      await writeAuditLog({
-        db,
-        actorUserId: adminUser.id,
-        organizationId: companyId,
-        action: `admin.company.${parsed.data.verificationStatus || "updated"}`,
-        entityType: "organization",
-        entityId: companyId,
-        metadata: {
-          previousStatus: existingOrg.verificationStatus,
-          newStatus: parsed.data.verificationStatus || existingOrg.verificationStatus,
-          notes: parsed.data.verificationNotes,
-        },
-      });
-    }
+    await writeAuditLog({
+      db,
+      actorUserId: adminUser.id,
+      organizationId: companyId,
+      action: `admin.company.${parsed.data.verificationStatus || "updated"}`,
+      entityType: "organization",
+      entityId: companyId,
+      metadata: {
+        previousStatus: existingOrg.verificationStatus,
+        newStatus: parsed.data.verificationStatus || existingOrg.verificationStatus,
+        notes: parsed.data.verificationNotes,
+      },
+    });
 
     return NextResponse.json({ success: true, company: updatedOrg });
   } catch (error) {
-    console.error("PATCH company error:", error);
-    return NextResponse.json({ error: "Gagal memperbarui data perusahaan." }, { status: 500 });
+    return apiError("Gagal memperbarui data perusahaan.", 500, error);
   }
 }

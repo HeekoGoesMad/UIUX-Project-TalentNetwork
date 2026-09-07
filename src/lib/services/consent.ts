@@ -2,18 +2,23 @@ import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import { CONSENT_STATE_BY_DB_STATUS } from "@/types";
 import type { AppUser } from "@/lib/api/auth";
 
 export class ConsentService {
   /**
-   * Retrieve all consent requests for a candidate or recruiter organization.
+   * Retrieve consent requests for a candidate or recruiter organization (paginated).
    */
   static async getConsentRequests(
     db: Database,
     user: AppUser,
-    scope?: { membership: { organizationId: string } } | null
+    scope?: { membership: { organizationId: string } } | null,
+    opts?: { page?: number; limit?: number; candidateProfileId?: string }
   ) {
+    const page = Math.max(1, Math.floor(opts?.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(opts?.limit ?? 24)));
+    const offset = (page - 1) * limit;
     const isCandidate = user.role === "candidate";
 
     const candidateProfile = isCandidate
@@ -27,12 +32,17 @@ export class ConsentService {
       : undefined;
 
     if (isCandidate && !candidateProfile) {
-      return { requests: [] };
+      return { requests: [], page, limit, hasMore: false };
     }
 
     const where = isCandidate
       ? eq(schema.consentRequestItems.candidateProfileId, candidateProfile!.id)
-      : eq(schema.consentRequestBatches.organizationId, scope!.membership.organizationId);
+      : opts?.candidateProfileId
+        ? and(
+            eq(schema.consentRequestBatches.organizationId, scope!.membership.organizationId),
+            eq(schema.consentRequestItems.candidateProfileId, opts.candidateProfileId)
+          )
+        : eq(schema.consentRequestBatches.organizationId, scope!.membership.organizationId);
 
     const rows = await db
       .select({
@@ -56,9 +66,14 @@ export class ConsentService {
       .innerJoin(schema.users, eq(schema.users.id, schema.consentRequestBatches.requestedBy))
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.users.id))
       .where(where)
-      .orderBy(asc(schema.consentRequestItems.createdAt));
+      .orderBy(asc(schema.consentRequestItems.createdAt))
+      .limit(limit + 1)
+      .offset(offset);
 
-    const events = rows.length
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+    const events = pageRows.length
       ? await db
           .select({
             itemId: schema.consentEvents.consentRequestItemId,
@@ -70,7 +85,7 @@ export class ConsentService {
           .where(
             inArray(
               schema.consentEvents.consentRequestItemId,
-              rows.map((row) => row.itemId)
+              pageRows.map((row) => row.itemId)
             )
           )
       : [];
@@ -79,11 +94,14 @@ export class ConsentService {
       CONSENT_STATE_BY_DB_STATUS[status];
 
     return {
-      requests: rows.map((row) => ({
+      requests: pageRows.map((row) => ({
         ...row,
         consentState: mapState(row.status),
         history: events.filter((event) => event.itemId === row.itemId),
       })),
+      page,
+      limit,
+      hasMore,
     };
   }
 
@@ -235,6 +253,15 @@ export class ConsentService {
         title: "Respons consent diterima",
         body: `Candidate ${params.decision === "approved" ? "menyetujui" : "menolak"} permintaan consent Anda.`,
         data: { consentRequestItemId: updated.id, status: updated.status },
+      });
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: params.candidateUserId,
+        action: "consent.responded",
+        entityType: "consent_request_item",
+        entityId: updated.id,
+        metadata: { decision: params.decision, status: updated.status },
       });
 
       return { itemId: updated.id, consentStatus: updated.status };

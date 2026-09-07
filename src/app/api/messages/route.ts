@@ -24,7 +24,6 @@ export async function getParticipant(db: Database, conversationId: string, userI
 const messageSchema = z.object({
   conversationId: z.string().uuid(),
   body: z.string().trim().min(1).max(4_000),
-  attachment: z.object({ name: z.string().trim().min(1).max(255), mimeType: z.string().trim().max(120), size: z.number().int().positive().max(25_000_000) }).optional(),
 });
 
 export async function GET(request: Request) {
@@ -32,12 +31,19 @@ export async function GET(request: Request) {
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-    const conversationId = new URL(request.url).searchParams.get("conversationId");
+    const params = new URL(request.url).searchParams;
+    const conversationId = params.get("conversationId");
     if (!conversationId || !z.string().uuid().safeParse(conversationId).success) {
       return NextResponse.json({ error: "Conversation ID tidak valid." }, { status: 400 });
     }
 
-    const result = await MessagingService.listMessages(current.db, current.user.id, conversationId);
+    // `cursor` is canonical; `before` is the legacy alias sent by the client.
+    const cursor = params.get("cursor") ?? params.get("before");
+    const limitParam = params.get("limit");
+    const result = await MessagingService.listMessages(current.db, current.user.id, conversationId, {
+      cursor,
+      limit: limitParam === null ? undefined : Number(limitParam),
+    });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("ROLE_MISMATCH:")) {
       const [, actualRole] = error.message.split(":");
-      const actualRoleLabel = actualRole === "candidate" ? "Talent / Candidate" : actualRole === "recruiter" ? "Recruiter / Hiring" : "Partner";
+        const actualRoleLabel = actualRole === "candidate" ? "Talent / Candidate" : actualRole === "recruiter" ? "Recruiter / Hiring" : actualRole === "admin" ? "Admin" : "Partner";
       return NextResponse.json({
         code: "ROLE_MISMATCH",
         actualRole,

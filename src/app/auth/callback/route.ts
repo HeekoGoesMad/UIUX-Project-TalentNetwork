@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       role: requestedRole === "candidate" || requestedRole === "recruiter" ? requestedRole : undefined,
     });
 
-    const fallback = result.role === "candidate" ? "/candidate/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending";
+    const fallback = result.role === "admin" ? "/admin" : result.role === "candidate" ? "/candidate/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending";
     const destination = safeNext(next, fallback);
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({

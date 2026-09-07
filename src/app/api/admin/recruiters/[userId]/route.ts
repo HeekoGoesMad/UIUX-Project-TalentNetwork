@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 import { writeAuditLog } from "@/lib/audit";
 
 const bodySchema = z
@@ -20,6 +21,8 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId } = await params;
+  const current = await requireAdmin();
+  if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
   const parsed = bodySchema.safeParse(await request.json());
   if (
     !parsed.success ||
@@ -39,9 +42,8 @@ export async function PATCH(
     return NextResponse.json({ success: true, status: nextStatus, demo: true });
   }
 
-  const current = await getCurrentAppUser({ allowPending: true });
-  const db = "error" in current ? (await import("@/db")).getDb() : current.db;
-  const actorUserId = "error" in current ? userId : current.user.id;
+  const db = current.db;
+  const actorUserId = current.user.id;
 
   const result = await db.transaction(async (tx) => {
     let nextStatus: "active" | "rejected" | "revision_required" = "active";
@@ -173,15 +175,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const current = await getCurrentAppUser({ allowPending: true });
+  const current = await requireAdmin();
+  if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
   const { userId } = await params;
   if (!z.string().uuid().safeParse(userId).success) {
     return NextResponse.json({ error: "User ID tidak valid." }, { status: 400 });
   }
 
-  const db = "error" in current ? (await import("@/db")).getDb() : current.db;
-  const actorUserId = "error" in current ? userId : current.user.id;
+  const db = current.db;
+  const actorUserId = current.user.id;
 
   try {
     const [deletedUser] = await db
@@ -204,6 +207,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, deleted: deletedUser });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Gagal menghapus rekruter." }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : "Gagal menghapus rekruter.", 500, err);
   }
 }
