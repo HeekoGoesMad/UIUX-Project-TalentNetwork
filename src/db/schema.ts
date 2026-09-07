@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -655,7 +656,7 @@ export const tokenPurchases = pgTable("token_purchases", {
   packageId: uuid("package_id").notNull().references(() => tokenPackages.id, { onDelete: "restrict" }),
   purchasedBy: uuid("purchased_by").notNull().references(() => users.id),
   provider: text("provider").notNull(),
-  providerReference: text("provider_reference").unique(),
+  providerReference: text("provider_reference"),
   status: tokenPurchaseStatus("status").notNull().default("pending"),
   amountMinor: integer("amount_minor").notNull(),
   currency: text("currency").notNull(),
@@ -667,6 +668,7 @@ export const tokenPurchases = pgTable("token_purchases", {
 }, (table) => [
   check("token_purchases_amount_minor_check", sql`${table.amountMinor} >= 0`),
   check("token_purchases_token_amount_check", sql`${table.tokenAmount} > 0`),
+  uniqueIndex("token_purchases_provider_reference_unique").on(table.providerReference).where(sql`${table.providerReference} is not null`),
   index("token_purchases_organization_status_idx").on(table.organizationId, table.status),
   index("token_purchases_package_idx").on(table.packageId),
   index("token_purchases_provider_reference_idx").on(table.provider, table.providerReference),
