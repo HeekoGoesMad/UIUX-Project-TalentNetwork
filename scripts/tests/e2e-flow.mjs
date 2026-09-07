@@ -1,6 +1,10 @@
 import { chromium } from "playwright";
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3000";
 
@@ -62,6 +66,7 @@ async function api(page, method, urlPath, body) {
       method,
       headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      cache: "no-store",
     });
     let data = null;
     try {
@@ -139,7 +144,7 @@ async function findConsentItem(page, step, candidateProfileId) {
 async function isShortlisted(page, candidateProfileId) {
   const res = await api(page, "GET", "/api/shortlists");
   expectStatus("Shortlist state", res, 200);
-  const shortlists = res.data;
+  const shortlists = Array.isArray(res.data) ? res.data : res.data?.shortlists;
   expectTruthy(
     Array.isArray(shortlists),
     "Shortlist state",
@@ -149,6 +154,36 @@ async function isShortlisted(page, candidateProfileId) {
   return shortlists.some((sl) =>
     (sl.items || []).some((item) => item.candidateProfileId === candidateProfileId)
   );
+}
+
+async function waitForShortlistState(page, candidateProfileId, expected) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (await isShortlisted(page, candidateProfileId) === expected) return true;
+    await page.waitForTimeout(250);
+  }
+  return false;
+}
+
+async function getCandidateProfileId(page, step) {
+  const res = await api(page, "GET", "/api/app/bootstrap");
+  expectStatus(step, res, 200);
+  const candidateProfileId = res.data?.candidateProfile?.id;
+  expectTruthy(
+    typeof candidateProfileId === "string" && /^[0-9a-f-]{36}$/.test(candidateProfileId),
+    step,
+    "bootstrap returns the authenticated candidate profile ID",
+    `candidateProfileId=${candidateProfileId}`
+  );
+  return candidateProfileId;
+}
+
+async function waitForMessage(page, conversationId, body) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const res = await api(page, "GET", `/api/messages?conversationId=${conversationId}`);
+    if (res.ok && (res.data?.messages || []).some((message) => message.body === body)) return true;
+    await page.waitForTimeout(250);
+  }
+  return false;
 }
 
 async function run() {
@@ -162,6 +197,10 @@ async function run() {
 
     const pageR = await recruiterContext.newPage();
     const pageC = await candidateContext.newPage();
+
+    logStep(1, `Candidate logging in to identify target profile (${CANDIDATE.email})`);
+    await login(pageC, "Step 1: candidate login", "Talent / Candidate", CANDIDATE);
+    const targetCandidateId = await getCandidateProfileId(pageC, "Step 1: candidate bootstrap");
 
     // ----------------------------------------------------
     // STEP 1: Recruiter login, token grant, navigate to /search
@@ -189,23 +228,23 @@ async function run() {
     // STEP 2: Open Candidate Profile
     // ----------------------------------------------------
     logStep(2, "Opening candidate profile from /search results");
-    const talentLinks = pageR.locator("a[href^='/talent/']");
+    const talentLinks = pageR.locator(`a[href$='/${targetCandidateId}']`);
     await talentLinks.first().waitFor({ state: "visible", timeout: 15000 });
     const talentLinkCount = await talentLinks.count();
     expectTruthy(
       talentLinkCount > 0,
       "Step 2: search results contain talent links",
-      "at least 1 a[href^='/talent/'] element",
+      `a[href$='/${targetCandidateId}'] candidate profile link`,
       `${talentLinkCount} elements`
     );
     const candidateHref = await talentLinks.first().getAttribute("href");
     expectTruthy(
-      typeof candidateHref === "string" && /^\/talent\/[0-9a-f-]{36}$/.test(candidateHref),
+      typeof candidateHref === "string" && /^(?:\/talent|\/recruiter\/discover)\/[0-9a-f-]{36}$/.test(candidateHref),
       "Step 2: talent link href format",
-      "'/talent/<uuid>'",
+      "'/talent/<uuid>' or '/recruiter/discover/<uuid>'",
       `href=${candidateHref}`
     );
-    const candidateId = candidateHref.replace("/talent/", "");
+    const candidateId = candidateHref.split("/").pop();
     logStep(2, `Target candidate path: ${candidateHref}`);
 
     await nav(pageR, "Step 2: GET candidate profile page", `/talent/${candidateId}`);
@@ -217,16 +256,17 @@ async function run() {
     logStep(3, "Toggling candidate shortlist");
     const wasShortlisted = await isShortlisted(pageR, candidateId);
 
-    const toggleBtn = pageR.locator("button[aria-label='Toggle shortlist']").first();
+    const toggleBtn = pageR.locator("button[aria-label='Toggle shortlist'], button[aria-label='Simpan ke shortlist'], button[aria-label='Hapus dari shortlist']").first();
+    await toggleBtn.waitFor({ state: "visible", timeout: 15000 }).catch(() => undefined);
     expectTruthy(
-      await toggleBtn.isVisible({ timeout: 5000 }).catch(() => false),
+      await toggleBtn.isVisible().catch(() => false),
       "Step 3: shortlist toggle button visible on profile",
-      "visible button[aria-label='Toggle shortlist']",
+      "visible shortlist toggle button",
       "button not found/not visible"
     );
     await toggleBtn.click();
 
-    const nowShortlisted = await isShortlisted(pageR, candidateId);
+    const nowShortlisted = await waitForShortlistState(pageR, candidateId, !wasShortlisted);
     expectTruthy(
       nowShortlisted === !wasShortlisted,
       "Step 3: shortlist membership flips after toggle click",
@@ -244,7 +284,7 @@ async function run() {
     if (!existingConsent) {
       const consentRes = await api(pageR, "POST", "/api/consent-requests", {
         candidateProfileIds: [candidateId],
-        purpose: "Screening kandidat",
+        purpose: "Pemeriksaan finansial kandidat",
       });
       expectStatus("Step 4: POST /api/consent-requests", consentRes, 201);
       expectTruthy(
@@ -262,8 +302,7 @@ async function run() {
     // ----------------------------------------------------
     // STEP 5: Candidate Login & Navigate to /candidate/contact-requests
     // ----------------------------------------------------
-    logStep(5, `Candidate logging in (${CANDIDATE.email})`);
-    await login(pageC, "Step 5: candidate login", "Talent / Candidate", CANDIDATE);
+    logStep(5, `Candidate session ready (${CANDIDATE.email})`);
     await pageC.screenshot({ path: `${SCREENSHOT_DIR}/06_candidate_login.png` });
 
     logStep(5, "Candidate opening /candidate/contact-requests");
@@ -413,14 +452,12 @@ async function run() {
     const sendButton = pageR.locator("button[aria-label='Kirim pesan']").first();
     await sendButton.click();
 
-    const msgListRes = await api(pageR, "GET", `/api/messages?conversationId=${conversationId}`);
-    expectStatus("Step 13: GET sent messages", msgListRes, 200);
-    const sentMessage = (msgListRes.data?.messages || []).find((m) => m.body === testMsgText);
+    const messagePersisted = await waitForMessage(pageR, conversationId, testMsgText);
     expectTruthy(
-      sentMessage !== undefined,
+      messagePersisted,
       "Step 13: sent message persisted with exact body",
       `a message with body '${testMsgText}'`,
-      `messages=${JSON.stringify(msgListRes.data?.messages)?.slice(0, 400)}`
+      "message was not returned within the persistence window"
     );
     logStep(13, `Message sent successfully: "${testMsgText}"`);
     await pageR.screenshot({ path: `${SCREENSHOT_DIR}/13_recruiter_sent_message.png` });

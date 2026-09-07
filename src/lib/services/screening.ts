@@ -9,7 +9,7 @@ import { screening, summary } from "@/lib/ai/provider";
 
 export class ScreeningService {
   /**
-   * Start a new screening run after verifying consent and charging tokens.
+   * Start a screening run, optionally retaining a consent link, and charge tokens.
    */
   static async startRun(
     db: Database,
@@ -17,37 +17,34 @@ export class ScreeningService {
     scope: { membership: { organizationId: string } },
     params: {
       candidateProfileId: string;
-      consentRequestItemId: string;
+      consentRequestItemId?: string | null;
       idempotencyKey: string;
     }
   ) {
     return db.transaction(async (tx) => {
       const now = new Date();
-      const [consent] = await tx
-        .select({
-          itemId: schema.consentRequestItems.id,
-          status: schema.consentRequestItems.status,
-          candidateProfileId: schema.consentRequestItems.candidateProfileId,
-          expiresAt: schema.consentRequestBatches.expiresAt,
-        })
-        .from(schema.consentRequestItems)
-        .innerJoin(
-          schema.consentRequestBatches,
-          eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
-        )
-        .where(
-          and(
-            eq(schema.consentRequestItems.id, params.consentRequestItemId),
-            eq(schema.consentRequestItems.candidateProfileId, params.candidateProfileId),
-            eq(schema.consentRequestBatches.organizationId, scope.membership.organizationId),
-            eq(schema.consentRequestItems.status, "approved"),
-            sql`(${schema.consentRequestBatches.expiresAt} is null or ${schema.consentRequestBatches.expiresAt} > ${now})`
-          )
-        )
-        .limit(1);
+      const consentRequestItemId: string | null = params.consentRequestItemId ?? null;
 
-      if (!consent) {
-        return { error: "Consent kandidat belum disetujui atau sudah kedaluwarsa.", status: 403 as const };
+      if (consentRequestItemId) {
+        const [consent] = await tx
+          .select({ itemId: schema.consentRequestItems.id })
+          .from(schema.consentRequestItems)
+          .innerJoin(
+            schema.consentRequestBatches,
+            eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
+          )
+          .where(
+            and(
+              eq(schema.consentRequestItems.id, consentRequestItemId),
+              eq(schema.consentRequestItems.candidateProfileId, params.candidateProfileId),
+              eq(schema.consentRequestBatches.organizationId, scope.membership.organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!consent) {
+          return { error: "Item consent tidak terkait dengan organisasi atau kandidat.", status: 403 as const };
+        }
       }
 
       const [account] = await tx
@@ -66,8 +63,8 @@ export class ScreeningService {
         .values({
           id: runId,
           organizationId: scope.membership.organizationId,
-          candidateProfileId: consent.candidateProfileId,
-          consentRequestItemId: consent.itemId,
+          candidateProfileId: params.candidateProfileId,
+          consentRequestItemId,
           requestedBy: user.id,
           status: "in_progress",
           tokenCost: 1,
@@ -84,8 +81,8 @@ export class ScreeningService {
           idempotencyKey: params.idempotencyKey,
           screeningRunId: run.id,
           metadata: {
-            candidateProfileId: consent.candidateProfileId,
-            consentRequestItemId: consent.itemId,
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId,
           },
         })
         .onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey })
@@ -103,10 +100,23 @@ export class ScreeningService {
         if (!existingRunId) return { error: "Charge token tidak konsisten.", status: 409 as const };
 
         const [existingRun] = await tx
-          .select({ id: schema.screeningRuns.id, status: schema.screeningRuns.status })
+          .select({
+            id: schema.screeningRuns.id,
+            organizationId: schema.screeningRuns.organizationId,
+            candidateProfileId: schema.screeningRuns.candidateProfileId,
+            status: schema.screeningRuns.status,
+          })
           .from(schema.screeningRuns)
           .where(eq(schema.screeningRuns.id, existingRunId))
           .limit(1);
+
+        if (
+          existingRun &&
+          (existingRun.organizationId !== scope.membership.organizationId ||
+            existingRun.candidateProfileId !== params.candidateProfileId)
+        ) {
+          return { error: "Idempotency key sudah digunakan untuk screening lain.", status: 409 as const };
+        }
 
         await writeAuditLog({
           db: tx,
@@ -148,11 +158,11 @@ export class ScreeningService {
         action: "screening.run.started",
         entityType: "screening_run",
         entityId: run.id,
-        metadata: {
-          candidateProfileId: consent.candidateProfileId,
-          consentRequestItemId: consent.itemId,
-          idempotent: false,
-        },
+          metadata: {
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId,
+            idempotent: false,
+          },
       });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };

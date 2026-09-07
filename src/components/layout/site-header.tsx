@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
+import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus, Settings } from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -105,7 +105,7 @@ export function SiteHeader() {
     : [
         { href: "/search", label: "Cari Talent" },
          { href: "/shortlist", label: "Shortlist" },
-         { href: "/recruiter/screenings/new", label: "Screening" },
+          { href: "/recruiter/screenings", label: "Screening" },
          { href: "/messages", label: "Pesan" },
          { href: "/dashboard", label: "Dashboard" },
       ];
@@ -233,6 +233,24 @@ export function SiteHeader() {
             );
           })()}
 
+          {visibleUser && (() => {
+            const settingsHref = visibleUser.role === "candidate" ? "/candidate/settings" : "/recruiter/settings";
+            return (
+              <Link
+                href={settingsHref}
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
+                  pathname === settingsHref && "border-primary bg-primary/10 text-primary",
+                  isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
+                )}
+                aria-label="Pengaturan Akun"
+                title="Pengaturan Akun"
+              >
+                <Settings className="size-4" />
+              </Link>
+            );
+          })()}
+
           {visibleUser ? (
             <Button
               variant="ghost"
@@ -322,6 +340,22 @@ export function SiteHeader() {
                 </Link>
               );
             })}
+            {visibleUser && (() => {
+              const settingsHref = visibleUser.role === "candidate" ? "/candidate/settings" : "/recruiter/settings";
+              return (
+                <Link
+                  href={settingsHref}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                    pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  <Settings className="size-4 text-primary" />
+                  Pengaturan
+                </Link>
+              );
+            })()}
             {!visibleUser && (
               <div className="mt-2 border-t pt-3 flex flex-col gap-2">
                 {pathname !== "/login" && (

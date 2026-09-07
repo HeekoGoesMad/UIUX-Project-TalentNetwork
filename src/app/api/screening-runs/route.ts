@@ -6,7 +6,7 @@ import { ScreeningService } from "@/lib/services/screening";
 
 const startSchema = z.object({
   candidateProfileId: z.string().uuid(),
-  consentRequestItemId: z.string().uuid(),
+  consentRequestItemId: z.string().uuid().nullish(),
   idempotencyKey: z.string().trim().min(8).max(200),
 }).strict();
 

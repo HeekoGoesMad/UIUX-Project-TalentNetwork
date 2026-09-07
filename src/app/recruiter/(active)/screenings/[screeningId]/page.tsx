@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileQuestion, Loader2, MessageSquare, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -31,8 +31,7 @@ type Run = {
 
 export default function ScreeningDetailPage() {
   const { screeningId } = useParams<{ screeningId: string }>();
-  const router = useRouter();
-  const { dbMode, bootstrapped, screeningConsents, screeningResults, startScreening, screeningTokens } = useApp();
+  const { dbMode, bootstrapped, screeningConsents, screeningRunStatuses, screeningResults, startScreening, screeningTokens } = useApp();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +73,9 @@ export default function ScreeningDetailPage() {
   }, [bootstrapped, dbMode, screeningId]);
 
   const insight = dbMode ? run?.score : localResult?.insight;
-  const status = dbMode ? run?.status : consent === "screening-completed" ? "completed" : consent;
+  const status = dbMode ? run?.status : screeningRunStatuses[screeningId];
+  const isCompleted = status === "completed";
+  const isProcessing = status === "processing" || status === "in_progress";
 
   const handleStartScreeningInline = async () => {
     setRunningScreening(true);
@@ -85,11 +86,13 @@ export default function ScreeningDetailPage() {
           description: "Insight dan skor kesesuaian peran telah diperbarui.",
         });
         if (dbMode) {
-          router.refresh();
+          const response = await fetch(`/api/screening-runs?candidateProfileId=${encodeURIComponent(screeningId)}`, { cache: "no-store" });
+          const payload = (await response.json()) as { run?: Run; error?: string };
+          if (response.ok) setRun(payload.run ?? null);
         }
       } else {
         toast.error("Gagal menjalankan screening", {
-          description: "Pastikan saldo token mencukupi dan consent telah diberikan.",
+          description: "Pastikan saldo token mencukupi sebelum menjalankan role-fit screening.",
         });
       }
     } catch (err) {
@@ -160,20 +163,16 @@ export default function ScreeningDetailPage() {
                     </div>
                     <Badge
                       className={
-                        status === "completed"
+                         isCompleted
                           ? "bg-emerald-50 text-emerald-800"
-                          : status === "consented"
-                          ? "bg-purple-50 text-purple-800"
                           : "bg-amber-50 text-amber-800"
                       }
                     >
-                      {status === "completed"
-                        ? "Selesai"
-                        : status === "consented"
-                        ? "Consent Aktif · Siap Screening"
-                        : status === "pending-candidate-consent"
-                        ? "Menunggu Jawaban Kandidat"
-                        : "Belum Selesai"}
+                       {isCompleted
+                         ? "Selesai"
+                         : isProcessing
+                         ? "Sedang Diproses"
+                         : "Belum Selesai"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -232,9 +231,9 @@ export default function ScreeningDetailPage() {
                       <Sparkles className="size-6 text-primary" />
                       <p className="mt-3 font-semibold">Belum ada insight screening</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Pastikan consent disetujui kandidat sebelum menjalankan screening satu token.
-                      </p>
-                      {consent === "consented" && (
+                         Jalankan screening role fit dengan satu token. Consent tidak diperlukan untuk insight ini.
+                       </p>
+                       {!isProcessing && !isCompleted && (
                         <Button
                           className="mt-5 bg-[#7C3AED] hover:bg-[#6D28D9]"
                           onClick={handleStartScreeningInline}
@@ -248,13 +247,13 @@ export default function ScreeningDetailPage() {
                           {runningScreening ? "Menjalankan screening..." : "Mulai screening · 1 token"}
                         </Button>
                       )}
-                      {consent !== "consented" && (
-                        <Button asChild className="mt-5" variant="outline">
-                          <Link href={`/recruiter/screenings/new?candidateId=${candidate.id}`}>
-                            Kelola Permintaan Consent &rarr;
-                          </Link>
-                        </Button>
-                      )}
+                        {!isProcessing && !isCompleted && (
+                          <Button asChild className="mt-5" variant="outline">
+                            <Link href={`/recruiter/screenings/new?candidateId=${candidate.id}`}>
+                              Buka halaman screening &rarr;
+                            </Link>
+                          </Button>
+                        )}
                     </div>
                   )}
                 </CardContent>
@@ -270,18 +269,18 @@ export default function ScreeningDetailPage() {
                     <div>
                       <p className="font-semibold">Status saat ini</p>
                       <p className="text-muted-foreground">
-                        {status === "completed" ? "Insight tersimpan & siap di-review" : "Menunggu langkah berikutnya"}
+                         {isCompleted ? "Insight tersimpan & siap di-review" : isProcessing ? "Run sedang diproses" : "Menunggu screening dijalankan"}
                       </p>
                     </div>
                   </div>
                   <div className="border-t pt-4">
-                    <p className="font-semibold">Consent kandidat</p>
-                    <p className="mt-1 text-muted-foreground">
-                      {consent === "consented" || status === "completed"
-                        ? "Disetujui kandidat"
-                        : consent === "pending-candidate-consent"
-                        ? "Menunggu persetujuan kandidat"
-                        : "Belum diminta"}
+                     <p className="font-semibold">Consent kandidat · future checks</p>
+                     <p className="mt-1 text-muted-foreground">
+                       {consent === "consented"
+                         ? "Disetujui untuk pemeriksaan yang memerlukannya"
+                         : consent === "pending-candidate-consent"
+                         ? "Menunggu persetujuan kandidat"
+                         : consent === "declined" ? "Ditolak" : "Belum diminta; tidak menghalangi role fit"}
                     </p>
                   </div>
                   <div className="border-t pt-4">
