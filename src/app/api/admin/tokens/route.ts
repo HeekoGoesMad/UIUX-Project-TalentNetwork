@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 
 const grantSchema = z
   .object({
@@ -82,8 +83,7 @@ export async function GET() {
 
     return NextResponse.json({ accounts });
   } catch (error) {
-    console.error("Tokens GET error:", error);
-    return NextResponse.json({ error: "Data pemantauan token belum tersedia." }, { status: 503 });
+    return apiError("Data pemantauan token belum tersedia.", 503, error);
   }
 }
 
@@ -156,7 +156,6 @@ export async function POST(request: Request) {
       { status: entry ? 201 : 200 }
     );
   } catch (error) {
-    console.error("Token POST error:", error);
-    return NextResponse.json({ error: "Operasi token gagal." }, { status: 503 });
+    return apiError("Operasi token gagal.", 503, error);
   }
 }

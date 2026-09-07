@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import type { AppUser } from "@/lib/api/auth";
 
 function encodeMessageCursor(createdAt: Date | string, id: string): string {
@@ -359,6 +360,15 @@ export class MessagingService {
           }))
         );
       }
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: userId,
+        action: "message.sent",
+        entityType: "message",
+        entityId: message.id,
+        metadata: { conversationId },
+      });
 
       return { message: { ...message, isMine: true } };
     });

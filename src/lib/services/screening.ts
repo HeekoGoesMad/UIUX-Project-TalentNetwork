@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import type { AppUser } from "@/lib/api/auth";
 import { TokenLedgerService } from "./token-ledger";
 import { screening, summary } from "@/lib/ai/provider";
@@ -117,6 +118,20 @@ export class ScreeningService {
           return { error: "Idempotency key sudah digunakan untuk screening lain.", status: 409 as const };
         }
 
+        await writeAuditLog({
+          db: tx,
+          actorUserId: user.id,
+          organizationId: scope.membership.organizationId,
+          action: "screening.run.started",
+          entityType: "screening_run",
+          entityId: existingRun?.id ?? existingRunId,
+          metadata: {
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId: params.consentRequestItemId,
+            idempotent: true,
+          },
+        });
+
         return {
           runId: existingRun?.id ?? existingRunId,
           runStatus: existingRun?.status ?? ("in_progress" as const),
@@ -135,6 +150,20 @@ export class ScreeningService {
         await tx.delete(schema.screeningRuns).where(eq(schema.screeningRuns.id, run.id));
         return { error: "Token screening organisasi tidak mencukupi.", status: 402 as const };
       }
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: user.id,
+        organizationId: scope.membership.organizationId,
+        action: "screening.run.started",
+        entityType: "screening_run",
+        entityId: run.id,
+          metadata: {
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId,
+            idempotent: false,
+          },
+      });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };
     });

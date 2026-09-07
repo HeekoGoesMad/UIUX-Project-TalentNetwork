@@ -1,17 +1,14 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - dev
-      - "milestone-*"
+    branches: ["**"]
   pull_request:
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +18,20 @@ jobs:
           cache: npm
 
       - run: npm ci
+
       - run: npm run lint
-      - run: npx tsc --noEmit
-      # Build requires no env secrets (guards fail closed).
+
+      - run: npm run typecheck
+
+      # drizzle-kit check validates migration snapshots offline; no DATABASE_URL needed.
+      - run: npm run db:check
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test e2e/route-parity.spec.ts e2e/jobs-assessment-smoke.spec.ts e2e/admin-gate.spec.ts
+        env:
+          CI: true
+
+      - run: npm run test:unit
+
       - run: npm run build

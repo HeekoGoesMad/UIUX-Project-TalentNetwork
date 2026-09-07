@@ -22,12 +22,12 @@ test.describe("route parity", () => {
   });
 
   test("legacy redirects preserve their canonical destinations", async ({ request }) => {
+    // Only true server-side legacy aliases are asserted here. /dashboard,
+    // /search, /shortlist, /profile, and /talent/* are real pages that
+    // respond 200, not redirects.
     const redirects = [
-      ["/dashboard", "/recruiter/dashboard"],
-      ["/search", "/recruiter/discover"],
-      ["/shortlist", "/recruiter/shortlists"],
-      ["/profile", "/candidate/profile"],
-      ["/talent/route-parity-candidate", "/recruiter/discover/route-parity-candidate"],
+      ["/admin/recruiters", "/admin/companies"],
+      ["/admin/organizations", "/admin/companies"],
     ] as const;
 
     for (const [source, destination] of redirects) {
