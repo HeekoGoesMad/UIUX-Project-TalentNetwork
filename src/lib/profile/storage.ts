@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { sanitizeMediaName } from "./validation";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { extractStorageKey, sanitizeMediaName } from "./validation";
 
 export {
   MAX_AVATAR_BYTES,
@@ -10,6 +11,7 @@ export {
   detectImageMime,
   validateProfileImage,
   sanitizeMediaName,
+  extractStorageKey,
   type AllowedImageMime,
 } from "./validation";
 
@@ -22,22 +24,66 @@ export type ProfileMediaStorageResult = {
   status: "stored" | "demo-only";
 };
 
+async function getStorageClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!url || (!anonKey && !serviceKey)) {
+    return null;
+  }
+
+  if (serviceKey) {
+    return createSupabaseClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  return await createClient();
+}
+
+export async function deleteProfileMedia(storageKeyOrUrl: string): Promise<boolean> {
+  const bucket = process.env.SUPABASE_PROFILE_MEDIA_BUCKET?.trim() || "profile-media";
+  const key = extractStorageKey(storageKeyOrUrl, bucket);
+  if (!key) return false;
+
+  const client = await getStorageClient();
+  if (!client) {
+    // In dev-mock mode without credentials, treat deletion as successful
+    return true;
+  }
+
+  try {
+    const { error } = await client.storage.from(bucket).remove([key]);
+    if (error) {
+      console.warn(`[profile-storage] Gagal menghapus media "${key}": ${error.message}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[profile-storage] Error saat menghapus media:`, err);
+    return false;
+  }
+}
+
 export async function storeProfileMedia(input: {
   userId: string;
   fileName: string;
   bytes: Uint8Array;
   type: "avatar" | "banner";
   contentType: string;
+  previousUrl?: string | null;
 }): Promise<ProfileMediaStorageResult> {
   const bucket = process.env.SUPABASE_PROFILE_MEDIA_BUCKET?.trim() || "profile-media";
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   const safeName = sanitizeMediaName(input.fileName);
   const ext = input.contentType.split("/")[1] ?? "jpg";
   const key = `${input.type}s/${input.userId}/${crypto.randomUUID()}-${safeName}.${ext}`;
 
-  if (process.env.NODE_ENV === "development" && (!url || !anonKey)) {
+  if (process.env.NODE_ENV === "development" && (!url || (!anonKey && !serviceKey))) {
     return {
       provider: "development-mock",
       publicUrl: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
@@ -46,14 +92,18 @@ export async function storeProfileMedia(input: {
     };
   }
 
-  if (!url || !anonKey) {
+  if (!url || (!anonKey && !serviceKey)) {
     throw new ProfileMediaConfigurationError(
       "Supabase Storage belum dikonfigurasi. Hubungi administrator."
     );
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.storage.from(bucket).upload(key, input.bytes, {
+  const client = await getStorageClient();
+  if (!client) {
+    throw new ProfileMediaConfigurationError("Gagal menginisialisasi client Supabase Storage.");
+  }
+
+  const { error } = await client.storage.from(bucket).upload(key, input.bytes, {
     contentType: input.contentType,
     cacheControl: "31536000",
     upsert: true,
@@ -63,7 +113,14 @@ export async function storeProfileMedia(input: {
     throw new Error(`Supabase Storage upload failed: ${error.message}`);
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(key);
+  const { data } = client.storage.from(bucket).getPublicUrl(key);
+
+  // If there was a previous media URL from our bucket, clean it up immediately to avoid bloat
+  if (input.previousUrl) {
+    void deleteProfileMedia(input.previousUrl).catch((err) => {
+      console.warn("[profile-storage] Cleanup of previous media failed:", err);
+    });
+  }
 
   return {
     provider: "supabase-storage",
@@ -72,3 +129,4 @@ export async function storeProfileMedia(input: {
     status: "stored",
   };
 }
+

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -22,11 +23,13 @@ import {
     GraduationCap,
     MapPin,
     Pencil,
+    Trash2,
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
   "open-to-work": "Aktif mencari pekerjaan.",
@@ -142,18 +145,46 @@ export default function ProfilePage() {
     portfolio: source?.portfolio ?? [],
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [cropModal, setCropModal] = useState<{
+    open: boolean;
+    imageSrc: string | null;
+    type: "avatar" | "banner";
+    fileName: string;
+  }>({
+    open: false,
+    imageSrc: null,
+    type: "avatar",
+    fileName: "",
+  });
+
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner") => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Ukuran foto profil maksimal 5MB");
+    const maxBytes = type === "banner" ? 8 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(`Ukuran ${type === "banner" ? "banner maksimal 8MB" : "foto profil maksimal 5MB"}`);
       return;
     }
-    const toastId = toast.loading("Mengunggah foto profil...");
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({
+        open: true,
+        imageSrc: reader.result as string,
+        type,
+        fileName: file.name,
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const isAvatar = cropModal.type === "avatar";
+    const toastId = toast.loading(`Mengunggah foto ${isAvatar ? "profil" : "sampul"}...`);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", "avatar");
+      formData.append("file", croppedBlob, cropModal.fileName || `${cropModal.type}.webp`);
+      formData.append("type", cropModal.type);
 
       const res = await fetch("/api/profile/media", {
         method: "POST",
@@ -162,7 +193,7 @@ export default function ProfilePage() {
 
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) {
-        throw new Error(data.error ?? "Gagal mengunggah foto profil.");
+        throw new Error(data.error ?? `Gagal mengunggah foto ${isAvatar ? "profil" : "sampul"}.`);
       }
 
       const base = cvProfile || {
@@ -178,39 +209,26 @@ export default function ProfilePage() {
         careerStatus: "open-to-work" as CareerStatus,
         updatedAt: new Date().toISOString(),
       };
+
       await saveCvProfile({
         ...base,
-        avatarUrl: data.url,
+        ...(isAvatar ? { avatarUrl: data.url } : { bannerUrl: data.url }),
       });
-      toast.success("Foto profil berhasil diperbarui!", { id: toastId });
+
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil diperbarui!`, { id: toastId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah foto profil", { id: toastId });
-    } finally {
-      e.target.value = "";
+      toast.error(err instanceof Error ? err.message : `Gagal mengunggah ${isAvatar ? "foto profil" : "sampul"}`, { id: toastId });
     }
   };
 
-  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Ukuran banner maksimal 8MB");
-      return;
-    }
-    const toastId = toast.loading("Mengunggah foto banner...");
+  const handleRemoveMedia = async (type: "avatar" | "banner") => {
+    const isAvatar = type === "avatar";
+    const toastId = toast.loading(`Menghapus foto ${isAvatar ? "profil" : "sampul"}...`);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", "banner");
-
-      const res = await fetch("/api/profile/media", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        throw new Error(data.error ?? "Gagal mengunggah banner.");
+      const res = await fetch(`/api/profile/media?type=${type}`, { method: "DELETE" });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}.`);
       }
 
       const base = cvProfile || {
@@ -226,15 +244,15 @@ export default function ProfilePage() {
         careerStatus: "open-to-work" as CareerStatus,
         updatedAt: new Date().toISOString(),
       };
+
       await saveCvProfile({
         ...base,
-        bannerUrl: data.url,
+        ...(isAvatar ? { avatarUrl: "" } : { bannerUrl: "" }),
       });
-      toast.success("Foto sampul profil berhasil diperbarui!", { id: toastId });
+
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil dihapus!`, { id: toastId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah banner", { id: toastId });
-    } finally {
-      e.target.value = "";
+      toast.error(err instanceof Error ? err.message : `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}`, { id: toastId });
     }
   };
 
@@ -302,21 +320,34 @@ export default function ProfilePage() {
                 ) : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
                 
-                {/* Button Ubah Foto Sampul */}
-                <label className="cursor-pointer absolute top-4 right-4 flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-black/60 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm">
-                  <Camera className="size-3.5" />
-                  <span>Ubah Foto Sampul</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleBannerUpload}
-                  />
-                </label>
+                {/* Buttons Ubah & Hapus Foto Sampul */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <label className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-black/60 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm">
+                    <Camera className="size-3.5" />
+                    <span>Ubah Foto Sampul</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => onSelectFile(e, "banner")}
+                    />
+                  </label>
+                  {p.bannerUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMedia("banner")}
+                      title="Hapus Foto Sampul"
+                      className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-red-600/80 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span className="hidden sm:inline">Hapus</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="px-6 pb-6">
-                {/* Avatar with Camera badge */}
+                {/* Avatar with Camera & Remove badges */}
                 <div className="-mt-16 sm:-mt-20 relative inline-block">
                   <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-3xl border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
                     {p.avatarUrl ? (
@@ -332,19 +363,31 @@ export default function ProfilePage() {
                     <span className="absolute text-3xl font-bold text-[#7C3AED] -z-10">{initials}</span>
                   </div>
 
-                  {/* Camera icon button to upload/edit avatar */}
-                  <label
-                    title="Ubah Foto Profil"
-                    className="cursor-pointer absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform hover:scale-105"
-                  >
-                    <Camera className="size-4" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleAvatarUpload}
-                    />
-                  </label>
+                  {/* Camera & Trash buttons for avatar */}
+                  <div className="absolute -bottom-1 -right-2 flex items-center gap-1">
+                    <label
+                      title="Ubah Foto Profil"
+                      className="cursor-pointer flex size-8 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform hover:scale-105"
+                    >
+                      <Camera className="size-4" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => onSelectFile(e, "avatar")}
+                      />
+                    </label>
+                    {p.avatarUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia("avatar")}
+                        title="Hapus Foto Profil"
+                        className="cursor-pointer flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md border-2 border-white transition-transform hover:scale-105"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/* Name + headline + location + status */}
@@ -640,6 +683,22 @@ export default function ProfilePage() {
         cvProfile={cvProfile}
         onApply={handleApplySummary}
       />
+
+      <ImageCropDialog
+        open={cropModal.open}
+        onOpenChange={(open) => setCropModal((prev) => ({ ...prev, open }))}
+        imageSrc={cropModal.imageSrc}
+        aspectRatio={cropModal.type === "avatar" ? 1 : 3}
+        cropShape={cropModal.type === "avatar" ? "round" : "rect"}
+        title={cropModal.type === "avatar" ? "Sesuaikan Foto Profil" : "Sesuaikan Foto Sampul"}
+        description={
+          cropModal.type === "avatar"
+            ? "Geser dan perbesar untuk mengatur foto profil Anda."
+            : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
+        }
+        onCropComplete={handleCropComplete}
+      />
     </ProtectedRoute>
   );
 }
+

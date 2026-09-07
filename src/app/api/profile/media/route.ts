@@ -7,6 +7,7 @@ import { enforceRateLimit } from "@/lib/api/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
 import {
   ProfileMediaConfigurationError,
+  deleteProfileMedia,
   storeProfileMedia,
   validateProfileImage,
 } from "@/lib/profile/storage";
@@ -64,12 +65,51 @@ export async function POST(request: Request) {
       );
     }
 
+    // Retrieve previous URL to auto-delete the previous file from storage on replace
+    let previousUrl: string | null = null;
+    if (mediaType === "avatar") {
+      const [existing] = await current.db
+        .select({ avatarUrl: schema.profiles.avatarUrl })
+        .from(schema.profiles)
+        .where(eq(schema.profiles.userId, current.user.id))
+        .limit(1);
+      previousUrl = existing?.avatarUrl ?? null;
+    } else {
+      const [candidateProfile] = await current.db
+        .select({ id: schema.candidateProfiles.id })
+        .from(schema.candidateProfiles)
+        .where(eq(schema.candidateProfiles.userId, current.user.id))
+        .limit(1);
+
+      if (candidateProfile) {
+        const [existingSection] = await current.db
+          .select({ content: schema.candidateProfileSections.content })
+          .from(schema.candidateProfileSections)
+          .where(
+            and(
+              eq(
+                schema.candidateProfileSections.candidateProfileId,
+                candidateProfile.id
+              ),
+              eq(schema.candidateProfileSections.type, "preferences")
+            )
+          )
+          .limit(1);
+
+        const content = existingSection?.content as Record<string, unknown> | null;
+        if (typeof content?.bannerUrl === "string") {
+          previousUrl = content.bannerUrl;
+        }
+      }
+    }
+
     const storageResult = await storeProfileMedia({
       userId: current.user.id,
       fileName: rawFile.name,
       bytes,
       type: mediaType,
       contentType: validation.mime,
+      previousUrl,
     });
 
     const now = new Date();
@@ -168,3 +208,112 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const current = await getCurrentAppUser();
+    if ("error" in current) {
+      return NextResponse.json({ error: current.error }, { status: current.status });
+    }
+
+    const rate = enforceRateLimit(`profile-media-delete:${current.user.id}`, 20, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Terlalu banyak permintaan. Coba lagi sebentar." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+      );
+    }
+
+    const url = new URL(request.url);
+    const mediaType = url.searchParams.get("type") === "banner" ? "banner" : "avatar";
+    const now = new Date();
+
+    if (mediaType === "avatar") {
+      const [existing] = await current.db
+        .select({ avatarUrl: schema.profiles.avatarUrl })
+        .from(schema.profiles)
+        .where(eq(schema.profiles.userId, current.user.id))
+        .limit(1);
+
+      if (existing?.avatarUrl) {
+        await deleteProfileMedia(existing.avatarUrl);
+      }
+
+      await current.db
+        .update(schema.profiles)
+        .set({ avatarUrl: null, updatedAt: now })
+        .where(eq(schema.profiles.userId, current.user.id));
+
+      await writeAuditLog({
+        db: current.db,
+        actorUserId: current.user.id,
+        action: "profile.avatar.deleted",
+        entityType: "profile",
+        entityId: current.user.id,
+      });
+
+      return NextResponse.json({ ok: true, type: "avatar" });
+    } else {
+      // mediaType === "banner"
+      const [candidateProfile] = await current.db
+        .select({ id: schema.candidateProfiles.id })
+        .from(schema.candidateProfiles)
+        .where(eq(schema.candidateProfiles.userId, current.user.id))
+        .limit(1);
+
+      if (candidateProfile) {
+        const [existingSection] = await current.db
+          .select({ content: schema.candidateProfileSections.content })
+          .from(schema.candidateProfileSections)
+          .where(
+            and(
+              eq(
+                schema.candidateProfileSections.candidateProfileId,
+                candidateProfile.id
+              ),
+              eq(schema.candidateProfileSections.type, "preferences")
+            )
+          )
+          .limit(1);
+
+        const content = (existingSection?.content as Record<string, unknown> | null) ?? {};
+        if (typeof content.bannerUrl === "string") {
+          await deleteProfileMedia(content.bannerUrl);
+        }
+
+        const newContent = { ...content };
+        delete newContent.bannerUrl;
+
+        await current.db
+          .update(schema.candidateProfileSections)
+          .set({ content: newContent, updatedAt: now })
+          .where(
+            and(
+              eq(
+                schema.candidateProfileSections.candidateProfileId,
+                candidateProfile.id
+              ),
+              eq(schema.candidateProfileSections.type, "preferences")
+            )
+          );
+
+        await writeAuditLog({
+          db: current.db,
+          actorUserId: current.user.id,
+          action: "profile.banner.deleted",
+          entityType: "candidate_profile",
+          entityId: candidateProfile.id,
+        });
+      }
+
+      return NextResponse.json({ ok: true, type: "banner" });
+    }
+  } catch (error) {
+    console.error("Gagal menghapus media profil:", error);
+    return NextResponse.json(
+      { error: "Gagal menghapus media profil saat ini." },
+      { status: 500 }
+    );
+  }
+}
+

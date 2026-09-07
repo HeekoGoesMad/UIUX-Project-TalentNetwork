@@ -7,6 +7,7 @@ import {
   detectImageMime,
   validateProfileImage,
   sanitizeMediaName,
+  extractStorageKey,
 } from "../../src/lib/profile/validation.ts";
 
 test("profile media validation", async (t) => {
@@ -73,4 +74,33 @@ test("profile media validation", async (t) => {
     assert.equal(sanitizeMediaName("C:\\fakepath\\my-photo.jpg"), "my-photo.jpg");
     assert.equal(sanitizeMediaName(""), "media");
   });
+
+  await t.test("extracts storage key correctly and safely", () => {
+    const fullUrl =
+      "https://example.supabase.co/storage/v1/object/public/profile-media/avatars/user-123/uuid-photo.webp";
+    assert.equal(extractStorageKey(fullUrl), "avatars/user-123/uuid-photo.webp");
+
+    const queryUrl =
+      "https://example.supabase.co/storage/v1/object/public/profile-media/banners/user-123/banner.jpg?t=123456";
+    assert.equal(extractStorageKey(queryUrl), "banners/user-123/banner.jpg");
+
+    const bucketPath = "profile-media/avatars/user-123/uuid-photo.webp";
+    assert.equal(extractStorageKey(bucketPath), "avatars/user-123/uuid-photo.webp");
+
+    const relativePath = "avatars/user-123/uuid-photo.webp";
+    assert.equal(extractStorageKey(relativePath), "avatars/user-123/uuid-photo.webp");
+
+    // Non-supabase or external URLs should safely return null
+    assert.equal(
+      extractStorageKey(
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400"
+      ),
+      null
+    );
+    assert.equal(extractStorageKey("development-mock/avatars/test.jpg"), null);
+    assert.equal(extractStorageKey(""), null);
+    assert.equal(extractStorageKey(null), null);
+    assert.equal(extractStorageKey(undefined), null);
+  });
 });
+

@@ -47,7 +47,7 @@ export default function RecruiterPendingPage() {
 
           if (next === "active") {
             toast.success("Akun Anda telah disetujui! Membuka Dashboard...");
-            window.location.href = "/dashboard";
+            router.push("/dashboard");
             return;
           }
           if (showToasts) {
@@ -88,7 +88,7 @@ export default function RecruiterPendingPage() {
             if (next === "active") {
               setLocalStatus("active");
               setProvisioningStatus("active", null);
-              window.location.href = "/dashboard";
+              router.push("/dashboard");
               return;
             }
             if (next !== localStatus) {
@@ -129,7 +129,7 @@ export default function RecruiterPendingPage() {
       window.removeEventListener("storage", handleStorage);
       clearInterval(interval);
     };
-  }, [localStatus, setProvisioningStatus]);
+  }, [localStatus, setProvisioningStatus, router]);
 
   const handleGoToDashboard = async () => {
     setRedirecting(true);

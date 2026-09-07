@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { CvDownload } from "./cv-download";
 import { ProfessionalSummaryModal } from "./professional-summary-modal";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 function blank(email = "", fullName = ""): CvProfile {
  return {
@@ -179,6 +181,80 @@ export function CvWorkspace() {
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [cropModal, setCropModal] = useState<{
+    open: boolean;
+    imageSrc: string | null;
+    type: "avatar" | "banner";
+    fileName: string;
+  }>({
+    open: false,
+    imageSrc: null,
+    type: "avatar",
+    fileName: "",
+  });
+
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxBytes = type === "banner" ? 8 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(`Ukuran ${type === "banner" ? "banner maksimal 8MB" : "foto profil maksimal 5MB"}`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({
+        open: true,
+        imageSrc: reader.result as string,
+        type,
+        fileName: file.name,
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const isAvatar = cropModal.type === "avatar";
+    const toastId = toast.loading(`Mengunggah foto ${isAvatar ? "profil" : "sampul"}...`);
+    try {
+      const formData = new FormData();
+      formData.append("file", croppedBlob, cropModal.fileName || `${cropModal.type}.webp`);
+      formData.append("type", cropModal.type);
+
+      const res = await fetch("/api/profile/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? `Gagal mengunggah foto ${isAvatar ? "profil" : "sampul"}.`);
+      }
+
+      update(isAvatar ? "avatarUrl" : "bannerUrl", data.url);
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil diperbarui!`, { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Gagal mengunggah ${isAvatar ? "foto profil" : "sampul"}`, { id: toastId });
+    }
+  };
+
+  const handleRemoveMedia = async (type: "avatar" | "banner") => {
+    const isAvatar = type === "avatar";
+    const toastId = toast.loading(`Menghapus foto ${isAvatar ? "profil" : "sampul"}...`);
+    try {
+      const res = await fetch(`/api/profile/media?type=${type}`, { method: "DELETE" });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}.`);
+      }
+
+      update(isAvatar ? "avatarUrl" : "bannerUrl", "");
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil dihapus!`, { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}`, { id: toastId });
+    }
+  };
 
   useEffect(() => {
     if (!cvProfile) return;
@@ -423,38 +499,28 @@ export function CvWorkspace() {
                       <User className="size-8 text-slate-400" />
                     )}
                   </div>
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                    <Camera className="size-3.5 text-[#7C3AED]" />
-                    <span>Upload Foto Profil</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast.error("Ukuran foto profil maksimal 5MB");
-                          return;
-                        }
-                        const toastId = toast.loading("Mengunggah foto profil...");
-                        try {
-                          const formData = new FormData();
-                          formData.append("file", file);
-                          formData.append("type", "avatar");
-                          const res = await fetch("/api/profile/media", { method: "POST", body: formData });
-                          const data = (await res.json()) as { url?: string; error?: string };
-                          if (!res.ok || !data.url) throw new Error(data.error ?? "Gagal mengunggah foto profil.");
-                          update("avatarUrl", data.url);
-                          toast.success("Foto profil berhasil diunggah!", { id: toastId });
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Gagal mengunggah foto profil", { id: toastId });
-                        } finally {
-                          e.target.value = "";
-                        }
-                      }}
-                    />
-                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
+                      <Camera className="size-3.5 text-[#7C3AED]" />
+                      <span>Upload Foto Profil</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => onSelectFile(e, "avatar")}
+                      />
+                    </label>
+                    {profile.avatarUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia("avatar")}
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors shadow-2xs"
+                      >
+                        <Trash2 className="size-3.5 text-red-500" />
+                        <span>Hapus</span>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -466,38 +532,28 @@ export function CvWorkspace() {
                       <img src={profile.bannerUrl} alt="Foto Sampul" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                    <Camera className="size-3.5 text-[#7C3AED]" />
-                    <span>Upload Sampul</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 8 * 1024 * 1024) {
-                          toast.error("Ukuran banner maksimal 8MB");
-                          return;
-                        }
-                        const toastId = toast.loading("Mengunggah foto banner...");
-                        try {
-                          const formData = new FormData();
-                          formData.append("file", file);
-                          formData.append("type", "banner");
-                          const res = await fetch("/api/profile/media", { method: "POST", body: formData });
-                          const data = (await res.json()) as { url?: string; error?: string };
-                          if (!res.ok || !data.url) throw new Error(data.error ?? "Gagal mengunggah banner.");
-                          update("bannerUrl", data.url);
-                          toast.success("Foto banner berhasil diunggah!", { id: toastId });
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Gagal mengunggah banner", { id: toastId });
-                        } finally {
-                          e.target.value = "";
-                        }
-                      }}
-                    />
-                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
+                      <Camera className="size-3.5 text-[#7C3AED]" />
+                      <span>Upload Sampul</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => onSelectFile(e, "banner")}
+                      />
+                    </label>
+                    {profile.bannerUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia("banner")}
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors shadow-2xs"
+                      >
+                        <Trash2 className="size-3.5 text-red-500" />
+                        <span>Hapus</span>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -987,6 +1043,21 @@ export function CvWorkspace() {
             });
           }
         }}
+      />
+
+      <ImageCropDialog
+        open={cropModal.open}
+        onOpenChange={(open) => setCropModal((prev) => ({ ...prev, open }))}
+        imageSrc={cropModal.imageSrc}
+        aspectRatio={cropModal.type === "avatar" ? 1 : 3}
+        cropShape={cropModal.type === "avatar" ? "round" : "rect"}
+        title={cropModal.type === "avatar" ? "Sesuaikan Foto Profil" : "Sesuaikan Foto Sampul"}
+        description={
+          cropModal.type === "avatar"
+            ? "Geser dan perbesar untuk mengatur foto profil Anda."
+            : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
+        }
+        onCropComplete={handleCropComplete}
       />
     </div>
   );
