@@ -583,6 +583,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrapUserKey.current = null;
     setUser(null);
     localStorage.removeItem(sessionKey);
+    try {
+      localStorage.removeItem("proofylink-a11y-prefs");
+      if (typeof document !== "undefined") {
+        const root = document.documentElement;
+        root.removeAttribute("data-text-scale");
+        root.removeAttribute("data-high-contrast");
+        root.removeAttribute("data-reduce-motion");
+        root.removeAttribute("data-enhanced-focus");
+        root.removeAttribute("data-relaxed-spacing");
+      }
+    } catch {}
   };
 
   const scan = (id: string) => {

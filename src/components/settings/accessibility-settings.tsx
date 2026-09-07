@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { useApp } from "@/providers/app-provider";
+
 export type AccessibilityPreferences = {
   textScale: "normal" | "large" | "xlarge";
   highContrast: boolean;
@@ -28,14 +30,21 @@ const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   relaxedSpacing: false,
 };
 
-const STORAGE_KEY = "proofylink-a11y-prefs";
+function getUserStorageKey(email?: string | null) {
+  if (!email) return null;
+  return `proofylink-a11y-prefs:${email.trim().toLowerCase()}`;
+}
 
 export function applyAccessibilityToDOM(prefs: AccessibilityPreferences) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
 
   // Text Scale
-  root.setAttribute("data-text-scale", prefs.textScale);
+  if (prefs.textScale === "normal") {
+    root.removeAttribute("data-text-scale");
+  } else {
+    root.setAttribute("data-text-scale", prefs.textScale);
+  }
 
   // High Contrast
   if (prefs.highContrast) {
@@ -67,16 +76,39 @@ export function applyAccessibilityToDOM(prefs: AccessibilityPreferences) {
 }
 
 export function AccessibilityInitializer() {
+  const { user, hydrated } = useApp();
+
   useEffect(() => {
-    // 1. Initial application from local storage
+    // Purge legacy un-namespaced key so it doesn't pollute any account
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        applyAccessibilityToDOM({ ...DEFAULT_PREFERENCES, ...JSON.parse(stored) });
-      }
+      localStorage.removeItem("proofylink-a11y-prefs");
     } catch {}
 
-    // 2. Fetch from user metadata if authenticated
+    if (!hydrated) return;
+
+    if (!user || !user.email) {
+      // Guest or logged out: always apply default preferences
+      applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+      return;
+    }
+
+    const userKey = getUserStorageKey(user.email);
+    if (!userKey) return;
+
+    // 1. Initial application from this specific user's local storage
+    try {
+      const stored = localStorage.getItem(userKey);
+      if (stored) {
+        applyAccessibilityToDOM({ ...DEFAULT_PREFERENCES, ...JSON.parse(stored) });
+      } else {
+        // If this user has no local preferences, enforce default
+        applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+      }
+    } catch {
+      applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+    }
+
+    // 2. Fetch from user metadata in Supabase
     fetch("/api/user/accessibility")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -84,31 +116,42 @@ export function AccessibilityInitializer() {
           const serverPrefs = { ...DEFAULT_PREFERENCES, ...data.preferences };
           applyAccessibilityToDOM(serverPrefs);
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(serverPrefs));
+            localStorage.setItem(userKey, JSON.stringify(serverPrefs));
+          } catch {}
+        } else if (data && data.preferences === null) {
+          // If this account hasn't configured accessibility, strictly enforce default
+          applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+          try {
+            localStorage.removeItem(userKey);
           } catch {}
         }
       })
       .catch(() => {});
 
-    // 3. Listen to local custom events for instant updates
+    // 3. Listen to local custom events for instant updates within the same user session
     const handleSync = (e: Event) => {
-      const customEvent = e as CustomEvent<AccessibilityPreferences>;
-      if (customEvent.detail) {
-        applyAccessibilityToDOM(customEvent.detail);
+      const customEvent = e as CustomEvent<{ email?: string; prefs: AccessibilityPreferences }>;
+      if (customEvent.detail?.prefs) {
+        if (!customEvent.detail.email || customEvent.detail.email.toLowerCase() === user.email.toLowerCase()) {
+          applyAccessibilityToDOM(customEvent.detail.prefs);
+        }
       }
     };
     window.addEventListener("proofylink-a11y-changed", handleSync);
     return () => window.removeEventListener("proofylink-a11y-changed", handleSync);
-  }, []);
+  }, [user, hydrated]);
 
   return null;
 }
 
 export function AccessibilitySettings() {
+  const { user } = useApp();
+  const userKey = getUserStorageKey(user?.email);
+
   const [prefs, setPrefs] = useState<AccessibilityPreferences>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+    if (typeof window === "undefined" || !userKey) return DEFAULT_PREFERENCES;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(userKey);
       if (stored) {
         return { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) };
       }
@@ -118,22 +161,39 @@ export function AccessibilitySettings() {
     return DEFAULT_PREFERENCES;
   });
 
-  // Sync from server on mount
+  // Sync with server when user changes or on mount
   useEffect(() => {
+    if (!userKey) {
+      applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+      return;
+    }
+
+    let active = true;
     fetch("/api/user/accessibility")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        if (!active) return;
         if (data?.preferences) {
           const merged = { ...DEFAULT_PREFERENCES, ...data.preferences };
           setPrefs(merged);
           applyAccessibilityToDOM(merged);
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+            localStorage.setItem(userKey, JSON.stringify(merged));
+          } catch {}
+        } else if (data && data.preferences === null) {
+          setPrefs(DEFAULT_PREFERENCES);
+          applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+          try {
+            localStorage.removeItem(userKey);
           } catch {}
         }
       })
       .catch(() => {});
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [userKey]);
 
   useEffect(() => {
     applyAccessibilityToDOM(prefs);
@@ -147,11 +207,17 @@ export function AccessibilitySettings() {
     setPrefs(updated);
     applyAccessibilityToDOM(updated);
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent("proofylink-a11y-changed", { detail: updated }));
-    } catch {
-      // ignore
+    if (userKey) {
+      try {
+        localStorage.setItem(userKey, JSON.stringify(updated));
+        window.dispatchEvent(
+          new CustomEvent("proofylink-a11y-changed", {
+            detail: { email: user?.email, prefs: updated },
+          })
+        );
+      } catch {
+        // ignore
+      }
     }
 
     // Persist to server (user_metadata)
@@ -168,11 +234,17 @@ export function AccessibilitySettings() {
     setPrefs(DEFAULT_PREFERENCES);
     applyAccessibilityToDOM(DEFAULT_PREFERENCES);
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PREFERENCES));
-      window.dispatchEvent(new CustomEvent("proofylink-a11y-changed", { detail: DEFAULT_PREFERENCES }));
-    } catch {
-      // ignore
+    if (userKey) {
+      try {
+        localStorage.removeItem(userKey);
+        window.dispatchEvent(
+          new CustomEvent("proofylink-a11y-changed", {
+            detail: { email: user?.email, prefs: DEFAULT_PREFERENCES },
+          })
+        );
+      } catch {
+        // ignore
+      }
     }
 
     // Persist reset to server
