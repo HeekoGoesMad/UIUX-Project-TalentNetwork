@@ -8,7 +8,7 @@ const querySchema = z.object({
   q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(24),
-  sort: z.enum(["relevance", "name", "experience"]).optional(),
+  sort: z.enum(["relevance", "name"]).optional(),
   locations: z.array(z.string().min(1)).optional(),
 });
 
