@@ -100,31 +100,36 @@ export async function GET() {
       where: eq(schema.profiles.userId, user.id),
     });
 
-    const membership = await db.query.organizationMembers.findFirst({
-      where: eq(schema.organizationMembers.userId, user.id),
-      with: {
-        organization: true,
-      },
-    });
+    const [membership] = await db
+      .select()
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, user.id))
+      .limit(1);
 
-    const org = membership?.organization;
+    const [org] = membership?.organizationId
+      ? await db
+          .select()
+          .from(schema.organizations)
+          .where(eq(schema.organizations.id, membership.organizationId))
+          .limit(1)
+      : [null];
 
     return NextResponse.json({
       data: {
-        picName: profile?.displayName || user.name || "Budi Santoso",
+        picName: profile?.displayName || user.email.split("@")[0] || "Budi Santoso",
         picEmail: user.email || "budi@perusahaan.com",
         picTitle: "Head of Talent Acquisition",
         picPhone: profile?.phone || "0812-9876-5432",
-        companyName: org?.name || user.companyName || "PT Berkah Sinarindo",
+        companyName: org?.name || "PT Berkah Sinarindo",
         industry: org?.industry || "Technology",
-        companySize: org?.scale || "51-200 Karyawan",
+        companySize: org?.companyScale || "51-200 Karyawan",
         description: org?.description || "Perusahaan penyedia teknologi analitik data dan platform kecerdasan talenta digital.",
         websiteUrl: org?.website || "https://berkahsinarindo.co.id",
         linkedinUrl: "https://linkedin.com/company/berkah-sinarindo",
-        officeAddress: org?.address || "Gedung Cyber 2 Lt. 18, Jl. HR Rasuna Said Blok X-5",
+        officeAddress: org?.officeAddress || "Gedung Cyber 2 Lt. 18, Jl. HR Rasuna Said Blok X-5",
         city: org?.city || "Jakarta Selatan, DKI Jakarta",
-        nibNumber: org?.nibNumber || "9120001234567",
-        npwpNumber: org?.npwpNumber || "01.234.567.8-012.000",
+        nibNumber: org?.nib || "9120001234567",
+        npwpNumber: org?.npwp || "01.234.567.8-012.000",
         verificationStatus: org?.verificationStatus || "approved",
       },
       isDemo: false,
@@ -132,11 +137,11 @@ export async function GET() {
   } catch {
     return NextResponse.json({
       data: {
-        picName: user.name || "Budi Santoso",
+        picName: "Budi Santoso",
         picEmail: user.email,
         picTitle: "Head of Talent Acquisition",
         picPhone: "0812-9876-5432",
-        companyName: user.companyName || "PT Berkah Sinarindo",
+        companyName: "PT Berkah Sinarindo",
         industry: "Technology",
         companySize: "51-200 Karyawan",
         description: "Perusahaan penyedia teknologi analitik data dan platform kecerdasan talenta digital.",
@@ -198,10 +203,11 @@ export async function PATCH(request: Request) {
           },
         });
 
-      // 2. Update organization
-      const membership = await tx.query.organizationMembers.findFirst({
-        where: eq(schema.organizationMembers.userId, user.id),
-      });
+      const [membership] = await tx
+        .select()
+        .from(schema.organizationMembers)
+        .where(eq(schema.organizationMembers.userId, user.id))
+        .limit(1);
 
       if (membership?.organizationId) {
         await tx
@@ -209,13 +215,13 @@ export async function PATCH(request: Request) {
           .set({
             name: data.companyName,
             industry: normalizeIndustry(data.industry),
-            scale: normalizeCompanyScale(data.companySize),
+            companyScale: normalizeCompanyScale(data.companySize),
             description: data.description || null,
             website: data.websiteUrl || null,
             city: data.city || null,
-            address: data.officeAddress || null,
-            nibNumber: data.nibNumber || null,
-            npwpNumber: data.npwpNumber || null,
+            officeAddress: data.officeAddress || null,
+            nib: data.nibNumber || null,
+            npwp: data.npwpNumber || null,
             updatedAt: new Date(),
           })
           .where(eq(schema.organizations.id, membership.organizationId));

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   FileCheck,
+  Loader2,
   Lock,
   Save,
   ShieldCheck,
@@ -40,6 +41,7 @@ const COMPANY_SIZE_OPTIONS = [
 export function RecruiterSettingsView() {
   const [activeTab, setActiveTab] = useState<"profile" | "accessibility" | "security">("profile");
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -101,6 +103,14 @@ export function RecruiterSettingsView() {
     "h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
   const textareaClass =
     "min-h-24 w-full resize-none rounded-lg border border-input bg-transparent p-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
+
+  if (loading) {
+    return (
+      <div className="container mx-auto flex max-w-5xl items-center justify-center px-4 py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:py-10">
