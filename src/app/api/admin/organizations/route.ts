@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 
 export async function GET() {
   try {
@@ -35,8 +36,8 @@ export async function GET() {
     }, []);
 
     return NextResponse.json({ organizations: grouped, supportedSettings: ["billingOwnerId", "spendLimit"] });
-  } catch {
-    return NextResponse.json({ error: "Organisasi belum tersedia." }, { status: 503 });
+  } catch (error) {
+    return apiError("Organisasi belum tersedia.", 503, error);
   }
 }
 
@@ -89,8 +90,8 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ organization, billing: account });
-  } catch {
-    return NextResponse.json({ error: "Pengaturan organisasi gagal diperbarui." }, { status: 503 });
+  } catch (error) {
+    return apiError("Pengaturan organisasi gagal diperbarui.", 503, error);
   }
 }
 

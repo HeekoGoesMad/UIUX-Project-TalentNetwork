@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 import { writeAuditLog } from "@/lib/audit";
 
 const bodySchema = z
@@ -206,6 +207,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, deleted: deletedUser });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Gagal menghapus rekruter." }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : "Gagal menghapus rekruter.", 500, err);
   }
 }

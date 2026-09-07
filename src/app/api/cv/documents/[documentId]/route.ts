@@ -6,6 +6,7 @@ import { getCurrentAppUser } from "@/lib/api/auth";
 import { ownedCvDocument, uuidSchema } from "@/lib/cv/api";
 import { writeAuditLog } from "@/lib/audit";
 import { getDemoDocuments } from "@/lib/cv/demo";
+import { createCvDownloadUrl } from "@/lib/cv/storage";
 import { isDevBypassEnabled } from "@/lib/config/server";
 
 const patchSchema = z.object({ originalFileName: z.string().trim().min(1).max(255).optional(), status: z.enum(["uploaded", "review", "approved", "rejected", "deleted"]).optional() }).strict();
@@ -23,7 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ doc
     if (current.user.role !== "candidate") return NextResponse.json({ error: "Akses kandidat diperlukan." }, { status: 403 });
     const document = await ownedCvDocument(current.db, documentId, current.user.id);
     if (!document) return NextResponse.json({ error: "Dokumen CV tidak ditemukan." }, { status: 404 });
-    return NextResponse.json({ document, review: { status: document.status, reviewerId: null, reviewedAt: null, notes: null }, limitations: ["Reviewer assignment, review notes, and document approval timestamp are not modeled in the existing schema."] });
+    const downloadUrl = await createCvDownloadUrl(document.storagePath);
+    return NextResponse.json({ document, downloadUrl, review: { status: document.status, reviewerId: null, reviewedAt: null, notes: null }, limitations: ["Reviewer assignment, review notes, and document approval timestamp are not modeled in the existing schema."] });
   } catch (error) { console.error("CV document detail failed", error); return NextResponse.json({ error: "Dokumen CV belum dapat dimuat." }, { status: 503 }); }
 }
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import { CONSENT_STATE_BY_DB_STATUS } from "@/types";
 import type { AppUser } from "@/lib/api/auth";
 
@@ -252,6 +253,15 @@ export class ConsentService {
         title: "Respons consent diterima",
         body: `Candidate ${params.decision === "approved" ? "menyetujui" : "menolak"} permintaan consent Anda.`,
         data: { consentRequestItemId: updated.id, status: updated.status },
+      });
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: params.candidateUserId,
+        action: "consent.responded",
+        entityType: "consent_request_item",
+        entityId: updated.id,
+        metadata: { decision: params.decision, status: updated.status },
       });
 
       return { itemId: updated.id, consentStatus: updated.status };

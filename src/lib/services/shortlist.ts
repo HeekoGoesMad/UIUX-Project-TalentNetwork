@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 
 export const DEFAULT_SHORTLIST_NAME = "Kandidat Baru";
 
@@ -177,7 +178,18 @@ export class ShortlistService {
           notes: schema.shortlistItems.notes,
         });
 
-      if (inserted) return { item: inserted };
+      if (inserted) {
+        await writeAuditLog({
+          db: tx,
+          actorUserId: params.createdBy,
+          organizationId: params.organizationId,
+          action: "shortlist.item.added",
+          entityType: "shortlist_item",
+          entityId: inserted.id,
+          metadata: { shortlistId: shortlist.id, candidateProfileId: params.candidateProfileId },
+        });
+        return { item: inserted };
+      }
 
       const [existing] = await tx
         .select({
@@ -193,6 +205,22 @@ export class ShortlistService {
           )
         )
         .limit(1);
+
+      if (existing) {
+        await writeAuditLog({
+          db: tx,
+          actorUserId: params.createdBy,
+          organizationId: params.organizationId,
+          action: "shortlist.item.added",
+          entityType: "shortlist_item",
+          entityId: existing.id,
+          metadata: {
+            shortlistId: shortlist.id,
+            candidateProfileId: params.candidateProfileId,
+            idempotent: true,
+          },
+        });
+      }
 
       return { item: existing, idempotent: true as const };
     });
@@ -257,6 +285,19 @@ export class ShortlistService {
     }
 
     await db.delete(schema.shortlistItems).where(eq(schema.shortlistItems.id, itemId));
+
+    try {
+      await writeAuditLog({
+        db,
+        organizationId,
+        action: "shortlist.item.removed",
+        entityType: "shortlist_item",
+        entityId: itemId,
+      });
+    } catch (error) {
+      console.error("Shortlist audit log failed", error);
+    }
+
     return { ok: true };
   }
 }

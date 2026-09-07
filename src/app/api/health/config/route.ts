@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getProductionConfig, isHealthTokenValid, validateProductionConfig } from "@/lib/config/server";
+import { apiError } from "@/lib/api/request-error";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const config = getProductionConfig();
   if (config.isProduction && !isHealthTokenValid(request.headers.get("x-healthcheck-token"))) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -19,12 +20,15 @@ export function GET(request: Request) {
       readiness: valid.readiness,
     }, { status: 200, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Production configuration is invalid.";
+    const { errorId } = await apiError(message, 503, error).json();
     return NextResponse.json({
       status: "not_ready",
       environment: "production",
-      error: error instanceof Error ? error.message : "Production configuration is invalid.",
+      error: message,
       readiness: config.readiness,
       flags: config.flags,
+      errorId,
     }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

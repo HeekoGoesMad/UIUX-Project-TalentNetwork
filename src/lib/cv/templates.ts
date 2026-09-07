@@ -12,6 +12,12 @@ export const safeUrl = (url: string): string => {
   return "#";
 };
 
+const safeAvatarUrl = (url: string): string | null => {
+  if (/^data:image\//i.test(url.trim())) return url.trim();
+  const sanitized = safeUrl(url);
+  return /^https:/i.test(sanitized) ? sanitized : null;
+};
+
 const portfolioLink = (u: string): string =>
   `<a href="${escapeHtml(safeUrl(u))}" style="color:inherit;text-decoration:none">${escapeHtml(u)}</a>`;
 
@@ -112,8 +118,9 @@ function renderModernBody(p: CvProfile): string {
       .join("")
   );
 
-  const avatarHtml = p.avatarUrl
-    ? `<img src="${escapeHtml(p.avatarUrl)}" alt="${escapeHtml(p.fullName)}" style="width:105px;height:105px;border-radius:50%;object-fit:cover;display:inline-block;box-shadow:0 2px 8px rgba(0,0,0,0.08);" />`
+  const avatarSrc = p.avatarUrl ? safeAvatarUrl(p.avatarUrl) : null;
+  const avatarHtml = avatarSrc
+    ? `<img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(p.fullName)}" style="width:105px;height:105px;border-radius:50%;object-fit:cover;display:inline-block;box-shadow:0 2px 8px rgba(0,0,0,0.08);" />`
     : `<div style="width:105px;height:105px;border-radius:50%;background:#2B2E3A;color:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;font-size:30px;font-weight:bold;letter-spacing:1px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">${initials}</div>`;
 
   const contactHtml = `

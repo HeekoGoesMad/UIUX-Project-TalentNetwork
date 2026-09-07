@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 import { writeAuditLog } from "@/lib/audit";
 
 const updateCompanySchema = z
@@ -154,7 +155,6 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, company: updatedOrg });
   } catch (error) {
-    console.error("PATCH company error:", error);
-    return NextResponse.json({ error: "Gagal memperbarui data perusahaan." }, { status: 500 });
+    return apiError("Gagal memperbarui data perusahaan.", 500, error);
   }
 }

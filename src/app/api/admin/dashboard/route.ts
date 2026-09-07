@@ -2,6 +2,7 @@ import { desc, eq, sql, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiError } from "@/lib/api/request-error";
 
 export async function GET() {
   try {
@@ -109,7 +110,6 @@ export async function GET() {
       recentActivities,
     });
   } catch (error) {
-    console.error("Dashboard metrics error:", error);
-    return NextResponse.json({ error: "Gagal memuat metrik dashboard." }, { status: 500 });
+    return apiError("Gagal memuat metrik dashboard.", 500, error);
   }
 }
