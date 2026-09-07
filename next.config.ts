@@ -25,11 +25,21 @@ if (isDeploymentProduction) {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  compress: true,
   async headers() {
     return [
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: "/:all*(svg|jpg|jpeg|png|webp|ico|woff|woff2)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
       },
     ];
   },
