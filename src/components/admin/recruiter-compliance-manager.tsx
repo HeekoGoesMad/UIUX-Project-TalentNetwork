@@ -93,7 +93,7 @@ const DEMO_RECRUITERS: RecruiterItem[] = [
       email: "sarah@fintekpratama.com",
       role: "recruiter",
       recruiterProvisioningStatus: "revision_required",
-      recruiterRejectionReason: "Foto KTP PIC buram, mohon unggah ulang foto identitas resmi yang jelas.",
+      recruiterRejectionReason: "Berkas NIB tidak terbaca jelas, mohon unggah ulang dokumen resmi OSS yang jelas.",
       createdAt: new Date(Date.now() - 86400000).toISOString(),
     },
     profile: {
@@ -144,7 +144,7 @@ export function RecruiterComplianceManager() {
 
   // Document Viewer Modal State
   const [viewingDocs, setViewingDocs] = useState<RecruiterItem | null>(null);
-  const [activeDocTab, setActiveDocTab] = useState<"nib" | "npwp" | "ktp">("nib");
+  const [activeDocTab, setActiveDocTab] = useState<"nib" | "npwp">("nib");
 
   // Revision Modal State
   const [revisingItem, setRevisingItem] = useState<RecruiterItem | null>(null);
@@ -683,13 +683,12 @@ export function RecruiterComplianceManager() {
             {[
               { id: "nib", label: "NIB Perusahaan" },
               { id: "npwp", label: "NPWP Badan Usaha" },
-              { id: "ktp", label: "KTP PIC Rekruter" },
             ].map((tab) => (
               <Button
                 key={tab.id}
                 size="sm"
                 variant={activeDocTab === tab.id ? "default" : "ghost"}
-                onClick={() => setActiveDocTab(tab.id as "nib" | "npwp" | "ktp")}
+                onClick={() => setActiveDocTab(tab.id as "nib" | "npwp")}
                 className={`text-xs h-8 rounded-lg ${activeDocTab === tab.id ? "bg-[#7C3AED] text-white" : "text-slate-600"}`}
               >
                 {tab.label}
@@ -732,25 +731,6 @@ export function RecruiterComplianceManager() {
                 <div className="pt-2">
                   <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
                     ✓ Nomor Pokok Wajib Pajak Valid
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {activeDocTab === "ktp" && (
-              <div className="space-y-3 max-w-md">
-                <div className="size-12 rounded-2xl bg-purple-100 text-[#7C3AED] mx-auto flex items-center justify-center">
-                  <User className="size-6" />
-                </div>
-                <h4 className="font-bold text-slate-900 text-sm">Kartu Tanda Penduduk (KTP) PIC</h4>
-                <p className="text-xs text-slate-500 leading-relaxed font-mono">
-                  Nama PIC: {viewingDocs?.profile?.displayName || viewingDocs?.user.email.split("@")[0]}<br />
-                  NIK: 3171************<br />
-                  Status PIC: Perwakilan Resmi (HR/Talent Lead)
-                </p>
-                <div className="pt-2">
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
-                    ✓ Identitas PIC Sesuai Akun
                   </Badge>
                 </div>
               </div>
@@ -827,7 +807,7 @@ export function RecruiterComplianceManager() {
               <textarea
                 value={revisionNotes}
                 onChange={(e) => setRevisionNotes(e.target.value)}
-                placeholder="Contoh: Foto KTP PIC buram, mohon unggah ulang dengan hasil scan/foto yang jelas. Nomor NPWP juga harap disesuaikan dengan kartu..."
+                placeholder="Contoh: Berkas NIB tidak terbaca jelas, mohon unggah ulang dokumen resmi OSS yang jelas. Nomor NPWP juga harap disesuaikan dengan kartu..."
                 rows={4}
                 className="w-full text-xs rounded-xl border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
@@ -837,10 +817,10 @@ export function RecruiterComplianceManager() {
               <div className="flex flex-wrap gap-1">
                 <button
                   type="button"
-                  onClick={() => setRevisionNotes("Foto KTP PIC buram / terpotong. Mohon unggah ulang scan KTP asli yang jelas.")}
+                  onClick={() => setRevisionNotes("Berkas NIB / NPWP buram atau terpotong. Mohon unggah ulang scan dokumen resmi yang jelas.")}
                   className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md"
                 >
-                  KTP Buram
+                  Dokumen Buram
                 </button>
                 <button
                   type="button"

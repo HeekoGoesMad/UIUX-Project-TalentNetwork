@@ -149,11 +149,6 @@ export default function RecruiterPendingPage() {
       status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
       file: "NPWP_Badan.pdf",
     },
-    {
-      name: "Foto KTP PIC Rekruter",
-      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
-      file: "KTP_PIC.jpg",
-    },
   ];
 
   return (
@@ -259,7 +254,7 @@ export default function RecruiterPendingPage() {
                       Catatan &amp; Instruksi dari Tim Compliance:
                     </p>
                     <p className="text-slate-800 leading-relaxed pl-2 font-medium">
-                      {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan foto KTP PIC atau berkas NIB yang diunggah."}
+                      {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan berkas NIB atau NPWP yang diunggah."}
                     </p>
                   </div>
 

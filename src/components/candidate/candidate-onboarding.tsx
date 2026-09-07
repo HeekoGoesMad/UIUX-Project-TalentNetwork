@@ -113,23 +113,35 @@ const requiredByStep: Record<number, TextField[]> = {
   3: ["location", "targetRole"],
 };
 
-const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, email: string): FormState => ({
-  talentCategory: profile?.talentCategory ?? "public",
-  careerStatus: profile?.careerStatus ?? careerStatus,
-  fullName: profile?.fullName ?? "",
-  headline: profile?.headline ?? "",
-  about: profile?.about ?? "",
-  location: profile?.location ?? "",
-  targetRole: profile?.targetRole ?? "",
-  email: profile?.email ?? email,
-  phone: profile?.phone ?? "",
-  experience: profile?.experience?.length ? profile.experience : [{ ...emptyHistory }],
-  education: profile?.education?.length ? profile.education : [{ ...emptyEducation }],
-  skills: profile?.hardCompetencies?.length ? profile.hardCompetencies : profile?.skills ?? [],
-  tools: profile?.tools ?? [],
-  softSkills: profile?.softSkills ?? [],
-  workArrangement: profile?.workArrangement ?? "hybrid",
-});
+function isDemoCandidateProfile(profile?: CvProfile | null) {
+  if (!profile) return false;
+  return (
+    profile.id === "demo-candidate-1" ||
+    profile.fullName === "Nadia Utami" ||
+    profile.email === "nadia.utami@example.com"
+  );
+}
+
+const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, email: string): FormState => {
+  const p = isDemoCandidateProfile(profile) ? null : profile;
+  return {
+    talentCategory: p?.talentCategory ?? "public",
+    careerStatus: p?.careerStatus ?? careerStatus,
+    fullName: p?.fullName ?? "",
+    headline: p?.headline ?? "",
+    about: p?.about ?? "",
+    location: p?.location ?? "",
+    targetRole: p?.targetRole ?? "",
+    email: p?.email ?? email,
+    phone: p?.phone ?? "",
+    experience: p?.experience?.length ? p.experience : [{ ...emptyHistory }],
+    education: p?.education?.length ? p.education : [{ ...emptyEducation }],
+    skills: p?.hardCompetencies?.length ? p.hardCompetencies : p?.skills ?? [],
+    tools: p?.tools ?? [],
+    softSkills: p?.softSkills ?? [],
+    workArrangement: p?.workArrangement ?? "hybrid",
+  };
+};
 
 function Field({
   label,
@@ -186,9 +198,14 @@ export function CandidateOnboarding() {
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(() => {
-    const profile = cvProfile ?? null;
-    const initial = initialForm(profile, careerStatus, user?.email ?? "");
-    return { ...initial, fullName: initial.fullName || user?.name || "" };
+    const isDemo = isDemoCandidateProfile(cvProfile);
+    const profile = isDemo ? null : (cvProfile ?? null);
+    const userIsDemo = user?.name === "Nadia Utami" || user?.email === "nadia.utami@example.com";
+    const initial = initialForm(profile, careerStatus, userIsDemo ? "" : user?.email ?? "");
+    return {
+      ...initial,
+      fullName: initial.fullName || (userIsDemo ? "" : user?.name !== "Kandidat Baru" ? user?.name || "" : ""),
+    };
   });
   const [tagInput, setTagInput] = useState<{ skills: string; tools: string; softSkills: string }>({
     skills: "",
@@ -210,6 +227,13 @@ export function CandidateOnboarding() {
         if (!raw) return;
         const parsed: unknown = JSON.parse(raw);
         if (!isValidDraftPayload(parsed) || !isMeaningfulDraft(parsed.form)) return;
+        if (
+          parsed.form.fullName?.includes("Nadia Utami") ||
+          parsed.form.email?.includes("nadia.utami@example.com")
+        ) {
+          window.localStorage.removeItem(draftKey);
+          return;
+        }
         draftAppliedRef.current = true;
         setForm(parsed.form);
         setStep(Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1));
@@ -223,6 +247,7 @@ export function CandidateOnboarding() {
 
   useEffect(() => {
     if (!user || !bootstrapped || !cvProfile || draftAppliedRef.current) return;
+    if (isDemoCandidateProfile(cvProfile)) return;
     const timer = window.setTimeout(() => {
       if (draftAppliedRef.current) return;
       setForm(initialForm(cvProfile, careerStatus, user.email));
@@ -232,12 +257,13 @@ export function CandidateOnboarding() {
 
   useEffect(() => {
     if (!user || !bootstrapped || cvProfile || draftAppliedRef.current) return;
+    const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
     const timer = window.setTimeout(() => {
       if (draftAppliedRef.current) return;
       setForm((current) => ({
         ...current,
-        fullName: current.fullName || user.name,
-        email: current.email || user.email,
+        fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
+        email: current.email || (isDemo ? "" : user.email),
       }));
     }, 0);
     return () => window.clearTimeout(timer);
@@ -662,7 +688,7 @@ function BasicStep({
               className={inputClass}
               value={form.fullName}
               onChange={(event) => setValue("fullName", event.target.value)}
-              placeholder="Contoh: Nadia Putri Rahayu"
+              placeholder="Contoh: Budi Pratama / Siti Rahmawati"
             />
           </Field>
           <Field label="Email aktif *" error={errors.email}>
@@ -791,8 +817,8 @@ function HistoryStep({
 
   return (
     <Intro
-      title="Pengalaman Kerja (Work Experience)"
-      text="Tambahkan pekerjaan yang paling relevan. Jika belum memiliki pengalaman kerja formal, kamu bisa menambahkan pengalaman magang, freelance, atau organisasi."
+      title="Pengalaman Kerja (Opsional)"
+      text="Tambahkan pekerjaan yang paling relevan. Jika belum memiliki pengalaman kerja formal (misalnya fresh graduate atau mahasiswa), langkah ini opsional dan dapat langsung dilewati dengan menekan tombol Lanjut."
     >
       <div className="space-y-4">
         {items.map((item, index) => (

@@ -184,6 +184,19 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Gagal menyimpan data onboarding:", error);
+    const errMessage = error instanceof Error ? error.message : "";
+    const errCode = (error as { code?: string })?.code;
+
+    if (errCode === "23505" || errMessage.includes("organizations_nib_unique") || errMessage.includes("organizations_npwp_unique")) {
+      if (errMessage.includes("organizations_nib_unique") || errMessage.includes("(nib)")) {
+        return NextResponse.json({ error: "Nomor NIB ini sudah terdaftar oleh perusahaan lain." }, { status: 400 });
+      }
+      if (errMessage.includes("organizations_npwp_unique") || errMessage.includes("(npwp)")) {
+        return NextResponse.json({ error: "Nomor NPWP ini sudah terdaftar oleh perusahaan lain." }, { status: 400 });
+      }
+      return NextResponse.json({ error: "Nomor NIB atau NPWP sudah terdaftar di sistem." }, { status: 400 });
+    }
+
     const detail = error instanceof Error ? error.message : "Gagal menyimpan data ke database.";
     return NextResponse.json({ error: detail }, { status: 500 });
   }
