@@ -129,43 +129,52 @@ export class MessagingService {
       };
     }
 
-    // Check if an active conversation already exists between both users in this org
-    const existingConversations = await db
-      .select({ id: schema.conversations.id })
-      .from(schema.conversations)
-      .innerJoin(
-        schema.conversationParticipants,
-        eq(schema.conversationParticipants.conversationId, schema.conversations.id)
-      )
-      .where(
-        and(
-          eq(schema.conversations.organizationId, approved.organizationId),
-          eq(schema.conversationParticipants.userId, user.id),
-          eq(schema.conversations.status, "active")
-        )
-      );
+    // Serialize concurrent creates per organization: the existence checks and
+    // the insert run in one transaction behind a FOR UPDATE lock on the parent
+    // organization row, so a racing POST waits, then sees the winner's row.
+    return db.transaction(async (tx) => {
+      await tx
+        .select({ id: schema.organizations.id })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, approved.organizationId))
+        .for("update");
 
-    if (existingConversations.length > 0) {
-      const existingIds = existingConversations.map((c) => c.id);
-      const [shared] = await db
-        .select({ conversationId: schema.conversationParticipants.conversationId })
-        .from(schema.conversationParticipants)
+      // Check if an active conversation already exists between both users in this org
+      const existingConversations = await tx
+        .select({ id: schema.conversations.id })
+        .from(schema.conversations)
+        .innerJoin(
+          schema.conversationParticipants,
+          eq(schema.conversationParticipants.conversationId, schema.conversations.id)
+        )
         .where(
           and(
-            inArray(schema.conversationParticipants.conversationId, existingIds),
-            eq(schema.conversationParticipants.userId, approved.candidateUserId),
-            isNull(schema.conversationParticipants.leftAt)
+            eq(schema.conversations.organizationId, approved.organizationId),
+            eq(schema.conversationParticipants.userId, user.id),
+            eq(schema.conversations.status, "active")
           )
-        )
-        .limit(1);
+        );
 
-      if (shared) {
-        return { conversationId: shared.conversationId, reused: true };
+      if (existingConversations.length > 0) {
+        const existingIds = existingConversations.map((c) => c.id);
+        const [shared] = await tx
+          .select({ conversationId: schema.conversationParticipants.conversationId })
+          .from(schema.conversationParticipants)
+          .where(
+            and(
+              inArray(schema.conversationParticipants.conversationId, existingIds),
+              eq(schema.conversationParticipants.userId, approved.candidateUserId),
+              isNull(schema.conversationParticipants.leftAt)
+            )
+          )
+          .limit(1);
+
+        if (shared) {
+          return { conversationId: shared.conversationId, reused: true };
+        }
       }
-    }
 
-    // Create new conversation and add participants
-    return db.transaction(async (tx) => {
+      // Create new conversation and add participants
       const [conversation] = await tx
         .insert(schema.conversations)
         .values({

@@ -63,7 +63,15 @@ export async function requireAdmin() {
   return { user: current.user, db: current.db };
 }
 
-export async function getRecruiterScope(db: Database, user: AppUser) {
+export type RecruiterMembership = {
+  organizationId: string;
+  organizationRole: (typeof schema.organizationMembers.$inferSelect)["role"];
+};
+
+export async function getRecruiterScope(
+  db: Database,
+  user: AppUser
+): Promise<{ membership: RecruiterMembership } | { error: string; status: 403 }> {
   if (user.role !== "recruiter") return { error: "Hanya recruiter yang dapat mengakses data ini.", status: 403 as const };
   if (user.recruiterProvisioningStatus !== "active") return recruiterAccessError(user.recruiterProvisioningStatus);
 
