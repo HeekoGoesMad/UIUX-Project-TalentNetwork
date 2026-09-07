@@ -10,7 +10,6 @@ import {
   Search,
   UserCheck,
   Users,
-  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -91,7 +90,6 @@ export default function PartnerTalentPage() {
     return list;
   }, [activePartnerInstitution, partnerVerifications, cvProfile]);
 
-  const verifiedCount = talentPool.filter((t) => t.status === "verified").length;
   const pendingCount = talentPool.filter((t) => t.status === "pending").length;
 
   const filtered = talentPool.filter((t) => {

@@ -30,19 +30,19 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl border-purple-100 shadow-2xl">
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90dvh] flex flex-col p-0 overflow-hidden rounded-2xl border-purple-100 shadow-2xl">
         {/* Header with Step Indicator */}
-        <div className="bg-gradient-to-r from-[#7C3AED] to-[#9333EA] p-6 text-white shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 px-3 py-1 rounded-full text-purple-50">
+        <div className="bg-gradient-to-r from-[#7C3AED] to-[#9333EA] p-4 sm:p-6 text-white shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-full text-purple-50">
               <ShieldCheck className="size-3.5" />
               {step === 1 ? "Tahap 1 dari 2: Ketentuan & Akses Data" : "Tahap 2 dari 2: Kebijakan Privasi"}
             </span>
-            <span className="text-xs font-medium text-purple-100">
+            <span className="text-[11px] sm:text-xs font-medium text-purple-100">
               Wajib ditinjau sebelum pendaftaran
             </span>
           </div>
-          <DialogTitle className="text-xl font-bold text-white">
+          <DialogTitle className="text-lg sm:text-xl font-bold text-white">
             {step === 1 ? "Syarat, Ketentuan & Persetujuan Akses Data" : "Kebijakan Privasi & Perlindungan Data"}
           </DialogTitle>
           <DialogDescription className="text-purple-100 text-xs mt-1">
@@ -51,7 +51,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
         </div>
 
         {/* Scrollable Document Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 text-slate-700 text-xs sm:text-sm leading-relaxed">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 text-slate-700 text-xs sm:text-sm leading-relaxed">
           {step === 1 ? (
             <>
               {/* Highlight Box: FEATURE 8 DATA ACCESS CONSENT */}
@@ -140,16 +140,16 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
         </div>
 
         {/* Footer Navigation */}
-        <DialogFooter className="p-4 sm:p-5 bg-slate-50 border-t flex flex-row items-center justify-between gap-3 shrink-0">
+        <DialogFooter className="p-3 sm:p-5 bg-slate-50 border-t flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
           {step === 1 ? (
             <>
-              <Button type="button" variant="ghost" size="sm" onClick={onClose} className="text-slate-500">
+              <Button type="button" variant="ghost" size="sm" onClick={onClose} className="w-full sm:w-auto text-slate-500">
                 Batal
               </Button>
               <Button
                 type="button"
                 onClick={handleNext}
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2 font-semibold shadow-xs"
+                className="w-full sm:w-auto bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2 font-semibold shadow-xs text-xs sm:text-sm"
               >
                 Lanjut ke Kebijakan Privasi
                 <ArrowRight className="size-4" />
@@ -157,14 +157,14 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
             </>
           ) : (
             <>
-              <Button type="button" variant="outline" size="sm" onClick={handlePrev} className="gap-1.5 text-slate-700">
+              <Button type="button" variant="outline" size="sm" onClick={handlePrev} className="w-full sm:w-auto gap-1.5 text-slate-700 text-xs sm:text-sm">
                 <ArrowLeft className="size-4" />
                 Kembali ke Syarat &amp; Ketentuan
               </Button>
               <Button
                 type="button"
                 onClick={handleFinalAgree}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-bold shadow-sm"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-bold shadow-sm text-xs sm:text-sm"
               >
                 <CheckCircle2 className="size-4" />
                 Saya Setuju &amp; Lanjutkan Pendaftaran

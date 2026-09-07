@@ -131,8 +131,8 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     certifications: [],
     portfolio: items<string>("portfolio"),
     targetRole: candidate?.targetRole ?? "",
-    avatarUrl: ((candidate as Record<string, unknown> | null)?.avatarUrl as string | undefined) ?? "",
-    bannerUrl: ((candidate as Record<string, unknown> | null)?.bannerUrl as string | undefined) ?? "",
+    avatarUrl: base?.avatarUrl ?? ((candidate as Record<string, unknown> | null)?.avatarUrl as string | undefined) ?? "",
+    bannerUrl: (preferences.bannerUrl as string | undefined) ?? ((candidate as Record<string, unknown> | null)?.bannerUrl as string | undefined) ?? "",
     workArrangement: preferences.workArrangement === "remote" || preferences.workArrangement === "onsite" ? preferences.workArrangement : "hybrid",
     openToWork: status !== "not-available",
     careerStatus: status,
@@ -583,6 +583,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrapUserKey.current = null;
     setUser(null);
     localStorage.removeItem(sessionKey);
+    try {
+      localStorage.removeItem("proofylink-a11y-prefs");
+      if (typeof document !== "undefined") {
+        const root = document.documentElement;
+        root.removeAttribute("data-text-scale");
+        root.removeAttribute("data-high-contrast");
+        root.removeAttribute("data-reduce-motion");
+        root.removeAttribute("data-enhanced-focus");
+        root.removeAttribute("data-relaxed-spacing");
+      }
+    } catch {}
   };
 
   const scan = (id: string) => {
@@ -631,13 +642,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const syncProfile = async (profile: CvProfile) => {
+    const validAvatarUrl = profile.avatarUrl?.startsWith("http") ? profile.avatarUrl : null;
+    const validBannerUrl = profile.bannerUrl?.startsWith("http") ? profile.bannerUrl : null;
     const response = await fetch("/api/profile/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        displayName: profile.fullName || null, phone: profile.phone || null,
-        headline: profile.headline || null, targetRole: profile.targetRole || null,
-        location: profile.location || null, summary: profile.about || null,
+        displayName: profile.fullName || null,
+        avatarUrl: validAvatarUrl,
+        phone: profile.phone || null,
+        headline: profile.headline || null,
+        targetRole: profile.targetRole || null,
+        location: profile.location || null,
+        summary: profile.about || null,
         isPublished: true,
         completeness: Math.min(100, [profile.fullName, profile.headline, profile.about, profile.location, profile.targetRole, profile.skills.length, profile.tools.length, profile.experience.length, profile.education.length].filter(Boolean).length * 10),
         sections: [
@@ -646,7 +663,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { type: "skills", content: { items: profile.skills } },
           { type: "tools", content: { items: profile.tools } },
           { type: "portfolio", content: { items: profile.portfolio } },
-          { type: "preferences", content: { careerStatus: profile.careerStatus, workArrangement: profile.workArrangement } },
+          { type: "preferences", content: { careerStatus: profile.careerStatus, workArrangement: profile.workArrangement, bannerUrl: validBannerUrl } },
         ],
       }),
     });

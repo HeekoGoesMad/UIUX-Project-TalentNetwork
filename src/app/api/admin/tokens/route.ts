@@ -6,6 +6,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const grantSchema = z
   .object({
     organizationId: z.string().uuid(),

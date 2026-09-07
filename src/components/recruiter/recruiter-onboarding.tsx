@@ -7,14 +7,11 @@ import {
   ArrowRight,
   Building2,
   Check,
-  Eye,
-  EyeOff,
   FileCheck,
   FileText,
   FileUp,
   Globe,
   Info,
-  Lock,
   Mail,
   MapPin,
   Phone,
@@ -32,7 +29,7 @@ import type { RecruiterOnboardingData } from "@/types";
 const recruiterSteps = [
   { title: "Akun PIC Rekruter", note: "Identitas perwakilan", icon: User },
   { title: "Profil Perusahaan", note: "Entitas & operasional", icon: Building2 },
-  { title: "Dokumen Legalitas", note: "NIB, NPWP & KTP", icon: FileCheck },
+  { title: "Dokumen Legalitas", note: "NIB & NPWP", icon: FileCheck },
   { title: "Review & Pengajuan", note: "Antrean compliance", icon: ShieldCheck },
 ] as const;
 
@@ -101,23 +98,22 @@ function Intro({ title, text, children }: { title: string; text: string; childre
 }
 
 const defaultForm: RecruiterOnboardingData = {
-  picName: "Budi Santoso",
-  picTitle: "Head of Talent Acquisition",
-  picPhone: "0812-9876-5432",
-  picEmail: "budi@perusahaan.com",
-  companyName: "PT Inovasi Digital Nusantara",
-  industry: "Teknologi & Perangkat Lunak (SaaS / IT)",
-  companySize: "51-200",
-  description: "Perusahaan teknologi penyedia platform digital & ekosistem automasi bisnis terintegrasi.",
-  websiteUrl: "https://inovasidigital.co.id",
-  linkedinUrl: "https://linkedin.com/company/inovasi-digital-nusantara",
-  officeAddress: "Gedung Cyber 2 Lt. 18, Jl. HR Rasuna Said Blok X-5 No. 13",
-  city: "Jakarta Selatan, DKI Jakarta",
-  nibNumber: "9120001234567",
-  nibFileName: "NIB_PT_Inovasi_Digital.pdf",
-  npwpNumber: "01.234.567.8-012.000",
-  npwpFileName: "NPWP_Badan_Usaha.pdf",
-  ktpFileName: "KTP_PIC_Budi_Santoso.jpg",
+  picName: "",
+  picTitle: "",
+  picPhone: "",
+  picEmail: "",
+  companyName: "",
+  industry: "",
+  companySize: "",
+  description: "",
+  websiteUrl: "",
+  linkedinUrl: "",
+  officeAddress: "",
+  city: "",
+  nibNumber: "",
+  nibFileName: "",
+  npwpNumber: "",
+  npwpFileName: "",
   verificationStatus: "draft",
 };
 
@@ -128,6 +124,10 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && parsed.form) {
+      if (parsed.form.picName === "Budi Santoso" || parsed.form.companyName === "PT Inovasi Digital Nusantara") {
+        window.localStorage.removeItem(draftKey);
+        return null;
+      }
       return {
         form: { ...defaultForm, ...parsed.form },
         step: typeof parsed.step === "number" ? parsed.step : 0,
@@ -152,15 +152,13 @@ export function RecruiterOnboarding() {
     const draft = getSavedDraft();
     return {
       ...(draft?.form ?? defaultForm),
-      companyName: draft?.form?.companyName || user?.companyName || (user?.role === "recruiter" && user?.name ? user.name : defaultForm.companyName),
-      picName: draft?.form?.picName || (user?.role === "recruiter" ? defaultForm.picName : user?.name || defaultForm.picName),
-      picEmail: draft?.form?.picEmail || user?.email || defaultForm.picEmail,
+      companyName: draft?.form?.companyName || user?.companyName || "",
+      picName: draft?.form?.picName || user?.name || "",
+      picEmail: draft?.form?.picEmail || user?.email || "",
     };
   });
 
-  const [password, setPassword] = useState("PasswordRahasia123!");
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreementChecked, setAgreementChecked] = useState(true);
+  const [agreementChecked, setAgreementChecked] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const editsRef = useRef(0);
@@ -190,7 +188,7 @@ export function RecruiterOnboarding() {
     }
   };
 
-  const handleFileUpload = (field: "nibFileName" | "npwpFileName" | "ktpFileName", file: File | null) => {
+  const handleFileUpload = (field: "nibFileName" | "npwpFileName", file: File | null) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Ukuran berkas maksimal 10MB");
@@ -204,18 +202,18 @@ export function RecruiterOnboarding() {
     const errs: Record<string, string> = {};
     if (s === 0) {
       if (!form.picName.trim()) errs.picName = "Nama lengkap PIC wajib diisi.";
-      if (!form.picTitle.trim()) errs.picTitle = "Jabatan PIC wajib diisi.";
+      if (!form.picTitle.trim()) errs.picTitle = "Jabatan / posisi PIC di perusahaan wajib diisi.";
     } else if (s === 1) {
       if (!form.companyName.trim()) errs.companyName = "Nama resmi entitas bisnis (PT/CV) wajib diisi.";
-      if (!form.picEmail.trim() || !form.picEmail.includes("@")) errs.picEmail = "Email resmi perusahaan wajib diisi.";
+      if (!form.industry) errs.industry = "Kategori industri wajib dipilih.";
+      if (!form.companySize) errs.companySize = "Skala perusahaan wajib dipilih.";
+      if (!form.picEmail.trim() || !form.picEmail.includes("@")) errs.picEmail = "Email resmi perusahaan wajib diisi dengan format valid.";
       if (!form.picPhone.trim()) errs.picPhone = "Nomor WhatsApp / telepon perusahaan wajib diisi.";
       if (!form.description.trim()) errs.description = "Deskripsi operasional bisnis wajib diisi.";
-      if (!form.city.trim()) errs.city = "Kota kantor wajib diisi.";
+      if (!form.city.trim()) errs.city = "Kota kantor operasional wajib diisi.";
       if (!form.officeAddress.trim()) errs.officeAddress = "Alamat kantor operasional wajib diisi.";
     } else if (s === 2) {
-      if (!form.nibNumber.trim() || !form.nibFileName) errs.nibNumber = "Nomor dan berkas NIB wajib dilampirkan.";
-      if (!form.npwpNumber.trim() || !form.npwpFileName) errs.npwpNumber = "Nomor dan berkas NPWP wajib dilampirkan.";
-      if (!form.ktpFileName) errs.ktpFileName = "Foto KTP PIC wajib diunggah.";
+      // Pengecualian: NIB dan NPWP tidak diwajibkan saat masa pengujian/testing akun rekruter
     }
 
     setErrors(errs);
@@ -278,8 +276,21 @@ export function RecruiterOnboarding() {
 
   return (
     <ProtectedRoute role="recruiter">
-      <div className="fixed inset-0 z-10 overflow-hidden bg-background pt-20">
-        <div className="mx-auto flex h-full max-w-7xl overflow-hidden border-x border-border bg-card shadow-xl">
+      <div className="fixed inset-0 z-10 flex flex-col overflow-hidden bg-background md:p-3 lg:p-6">
+        <div className="mx-auto flex h-full w-full max-w-7xl flex-col md:flex-row overflow-hidden border-border bg-card md:rounded-2xl md:border md:shadow-2xl">
+          {/* Mobile Brand Top Bar */}
+          <div className="flex items-center justify-between border-b bg-[#0b2342] px-4 py-3 text-white md:hidden">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white shadow-xs">
+                <ShieldCheck className="size-4" />
+              </span>
+              <span>ProofyLink</span>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-[#7aaee0]">
+              Rekruter
+            </span>
+          </div>
+
           {/* ─── LEFT SIDEBAR (DARK ENTERPRISE BLUE) ─── */}
           <aside className="hidden w-[295px] shrink-0 flex-col bg-[#0b2342] p-7 text-white md:flex">
             <div className="flex items-center gap-2.5 font-bold text-base">
@@ -342,7 +353,7 @@ export function RecruiterOnboarding() {
           {/* ─── RIGHT CONTENT PANEL ─── */}
           <main className="flex min-w-0 flex-1 flex-col">
             {/* Top Bar with Step and Progress */}
-            <div className="border-b bg-card px-5 py-4 sm:px-10">
+            <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-mono text-[11px] uppercase tracking-widest text-[#0b2342] font-semibold">
@@ -362,10 +373,18 @@ export function RecruiterOnboarding() {
                   </div>
                 </div>
               </div>
+              <div className="mt-3 flex gap-1 md:hidden">
+                {recruiterSteps.map((item, index) => (
+                  <span
+                    key={item.title}
+                    className={`h-1 flex-1 rounded-full ${index <= step ? "bg-[#0b2342]" : "bg-muted"}`}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Scrollable Form Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-10">
+            <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
               <div className="mx-auto max-w-2xl">
                 {/* ── STEP 0: AKUN PIC REKRUTER ── */}
                 {step === 0 && (
@@ -393,27 +412,6 @@ export function RecruiterOnboarding() {
                           placeholder="Contoh: Head of Talent Acquisition / HR Manager"
                         />
                       </Field>
-
-                      <Field label="Kata Sandi Akun *">
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 size-4 text-slate-400" />
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            className={`${inputClass} pl-9 pr-10`}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Minimal 8 karakter"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                          >
-                            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                          </button>
-                        </div>
-                      </Field>
-
                       {/* Email OTP Verification Notice */}
                       <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
                         <ShieldCheck className="size-4 text-[#7C3AED] shrink-0 mt-0.5" />
@@ -446,12 +444,13 @@ export function RecruiterOnboarding() {
                       </Field>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Kategori Industri *">
+                        <Field label="Kategori Industri *" error={errors.industry}>
                           <select
                             className={inputClass}
                             value={form.industry}
                             onChange={(e) => update("industry", e.target.value)}
                           >
+                            <option value="">-- Pilih Kategori Industri --</option>
                             {INDUSTRY_OPTIONS.map((ind) => (
                               <option key={ind} value={ind}>
                                 {ind}
@@ -460,12 +459,13 @@ export function RecruiterOnboarding() {
                           </select>
                         </Field>
 
-                        <Field label="Ukuran / Skala Perusahaan *">
+                        <Field label="Ukuran / Skala Perusahaan *" error={errors.companySize}>
                           <select
                             className={inputClass}
                             value={form.companySize}
                             onChange={(e) => update("companySize", e.target.value)}
                           >
+                            <option value="">-- Pilih Skala Perusahaan --</option>
                             {COMPANY_SIZE_OPTIONS.map((opt) => (
                               <option key={opt.id} value={opt.id}>
                                 {opt.label} ({opt.desc})
@@ -570,15 +570,15 @@ export function RecruiterOnboarding() {
                 {/* ── STEP 2: DOKUMEN LEGALITAS ── */}
                 {step === 2 && (
                   <Intro
-                    title="Unggah Dokumen Legalitas & KTP PIC *"
-                    text="Berkas resmi ini digunakan tim compliance untuk memverifikasi keabsahan entitas sebelum akun diaktifkan."
+                    title="Unggah Dokumen Legalitas (NIB & NPWP)"
+                    text="Berkas resmi ini digunakan tim compliance untuk memverifikasi keabsahan entitas bisnis sebelum akun diaktifkan. (Opsional selama fase pengujian)"
                   >
                     <div className="space-y-4">
                       {/* NIB */}
                       <Card className="p-4 border-border shadow-2xs space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <FileText className="size-4 text-[#0b2342]" /> 1. Nomor Induk Berusaha (NIB OSS) *
+                            <FileText className="size-4 text-[#0b2342]" /> 1. Nomor Induk Berusaha (NIB OSS)
                           </span>
                           {form.nibFileName && (
                             <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -590,11 +590,11 @@ export function RecruiterOnboarding() {
                           className={inputClass}
                           value={form.nibNumber}
                           onChange={(e) => update("nibNumber", e.target.value)}
-                          placeholder="Nomor 13 digit NIB"
+                          placeholder="Nomor 13 digit NIB (opsional)"
                         />
                         <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
                           <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.nibFileName || "Pilih Berkas NIB (PDF / JPG)"}</span>
+                          <span className="truncate">{form.nibFileName || "Pilih Berkas NIB (PDF / JPG) - Opsional"}</span>
                           <input
                             type="file"
                             accept=".pdf,image/*"
@@ -608,7 +608,7 @@ export function RecruiterOnboarding() {
                       <Card className="p-4 border-border shadow-2xs space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <FileText className="size-4 text-[#0b2342]" /> 2. NPWP Badan Usaha *
+                            <FileText className="size-4 text-[#0b2342]" /> 2. NPWP Badan Usaha
                           </span>
                           {form.npwpFileName && (
                             <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -620,11 +620,11 @@ export function RecruiterOnboarding() {
                           className={inputClass}
                           value={form.npwpNumber}
                           onChange={(e) => update("npwpNumber", e.target.value)}
-                          placeholder="Nomor 16 digit NPWP Badan"
+                          placeholder="Nomor 16 digit NPWP Badan (opsional)"
                         />
                         <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
                           <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.npwpFileName || "Pilih Berkas NPWP (PDF / JPG)"}</span>
+                          <span className="truncate">{form.npwpFileName || "Pilih Berkas NPWP (PDF / JPG) - Opsional"}</span>
                           <input
                             type="file"
                             accept=".pdf,image/*"
@@ -634,34 +634,10 @@ export function RecruiterOnboarding() {
                         </label>
                       </Card>
 
-                      {/* KTP PIC */}
-                      <Card className="p-4 border-border shadow-2xs space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <User className="size-4 text-[#0b2342]" /> 3. Foto KTP PIC / Rekruter ({form.picName}) *
-                          </span>
-                          {form.ktpFileName && (
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              Terunggah
-                            </span>
-                          )}
-                        </div>
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.ktpFileName || "Pilih Foto KTP PIC (JPG / PNG / PDF)"}</span>
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            className="sr-only"
-                            onChange={(e) => handleFileUpload("ktpFileName", e.target.files?.[0] || null)}
-                          />
-                        </label>
-                      </Card>
-
                       <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3.5 text-xs text-slate-700 flex items-start gap-2.5">
                         <Info className="size-4 text-blue-600 shrink-0 mt-0.5" />
                         <p className="leading-relaxed">
-                          Seluruh berkas legalitas dan identitas disimpan terenkripsi dengan standar kepatuhan tinggi untuk verifikasi manual internal ProofyLink.
+                          Seluruh berkas legalitas perusahaan disimpan terenkripsi dengan standar kepatuhan tinggi untuk verifikasi manual internal ProofyLink. Selama masa testing, Anda dapat melewati langkah ini.
                         </p>
                       </div>
                     </div>
@@ -718,15 +694,12 @@ export function RecruiterOnboarding() {
 
                         <div className="p-6 bg-slate-50/50 space-y-2 text-xs">
                           <strong className="text-foreground block">Berkas Terlampir:</strong>
-                          <div className="grid sm:grid-cols-3 gap-2 text-slate-700">
+                          <div className="grid sm:grid-cols-2 gap-2 text-slate-700">
                             <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> NIB: {form.nibFileName}
+                              <Check className="size-3.5 text-emerald-600" /> NIB: {form.nibFileName || (form.nibNumber ? `No: ${form.nibNumber}` : "Tidak dilampirkan (opsional)")}
                             </p>
                             <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> NPWP: {form.npwpFileName}
-                            </p>
-                            <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> KTP PIC: {form.ktpFileName}
+                              <Check className="size-3.5 text-emerald-600" /> NPWP: {form.npwpFileName || (form.npwpNumber ? `No: ${form.npwpNumber}` : "Tidak dilampirkan (opsional)")}
                             </p>
                           </div>
                         </div>
@@ -750,26 +723,27 @@ export function RecruiterOnboarding() {
             </div>
 
             {/* ─── BOTTOM FIXED ACTION BAR ─── */}
-            <div className="border-t bg-card px-5 py-4 sm:px-10">
-              <div className="flex items-center justify-between">
+            <div className="border-t bg-card px-4 py-3 sm:px-8 sm:py-4">
+              <div className="flex items-center justify-between gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleExit}
-                  className="text-xs font-semibold text-muted-foreground hover:text-destructive"
+                  className="text-xs font-semibold text-muted-foreground hover:text-destructive px-2 sm:px-4"
                 >
-                  Keluar Akun
+                  <span className="hidden sm:inline">Keluar Akun</span>
+                  <span className="sm:hidden">Keluar</span>
                 </Button>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {step > 0 && (
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setStep((prev) => prev - 1)}
-                      className="border-border rounded-xl"
+                      className="border-border rounded-xl text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-10"
                     >
-                      <ArrowLeft className="size-4 mr-1.5" /> Kembali
+                      <ArrowLeft className="size-3.5 sm:size-4 mr-1" /> Kembali
                     </Button>
                   )}
 
@@ -777,7 +751,7 @@ export function RecruiterOnboarding() {
                     type="button"
                     onClick={handleNext}
                     disabled={isSubmitting}
-                    className={`rounded-xl px-6 font-bold text-white shadow-xs ${
+                    className={`rounded-xl px-4 sm:px-6 font-bold text-white shadow-xs text-xs sm:text-sm h-9 sm:h-10 ${
                       step === recruiterSteps.length - 1
                         ? "bg-emerald-600 hover:bg-emerald-700"
                         : "bg-[#0b2342] hover:bg-[#1a3460]"
@@ -787,11 +761,13 @@ export function RecruiterOnboarding() {
                       "Mengirim..."
                     ) : step === recruiterSteps.length - 1 ? (
                       <>
-                        Kirim untuk Compliance Review <UploadCloud className="size-4 ml-1.5" />
+                        <span className="hidden sm:inline">Kirim untuk Compliance Review</span>
+                        <span className="sm:hidden">Kirim Review</span>
+                        <UploadCloud className="size-3.5 sm:size-4 ml-1.5" />
                       </>
                     ) : (
                       <>
-                        Lanjut <ArrowRight className="size-4 ml-1.5" />
+                        Lanjut <ArrowRight className="size-3.5 sm:size-4 ml-1.5" />
                       </>
                     )}
                   </Button>

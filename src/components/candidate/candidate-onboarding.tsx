@@ -113,23 +113,35 @@ const requiredByStep: Record<number, TextField[]> = {
   3: ["location", "targetRole"],
 };
 
-const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, email: string): FormState => ({
-  talentCategory: profile?.talentCategory ?? "public",
-  careerStatus: profile?.careerStatus ?? careerStatus,
-  fullName: profile?.fullName ?? "",
-  headline: profile?.headline ?? "",
-  about: profile?.about ?? "",
-  location: profile?.location ?? "",
-  targetRole: profile?.targetRole ?? "",
-  email: profile?.email ?? email,
-  phone: profile?.phone ?? "",
-  experience: profile?.experience?.length ? profile.experience : [{ ...emptyHistory }],
-  education: profile?.education?.length ? profile.education : [{ ...emptyEducation }],
-  skills: profile?.hardCompetencies?.length ? profile.hardCompetencies : profile?.skills ?? [],
-  tools: profile?.tools ?? [],
-  softSkills: profile?.softSkills ?? [],
-  workArrangement: profile?.workArrangement ?? "hybrid",
-});
+function isDemoCandidateProfile(profile?: CvProfile | null) {
+  if (!profile) return false;
+  return (
+    profile.id === "demo-candidate-1" ||
+    profile.fullName === "Nadia Utami" ||
+    profile.email === "nadia.utami@example.com"
+  );
+}
+
+const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, email: string): FormState => {
+  const p = isDemoCandidateProfile(profile) ? null : profile;
+  return {
+    talentCategory: p?.talentCategory ?? "public",
+    careerStatus: p?.careerStatus ?? careerStatus,
+    fullName: p?.fullName ?? "",
+    headline: p?.headline ?? "",
+    about: p?.about ?? "",
+    location: p?.location ?? "",
+    targetRole: p?.targetRole ?? "",
+    email: p?.email ?? email,
+    phone: p?.phone ?? "",
+    experience: p?.experience?.length ? p.experience : [{ ...emptyHistory }],
+    education: p?.education?.length ? p.education : [{ ...emptyEducation }],
+    skills: p?.hardCompetencies?.length ? p.hardCompetencies : p?.skills ?? [],
+    tools: p?.tools ?? [],
+    softSkills: p?.softSkills ?? [],
+    workArrangement: p?.workArrangement ?? "hybrid",
+  };
+};
 
 function Field({
   label,
@@ -186,9 +198,14 @@ export function CandidateOnboarding() {
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(() => {
-    const profile = cvProfile ?? null;
-    const initial = initialForm(profile, careerStatus, user?.email ?? "");
-    return { ...initial, fullName: initial.fullName || user?.name || "" };
+    const isDemo = isDemoCandidateProfile(cvProfile);
+    const profile = isDemo ? null : (cvProfile ?? null);
+    const userIsDemo = user?.name === "Nadia Utami" || user?.email === "nadia.utami@example.com";
+    const initial = initialForm(profile, careerStatus, userIsDemo ? "" : user?.email ?? "");
+    return {
+      ...initial,
+      fullName: initial.fullName || (userIsDemo ? "" : user?.name !== "Kandidat Baru" ? user?.name || "" : ""),
+    };
   });
   const [tagInput, setTagInput] = useState<{ skills: string; tools: string; softSkills: string }>({
     skills: "",
@@ -210,6 +227,13 @@ export function CandidateOnboarding() {
         if (!raw) return;
         const parsed: unknown = JSON.parse(raw);
         if (!isValidDraftPayload(parsed) || !isMeaningfulDraft(parsed.form)) return;
+        if (
+          parsed.form.fullName?.includes("Nadia Utami") ||
+          parsed.form.email?.includes("nadia.utami@example.com")
+        ) {
+          window.localStorage.removeItem(draftKey);
+          return;
+        }
         draftAppliedRef.current = true;
         setForm(parsed.form);
         setStep(Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1));
@@ -223,6 +247,7 @@ export function CandidateOnboarding() {
 
   useEffect(() => {
     if (!user || !bootstrapped || !cvProfile || draftAppliedRef.current) return;
+    if (isDemoCandidateProfile(cvProfile)) return;
     const timer = window.setTimeout(() => {
       if (draftAppliedRef.current) return;
       setForm(initialForm(cvProfile, careerStatus, user.email));
@@ -232,12 +257,13 @@ export function CandidateOnboarding() {
 
   useEffect(() => {
     if (!user || !bootstrapped || cvProfile || draftAppliedRef.current) return;
+    const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
     const timer = window.setTimeout(() => {
       if (draftAppliedRef.current) return;
       setForm((current) => ({
         ...current,
-        fullName: current.fullName || user.name,
-        email: current.email || user.email,
+        fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
+        email: current.email || (isDemo ? "" : user.email),
       }));
     }, 0);
     return () => window.clearTimeout(timer);
@@ -434,8 +460,21 @@ export function CandidateOnboarding() {
 
   return (
     <ProtectedRoute role="candidate">
-      <div className="fixed inset-0 z-10 overflow-hidden bg-background pt-20">
-        <div className="mx-auto flex h-full max-w-7xl overflow-hidden border-x border-border bg-card shadow-xl">
+      <div className="fixed inset-0 z-10 flex flex-col overflow-hidden bg-background md:p-3 lg:p-6">
+        <div className="mx-auto flex h-full w-full max-w-7xl flex-col md:flex-row overflow-hidden border-border bg-card md:rounded-2xl md:border md:shadow-2xl">
+          {/* Mobile Brand Top Bar */}
+          <div className="flex items-center justify-between border-b bg-[#0b2342] px-4 py-3 text-white md:hidden">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+                <ShieldCheck className="size-4" />
+              </span>
+              <span>ProofyLink</span>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-[#7aaee0]">
+              Kandidat
+            </span>
+          </div>
+
           <aside className="hidden w-[285px] shrink-0 flex-col bg-[#0b2342] p-7 text-white md:flex">
             <div className="flex items-center gap-2 font-bold">
               <span className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
@@ -478,7 +517,7 @@ export function CandidateOnboarding() {
           </aside>
 
           <main className="flex min-w-0 flex-1 flex-col">
-            <div className="border-b bg-card px-5 py-4 sm:px-10">
+            <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-mono text-[11px] uppercase tracking-widest text-[#7C3AED]">
@@ -496,7 +535,7 @@ export function CandidateOnboarding() {
                   </div>
                 </div>
               </div>
-              <div className="mt-4 flex gap-1 md:hidden">
+              <div className="mt-3 flex gap-1 md:hidden">
                 {steps.map((item, index) => (
                   <span
                     key={item.title}
@@ -507,7 +546,7 @@ export function CandidateOnboarding() {
             </div>
 
             <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-7 sm:px-10">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
                 <div className="mx-auto max-w-2xl animate-fade-up">
                   {step === 0 && <TalentCategoryStep value={form.talentCategory} onChange={(value) => setValue("talentCategory", value)} />}
                   {step === 1 && <StatusStep value={form.careerStatus} onChange={(value) => setValue("careerStatus", value)} />}
@@ -543,9 +582,9 @@ export function CandidateOnboarding() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t bg-card px-5 py-4 sm:px-10">
+              <div className="flex items-center justify-between border-t bg-card px-4 py-3 sm:px-8 sm:py-4">
                 {step > 0 ? (
-                  <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)} className="rounded-xl text-xs font-semibold">
+                  <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)} className="rounded-xl text-xs font-semibold px-3 sm:px-4 h-9 sm:h-10">
                     <ArrowLeft className="size-4 mr-1.5" />
                     Kembali
                   </Button>
@@ -555,7 +594,7 @@ export function CandidateOnboarding() {
                     <span>Langkah 1 dari {steps.length} (Wajib)</span>
                   </div>
                 )}
-                <Button type="submit" size="lg" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm">
+                <Button type="submit" size="lg" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10">
                   {step === steps.length - 1 ? "Publikasikan Profil" : "Lanjut"}
                   <ArrowRight className="size-4 ml-1.5" />
                 </Button>
@@ -662,7 +701,7 @@ function BasicStep({
               className={inputClass}
               value={form.fullName}
               onChange={(event) => setValue("fullName", event.target.value)}
-              placeholder="Contoh: Nadia Putri Rahayu"
+              placeholder="Contoh: Budi Pratama / Siti Rahmawati"
             />
           </Field>
           <Field label="Email aktif *" error={errors.email}>
@@ -791,8 +830,8 @@ function HistoryStep({
 
   return (
     <Intro
-      title="Pengalaman Kerja (Work Experience)"
-      text="Tambahkan pekerjaan yang paling relevan. Jika belum memiliki pengalaman kerja formal, kamu bisa menambahkan pengalaman magang, freelance, atau organisasi."
+      title="Pengalaman Kerja (Opsional)"
+      text="Tambahkan pekerjaan yang paling relevan. Jika belum memiliki pengalaman kerja formal (misalnya fresh graduate atau mahasiswa), langkah ini opsional dan dapat langsung dilewati dengan menekan tombol Lanjut."
     >
       <div className="space-y-4">
         {items.map((item, index) => (

@@ -47,7 +47,7 @@ export default function RecruiterPendingPage() {
 
           if (next === "active") {
             toast.success("Akun Anda telah disetujui! Membuka Dashboard...");
-            window.location.href = "/dashboard";
+            router.push("/dashboard");
             return;
           }
           if (showToasts) {
@@ -88,7 +88,7 @@ export default function RecruiterPendingPage() {
             if (next === "active") {
               setLocalStatus("active");
               setProvisioningStatus("active", null);
-              window.location.href = "/dashboard";
+              router.push("/dashboard");
               return;
             }
             if (next !== localStatus) {
@@ -129,7 +129,7 @@ export default function RecruiterPendingPage() {
       window.removeEventListener("storage", handleStorage);
       clearInterval(interval);
     };
-  }, [localStatus, setProvisioningStatus]);
+  }, [localStatus, setProvisioningStatus, router]);
 
   const handleGoToDashboard = async () => {
     setRedirecting(true);
@@ -148,11 +148,6 @@ export default function RecruiterPendingPage() {
       name: "NPWP Badan Usaha",
       status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
       file: "NPWP_Badan.pdf",
-    },
-    {
-      name: "Foto KTP PIC Rekruter",
-      status: isApproved ? "Terverifikasi" : isRevisionRequired ? "Perlu Diperiksa" : isRejected ? "Ditolak" : "Dalam Antrean Peninjauan",
-      file: "KTP_PIC.jpg",
     },
   ];
 
@@ -259,7 +254,7 @@ export default function RecruiterPendingPage() {
                       Catatan &amp; Instruksi dari Tim Compliance:
                     </p>
                     <p className="text-slate-800 leading-relaxed pl-2 font-medium">
-                      {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan foto KTP PIC atau berkas NIB yang diunggah."}
+                      {user?.provisioningReason || "Mohon periksa kembali kelengkapan dan kejelasan berkas NIB atau NPWP yang diunggah."}
                     </p>
                   </div>
 

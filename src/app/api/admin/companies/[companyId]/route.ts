@@ -6,6 +6,9 @@ import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
 import { writeAuditLog } from "@/lib/audit";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const updateCompanySchema = z
   .object({
     verificationStatus: z
