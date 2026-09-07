@@ -492,7 +492,7 @@ export function CvWorkspace() {
               <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Profil (Avatar)</span>
                 <div className="flex items-center gap-4">
-                  <div className="relative flex size-16 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-slate-200 shadow-2xs overflow-hidden">
+                  <div className="relative flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-white bg-slate-200 shadow-2xs overflow-hidden">
                     {profile.avatarUrl ? (
                       <img src={profile.avatarUrl} alt="Foto Profil" className="h-full w-full object-cover" />
                     ) : (
