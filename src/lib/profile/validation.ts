@@ -87,3 +87,49 @@ export function sanitizeMediaName(name: string): string {
   if (clean.length === 0) return "media";
   return clean.slice(0, 100);
 }
+
+/**
+ * Safely extracts the internal object key from a Supabase storage URL or relative path.
+ * Returns null if the URL belongs to an external provider (e.g. Unsplash) or is invalid.
+ */
+export function extractStorageKey(
+  urlOrPath: string | null | undefined,
+  bucketName: string = "profile-media"
+): string | null {
+  if (!urlOrPath || typeof urlOrPath !== "string") return null;
+  const trimmed = urlOrPath.trim();
+  if (!trimmed) return null;
+
+  // Ignore mock, demo, or external URLs
+  if (trimmed.startsWith("development-mock/")) return null;
+  if (
+    trimmed.includes("images.unsplash.com") ||
+    trimmed.includes("api.dicebear.com") ||
+    trimmed.startsWith("data:")
+  ) {
+    return null;
+  }
+
+  // Check if it's a Supabase public object URL: .../storage/v1/object/public/<bucket>/<key>
+  const publicMarker = `/storage/v1/object/public/${bucketName}/`;
+  const publicIdx = trimmed.indexOf(publicMarker);
+  if (publicIdx !== -1) {
+    const key = trimmed.slice(publicIdx + publicMarker.length).split("?")[0]?.trim();
+    return key && key.length > 0 ? decodeURIComponent(key) : null;
+  }
+
+  // Check if it starts with `<bucketName>/`
+  if (trimmed.startsWith(`${bucketName}/`)) {
+    const key = trimmed.slice(bucketName.length + 1).split("?")[0]?.trim();
+    return key && key.length > 0 ? decodeURIComponent(key) : null;
+  }
+
+  // Check if it starts directly with folder prefixes avatars/ or banners/
+  if (trimmed.startsWith("avatars/") || trimmed.startsWith("banners/")) {
+    const key = trimmed.split("?")[0]?.trim();
+    return key && key.length > 0 ? decodeURIComponent(key) : null;
+  }
+
+  return null;
+}
+
