@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Database } from "@/db";
 
 export const DEFAULT_SHORTLIST_NAME = "Kandidat Baru";
@@ -42,16 +42,34 @@ export class ShortlistService {
   }
 
   /**
-   * List all shortlists and their candidate items for an organization.
+   * List shortlists and their candidate items for an organization (paginated).
    */
-  static async list(db: Database, organizationId: string) {
-    const rows = await db
+  static async list(db: Database, organizationId: string, opts?: { page?: number; limit?: number }) {
+    const page = Math.max(1, Math.floor(opts?.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(opts?.limit ?? 24)));
+    const offset = (page - 1) * limit;
+
+    const lists = await db
       .select({
         id: schema.shortlists.id,
         name: schema.shortlists.name,
         description: schema.shortlists.description,
         createdAt: schema.shortlists.createdAt,
         updatedAt: schema.shortlists.updatedAt,
+      })
+      .from(schema.shortlists)
+      .where(eq(schema.shortlists.organizationId, organizationId))
+      .orderBy(asc(schema.shortlists.createdAt))
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = lists.length > limit;
+    const pageLists = hasMore ? lists.slice(0, limit) : lists;
+    if (pageLists.length === 0) return { shortlists: [], page, limit, hasMore: false };
+
+    const items = await db
+      .select({
+        shortlistId: schema.shortlistItems.shortlistId,
         itemId: schema.shortlistItems.id,
         candidateProfileId: schema.shortlistItems.candidateProfileId,
         candidateName: schema.profiles.displayName,
@@ -61,47 +79,34 @@ export class ShortlistService {
         notes: schema.shortlistItems.notes,
         itemCreatedAt: schema.shortlistItems.createdAt,
       })
-      .from(schema.shortlists)
-      .leftJoin(schema.shortlistItems, eq(schema.shortlistItems.shortlistId, schema.shortlists.id))
+      .from(schema.shortlistItems)
       .leftJoin(
         schema.candidateProfiles,
         eq(schema.candidateProfiles.id, schema.shortlistItems.candidateProfileId)
       )
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-      .where(eq(schema.shortlists.organizationId, organizationId))
-      .orderBy(asc(schema.shortlists.createdAt), asc(schema.shortlistItems.createdAt));
+      .where(inArray(schema.shortlistItems.shortlistId, pageLists.map((list) => list.id)))
+      .orderBy(asc(schema.shortlistItems.createdAt));
 
-    const shortlists = rows.reduce<Array<Record<string, unknown>>>((result, row) => {
-      let shortlist = result.find((item) => item.id === row.id);
-      if (!shortlist) {
-        shortlist = {
-          id: row.id,
-          name: row.name,
-          description: row.description,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          items: [],
-        };
-        result.push(shortlist);
-      }
-      if (row.itemId) {
-        (shortlist.items as unknown[]).push({
-          id: row.itemId,
-          candidateProfileId: row.candidateProfileId,
-          candidate: {
-            name: row.candidateName,
-            role: row.candidateRole,
-            location: row.candidateLocation,
-          },
-          status: row.status,
-          notes: row.notes,
-          createdAt: row.itemCreatedAt,
-        });
-      }
-      return result;
-    }, []);
+    const shortlists = pageLists.map((list) => ({ ...list, items: [] as unknown[] }));
+    for (const row of items) {
+      const shortlist = shortlists.find((item) => item.id === row.shortlistId);
+      if (!shortlist || !row.itemId) continue;
+      shortlist.items.push({
+        id: row.itemId,
+        candidateProfileId: row.candidateProfileId,
+        candidate: {
+          name: row.candidateName,
+          role: row.candidateRole,
+          location: row.candidateLocation,
+        },
+        status: row.status,
+        notes: row.notes,
+        createdAt: row.itemCreatedAt,
+      });
+    }
 
-    return { shortlists };
+    return { shortlists, page, limit, hasMore };
   }
 
   /**
