@@ -1,24 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Bot,
-  CheckCircle2,
-  ChevronRight,
-  Layers,
-  Lightbulb,
-  Map,
-  ShieldAlert,
-  Sparkles,
-  Target,
-  TrendingUp,
-  XCircle,
-} from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 export function AiTool({ title, description, endpoint }: { title: string; description: string; endpoint: string }) {
   const { cvProfile } = useApp();

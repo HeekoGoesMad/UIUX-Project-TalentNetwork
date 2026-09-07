@@ -25,21 +25,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 // ── Mock partner data ──────────────────────────────────────────────────────────
-const PARTNER_STATS = [
-  { label: "Total Mahasiswa Terdaftar", value: "1.847", icon: Users, color: "text-slate-700", bg: "bg-slate-100", trend: "+124 bulan ini" },
-  { label: "Campus Verified Talent", value: "412", icon: BadgeCheck, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+38 bulan ini" },
-  { label: "Employer Aktif Mengakses", value: "67", icon: Building2, color: "text-sky-600", bg: "bg-sky-50", trend: "+12 bulan ini" },
-  { label: "Tingkat Penempatan", value: "73%", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "+5% dari kuartal lalu" },
-];
-
-const RECENT_TALENT = [
-  { name: "Anya Fitriani", program: "Teknik Informatika", year: "2024", status: "Terverifikasi", unlocked: 3 },
-  { name: "Budi Hartono", program: "Manajemen Bisnis", year: "2024", status: "Terverifikasi", unlocked: 1 },
-  { name: "Citra Maharani", program: "Desain Komunikasi Visual", year: "2023", status: "Terverifikasi", unlocked: 5 },
-  { name: "Dian Purnomo", program: "Sistem Informasi", year: "2024", status: "Menunggu", unlocked: 0 },
-  { name: "Eko Prasetyo", program: "Akuntansi", year: "2023", status: "Terverifikasi", unlocked: 2 },
-];
-
 const RECENT_EMPLOYERS = [
   { name: "Gojek", industry: "Tech / Superapp", accessed: "2 jam lalu", talent: 12 },
   { name: "Tokopedia", industry: "E-Commerce", accessed: "5 jam lalu", talent: 8 },
