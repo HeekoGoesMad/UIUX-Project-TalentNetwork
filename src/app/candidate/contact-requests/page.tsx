@@ -26,13 +26,14 @@ function formatDate(value?: string) {
 export default function ContactRequestsPage() {
   const { hydrated, screeningConsents, contactRequests, respondToConsent, approvePendingRequests, dbMode, bootstrapped, databaseError, consentRequests } = useApp();
   const remoteRequests = consentRequests.map((request) => ({
+    itemId: typeof request.itemId === "string" ? request.itemId : String(request.candidateProfileId),
     candidateId: typeof request.candidateProfileId === "string" ? request.candidateProfileId : "",
     state: statusLabels[request.consentState as ConsentState] ? request.consentState as ConsentState : (screeningConsents[String(request.candidateProfileId)] ?? "not-requested"),
     request: { recruiterName: typeof request.recruiterName === "string" ? request.recruiterName : undefined, company: typeof request.organizationName === "string" ? request.organizationName : undefined, email: typeof request.recruiterEmail === "string" ? request.recruiterEmail : undefined, requestedAt: typeof request.createdAt === "string" ? request.createdAt : undefined, history: [] },
   })).filter((request) => request.candidateId && request.state !== "not-requested");
-  const localRequests = Object.entries(screeningConsents).filter(([, state]) => state !== "not-requested").map(([candidateId, state]) => ({ candidateId, state, request: contactRequests ? contactRequests[candidateId] : undefined }));
+  const localRequests = Object.entries(screeningConsents).filter(([, state]) => state !== "not-requested").map(([candidateId, state]) => ({ itemId: candidateId, candidateId, state, request: contactRequests ? contactRequests[candidateId] : undefined }));
   const requests = dbMode ? remoteRequests : localRequests;
-  const requestIds = requests.map(({ candidateId }) => candidateId).join(",");
+  const requestIds = [...new Set(requests.map(({ candidateId }) => candidateId))].join(",");
   const [remoteCandidates, setRemoteCandidates] = useState<Record<string, { role: string | null; location: string | null }>>({});
   const [candidateError, setCandidateError] = useState<string | null>(null);
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function ContactRequestsPage() {
     return () => { active = false; };
   }, [dbMode, bootstrapped, requestIds]);
   const pending = requests.filter(({ state }) => state === "pending-candidate-consent");
+  const [approvingAll, setApprovingAll] = useState(false);
 
   return <ProtectedRoute role="candidate">
     <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
@@ -57,7 +59,7 @@ export default function ContactRequestsPage() {
           <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Permintaan kontak</h1>
           <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Pilih siapa yang boleh melanjutkan ke screening. Profil kamu tetap aman sampai kamu menyetujui permintaan.</p>
         </div>
-        {pending.length > 0 && <Button onClick={approvePendingRequests}><Check className="size-4" /> Setujui {pending.length} permintaan</Button>}
+        {pending.length > 0 && <Button disabled={approvingAll} onClick={async () => { setApprovingAll(true); try { await approvePendingRequests(); } finally { setApprovingAll(false); } }}><Check className="size-4" /> {approvingAll ? "Menyetujui..." : `Setujui ${pending.length} permintaan`}</Button>}
       </div>
 
        {(!hydrated || (dbMode && !bootstrapped)) ? <div className="mt-8 rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground" role="status">Memuat permintaan...</div> : databaseError ? <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">Permintaan belum dapat dimuat. {databaseError}</div> : requests.length === 0 ?
@@ -67,15 +69,15 @@ export default function ContactRequestsPage() {
           title="Inbox kamu masih tenang"
           description="Permintaan dari recruiter akan muncul di sini untuk kamu tinjau."
         /> :
-          <div className="mt-8 space-y-4">{candidateError && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{candidateError}</div>}{requests.map(({ candidateId, state, request }) => {
+          <div className="mt-8 space-y-4">{candidateError && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{candidateError}</div>}{requests.map(({ itemId, candidateId, state, request }) => {
             const candidate = dbMode ? remoteCandidates[candidateId] : candidates.find((item) => item.id === candidateId);
           const isPending = state === "pending-candidate-consent";
           const isApproved = ["consented", "screening-in-progress", "screening-completed"].includes(state);
-          return <Card key={candidateId} className={isPending ? "border-[#19a974]/40 shadow-sm" : "shadow-sm"}>
+          return <Card key={itemId} className={isPending ? "border-[#19a974]/40 shadow-sm" : "shadow-sm"}>
             <CardContent className="p-5 sm:p-6">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex gap-4"><div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#f0f6fd] text-[#1e4080]"><UserRound className="size-5" /></div><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">{request?.recruiterName ?? "Recruiter"}</h2><Badge variant={isPending ? "default" : "outline"}>{statusLabels[state]}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{request?.company ?? "Konteks perusahaan belum tersedia"}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1"><Mail className="size-3.5" /> {request?.email ?? "Email belum tersedia"}</span><span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" /> {formatDate(request?.requestedAt)}</span></div></div></div>
-                 {isPending && <div className="flex shrink-0 gap-2"><Button size="sm" onClick={() => void respondToConsent(candidateId, "consented")}><Check className="size-3.5" /> Izinkan</Button><Button size="sm" variant="outline" onClick={() => void respondToConsent(candidateId, "declined")}>Tolak</Button></div>}
+                  {isPending && <div className="flex shrink-0 gap-2"><Button size="sm" onClick={() => void respondToConsent(candidateId, "consented", itemId)}><Check className="size-3.5" /> Izinkan</Button><Button size="sm" variant="outline" onClick={() => void respondToConsent(candidateId, "declined", itemId)}>Tolak</Button></div>}
               </div>
                <div className="mt-5 grid gap-4 border-t pt-4 sm:grid-cols-[1fr_auto] sm:items-end"><div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Konteks screening</p><p className="mt-1 text-sm">{candidate ? `${candidate.role ?? "Role belum tersedia"} · ${candidate.location ?? "Lokasi belum tersedia"}` : dbMode ? "Profil kandidat tidak ditemukan." : `Candidate ID: ${candidateId}`}</p>{request?.history && request.history.length > 0 && <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground"><History className="size-3.5" /> Riwayat: {request.history.map((item) => statusLabels[item.state]).join(" → ")}</div>}</div>{isApproved && <Button size="sm" variant="outline" asChild><Link href={`/candidate/messages?contact=${encodeURIComponent(request?.email ?? candidateId)}`}>Lanjut ke percakapan <ArrowRight className="size-3.5" /></Link></Button>}</div>
             </CardContent>

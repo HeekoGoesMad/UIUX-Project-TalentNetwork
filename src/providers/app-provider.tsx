@@ -96,7 +96,7 @@ type Context = AppState & {
   saveScreeningResult: (candidateId: string, result: ScreeningResult) => void;
   requestConsent: (candidateId: string) => Promise<boolean>;
   requestConsentBatch: (candidateIds: string[]) => Promise<boolean>;
-  respondToConsent: (candidateId: string, state: Extract<ConsentState, "consented" | "declined">) => Promise<boolean>;
+  respondToConsent: (candidateId: string, state: Extract<ConsentState, "consented" | "declined">, itemId?: string) => Promise<boolean>;
   approvePendingRequests: () => Promise<boolean>;
   startScreening: (candidateId: string) => Promise<boolean>;
   previewCandidate: (candidateId: string) => boolean;
@@ -758,8 +758,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const respondToConsent = async (candidateId: string, consent: Extract<ConsentState, "consented" | "declined">) => {
-    const request = consentRequests.find((item) => item.candidateProfileId === candidateId);
+  const respondToConsent = async (candidateId: string, consent: Extract<ConsentState, "consented" | "declined">, itemId?: string) => {
+    const request = consentRequests.find((item) => itemId ? item.itemId === itemId : item.candidateProfileId === candidateId && item.status === "pending");
     if (supabaseConfigured && request && typeof request.itemId === "string") {
       const response = await fetch(`/api/consent-requests/${request.itemId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: consent === "consented" ? "approved" : "declined" }) });
       if (!response.ok) { toast.error("Respons consent gagal disimpan", { description: ((await response.json()) as { error?: string }).error ?? "Coba lagi." }); return false; }
@@ -781,8 +781,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const approvePendingRequests = async () => {
     if (supabaseConfigured) {
       const pending = consentRequests.filter((item) => item.status === "pending" && typeof item.candidateProfileId === "string");
-      const results = await Promise.all(pending.map((item) => respondToConsent(item.candidateProfileId as string, "consented")));
-      return results.every(Boolean);
+      let allApproved = true;
+      for (const item of pending) {
+        const approved = await respondToConsent(item.candidateProfileId as string, "consented", item.itemId as string);
+        allApproved = approved && allApproved;
+      }
+      return allApproved;
     }
     setState((current) => {
       const now = new Date().toISOString();
