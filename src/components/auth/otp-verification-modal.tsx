@@ -10,7 +10,7 @@ interface OtpVerificationModalProps {
   isOpen: boolean;
   email: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: () => void | Promise<void>;
   title?: string;
   description?: string;
 }
@@ -25,6 +25,7 @@ export function OtpVerificationModal({
 }: OtpVerificationModalProps) {
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const canResend = countdown <= 0;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -48,6 +49,7 @@ export function OtpVerificationModal({
   if (!isOpen) return null;
 
   const handleChange = (index: number, value: string) => {
+    if (loading || isVerified) return;
     const clean = value.replace(/\D/g, "");
     if (!clean) {
       const nextOtp = [...otp];
@@ -74,12 +76,14 @@ export function OtpVerificationModal({
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (loading || isVerified) return;
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (loading || isVerified) return;
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (!pasted) return;
@@ -99,6 +103,7 @@ export function OtpVerificationModal({
   };
 
   const verifyCode = async (tokenString?: string) => {
+    if (loading || isVerified) return;
     const code = tokenString || otp.join("");
     if (code.length < 6) {
       toast.error("Masukkan 6 digit kode OTP secara lengkap.");
@@ -132,16 +137,16 @@ export function OtpVerificationModal({
         }
       }
 
-      // Success
-      toast.success("Email berhasil diverifikasi!");
-      setLoading(false);
-      onSuccess();
+      // Success: lock UI immediately and show transition message
+      setIsVerified(true);
+      toast.success("Email berhasil diverifikasi! Mengalihkan...");
+      await Promise.resolve(onSuccess());
       onClose();
     } catch {
       // Fallback demo validation
-      toast.success("Email berhasil diverifikasi!");
-      setLoading(false);
-      onSuccess();
+      setIsVerified(true);
+      toast.success("Email berhasil diverifikasi! Mengalihkan...");
+      await Promise.resolve(onSuccess());
       onClose();
     }
   };
@@ -169,15 +174,18 @@ export function OtpVerificationModal({
       <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 animate-scale-up">
         {/* Close Button */}
         <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+          onClick={!loading && !isVerified ? onClose : undefined}
+          disabled={loading || isVerified}
+          className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <X className="size-5" />
         </button>
 
         {/* Icon & Title */}
         <div className="text-center space-y-2">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-purple-100 text-[#7C3AED] shadow-2xs">
+          <div className={`mx-auto flex size-12 items-center justify-center rounded-2xl shadow-2xs transition-colors ${
+            isVerified ? "bg-emerald-100 text-emerald-700" : "bg-purple-100 text-[#7C3AED]"
+          }`}>
             <ShieldCheck className="size-6" />
           </div>
           <h3 className="text-xl font-bold text-[#0b2342]">{title}</h3>
@@ -202,11 +210,14 @@ export function OtpVerificationModal({
               inputMode="numeric"
               maxLength={1}
               value={digit}
+              disabled={loading || isVerified}
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}
               onPaste={idx === 0 ? handlePaste : undefined}
-              className={`size-12 rounded-xl border text-center text-xl font-bold transition-all outline-none ${
-                digit
+              className={`size-12 rounded-xl border text-center text-xl font-bold transition-all outline-none disabled:opacity-60 disabled:cursor-not-allowed ${
+                isVerified
+                  ? "border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-2 ring-emerald-500/20"
+                  : digit
                   ? "border-[#7C3AED] bg-purple-50/50 text-[#7C3AED] ring-2 ring-[#7C3AED]/20 shadow-xs"
                   : "border-slate-300 bg-white text-slate-900 focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20"
               }`}
@@ -218,10 +229,18 @@ export function OtpVerificationModal({
         <div className="space-y-3 pt-2">
           <Button
             onClick={() => void verifyCode()}
-            disabled={loading || otp.join("").length < 6}
-            className="w-full h-11 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs gap-2"
+            disabled={loading || isVerified || otp.join("").length < 6}
+            className={`w-full h-11 text-white font-bold rounded-xl shadow-xs gap-2 transition-all ${
+              isVerified
+                ? "bg-emerald-600 hover:bg-emerald-600 cursor-not-allowed"
+                : "bg-[#7C3AED] hover:bg-[#6D28D9]"
+            }`}
           >
-            {loading ? (
+            {isVerified ? (
+              <>
+                <Check className="size-4" /> Berhasil Diverifikasi! Mengalihkan...
+              </>
+            ) : loading ? (
               <>
                 <Loader2 className="size-4 animate-spin" /> Memverifikasi...
               </>
@@ -234,7 +253,7 @@ export function OtpVerificationModal({
 
           {/* Resend Button */}
           <div className="text-center">
-            {canResend ? (
+            {canResend && !loading && !isVerified ? (
               <button
                 type="button"
                 onClick={() => void handleResend()}
@@ -242,6 +261,10 @@ export function OtpVerificationModal({
               >
                 <RefreshCw className="size-3.5" /> Kirim Ulang Kode OTP
               </button>
+            ) : isVerified ? (
+              <p className="text-xs text-emerald-700 font-medium">
+                Akun berhasil diverifikasi. Membuka workspace Anda...
+              </p>
             ) : (
               <p className="text-xs text-muted-foreground">
                 Kirim ulang kode dalam <strong className="text-slate-700">{countdown}s</strong>

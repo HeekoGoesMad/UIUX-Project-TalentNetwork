@@ -101,36 +101,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setOtpModalOpen(true);
       return;
     }
-    
-    let synced: { role?: UserRole; provisioningStatus?: ProvisioningStatus } | null = null;
-    if (supabaseConfigured) {
-      synced = await fetch("/api/auth/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role,
-          name: name || undefined,
-          companyName: companyName || undefined,
-        }),
-      }).then(async (response) => {
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Gagal menyinkronkan profil akun.");
-        }
-        return response.json();
-      }).catch((err) => {
-        setLoading(false);
-        setErrorMessage(err instanceof Error ? err.message : "Tidak dapat menyiapkan profil akun Anda.");
-        return null;
-      });
 
-      if (!synced) return;
-    }
+    // Login flow: app-provider's login() already synced with /api/auth/sync!
     const dest = destination(
-      synced?.role ?? result.role ?? role,
+      result.role ?? role,
       getNext(),
       false,
-      synced?.provisioningStatus ?? result.provisioningStatus
+      result.provisioningStatus
     );
     window.location.href = dest;
   };
@@ -439,12 +416,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Button
             type="submit"
             className="mt-1 w-full rounded-xl bg-[#7C3AED] h-11 sm:h-12 text-xs sm:text-sm font-semibold hover:bg-[#6D28D9] shadow-sm text-white"
-            disabled={loading}
+            disabled={loading || otpModalOpen}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                Memproses…
+                {otpModalOpen ? "Mengalihkan ke Workspace…" : "Memproses…"}
               </>
             ) : (
               <>
@@ -565,6 +542,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           email={pendingRegistration.email}
           onClose={() => setOtpModalOpen(false)}
           onSuccess={async () => {
+            setLoading(true);
             if (supabaseConfigured && pendingRegistration) {
               await fetch("/api/auth/sync", {
                 method: "POST",
@@ -577,7 +555,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               }).catch(() => null);
             }
             setOtpModalOpen(false);
-            router.push(pendingRegistration.destinationPath);
+            window.location.href = pendingRegistration.destinationPath;
           }}
           title="Verifikasi Akun Baru"
           description="Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."

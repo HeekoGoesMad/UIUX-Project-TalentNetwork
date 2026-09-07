@@ -66,6 +66,44 @@ export function applyAccessibilityToDOM(prefs: AccessibilityPreferences) {
   }
 }
 
+export function AccessibilityInitializer() {
+  useEffect(() => {
+    // 1. Initial application from local storage
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        applyAccessibilityToDOM({ ...DEFAULT_PREFERENCES, ...JSON.parse(stored) });
+      }
+    } catch {}
+
+    // 2. Fetch from user metadata if authenticated
+    fetch("/api/user/accessibility")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.preferences) {
+          const serverPrefs = { ...DEFAULT_PREFERENCES, ...data.preferences };
+          applyAccessibilityToDOM(serverPrefs);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(serverPrefs));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // 3. Listen to local custom events for instant updates
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent<AccessibilityPreferences>;
+      if (customEvent.detail) {
+        applyAccessibilityToDOM(customEvent.detail);
+      }
+    };
+    window.addEventListener("proofylink-a11y-changed", handleSync);
+    return () => window.removeEventListener("proofylink-a11y-changed", handleSync);
+  }, []);
+
+  return null;
+}
+
 export function AccessibilitySettings() {
   const [prefs, setPrefs] = useState<AccessibilityPreferences>(() => {
     if (typeof window === "undefined") return DEFAULT_PREFERENCES;
@@ -80,6 +118,23 @@ export function AccessibilitySettings() {
     return DEFAULT_PREFERENCES;
   });
 
+  // Sync from server on mount
+  useEffect(() => {
+    fetch("/api/user/accessibility")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.preferences) {
+          const merged = { ...DEFAULT_PREFERENCES, ...data.preferences };
+          setPrefs(merged);
+          applyAccessibilityToDOM(merged);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     applyAccessibilityToDOM(prefs);
   }, [prefs]);
@@ -90,22 +145,44 @@ export function AccessibilitySettings() {
   ) => {
     const updated = { ...prefs, [key]: val };
     setPrefs(updated);
+    applyAccessibilityToDOM(updated);
+
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      toast.success("Preferensi aksesibilitas diperbarui.");
+      window.dispatchEvent(new CustomEvent("proofylink-a11y-changed", { detail: updated }));
     } catch {
       // ignore
     }
+
+    // Persist to server (user_metadata)
+    fetch("/api/user/accessibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+
+    toast.success("Preferensi aksesibilitas diperbarui.");
   };
 
   const handleReset = () => {
     setPrefs(DEFAULT_PREFERENCES);
+    applyAccessibilityToDOM(DEFAULT_PREFERENCES);
+
     try {
-      localStorage.removeItem(STORAGE_KEY);
-      toast.info("Preferensi aksesibilitas dikembalikan ke bawaan.");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PREFERENCES));
+      window.dispatchEvent(new CustomEvent("proofylink-a11y-changed", { detail: DEFAULT_PREFERENCES }));
     } catch {
       // ignore
     }
+
+    // Persist reset to server
+    fetch("/api/user/accessibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(DEFAULT_PREFERENCES),
+    }).catch(() => {});
+
+    toast.info("Preferensi aksesibilitas dikembalikan ke bawaan.");
   };
 
   return (

@@ -3,8 +3,11 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const syncSchema = z.object({
-  name: z.string().trim().min(2).max(160),
+  name: z.string().trim().min(2).max(160).optional(),
   companyName: z.string().trim().max(160).optional(),
   role: z.enum(["candidate", "recruiter", "partner"]).optional(),
 });
