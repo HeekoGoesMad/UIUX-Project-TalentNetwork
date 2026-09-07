@@ -117,29 +117,31 @@ export class ShortlistService {
       notes?: string | null;
     }
   ) {
-    await this.ensureDefault(db, params.organizationId, params.createdBy);
+    return db.transaction(async (tx) => {
+      await this.ensureDefault(tx, params.organizationId, params.createdBy);
 
-    const shortlist = (
-      await db
+      const [shortlist] = await tx
         .select({ id: schema.shortlists.id })
         .from(schema.shortlists)
         .where(
-          and(
-            eq(schema.shortlists.organizationId, params.organizationId),
-            params.shortlistId
-              ? eq(schema.shortlists.id, params.shortlistId)
-              : eq(schema.shortlists.organizationId, params.organizationId)
-          )
+          params.shortlistId
+            ? and(
+                eq(schema.shortlists.organizationId, params.organizationId),
+                eq(schema.shortlists.id, params.shortlistId)
+              )
+            : and(
+                eq(schema.shortlists.organizationId, params.organizationId),
+                eq(schema.shortlists.name, DEFAULT_SHORTLIST_NAME)
+              )
         )
-        .limit(1)
-    )[0];
+        .orderBy(asc(schema.shortlists.createdAt))
+        .limit(1);
 
-    if (!shortlist) {
-      return { error: "Shortlist belum tersedia.", status: 404 as const };
-    }
+      if (!shortlist) {
+        return { error: "Shortlist belum tersedia.", status: 404 as const };
+      }
 
-    const candidate = (
-      await db
+      const [candidate] = await tx
         .select({ id: schema.candidateProfiles.id })
         .from(schema.candidateProfiles)
         .where(
@@ -148,27 +150,47 @@ export class ShortlistService {
             eq(schema.candidateProfiles.isPublished, true)
           )
         )
-        .limit(1)
-    )[0];
+        .limit(1);
 
-    if (!candidate) {
-      return { error: "Profil kandidat tidak tersedia.", status: 404 as const };
-    }
+      if (!candidate) {
+        return { error: "Profil kandidat tidak tersedia.", status: 404 as const };
+      }
 
-    const [item] = await db
-      .insert(schema.shortlistItems)
-      .values({
-        shortlistId: shortlist.id,
-        candidateProfileId: params.candidateProfileId,
-        notes: params.notes ?? null,
-      })
-      .returning({
-        id: schema.shortlistItems.id,
-        candidateProfileId: schema.shortlistItems.candidateProfileId,
-        notes: schema.shortlistItems.notes,
-      });
+      const [inserted] = await tx
+        .insert(schema.shortlistItems)
+        .values({
+          shortlistId: shortlist.id,
+          candidateProfileId: params.candidateProfileId,
+          notes: params.notes ?? null,
+        })
+        .onConflictDoNothing({
+          target: [schema.shortlistItems.shortlistId, schema.shortlistItems.candidateProfileId],
+        })
+        .returning({
+          id: schema.shortlistItems.id,
+          candidateProfileId: schema.shortlistItems.candidateProfileId,
+          notes: schema.shortlistItems.notes,
+        });
 
-    return { item };
+      if (inserted) return { item: inserted };
+
+      const [existing] = await tx
+        .select({
+          id: schema.shortlistItems.id,
+          candidateProfileId: schema.shortlistItems.candidateProfileId,
+          notes: schema.shortlistItems.notes,
+        })
+        .from(schema.shortlistItems)
+        .where(
+          and(
+            eq(schema.shortlistItems.shortlistId, shortlist.id),
+            eq(schema.shortlistItems.candidateProfileId, params.candidateProfileId)
+          )
+        )
+        .limit(1);
+
+      return { item: existing, idempotent: true as const };
+    });
   }
 
   /**
