@@ -10,8 +10,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test:e2e": "node scripts/tests/e2e-flow.mjs",
+    "test:unit": "node --test test/unit/*.test.mjs",
     "worker:outbox": "node scripts/outbox-worker.mjs",
+    "db:seed": "node scripts/seed.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check"
