@@ -24,7 +24,6 @@ export async function getParticipant(db: Database, conversationId: string, userI
 const messageSchema = z.object({
   conversationId: z.string().uuid(),
   body: z.string().trim().min(1).max(4_000),
-  attachment: z.object({ name: z.string().trim().min(1).max(255), mimeType: z.string().trim().max(120), size: z.number().int().positive().max(25_000_000) }).optional(),
 });
 
 export async function GET(request: Request) {
