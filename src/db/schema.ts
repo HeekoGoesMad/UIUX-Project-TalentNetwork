@@ -202,6 +202,7 @@ export const organizations = pgTable("organizations", {
   updatedAt: updatedAt(),
 }, (table) => [
   index("organizations_created_by_idx").on(table.createdBy),
+  index("organizations_reviewed_by_idx").on(table.reviewedBy),
   index("organizations_verification_status_idx").on(table.verificationStatus),
   index("organizations_subscription_status_idx").on(table.subscriptionStatus),
 ]);
@@ -228,7 +229,11 @@ export const candidateProfiles = pgTable("candidate_profiles", {
   completeness: integer("completeness").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (table) => [check("candidate_profiles_completeness_check", sql`${table.completeness} between 0 and 100`)]);
+}, (table) => [
+  check("candidate_profiles_completeness_check", sql`${table.completeness} between 0 and 100`),
+  index("candidate_profiles_published_updated_idx").on(table.isPublished, table.updatedAt),
+  index("candidate_profiles_published_location_idx").on(table.isPublished, table.location),
+]);
 
 export const candidateProfileSections = pgTable("candidate_profile_sections", {
   id: id(),
@@ -368,6 +373,7 @@ export const conversations = pgTable("conversations", {
 }, (table) => [
   index("conversations_organization_idx").on(table.organizationId),
   index("conversations_created_by_idx").on(table.createdBy),
+  index("conversations_consent_item_idx").on(table.consentRequestItemId),
 ]);
 
 export const conversationParticipants = pgTable("conversation_participants", {
@@ -443,6 +449,7 @@ export const messageReports = pgTable("message_reports", {
   createdAt: createdAt(),
 }, (table) => [
   index("message_reports_conversation_idx").on(table.conversationId),
+  index("message_reports_message_idx").on(table.messageId),
   index("message_reports_reporter_idx").on(table.reporterId),
 ]);
 
@@ -714,6 +721,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
 }, (table) => [
   check("notification_deliveries_attempt_count_check", sql`${table.attemptCount} >= 0`),
   index("notification_deliveries_notification_status_idx").on(table.notificationId, table.status),
+  index("notification_deliveries_status_next_attempt_idx").on(table.status, table.nextAttemptAt),
 ]);
 
 export const candidateDocuments = pgTable("candidate_documents", {
@@ -853,7 +861,7 @@ export const skillAliases = pgTable("skill_aliases", {
 
 export const searchAnalytics = pgTable("search_analytics", {
   id: id(), organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }), userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), savedSearchId: uuid("saved_search_id").references(() => savedSearches.id, { onDelete: "set null" }), eventType: searchAnalyticsEventType("event_type").notNull(), query: text("query"), resultCount: integer("result_count"), metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}), createdAt: createdAt(),
-}, (table) => [index("search_analytics_organization_created_idx").on(table.organizationId, table.createdAt), index("search_analytics_saved_search_idx").on(table.savedSearchId)]);
+}, (table) => [index("search_analytics_organization_created_idx").on(table.organizationId, table.createdAt), index("search_analytics_user_idx").on(table.userId), index("search_analytics_saved_search_idx").on(table.savedSearchId)]);
 
 export const screeningGovernanceVersions = pgTable("screening_governance_versions", {
   id: id(), organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }), version: integer("version").notNull(), policy: jsonb("policy").$type<Record<string, unknown>>().notNull().default({}), publishedAt: timestamp("published_at", { withTimezone: true }), createdBy: uuid("created_by").notNull().references(() => users.id), createdAt: createdAt(),

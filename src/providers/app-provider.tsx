@@ -779,7 +779,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startScreening = async (candidateId: string) => {
     if (supabaseConfigured && UUID_RE.test(candidateId)) {
       try {
-        const consentResponse = await fetch("/api/consent-requests");
+        const consentResponse = await fetch(`/api/consent-requests?candidateProfileId=${encodeURIComponent(candidateId)}`);
         const consentData = (await consentResponse.json()) as { requests?: { itemId: string; candidateProfileId: string; consentState?: ConsentState }[] };
         const consent = consentData.requests?.find((item) => item.candidateProfileId === candidateId && item.consentState === "consented");
         if (!consent) {

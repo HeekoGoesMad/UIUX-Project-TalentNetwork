@@ -12,6 +12,11 @@ const createSchema = z.object({
   coverNote: z.string().trim().min(20, "Cover note minimal 20 karakter.").max(4000, "Cover note maksimal 4.000 karakter."),
 }).strict();
 
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(24),
+});
+
 const applicationSelect = {
   application: schema.applications,
   jobTitle: schema.jobs.title,
@@ -22,21 +27,26 @@ const applicationSelect = {
 };
 type ApplicationRow = { application: typeof schema.applications.$inferSelect; jobTitle: string; organizationName: string; candidateName: string | null; candidateHeadline: string | null; candidateLocation: string | null };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const paged = paginationSchema.safeParse({ page: url.searchParams.get("page") ?? undefined, limit: url.searchParams.get("limit") ?? undefined });
+    if (!paged.success) return NextResponse.json({ error: "Parameter pagination tidak valid." }, { status: 400 });
+    const { page, limit } = paged.data; const offset = (page - 1) * limit;
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     if (current.user.role === "candidate") {
       const profile = await current.db.select({ id: schema.candidateProfiles.id }).from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1);
-      if (!profile[0]) return NextResponse.json({ applications: [] });
+      if (!profile[0]) return NextResponse.json({ applications: [], page, limit, hasMore: false });
       const rows = await current.db.select(applicationSelect).from(schema.applications)
         .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
         .innerJoin(schema.organizations, eq(schema.organizations.id, schema.jobs.organizationId))
         .leftJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
         .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-        .where(eq(schema.applications.candidateProfileId, profile[0].id)).orderBy(desc(schema.applications.updatedAt));
-      return NextResponse.json({ applications: rows.map(formatApplication) });
+        .where(eq(schema.applications.candidateProfileId, profile[0].id)).orderBy(desc(schema.applications.updatedAt)).limit(limit + 1).offset(offset);
+      const hasMore = rows.length > limit;
+      return NextResponse.json({ applications: (hasMore ? rows.slice(0, limit) : rows).map(formatApplication), page, limit, hasMore });
     }
 
     const scope = await getRecruiterScope(current.db, current.user);
@@ -46,8 +56,9 @@ export async function GET() {
       .innerJoin(schema.organizations, eq(schema.organizations.id, schema.jobs.organizationId))
       .leftJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-      .where(eq(schema.jobs.organizationId, scope.membership.organizationId)).orderBy(desc(schema.applications.updatedAt));
-    return NextResponse.json({ applications: rows.map(formatApplication) });
+      .where(eq(schema.jobs.organizationId, scope.membership.organizationId)).orderBy(desc(schema.applications.updatedAt)).limit(limit + 1).offset(offset);
+    const hasMore = rows.length > limit;
+    return NextResponse.json({ applications: (hasMore ? rows.slice(0, limit) : rows).map(formatApplication), page, limit, hasMore });
   } catch (error) {
     console.error("Application list failed", error);
     return NextResponse.json({ error: "Aplikasi belum dapat dimuat." }, { status: 503 });
