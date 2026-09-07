@@ -52,12 +52,12 @@ export function AdminShell({ title, children }: { title: string; children: React
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl">
+          <Button asChild variant="ghost" size="sm" className="gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl">
+            <Link href="/?preview=1">
               <ArrowLeft className="size-3.5" />
               Kembali ke Web
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <div className="h-4 w-px bg-slate-200" />
           <div className="flex items-center gap-2 text-xs">
             <div className="flex size-7 items-center justify-center rounded-full bg-purple-100 font-bold text-[#7C3AED]">
