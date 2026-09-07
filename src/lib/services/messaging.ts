@@ -128,6 +128,7 @@ export class MessagingService {
   ) {
     const [approved] = await db
       .select({
+        itemId: schema.consentRequestItems.id,
         candidateUserId: schema.candidateProfiles.userId,
         organizationId: schema.consentRequestBatches.organizationId,
       })
@@ -207,12 +208,100 @@ export class MessagingService {
         .values({
           organizationId: approved.organizationId,
           createdBy: user.id,
+          consentRequestItemId: approved.itemId,
         })
         .returning({ id: schema.conversations.id });
 
       await tx.insert(schema.conversationParticipants).values([
         { conversationId: conversation.id, userId: user.id },
         { conversationId: conversation.id, userId: approved.candidateUserId },
+      ]);
+
+      return { conversationId: conversation.id, reused: false };
+    });
+  }
+
+  /**
+   * Create or reuse the conversation selected by a candidate's approved request.
+   * The consent item identifies the exact recruiter when several recruiters have
+   * requested contact for the same candidate profile.
+   */
+  static async createOrGetConversationForCandidate(
+    db: Database,
+    candidateUserId: string,
+    candidateProfileId: string,
+    consentRequestItemId: string
+  ) {
+    const [approved] = await db
+      .select({
+        organizationId: schema.consentRequestBatches.organizationId,
+        recruiterUserId: schema.consentRequestBatches.requestedBy,
+        candidateUserId: schema.candidateProfiles.userId,
+      })
+      .from(schema.consentRequestItems)
+      .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.consentRequestItems.candidateProfileId))
+      .innerJoin(schema.consentRequestBatches, eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId))
+      .where(
+        and(
+          eq(schema.consentRequestItems.id, consentRequestItemId),
+          eq(schema.consentRequestItems.candidateProfileId, candidateProfileId),
+          eq(schema.consentRequestItems.status, "approved")
+        )
+      )
+      .limit(1);
+
+    if (!approved || approved.candidateUserId !== candidateUserId) {
+      return { error: "Percakapan hanya dapat dibuat dari consent kandidat yang disetujui.", status: 403 as const };
+    }
+
+    return db.transaction(async (tx) => {
+      await tx
+        .select({ id: schema.organizations.id })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, approved.organizationId))
+        .for("update");
+
+      const existingConversations = await tx
+        .select({ id: schema.conversations.id })
+        .from(schema.conversations)
+        .innerJoin(schema.conversationParticipants, eq(schema.conversationParticipants.conversationId, schema.conversations.id))
+        .where(
+          and(
+            eq(schema.conversations.organizationId, approved.organizationId),
+            eq(schema.conversationParticipants.userId, candidateUserId),
+            eq(schema.conversations.status, "active")
+          )
+        );
+
+      if (existingConversations.length > 0) {
+        const existingIds = existingConversations.map((conversation) => conversation.id);
+        const [shared] = await tx
+          .select({ conversationId: schema.conversationParticipants.conversationId })
+          .from(schema.conversationParticipants)
+          .where(
+            and(
+              inArray(schema.conversationParticipants.conversationId, existingIds),
+              eq(schema.conversationParticipants.userId, approved.recruiterUserId),
+              isNull(schema.conversationParticipants.leftAt)
+            )
+          )
+          .limit(1);
+
+        if (shared) return { conversationId: shared.conversationId, reused: true };
+      }
+
+      const [conversation] = await tx
+        .insert(schema.conversations)
+        .values({
+          organizationId: approved.organizationId,
+          createdBy: candidateUserId,
+          consentRequestItemId,
+        })
+        .returning({ id: schema.conversations.id });
+
+      await tx.insert(schema.conversationParticipants).values([
+        { conversationId: conversation.id, userId: candidateUserId },
+        { conversationId: conversation.id, userId: approved.recruiterUserId },
       ]);
 
       return { conversationId: conversation.id, reused: false };
