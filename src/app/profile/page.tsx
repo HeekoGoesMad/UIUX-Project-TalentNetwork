@@ -349,7 +349,7 @@ export default function ProfilePage() {
               <div className="px-6 pb-6">
                 {/* Avatar with Camera & Remove badges */}
                 <div className="-mt-16 sm:-mt-20 relative inline-block">
-                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-3xl border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
+                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-full border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
                     {p.avatarUrl ? (
                       <img
                         src={p.avatarUrl}
@@ -364,7 +364,7 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Camera & Trash buttons for avatar */}
-                  <div className="absolute -bottom-1 -right-2 flex items-center gap-1">
+                  <div className="absolute bottom-0 right-0 flex items-center gap-1">
                     <label
                       title="Ubah Foto Profil"
                       className="cursor-pointer flex size-8 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform hover:scale-105"
