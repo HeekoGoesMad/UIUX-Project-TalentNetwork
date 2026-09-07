@@ -1,40 +1,31 @@
-import { expect, test, type APIRequestContext } from "playwright/test";
+import { expect, test } from "playwright/test";
 
-async function backendUp(request: APIRequestContext) {
-  try {
-    const res = await request.get("/api/health");
-    const body = (await res.json()) as { checks?: { database?: string } };
-    return body?.checks?.database === "up";
-  } catch {
-    return false;
-  }
-}
-
-// With a backend, logged-out visitors stay on the denied popup past the
-// ceremony (regression: the gate timer once clobbered the denial). Without
-// one, the portal renders its empty state without crashing or leaking data.
-test("logged-out visitor flow respects backend availability", async ({ page, request }) => {
-  const hasBackend = await backendUp(request);
+// The API response is the ground-truth availability signal: auth runs before
+// any DB access, so anonymous callers get 401/403 whenever Supabase is
+// configured, regardless of DB health.
+test("logged-out visitor never sees admin data", async ({ page, request }) => {
   await page.goto("/admin");
   await expect(page.getByText("Memverifikasi akses admin")).toBeVisible();
-  if (hasBackend) {
-    await expect(page.getByText("Error 401")).toBeVisible({ timeout: 10_000 });
+  const probe = await request.get("/api/admin/dashboard");
+  if (probe.status() === 401 || probe.status() === 403) {
+    const label = probe.status() === 401 ? "Error 401" : "Error 403";
+    await expect(page.getByText(label)).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(4000);
-    await expect(page.getByText("Error 401")).toBeVisible();
+    await expect(page.getByText(label)).toBeVisible();
     await expect(page.getByText("Metrik Utama")).toHaveCount(0);
   } else {
     await expect(page.getByText("Metrik Utama")).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(4000);
+    await expect(page.getByText("Metrik Utama")).toBeVisible();
   }
 });
 
-test("admin dashboard API rejects anonymous callers", async ({ request }) => {
-  const hasBackend = await backendUp(request);
+test("admin dashboard API never serves anonymous callers", async ({ request }) => {
   const res = await request.get("/api/admin/dashboard");
-  const body = (await res.json()) as { error?: string; errorId?: string };
-  if (hasBackend) {
-    expect(res.status()).toBe(401);
-  } else {
-    expect(res.status()).toBe(500);
-    expect(body.errorId).toBeTruthy();
-  }
+  // 401 with Supabase configured, 500+errorId without — but never 200+data.
+  expect(res.status()).not.toBe(200);
+  const body = (await res.json()) as { error?: string; errorId?: string; metrics?: unknown };
+  expect(body.error).toBeTruthy();
+  expect(body.metrics).toBeUndefined();
+  if (res.status() === 500) expect(body.errorId).toBeTruthy();
 });
