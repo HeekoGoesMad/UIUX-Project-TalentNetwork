@@ -1,16 +1,17 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
 
 export async function GET(request: Request) {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() || "";
     const actionFilter = searchParams.get("action")?.trim() || "";
 
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
+    const db = current.db;
 
     const rows = await db
       .select({

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
 
 const grantSchema = z
   .object({
@@ -17,8 +17,9 @@ const grantSchema = z
 
 export async function GET() {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = current.db;
 
     // Ambil token accounts beserta data organisasi
     const orgAccounts = await db
@@ -88,7 +89,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const current = await getCurrentAppUser({ allowPending: true });
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const parsed = grantSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -98,8 +100,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const db = "error" in current ? (await import("@/db")).getDb() : current.db;
-    const actorUserId = "error" in current ? parsed.data.organizationId : current.user.id;
+    const db = current.db;
+    const actorUserId = current.user.id;
 
     const [account] = await db
       .insert(schema.tokenAccounts)

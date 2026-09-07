@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
+import { isDevBypassEnabled } from "@/lib/config/server";
 import type { Database } from "@/db";
 
 export type ApiRole = "candidate" | "recruiter";
@@ -12,7 +13,7 @@ export type ApiAccess =
 export type ApiAccessFailure = { error: string; status: 401 | 403 | 503 };
 
 function demoAuthEnabled() {
-  return process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true";
+  return isDevBypassEnabled();
 }
 
 function databaseModeConfigured() {

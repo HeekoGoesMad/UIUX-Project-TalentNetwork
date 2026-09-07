@@ -26,7 +26,9 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     const existing = existingByAuthId ?? existingByEmail;
 
     const metadataRole = authUser.user_metadata?.role as PersistedRole | undefined;
-    const requestedRole: PersistedRole | undefined = input.role ?? metadataRole;
+    // ponytail: strip client-controlled "admin" so new users default to candidate; existing admin rows keep role via existing?.role below
+    const rawRequestedRole: PersistedRole | undefined = input.role ?? metadataRole;
+    const requestedRole: PersistedRole | undefined = rawRequestedRole === "admin" ? undefined : rawRequestedRole;
 
     // Strict 1 Email = 1 Role check:
     // If the user already exists in the database with an assigned role, do NOT allow changing roles.

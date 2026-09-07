@@ -3,13 +3,128 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
 
-async function getAdmin() {
-  return getCurrentAppUser({ allowPending: true });
+export async function GET() {
+  try {
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    const organizations = await current.db
+      .select({
+        organization: schema.organizations,
+        memberCount: schema.organizationMembers.id,
+        billing: schema.billingAccounts,
+      })
+      .from(schema.organizations)
+      .leftJoin(schema.organizationMembers, eq(schema.organizationMembers.organizationId, schema.organizations.id))
+      .leftJoin(schema.billingAccounts, eq(schema.billingAccounts.organizationId, schema.organizations.id))
+      .orderBy(desc(schema.organizations.createdAt));
+
+    const grouped = organizations.reduce<
+      Array<{
+        organization: (typeof organizations)[number]["organization"];
+        memberCount: number;
+        billing: (typeof organizations)[number]["billing"];
+      }>
+    >((all, row) => {
+      const existing = all.find((item) => item.organization.id === row.organization.id);
+      if (existing) existing.memberCount += row.memberCount ? 1 : 0;
+      else all.push({ organization: row.organization, memberCount: row.memberCount ? 1 : 0, billing: row.billing });
+      return all;
+    }, []);
+
+    return NextResponse.json({ organizations: grouped, supportedSettings: ["billingOwnerId", "spendLimit"] });
+  } catch {
+    return NextResponse.json({ error: "Organisasi belum tersedia." }, { status: 503 });
+  }
 }
-export async function GET() { try { const current = await getAdmin(); if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status }); const organizations = await current.db.select({ organization: schema.organizations, memberCount: schema.organizationMembers.id, billing: schema.billingAccounts }).from(schema.organizations).leftJoin(schema.organizationMembers, eq(schema.organizationMembers.organizationId, schema.organizations.id)).leftJoin(schema.billingAccounts, eq(schema.billingAccounts.organizationId, schema.organizations.id)).orderBy(desc(schema.organizations.createdAt)); const grouped = organizations.reduce<Array<{ organization: typeof organizations[number]["organization"]; memberCount: number; billing: typeof organizations[number]["billing"] }>>((all, row) => { const existing = all.find((item) => item.organization.id === row.organization.id); if (existing) existing.memberCount += row.memberCount ? 1 : 0; else all.push({ organization: row.organization, memberCount: row.memberCount ? 1 : 0, billing: row.billing }); return all; }, []); return NextResponse.json({ organizations: grouped, supportedSettings: ["billingOwnerId", "spendLimit"] }); } catch { return NextResponse.json({ error: "Organisasi belum tersedia." }, { status: 503 }); } }
 
-export async function PATCH(request: Request) { try { const current = await getAdmin(); if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status }); const parsed = z.object({ organizationId: z.string().uuid(), spendLimit: z.number().int().nonnegative().nullable().optional(), billingOwnerId: z.string().uuid().nullable().optional() }).strict().safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: "Pengaturan organisasi tidak valid." }, { status: 400 }); const [organization] = await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, parsed.data.organizationId)); if (!organization) return NextResponse.json({ error: "Organisasi tidak ditemukan." }, { status: 404 }); const [account] = await current.db.insert(schema.billingAccounts).values({ organizationId: organization.id, billingOwnerId: parsed.data.billingOwnerId ?? null, spendLimit: parsed.data.spendLimit ?? null }).onConflictDoUpdate({ target: schema.billingAccounts.organizationId, set: { billingOwnerId: parsed.data.billingOwnerId ?? null, spendLimit: parsed.data.spendLimit ?? null, updatedAt: new Date() } }).returning(); await writeAuditLog({ db: current.db, actorUserId: current.user.id, organizationId: organization.id, action: "admin.organization.billing.updated", entityType: "organization", entityId: organization.id, metadata: parsed.data }); return NextResponse.json({ organization, billing: account }); } catch { return NextResponse.json({ error: "Pengaturan organisasi gagal diperbarui." }, { status: 503 }); } }
+export async function PATCH(request: Request) {
+  try {
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-export async function POST(request: Request) { try { const current = await getAdmin(); if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status }); const parsed = z.object({ name: z.string().trim().min(2).max(120), slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/) }).strict().safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 }); const [organization] = await current.db.insert(schema.organizations).values({ ...parsed.data, createdBy: current.user.id }).returning(); await writeAuditLog({ db: current.db, actorUserId: current.user.id, organizationId: organization.id, action: "admin.organization.created", entityType: "organization", entityId: organization.id, metadata: { name: organization.name } }); return NextResponse.json({ organization }, { status: 201 }); } catch { return NextResponse.json({ error: "Organisasi gagal dibuat." }, { status: 409 }); } }
+    const parsed = z
+      .object({
+        organizationId: z.string().uuid(),
+        spendLimit: z.number().int().nonnegative().nullable().optional(),
+        billingOwnerId: z.string().uuid().nullable().optional(),
+      })
+      .strict()
+      .safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: "Pengaturan organisasi tidak valid." }, { status: 400 });
+
+    const [organization] = await current.db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, parsed.data.organizationId));
+    if (!organization) return NextResponse.json({ error: "Organisasi tidak ditemukan." }, { status: 404 });
+
+    const [account] = await current.db
+      .insert(schema.billingAccounts)
+      .values({
+        organizationId: organization.id,
+        billingOwnerId: parsed.data.billingOwnerId ?? null,
+        spendLimit: parsed.data.spendLimit ?? null,
+      })
+      .onConflictDoUpdate({
+        target: schema.billingAccounts.organizationId,
+        set: {
+          billingOwnerId: parsed.data.billingOwnerId ?? null,
+          spendLimit: parsed.data.spendLimit ?? null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    await writeAuditLog({
+      db: current.db,
+      actorUserId: current.user.id,
+      organizationId: organization.id,
+      action: "admin.organization.billing.updated",
+      entityType: "organization",
+      entityId: organization.id,
+      metadata: parsed.data,
+    });
+
+    return NextResponse.json({ organization, billing: account });
+  } catch {
+    return NextResponse.json({ error: "Pengaturan organisasi gagal diperbarui." }, { status: 503 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    const parsed = z
+      .object({
+        name: z.string().trim().min(2).max(120),
+        slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/),
+      })
+      .strict()
+      .safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: "Organisasi tidak valid." }, { status: 400 });
+
+    const [organization] = await current.db
+      .insert(schema.organizations)
+      .values({ ...parsed.data, createdBy: current.user.id })
+      .returning();
+
+    await writeAuditLog({
+      db: current.db,
+      actorUserId: current.user.id,
+      organizationId: organization.id,
+      action: "admin.organization.created",
+      entityType: "organization",
+      entityId: organization.id,
+      metadata: { name: organization.name },
+    });
+
+    return NextResponse.json({ organization }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "Organisasi gagal dibuat." }, { status: 409 });
+  }
+}
