@@ -32,7 +32,8 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
 
     // Strict 1 Email = 1 Role check:
     // If the user already exists in the database with an assigned role, do NOT allow changing roles.
-    if (existing && requestedRole && existing.role !== requestedRole) {
+    // Existing admins are exempt so they can sign in via any login tab; their role is never mutated.
+    if (existing && requestedRole && existing.role !== requestedRole && existing.role !== "admin") {
       const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
       err.name = "RoleMismatchError";
       throw err;

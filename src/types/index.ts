@@ -101,7 +101,7 @@ export type AppState = {
   partnerVerifications?: Record<string, CampusVerification>;
 };
 
-export type UserRole = "candidate" | "recruiter" | "partner";
+export type UserRole = "candidate" | "recruiter" | "partner" | "admin";
 export type ProvisioningStatus = "pending" | "active" | "rejected" | "revision_required";
 export type DemoUser = {
   name: string;
