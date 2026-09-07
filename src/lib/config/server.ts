@@ -22,6 +22,23 @@ function hasValue(name: string) {
   return Boolean(process.env[name]?.trim());
 }
 
+export function isDevBypassEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.APP_ENV !== "production" &&
+    process.env.DEV_AUTH_BYPASS === "true"
+  );
+}
+
+export function assertNoDevBypassInProduction() {
+  if (
+    (process.env.NODE_ENV === "production" || process.env.APP_ENV === "production") &&
+    process.env.DEV_AUTH_BYPASS === "true"
+  ) {
+    throw new Error("DEV_AUTH_BYPASS must not be set in production");
+  }
+}
+
 export function getProductionConfig(): ProductionConfig {
   const isProduction = process.env.NODE_ENV === "production" || process.env.APP_ENV === "production";
   const flags = {
@@ -54,7 +71,7 @@ export function validateProductionConfig() {
   if (!config.isProduction) return config;
 
   const missing: string[] = [];
-  if (process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") missing.push("NEXT_PUBLIC_DEV_AUTH_BYPASS must not be true");
+  if (process.env.DEV_AUTH_BYPASS === "true") missing.push("DEV_AUTH_BYPASS must not be true");
   if (process.env.DEV_TOKEN_GRANT_ENABLED === "true") missing.push("DEV_TOKEN_GRANT_ENABLED must not be true");
   if (!config.readiness.database) missing.push("DATABASE_URL");
   if (!config.readiness.supabase) missing.push("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY");

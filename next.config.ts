@@ -15,7 +15,7 @@ const isDeploymentProduction =
   process.env.CONTEXT === "production";
 
 if (isDeploymentProduction) {
-  const forbidden = ["DEV_AUTH_BYPASS", "DEV_TOKEN_GRANT_ENABLED"].filter(
+  const forbidden = ["DEV_AUTH_BYPASS", "DEV_TOKEN_GRANT_ENABLED", "NEXT_PUBLIC_DEV_AUTH_BYPASS"].filter(
     (name) => process.env[name] === "true"
   );
   if (forbidden.length) {

@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { candidateProfileForUser, uuidSchema, verificationStatusSchema } from "@/lib/cv/api";
 import { getDemoVerifications } from "@/lib/cv/demo";
+import { isDevBypassEnabled } from "@/lib/config/server";
 
 const patchSchema = z.object({ status: verificationStatusSchema, provider: z.string().trim().min(1).max(120).optional(), evidence: z.record(z.string(), z.unknown()).optional(), disputeReason: z.string().trim().min(10).max(1000).optional(), expiresAt: z.string().datetime().optional() }).strict();
 
@@ -15,7 +16,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ve
     if (!uuidSchema.safeParse(verificationId).success) return NextResponse.json({ error: "ID verifikasi tidak valid." }, { status: 400 });
     const parsed = patchSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Perubahan status verifikasi tidak valid." }, { status: 400 });
-    if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") {
+    if (isDevBypassEnabled()) {
       const row = getDemoVerifications().find((item) => item.id === verificationId);
       if (!row) return NextResponse.json({ error: "Verifikasi tidak ditemukan." }, { status: 404 });
       if (parsed.data.status !== "disputed") return NextResponse.json({ error: "Mode demo hanya memperlihatkan dispute kandidat; review admin memerlukan database." }, { status: 403 });
