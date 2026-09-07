@@ -16,7 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminDenied } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,15 @@ export default function AdminDashboardPage() {
   if (denied) {
     return (
       <AdminShell title="Ringkasan Performa Platform">
-        <AdminDenied reason={denied} />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+      </AdminShell>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <AdminShell title="Ringkasan Performa Platform">
+        <AdminChecking />
       </AdminShell>
     );
   }

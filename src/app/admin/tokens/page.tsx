@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminDenied } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,7 +134,15 @@ export default function AdminTokensPage() {
   if (denied) {
     return (
       <AdminShell title="Pemantauan & Kuota Token Perusahaan">
-        <AdminDenied reason={denied} />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+      </AdminShell>
+    );
+  }
+
+  if (loading && accounts.length === 0) {
+    return (
+      <AdminShell title="Pemantauan & Kuota Token Perusahaan">
+        <AdminChecking />
       </AdminShell>
     );
   }

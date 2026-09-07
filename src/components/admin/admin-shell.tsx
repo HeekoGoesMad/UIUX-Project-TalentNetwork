@@ -65,7 +65,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             </div>
             <div className="hidden sm:block text-left">
               <p className="font-semibold text-slate-900 leading-tight">Admin System</p>
-              <p className="text-[10px] text-muted-foreground">superadmin@proofylink.id</p>
+              <p className="text-[10px] text-muted-foreground">superadmin@talentnetwork.id</p>
             </div>
           </div>
         </div>
