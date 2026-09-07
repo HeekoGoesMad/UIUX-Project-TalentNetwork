@@ -40,6 +40,7 @@ const COMPANY_SIZE_OPTIONS = [
 export function RecruiterSettingsView() {
   const [activeTab, setActiveTab] = useState<"profile" | "accessibility" | "security">("profile");
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
