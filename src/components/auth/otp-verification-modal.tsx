@@ -199,7 +199,7 @@ export function OtpVerificationModal({
         </div>
 
         {/* 6 Digit Inputs */}
-        <div className="flex justify-center gap-2.5 py-2">
+        <div className="flex justify-center gap-1.5 sm:gap-2.5 py-2">
           {otp.map((digit, idx) => (
             <input
               key={idx}
@@ -214,7 +214,7 @@ export function OtpVerificationModal({
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}
               onPaste={idx === 0 ? handlePaste : undefined}
-              className={`size-12 rounded-xl border text-center text-xl font-bold transition-all outline-none disabled:opacity-60 disabled:cursor-not-allowed ${
+              className={`size-10 sm:size-12 rounded-lg sm:rounded-xl border text-center text-lg sm:text-xl font-bold transition-all outline-none disabled:opacity-60 disabled:cursor-not-allowed ${
                 isVerified
                   ? "border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-2 ring-emerald-500/20"
                   : digit

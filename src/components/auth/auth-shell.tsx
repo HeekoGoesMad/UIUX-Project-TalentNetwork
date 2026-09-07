@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, ReactNode } from "react";
+import { ReactNode } from "react";
 import { ShieldCheck, Sparkles, Check, Lock, WalletCards, GraduationCap } from "lucide-react";
 
 export function AuthShell({
@@ -13,27 +13,10 @@ export function AuthShell({
   title: string;
   description: string;
 }) {
-  useEffect(() => {
-    const { body } = document;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const previousOverflow = body.style.overflow;
-    const previousPaddingRight = body.style.paddingRight;
-
-    body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${scrollbarWidth}px`;
-    }
-
-    return () => {
-      body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPaddingRight;
-    };
-  }, []);
-
   return (
-    <div className="h-[calc(100vh-4.5rem)] flex items-center justify-center px-4 py-4 sm:py-6 bg-[#f9fafb] overflow-hidden">
-      <div className="w-full max-w-6xl">
-        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl grid lg:grid-cols-[1fr_1.25fr]">
+    <div className="min-h-[calc(100vh-4.5rem)] flex items-center justify-center px-3.5 py-6 sm:px-6 sm:py-10 bg-[#f9fafb]">
+      <div className="w-full max-w-6xl my-auto">
+        <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white shadow-xl grid lg:grid-cols-[1fr_1.25fr]">
           {/* Left Decorative & Trust Panel (Desktop) */}
           <aside className="navy-grid relative hidden flex-col justify-between p-8 lg:p-12 text-white lg:flex overflow-hidden">
             {/* Ambient Background Glows */}
@@ -98,7 +81,7 @@ export function AuthShell({
           </aside>
 
           {/* Right Main Form Container */}
-          <main className="flex flex-col justify-center p-6 sm:p-10 lg:p-12 bg-white">
+          <main className="flex flex-col justify-center p-5 sm:p-8 lg:p-12 bg-white">
             <div className="w-full max-w-lg mx-auto">
               {/* Mobile Header Logo */}
               <div className="mb-4 lg:hidden">

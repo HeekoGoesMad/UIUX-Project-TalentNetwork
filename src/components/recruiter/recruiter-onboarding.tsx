@@ -276,8 +276,21 @@ export function RecruiterOnboarding() {
 
   return (
     <ProtectedRoute role="recruiter">
-      <div className="fixed inset-0 z-10 overflow-hidden bg-background pt-20">
-        <div className="mx-auto flex h-full max-w-7xl overflow-hidden border-x border-border bg-card shadow-xl">
+      <div className="fixed inset-0 z-10 flex flex-col overflow-hidden bg-background md:p-3 lg:p-6">
+        <div className="mx-auto flex h-full w-full max-w-7xl flex-col md:flex-row overflow-hidden border-border bg-card md:rounded-2xl md:border md:shadow-2xl">
+          {/* Mobile Brand Top Bar */}
+          <div className="flex items-center justify-between border-b bg-[#0b2342] px-4 py-3 text-white md:hidden">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white shadow-xs">
+                <ShieldCheck className="size-4" />
+              </span>
+              <span>ProofyLink</span>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-[#7aaee0]">
+              Rekruter
+            </span>
+          </div>
+
           {/* ─── LEFT SIDEBAR (DARK ENTERPRISE BLUE) ─── */}
           <aside className="hidden w-[295px] shrink-0 flex-col bg-[#0b2342] p-7 text-white md:flex">
             <div className="flex items-center gap-2.5 font-bold text-base">
@@ -340,7 +353,7 @@ export function RecruiterOnboarding() {
           {/* ─── RIGHT CONTENT PANEL ─── */}
           <main className="flex min-w-0 flex-1 flex-col">
             {/* Top Bar with Step and Progress */}
-            <div className="border-b bg-card px-5 py-4 sm:px-10">
+            <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-mono text-[11px] uppercase tracking-widest text-[#0b2342] font-semibold">
@@ -360,10 +373,18 @@ export function RecruiterOnboarding() {
                   </div>
                 </div>
               </div>
+              <div className="mt-3 flex gap-1 md:hidden">
+                {recruiterSteps.map((item, index) => (
+                  <span
+                    key={item.title}
+                    className={`h-1 flex-1 rounded-full ${index <= step ? "bg-[#0b2342]" : "bg-muted"}`}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Scrollable Form Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-8 sm:px-10">
+            <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
               <div className="mx-auto max-w-2xl">
                 {/* ── STEP 0: AKUN PIC REKRUTER ── */}
                 {step === 0 && (
@@ -702,26 +723,27 @@ export function RecruiterOnboarding() {
             </div>
 
             {/* ─── BOTTOM FIXED ACTION BAR ─── */}
-            <div className="border-t bg-card px-5 py-4 sm:px-10">
-              <div className="flex items-center justify-between">
+            <div className="border-t bg-card px-4 py-3 sm:px-8 sm:py-4">
+              <div className="flex items-center justify-between gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleExit}
-                  className="text-xs font-semibold text-muted-foreground hover:text-destructive"
+                  className="text-xs font-semibold text-muted-foreground hover:text-destructive px-2 sm:px-4"
                 >
-                  Keluar Akun
+                  <span className="hidden sm:inline">Keluar Akun</span>
+                  <span className="sm:hidden">Keluar</span>
                 </Button>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {step > 0 && (
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setStep((prev) => prev - 1)}
-                      className="border-border rounded-xl"
+                      className="border-border rounded-xl text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-10"
                     >
-                      <ArrowLeft className="size-4 mr-1.5" /> Kembali
+                      <ArrowLeft className="size-3.5 sm:size-4 mr-1" /> Kembali
                     </Button>
                   )}
 
@@ -729,7 +751,7 @@ export function RecruiterOnboarding() {
                     type="button"
                     onClick={handleNext}
                     disabled={isSubmitting}
-                    className={`rounded-xl px-6 font-bold text-white shadow-xs ${
+                    className={`rounded-xl px-4 sm:px-6 font-bold text-white shadow-xs text-xs sm:text-sm h-9 sm:h-10 ${
                       step === recruiterSteps.length - 1
                         ? "bg-emerald-600 hover:bg-emerald-700"
                         : "bg-[#0b2342] hover:bg-[#1a3460]"
@@ -739,11 +761,13 @@ export function RecruiterOnboarding() {
                       "Mengirim..."
                     ) : step === recruiterSteps.length - 1 ? (
                       <>
-                        Kirim untuk Compliance Review <UploadCloud className="size-4 ml-1.5" />
+                        <span className="hidden sm:inline">Kirim untuk Compliance Review</span>
+                        <span className="sm:hidden">Kirim Review</span>
+                        <UploadCloud className="size-3.5 sm:size-4 ml-1.5" />
                       </>
                     ) : (
                       <>
-                        Lanjut <ArrowRight className="size-4 ml-1.5" />
+                        Lanjut <ArrowRight className="size-3.5 sm:size-4 ml-1.5" />
                       </>
                     )}
                   </Button>
