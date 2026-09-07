@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied, AdminPopup, settleAdminCheck } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, AdminPopup, adminGateRecentlyPassed, clearAdminGate, markAdminGatePassed, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,20 +50,24 @@ export default function AdminAuditLogPage() {
     setLoading(true);
     setDenied(null);
     const startedAt = Date.now();
+    const skipCeremony = adminGateRecentlyPassed();
     try {
       const res = await fetch(new URL("/api/admin/audit-log", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);
+        markAdminGatePassed();
       } else if (res.status === 401) {
+        clearAdminGate();
         setDenied("unauthenticated");
       } else if (res.status === 403) {
+        clearAdminGate();
         setDenied("forbidden");
       }
     } catch {
       toast.error("Gagal memuat riwayat audit log.");
     } finally {
-      await settleAdminCheck(startedAt);
+      if (!skipCeremony) await settleAdminCheck(startedAt);
       setSettled(true);
       setLoading(false);
     }

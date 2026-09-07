@@ -7,6 +7,23 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export const ADMIN_CHECK_MIN_MS = 3000;
 
+// Module-scoped stamp so intra-portal navigation skips the ceremony after one
+// full check. Resets on reload. UI-only: every API still enforces 401/403.
+const ADMIN_GATE_TTL_MS = 5 * 60 * 1000;
+let lastGatePassAt = 0;
+
+export function adminGateRecentlyPassed() {
+  return Date.now() - lastGatePassAt < ADMIN_GATE_TTL_MS;
+}
+
+export function markAdminGatePassed() {
+  lastGatePassAt = Date.now();
+}
+
+export function clearAdminGate() {
+  lastGatePassAt = 0;
+}
+
 export async function settleAdminCheck(startedAt: number) {
   const elapsed = Date.now() - startedAt;
   if (elapsed < ADMIN_CHECK_MIN_MS) {

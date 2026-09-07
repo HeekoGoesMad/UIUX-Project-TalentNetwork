@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied, AdminPopup, settleAdminCheck } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, AdminPopup, adminGateRecentlyPassed, clearAdminGate, markAdminGatePassed, settleAdminCheck } from "@/components/admin/admin-denied";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,6 +183,7 @@ function AdminCompaniesContent() {
     setLoading(true);
     setDenied(null);
     const startedAt = Date.now();
+    const skipCeremony = adminGateRecentlyPassed();
     try {
       const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -195,9 +196,12 @@ function AdminCompaniesContent() {
             openReviewModal(target);
           }
         }
+        markAdminGatePassed();
       } else if (res.status === 401) {
+        clearAdminGate();
         setDenied("unauthenticated");
       } else if (res.status === 403) {
+        clearAdminGate();
         setDenied("forbidden");
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -208,7 +212,7 @@ function AdminCompaniesContent() {
       console.error("fetchCompanies exception:", err);
       toast.error("Gagal memuat daftar perusahaan.");
     } finally {
-      await settleAdminCheck(startedAt);
+      if (!skipCeremony) await settleAdminCheck(startedAt);
       setSettled(true);
       setLoading(false);
     }
