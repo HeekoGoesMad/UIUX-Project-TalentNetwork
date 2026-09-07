@@ -82,6 +82,7 @@ export class ScreeningService {
           metadata: {
             candidateProfileId: params.candidateProfileId,
             consentRequestItemId,
+            ...(consentRequestItemId ? {} : { consentOptional: true }),
           },
         })
         .onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey })
@@ -103,6 +104,7 @@ export class ScreeningService {
             id: schema.screeningRuns.id,
             organizationId: schema.screeningRuns.organizationId,
             candidateProfileId: schema.screeningRuns.candidateProfileId,
+            consentRequestItemId: schema.screeningRuns.consentRequestItemId,
             status: schema.screeningRuns.status,
           })
           .from(schema.screeningRuns)
@@ -121,6 +123,9 @@ export class ScreeningService {
           runId: existingRun?.id ?? existingRunId,
           runStatus: existingRun?.status ?? ("in_progress" as const),
           idempotent: true,
+          // No new ledger entry is written on replay; the stored audit metadata
+          // from the fresh write already carries consentOptional when applicable.
+          ...(existingRun?.consentRequestItemId ? {} : { consentOptional: true }),
         };
       }
 
