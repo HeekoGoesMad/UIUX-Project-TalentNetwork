@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied, AdminPopup, adminGateRecentlyPassed, clearAdminGate, markAdminGatePassed, settleAdminCheck } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, AdminPopup } from "@/components/admin/admin-denied";
+import { useAdminGate } from "@/components/admin/admin-gate";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,8 +40,7 @@ interface TokenAccountItem {
 export default function AdminTokensPage() {
   const [accounts, setAccounts] = useState<TokenAccountItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
-  const [settled, setSettled] = useState(false);
+  const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
   const [search, setSearch] = useState("");
 
   // Grant / Adjust Modal
@@ -53,30 +53,22 @@ export default function AdminTokensPage() {
 
   const fetchTokens = useCallback(async () => {
     setLoading(true);
-    setDenied(null);
-    const startedAt = Date.now();
-    const skipCeremony = adminGateRecentlyPassed();
     try {
       const res = await fetch(new URL("/api/admin/tokens", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
-        markAdminGatePassed();
       } else if (res.status === 401) {
-        clearAdminGate();
-        setDenied("unauthenticated");
+        failGate(401);
       } else if (res.status === 403) {
-        clearAdminGate();
-        setDenied("forbidden");
+        failGate(403);
       }
     } catch {
       toast.error("Gagal memuat data token.");
     } finally {
-      if (!skipCeremony) await settleAdminCheck(startedAt);
-      setSettled(true);
       setLoading(false);
     }
-  }, []);
+  }, [failGate]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -139,7 +131,7 @@ export default function AdminTokensPage() {
     });
   }, [accounts, search]);
 
-  if (!settled) {
+  if (gatePhase === "checking") {
     return (
       <AdminPopup>
         <AdminChecking />
@@ -147,10 +139,10 @@ export default function AdminTokensPage() {
     );
   }
 
-  if (denied) {
+  if (gatePhase === "denied") {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminDenied code={gateCode ?? 403} />
       </AdminPopup>
     );
   }

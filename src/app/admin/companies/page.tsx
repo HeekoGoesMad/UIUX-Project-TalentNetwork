@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AdminChecking, AdminDenied, AdminPopup, adminGateRecentlyPassed, clearAdminGate, markAdminGatePassed, settleAdminCheck } from "@/components/admin/admin-denied";
+import { AdminChecking, AdminDenied, AdminPopup } from "@/components/admin/admin-denied";
+import { useAdminGate } from "@/components/admin/admin-gate";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,8 +135,7 @@ function AdminCompaniesContent() {
 
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
-  const [settled, setSettled] = useState(false);
+  const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
 
@@ -181,9 +181,6 @@ function AdminCompaniesContent() {
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
-    setDenied(null);
-    const startedAt = Date.now();
-    const skipCeremony = adminGateRecentlyPassed();
     try {
       const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
@@ -196,13 +193,10 @@ function AdminCompaniesContent() {
             openReviewModal(target);
           }
         }
-        markAdminGatePassed();
       } else if (res.status === 401) {
-        clearAdminGate();
-        setDenied("unauthenticated");
+        failGate(401);
       } else if (res.status === 403) {
-        clearAdminGate();
-        setDenied("forbidden");
+        failGate(403);
       } else {
         const errData = await res.json().catch(() => ({}));
         console.error("Companies API error:", res.status, errData);
@@ -212,11 +206,9 @@ function AdminCompaniesContent() {
       console.error("fetchCompanies exception:", err);
       toast.error("Gagal memuat daftar perusahaan.");
     } finally {
-      if (!skipCeremony) await settleAdminCheck(startedAt);
-      setSettled(true);
       setLoading(false);
     }
-  }, [initialReviewId, openReviewModal]);
+  }, [initialReviewId, openReviewModal, failGate]);
 
 
   useEffect(() => {
@@ -289,7 +281,7 @@ function AdminCompaniesContent() {
     });
   }, [companies, statusFilter, search]);
 
-  if (!settled) {
+  if (gatePhase === "checking") {
     return (
       <AdminPopup>
         <AdminChecking />
@@ -297,10 +289,10 @@ function AdminCompaniesContent() {
     );
   }
 
-  if (denied) {
+  if (gatePhase === "denied") {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminDenied code={gateCode ?? 403} />
       </AdminPopup>
     );
   }
