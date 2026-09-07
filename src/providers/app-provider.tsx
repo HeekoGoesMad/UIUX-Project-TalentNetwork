@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES } from "@/types";
 import { createClient } from "@/lib/supabase/client";
@@ -262,18 +262,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBootstrapped(false);
     setDatabaseError(null);
     try {
-      const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
-      const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
-        profile?: BootstrapProfile | null;
-        candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
-        candidateSections?: BootstrapSection[];
-        token?: BootstrapTokenAccount;
-        notifications?: BootstrapNotification[];
-        shortlists?: BootstrapShortlist[];
-        consentRequests?: Record<string, unknown>[];
-        error?: string;
-      };
+      const [response, consentResponse] = await Promise.all([
+        fetch("/api/app/bootstrap", { cache: "no-store" }),
+        fetch("/api/consent-requests", { cache: "no-store" }),
+      ]);
+      const [payload, consentPayload] = await Promise.all([
+        response.json() as Promise<{
+          identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+          profile?: BootstrapProfile | null;
+          candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
+          candidateSections?: BootstrapSection[];
+          token?: BootstrapTokenAccount;
+          notifications?: BootstrapNotification[];
+          shortlists?: BootstrapShortlist[];
+          consentRequests?: Record<string, unknown>[];
+          error?: string;
+        }>,
+        consentResponse.json() as Promise<{ requests?: Record<string, unknown>[]; error?: string }>,
+      ]);
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
       if (payload.identity?.role) {
@@ -291,14 +297,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
       }
 
-      const consentResponse = await fetch("/api/consent-requests", { cache: "no-store" });
-      const consentPayload = (await consentResponse.json()) as { requests?: Record<string, unknown>[]; error?: string };
-
       setProfile(payload.profile ?? null);
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
       setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
-       setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
+      setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
        const remoteProfile = remoteCvProfile(payload);
        setState((current) => ({
          ...current,
@@ -457,8 +460,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const markAllNotificationsRead = async () => {
     if (supabaseConfigured) {
-      const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
-      await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      if (!response.ok) return false;
     }
     setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
     return true;
@@ -890,7 +897,129 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
-  return <AppContext.Provider value={{ ...state, hydrated, dbMode: supabaseConfigured, devBypass, bootstrapped, user, profile, tokenAccount, screeningRunStatuses, notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications), shortlists, consentRequests, databaseError, configError, activePartnerInstitution, setActivePartnerInstitution, verifyCandidateByPartner, verifyAllCandidatesForInstitution, markNotificationRead, markAllNotificationsRead, login, loginAsDemoCandidate, loginAsFreshCandidate, register, logout, scan, toggleShortlist, saveNote, viewed, saveCvProfile, saveCareerStatus, saveScreeningResult, requestConsent, requestConsentBatch, respondToConsent, approvePendingRequests, startScreening, previewCandidate, reloadBootstrap, setProvisioningStatus }}>{children}</AppContext.Provider>;
+  const actionsRef = useRef({
+    setActivePartnerInstitution,
+    verifyCandidateByPartner,
+    verifyAllCandidatesForInstitution,
+    markNotificationRead,
+    markAllNotificationsRead,
+    login,
+    loginAsDemoCandidate,
+    loginAsFreshCandidate,
+    register,
+    logout,
+    scan,
+    toggleShortlist,
+    saveNote,
+    viewed,
+    saveCvProfile,
+    saveCareerStatus,
+    saveScreeningResult,
+    requestConsent,
+    requestConsentBatch,
+    respondToConsent,
+    approvePendingRequests,
+    startScreening,
+    previewCandidate,
+    reloadBootstrap,
+    setProvisioningStatus,
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    actionsRef.current = {
+      setActivePartnerInstitution,
+      verifyCandidateByPartner,
+      verifyAllCandidatesForInstitution,
+      markNotificationRead,
+      markAllNotificationsRead,
+      login,
+      loginAsDemoCandidate,
+      loginAsFreshCandidate,
+      register,
+      logout,
+      scan,
+      toggleShortlist,
+      saveNote,
+      viewed,
+      saveCvProfile,
+      saveCareerStatus,
+      saveScreeningResult,
+      requestConsent,
+      requestConsentBatch,
+      respondToConsent,
+      approvePendingRequests,
+      startScreening,
+      previewCandidate,
+      reloadBootstrap,
+      setProvisioningStatus,
+    };
+  });
+
+  const actions = useMemo(() => ({
+    setActivePartnerInstitution: (institution: string) => actionsRef.current.setActivePartnerInstitution(institution),
+    verifyCandidateByPartner: (candidateId: string, status: "verified" | "rejected") => actionsRef.current.verifyCandidateByPartner(candidateId, status),
+    verifyAllCandidatesForInstitution: (institution: string) => actionsRef.current.verifyAllCandidatesForInstitution(institution),
+    markNotificationRead: (id: string) => actionsRef.current.markNotificationRead(id),
+    markAllNotificationsRead: () => actionsRef.current.markAllNotificationsRead(),
+    login: (role: UserRole, email: string, password: string) => actionsRef.current.login(role, email, password),
+    loginAsDemoCandidate: () => actionsRef.current.loginAsDemoCandidate(),
+    loginAsFreshCandidate: () => actionsRef.current.loginAsFreshCandidate(),
+    register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => actionsRef.current.register(name, role, email, password, companyName),
+    logout: () => actionsRef.current.logout(),
+    scan: (id: string) => actionsRef.current.scan(id),
+    toggleShortlist: (id: string) => actionsRef.current.toggleShortlist(id),
+    saveNote: (id: string, note: string) => actionsRef.current.saveNote(id, note),
+    viewed: (id: string) => actionsRef.current.viewed(id),
+    saveCvProfile: (p: CvProfile) => actionsRef.current.saveCvProfile(p),
+    saveCareerStatus: (status: CareerStatus) => actionsRef.current.saveCareerStatus(status),
+    saveScreeningResult: (candidateId: string, result: ScreeningResult) => actionsRef.current.saveScreeningResult(candidateId, result),
+    requestConsent: (candidateId: string) => actionsRef.current.requestConsent(candidateId),
+    requestConsentBatch: (candidateIds: string[]) => actionsRef.current.requestConsentBatch(candidateIds),
+    respondToConsent: (candidateId: string, state: Extract<ConsentState, "consented" | "declined">, itemId?: string) => actionsRef.current.respondToConsent(candidateId, state, itemId),
+    approvePendingRequests: () => actionsRef.current.approvePendingRequests(),
+    startScreening: (candidateId: string) => actionsRef.current.startScreening(candidateId),
+    previewCandidate: (candidateId: string) => actionsRef.current.previewCandidate(candidateId),
+    reloadBootstrap: () => actionsRef.current.reloadBootstrap(),
+    setProvisioningStatus: (status: ProvisioningStatus, reason?: string | null) => actionsRef.current.setProvisioningStatus(status, reason),
+  }), []);
+
+  const contextValue = useMemo<Context>(() => ({
+    ...state,
+    hydrated,
+    dbMode: supabaseConfigured,
+    devBypass,
+    bootstrapped,
+    user,
+    profile,
+    tokenAccount,
+    screeningRunStatuses,
+    notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications),
+    shortlists,
+    consentRequests,
+    databaseError,
+    configError,
+    activePartnerInstitution,
+    ...actions,
+  }), [
+    state,
+    hydrated,
+    supabaseConfigured,
+    devBypass,
+    bootstrapped,
+    user,
+    profile,
+    tokenAccount,
+    screeningRunStatuses,
+    notifications,
+    shortlists,
+    consentRequests,
+    databaseError,
+    configError,
+    activePartnerInstitution,
+    actions,
+  ]);
+
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
