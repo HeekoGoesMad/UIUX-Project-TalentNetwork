@@ -135,6 +135,7 @@ function AdminCompaniesContent() {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
+  const [settled, setSettled] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
 
@@ -208,6 +209,7 @@ function AdminCompaniesContent() {
       toast.error("Gagal memuat daftar perusahaan.");
     } finally {
       await settleAdminCheck(startedAt);
+      setSettled(true);
       setLoading(false);
     }
   }, [initialReviewId, openReviewModal]);
@@ -283,18 +285,18 @@ function AdminCompaniesContent() {
     });
   }, [companies, statusFilter, search]);
 
-  if (denied) {
+  if (!settled) {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminChecking />
       </AdminPopup>
     );
   }
 
-  if (loading && companies.length === 0) {
+  if (denied) {
     return (
       <AdminPopup>
-        <AdminChecking />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
       </AdminPopup>
     );
   }

@@ -42,6 +42,7 @@ export default function AdminAuditLogPage() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
+  const [settled, setSettled] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -63,6 +64,7 @@ export default function AdminAuditLogPage() {
       toast.error("Gagal memuat riwayat audit log.");
     } finally {
       await settleAdminCheck(startedAt);
+      setSettled(true);
       setLoading(false);
     }
   }, []);
@@ -111,18 +113,18 @@ export default function AdminAuditLogPage() {
     return <Badge className="bg-slate-100 text-slate-700 border-slate-200">{action}</Badge>;
   };
 
-  if (denied) {
+  if (!settled) {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminChecking />
       </AdminPopup>
     );
   }
 
-  if (loading && logs.length === 0) {
+  if (denied) {
     return (
       <AdminPopup>
-        <AdminChecking />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
       </AdminPopup>
     );
   }

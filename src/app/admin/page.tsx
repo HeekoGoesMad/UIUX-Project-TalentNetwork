@@ -55,6 +55,7 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
+  const [settled, setSettled] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -74,6 +75,7 @@ export default function AdminDashboardPage() {
       console.error("Failed to load dashboard:", err);
     } finally {
       await settleAdminCheck(startedAt);
+      setSettled(true);
       setLoading(false);
     }
   }, []);
@@ -96,18 +98,18 @@ export default function AdminDashboardPage() {
     monthlyGrowth: 0,
   };
 
-  if (denied) {
+  if (!settled) {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminChecking />
       </AdminPopup>
     );
   }
 
-  if (loading && !data) {
+  if (denied) {
     return (
       <AdminPopup>
-        <AdminChecking />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
       </AdminPopup>
     );
   }

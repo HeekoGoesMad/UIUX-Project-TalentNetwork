@@ -40,6 +40,7 @@ export default function AdminTokensPage() {
   const [accounts, setAccounts] = useState<TokenAccountItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState<"unauthenticated" | "forbidden" | null>(null);
+  const [settled, setSettled] = useState(false);
   const [search, setSearch] = useState("");
 
   // Grant / Adjust Modal
@@ -68,6 +69,7 @@ export default function AdminTokensPage() {
       toast.error("Gagal memuat data token.");
     } finally {
       await settleAdminCheck(startedAt);
+      setSettled(true);
       setLoading(false);
     }
   }, []);
@@ -133,18 +135,18 @@ export default function AdminTokensPage() {
     });
   }, [accounts, search]);
 
-  if (denied) {
+  if (!settled) {
     return (
       <AdminPopup>
-        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
+        <AdminChecking />
       </AdminPopup>
     );
   }
 
-  if (loading && accounts.length === 0) {
+  if (denied) {
     return (
       <AdminPopup>
-        <AdminChecking />
+        <AdminDenied code={denied === "unauthenticated" ? 401 : 403} />
       </AdminPopup>
     );
   }
