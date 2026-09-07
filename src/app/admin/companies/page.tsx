@@ -179,7 +179,7 @@ function AdminCompaniesContent() {
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/companies", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/companies", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setCompanies(data.companies || []);

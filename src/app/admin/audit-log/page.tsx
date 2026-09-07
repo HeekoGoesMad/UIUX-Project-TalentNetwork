@@ -46,7 +46,7 @@ export default function AdminAuditLogPage() {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/audit-log", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/audit-log", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);

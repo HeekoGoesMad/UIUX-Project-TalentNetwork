@@ -51,7 +51,7 @@ export default function AdminTokensPage() {
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/tokens", { cache: "no-store" });
+      const res = await fetch(new URL("/api/admin/tokens", window.location.origin), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
@@ -87,7 +87,7 @@ export default function AdminTokensPage() {
 
     setAdjusting(true);
     try {
-      const res = await fetch("/api/admin/tokens", {
+      const res = await fetch(new URL("/api/admin/tokens", window.location.origin), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
