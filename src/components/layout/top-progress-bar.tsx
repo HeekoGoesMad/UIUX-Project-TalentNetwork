@@ -11,9 +11,14 @@ function ProgressBarInner() {
 
   const trickleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isNavigatingRef = useRef(false);
 
   const clearTimers = () => {
+    if (pendingStartRef.current) {
+      clearTimeout(pendingStartRef.current);
+      pendingStartRef.current = null;
+    }
     if (trickleTimerRef.current) {
       clearInterval(trickleTimerRef.current);
       trickleTimerRef.current = null;
@@ -121,15 +126,29 @@ function ProgressBarInner() {
           return;
         }
 
-        startProgress();
+        clearTimers();
+        // Defer start by a tiny frame so that any unsaved guard or modal cancel event has time to abort
+        pendingStartRef.current = setTimeout(() => {
+          startProgress();
+        }, 16);
       } catch {
         // Ignore malformed URLs
       }
     };
 
+    const handleAbort = () => {
+      clearTimers();
+      isNavigatingRef.current = false;
+      setVisible(false);
+      setProgress(0);
+    };
+
     document.addEventListener("click", handleDocumentClick, { capture: true });
+    window.addEventListener("navigation-abort", handleAbort);
     return () => {
       document.removeEventListener("click", handleDocumentClick, { capture: true });
+      window.removeEventListener("navigation-abort", handleAbort);
+      clearTimers();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

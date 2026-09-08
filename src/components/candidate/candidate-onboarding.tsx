@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { IndonesianPhoneInput } from "@/components/ui/phone-input";
+import { extractIndonesianLocalPhone } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
 import {
@@ -388,6 +390,11 @@ export function CandidateOnboarding() {
       const text = form[field].trim();
       if (!text) found[field] = `${requiredLabels[field]} wajib diisi.`;
       else if (field === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) found[field] = "Format email belum valid.";
+      else if (field === "phone") {
+        const digits = extractIndonesianLocalPhone(text);
+        if (!digits) found[field] = "Nomor telepon wajib diisi.";
+        else if (digits.length < 8) found[field] = "Nomor telepon minimal 8 digit angka.";
+      }
     }
     setErrors(found);
     return found;
@@ -825,14 +832,11 @@ function BasicStep({
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Nomor telepon / WhatsApp *" error={errors.phone} hint="Digunakan recruiter untuk menghubungi saat screening disetujui">
-            <input
+            <IndonesianPhoneInput
               required
-              aria-invalid={Boolean(errors.phone)}
-              autoComplete="tel"
-              className={inputClass}
+              error={Boolean(errors.phone)}
               value={form.phone}
-              onChange={(event) => setValue("phone", event.target.value)}
-              placeholder="0812-xxxx-xxxx"
+              onChange={(val) => setValue("phone", val)}
             />
           </Field>
           <Field label="Headline profesional *" hint="Contoh: Senior Product Designer | UX Research" error={errors.headline}>
