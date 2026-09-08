@@ -1,34 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  AlertTriangle,
-  Award,
-  BookOpen,
-  Bot,
-  Calendar,
-  Check,
-  CheckCircle2,
-  Compass,
-  Download,
-  FileText,
-  GraduationCap,
-  Layers,
-  Lightbulb,
-  ShieldAlert,
-  Sparkles,
-  Target,
-  TrendingUp,
-  User,
-  Zap,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/providers/app-provider";
-import { PersonalityAdvisorCard } from "./personality-advisor-card";
+import {
+    AlertTriangle,
+    Award,
+    BookOpen,
+    Bot,
+    Calendar,
+    Check,
+    CheckCircle2,
+    Compass,
+    Download,
+    FileText,
+    GraduationCap,
+    Layers,
+    Lightbulb,
+    ShieldAlert,
+    Sparkles,
+    Target,
+    TrendingUp,
+    User,
+    Zap,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -497,9 +496,6 @@ export function CareerAdvisorWorkspace() {
           </Button>
         </div>
       </div>
-
-      {/* ─── Tes Kepribadian (16Personalities) ─── */}
-      <PersonalityAdvisorCard />
 
       {/* ─── Advice Results ─── */}
       {result && (

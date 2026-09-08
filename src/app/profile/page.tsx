@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { CAREER_STATUS_CONFIG, CareerStatus, type EducationItem } from "@/types";
 import {
+    Banknote,
+    Brain,
     BriefcaseBusiness,
     Camera,
     Check,
@@ -44,6 +46,12 @@ const DEMO = {
   fullName: "Nadia Putri",
   headline: "Senior Product Designer | UX Research | Design Systems",
   location: "Jakarta",
+  salary: "Rp 18.000.000 – Rp 25.000.000 / bln",
+  personality: {
+    type: "ENFJ",
+    label: "Protagonis",
+    tagline: "Pemimpin yang karismatik dan inspiratif, mampu memikat pendengarnya.",
+  },
   about:
     "Product designer yang senang mengubah masalah kompleks menjadi pengalaman digital yang jelas, berguna, dan terasa manusiawi.",
   experience: [
@@ -147,6 +155,8 @@ export default function ProfilePage() {
     tools: source?.tools ?? [],
     softSkills: source?.softSkills ?? [],
     portfolio: source?.portfolio ?? [],
+    salary: source && "salary" in source ? source.salary : undefined,
+    personality: source && "personality" in source ? source.personality : undefined,
   };
 
   const [cropModal, setCropModal] = useState<{
@@ -406,8 +416,19 @@ export default function ProfilePage() {
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-[#111827]">{p.fullName || user?.name || "Profil kamu"}</h2>
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                      {p.fullName || user?.name || "Profil Saya"}
+                    </h1>
                     <VerifiedBadge />
+                    {p.personality && (
+                      <span
+                        title={`Tipe Kepribadian: ${p.personality.type} (${p.personality.label})`}
+                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-[#7C3AED]"
+                      >
+                        <Brain className="size-3.5 text-[#7C3AED]" />
+                        {p.personality.type} · {p.personality.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Headline */}
@@ -415,11 +436,19 @@ export default function ProfilePage() {
                     <p className="mt-1 text-base font-semibold text-[#7C3AED]">{p.headline}</p>
                   )}
 
-                  {/* Location */}
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <MapPin className="size-4 text-slate-400" />
-                    {p.location}
-                  </p>
+                  {/* Location & Salary */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="size-4 text-slate-400" />
+                      {p.location}
+                    </span>
+                    {p.salary && (
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <Banknote className="size-4 text-emerald-600" />
+                        Ekspektasi: {p.salary}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Career Status Selector */}
                   <div className="relative mt-3">

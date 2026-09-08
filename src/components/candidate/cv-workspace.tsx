@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
   Brain,
   BriefcaseBusiness,
@@ -21,11 +20,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/providers/app-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { CvDownload } from "./cv-download";
 import { ProfessionalSummaryModal } from "./professional-summary-modal";
+import { PersonalityModal } from "./personality-modal";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 function blank(email = "", fullName = ""): CvProfile {
@@ -37,6 +38,7 @@ function blank(email = "", fullName = ""): CvProfile {
   location: "",
   email,
   phone: "",
+  salary: "",
   skills: [],
   tools: [],
   industries: [],
@@ -189,6 +191,7 @@ export function CvWorkspace() {
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [personalityModalOpen, setPersonalityModalOpen] = useState(false);
   const [cropModal, setCropModal] = useState<{
     open: boolean;
     imageSrc: string | null;
@@ -602,6 +605,17 @@ export function CvWorkspace() {
                 />
               </Field>
               <Field
+                label="Ekspektasi Gaji"
+                hint="Ditunjukkan ke rekruter setelah profil dibuka (unlocked)."
+              >
+                <input
+                  className={inputCls}
+                  value={profile.salary ?? ""}
+                  onChange={(e) => update("salary", e.target.value)}
+                  placeholder="Contoh: Rp 15 jt – 22 jt / bln"
+                />
+              </Field>
+              <Field
                 label="Headline"
                 hint='Contoh: "Human Capital Specialist | Recruitment | Employee Relations"'
                 span2
@@ -613,6 +627,47 @@ export function CvWorkspace() {
                   placeholder="Posisi | Keahlian | Spesialisasi"
                 />
               </Field>
+
+              {/* ── Tipe Kepribadian (16Personalities) ── */}
+              <div className="md:col-span-2 rounded-xl border border-purple-200/70 bg-gradient-to-r from-purple-50/40 via-white to-purple-50/20 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-[#7C3AED] border border-purple-200/60">
+                      <Brain className="size-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-bold text-foreground">
+                          Tes Kepribadian (16Personalities)
+                        </span>
+                        {profile.personality?.type ? (
+                          <Badge className="bg-[#7C3AED] text-white font-bold text-[10px] px-2 py-0.5">
+                            {profile.personality.type} · {profile.personality.label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-semibold">
+                            Belum Diisi
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                        {profile.personality?.tagline || "Lengkapi tipe kepribadian MBTI untuk menarik perhatian rekruter."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPersonalityModalOpen(true)}
+                    className="shrink-0 border-purple-200 text-[#7C3AED] hover:bg-purple-50 hover:text-[#6D28D9] rounded-xl text-xs font-semibold h-8.5 px-3 self-start sm:self-center"
+                  >
+                    <Brain className="mr-1.5 size-3.5" />
+                    {profile.personality?.type ? "Ubah Kepribadian" : "Pilih Kepribadian"}
+                  </Button>
+                </div>
+              </div>
               <div className="md:col-span-2 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-foreground">
@@ -639,41 +694,6 @@ export function CvWorkspace() {
                   placeholder="Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa."
                   rows={4}
                 />
-              </div>
-
-              {/* ── Tipe Kepribadian (16Personalities) ── */}
-              <div className="md:col-span-2 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                    <Brain className="size-4 text-indigo-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">Tipe Kepribadian (16Personalities)</span>
-                      {profile.personality?.type ? (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                          {profile.personality.type} · {profile.personality.label}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic">Belum diatur</span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {profile.personality?.summary || "Tampilkan tipe kepribadianmu di preview card agar dilirik oleh rekruter."}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs font-semibold rounded-xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 shrink-0 self-start sm:self-center"
-                >
-                  <Link href="/candidate/career-advisor">
-                    <Sparkles className="size-3 mr-1" />
-                    Kelola di Career Advisor
-                  </Link>
-                </Button>
               </div>
             </div>
           </FormSection>
@@ -1088,6 +1108,16 @@ export function CvWorkspace() {
               about: newSummary,
             });
           }
+        }}
+      />
+
+      <PersonalityModal
+        open={personalityModalOpen}
+        onOpenChange={setPersonalityModalOpen}
+        personality={profile.personality}
+        onSave={(newPersonality) => {
+          update("personality", newPersonality);
+          toast.success(newPersonality ? "Tipe kepribadian diperbarui! Klik Simpan Profil untuk menyimpan permanen." : "Tipe kepribadian dihapus.");
         }}
       />
 

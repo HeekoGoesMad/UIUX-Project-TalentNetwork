@@ -1,5 +1,4 @@
 import { Candidate, CareerStatus, IndustryCategory, TalentCategory } from "@/types";
-import { PERSONALITY_TYPES } from "@/config/personality";
 
 const names = ["Nadia Putri","Rizky Pratama","Clara Wijaya","Bima Santoso","Maya Kusuma","Aditya Ramadhan","Salsabila Noor","Kevin Hartono","Dewi Lestari","Fajar Nugroho","Sarah Tan","Dimas Haryanto","Anisa Rahma","Bagas Permana","Citra Anggraini","Yoga Saputra","Larasati Dewi","Rafi Maulana","Intan Sari","Gilang Wibowo","Mei Chen","Arif Setiawan","Nina Kurnia","Rendra Wijaya","Vania Putri","Teguh Adi","Alya Prameswari","Raka Putra","Wulan Sari","Hendra Gunawan"];
 const roles = ["Senior Product Designer","Frontend Engineer","Growth Marketing Lead","Data Scientist","Product Manager","UX Researcher","Backend Engineer","Brand Strategist"];
@@ -58,12 +57,6 @@ export const candidates: Candidate[] = names.map((name, i) => ({
   careerStatus: careerStatuses[i % careerStatuses.length],
   talentCategory: talentCategories[i],
   industry: industries[i % roles.length],
-  personality: i % 5 === 4 ? undefined : {
-    type: PERSONALITY_TYPES[i % PERSONALITY_TYPES.length].type,
-    label: PERSONALITY_TYPES[i % PERSONALITY_TYPES.length].name,
-    tagline: PERSONALITY_TYPES[i % PERSONALITY_TYPES.length].tagline,
-    testUrl: i % 2 === 0 ? `https://www.16personalities.com/profiles/${PERSONALITY_TYPES[i % PERSONALITY_TYPES.length].type.toLowerCase()}-personality` : undefined,
-  },
 }));
 
 export const findCandidate = (id: string) => candidates.find((candidate) => candidate.id === id);

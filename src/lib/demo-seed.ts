@@ -154,6 +154,7 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
   openToWork: true,
   careerStatus: "open-to-work",
   talentCategory: "djoin-verified",
+  salary: "Rp 18.000.000 – Rp 25.000.000 / bln",
   personality: {
     type: "ENFJ",
     label: "Protagonis",

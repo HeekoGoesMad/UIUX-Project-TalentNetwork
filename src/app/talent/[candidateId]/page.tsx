@@ -1,37 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Bookmark,
-  Brain,
-  Check,
-  CircleHelp,
-  Copy,
-  ExternalLink,
-  FileCheck2,
-  FileText,
-  Globe,
-  GraduationCap,
-  Loader2,
-  Lock,
-  Mail,
-  Phone,
-  Printer,
-  RefreshCw,
-  ScanLine,
-  ShieldCheck,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
-import { toast } from "sonner";
-import { findCandidate } from "@/data/candidates";
-import { maskName } from "@/lib/candidate-display";
-import { UUID_RE } from "@/lib/utils";
-import { useApp } from "@/providers/app-provider";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateCategoryBadge } from "@/components/talent/candidate-category-badge";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
@@ -39,15 +8,46 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { ProtectedRoute } from "@/components/auth/protected-route";
+import { findCandidate } from "@/data/candidates";
+import { maskName } from "@/lib/candidate-display";
+import { UUID_RE } from "@/lib/utils";
+import { useApp } from "@/providers/app-provider";
 import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
+import {
+    AlertCircle,
+    ArrowLeft,
+    Banknote,
+    Bookmark,
+    Brain,
+    Check,
+    CircleHelp,
+    Copy,
+    ExternalLink,
+    FileCheck2,
+    FileText,
+    Globe,
+    GraduationCap,
+    Loader2,
+    Lock,
+    Mail,
+    Phone,
+    Printer,
+    RefreshCw,
+    ScanLine,
+    ShieldCheck,
+    Sparkles,
+    Wrench,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -84,6 +84,7 @@ function PersonalityOverview({ personality }: { personality: CandidatePersonalit
     </div>
   );
 }
+import { toast } from "sonner";
 
 const PORTFOLIO_LABELS: Record<string, string> = {
   "github.com": "GitHub",
@@ -650,6 +651,11 @@ export default function TalentProfile() {
               </p>
               <p className="mt-2 text-xs text-primary-foreground/75">
                 Pengalaman {candidate.experience} tahun · {candidate.availability}
+                {unlocked && (
+                  <span className="ml-2 font-mono font-bold text-emerald-200">
+                    · Ekspektasi Gaji: {candidate.salary}
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex gap-2">
@@ -792,6 +798,13 @@ export default function TalentProfile() {
                   <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
                     Profil LinkedIn <ExternalLink className="size-3" />
                   </a>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Banknote className="size-4 text-emerald-600 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Ekspektasi Gaji</span>
+                    <span className="font-mono font-semibold text-foreground truncate">{candidate.salary}</span>
+                  </div>
                 </div>
               </div>
 

@@ -16,9 +16,7 @@ export type IndustryCategory =
   | "technology-software";
 
 export {
-  CAREER_STATUS_CONFIG,
-  TALENT_CATEGORY_CONFIG,
-  INDUSTRY_CATEGORY_CONFIG,
+    CAREER_STATUS_CONFIG, INDUSTRY_CATEGORY_CONFIG, TALENT_CATEGORY_CONFIG
 } from "@/config/talent";
 
 
@@ -173,8 +171,9 @@ export type CvProfile = {
   talentCategory?: TalentCategory;
   avatarUrl?: string;
   bannerUrl?: string;
-  campusVerification?: CampusVerification;
+  salary?: string;
   personality?: CandidatePersonality;
+  campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
 };

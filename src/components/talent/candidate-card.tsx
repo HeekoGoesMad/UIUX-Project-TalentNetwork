@@ -1,17 +1,17 @@
 "use client";
 
-import { memo } from "react";
-import Link from "next/link";
-import { Bookmark, Brain, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
-import { Candidate } from "@/types";
-import { useApp } from "@/providers/app-provider";
-import { maskName } from "@/lib/candidate-display";
-import { CandidateAvatar } from "./avatar";
-import { CandidateStatusBadge } from "./candidate-status-badge";
-import { CandidateCategoryBadge } from "./candidate-category-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { maskName } from "@/lib/candidate-display";
+import { useApp } from "@/providers/app-provider";
+import { Candidate } from "@/types";
+import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
+import Link from "next/link";
+import { memo } from "react";
+import { CandidateAvatar } from "./avatar";
+import { CandidateCategoryBadge } from "./candidate-category-badge";
+import { CandidateStatusBadge } from "./candidate-status-badge";
 
 export const CandidateCard = memo(function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
   const { shortlisted, toggleShortlist, scans, partnerVerifications } = useApp();
@@ -37,15 +37,6 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
                 >
                   <GraduationCap className="size-3 text-[#7C3AED]" />
                   Campus Verified · {verif.institution.replace("Universitas ", "UI ").replace("Institut Teknologi ", "IT ")}
-                </span>
-              )}
-              {candidate.personality && (
-                <span
-                  title={`Tipe Kepribadian (16Personalities): ${candidate.personality.type} · ${candidate.personality.label}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50/80 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-300"
-                >
-                  <Brain className="size-3 text-violet-500" />
-                  {candidate.personality.type} · {candidate.personality.label}
                 </span>
               )}
             </div>
@@ -98,7 +89,13 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
 
         <div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}>
           <p className="text-xs text-muted-foreground">Ekspektasi gaji</p>
-          <p className="font-mono text-sm font-medium">{candidate.salary}</p>
+          {unlocked ? (
+            <p className="font-mono text-sm font-medium text-foreground">{candidate.salary}</p>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+              <Lock className="size-3 text-muted-foreground" /> Buka profil
+            </span>
+          )}
         </div>
 
         <div className={list ? "ml-auto flex items-center gap-3" : "mt-auto flex flex-col gap-3 pt-2"}>
