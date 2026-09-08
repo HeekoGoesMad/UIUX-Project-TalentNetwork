@@ -213,6 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
+  const isLoggingIn = useRef(false);
   const bootstrapUserKey = useRef<string | null>(null);
   // Database is the source of truth for role/provisioning. Metadata freezes
   // at signup and goes stale the moment an admin approves or SQL changes land.
@@ -221,6 +222,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
       setUser(null);
+      return;
+    }
+    // Jika proses login manual sedang memvalidasi role akun, cegah pembaruan prematur
+    if (isLoggingIn.current) {
       return;
     }
     const metadata = authUser.user_metadata ?? {};
@@ -349,6 +354,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { email?: string; user_metadata?: Record<string, unknown>; id?: string } } | null) => {
+      if (isLoggingIn.current) {
+        return;
+      }
       setSupabaseUser(session?.user ?? null);
       const userId = session?.user?.id ?? null;
       if (!userId) {
@@ -472,12 +480,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (role: UserRole, email: string, password: string): Promise<AuthResult> => {
+    isLoggingIn.current = true;
     pendingRole.current = role;
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
         const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
-        if (error) return { error: error.message };
+        if (error) {
+          isLoggingIn.current = false;
+          return { error: error.message };
+        }
 
         // Sync with expected role to check role match against database
         const syncResponse = await fetch("/api/auth/sync", {
@@ -491,7 +503,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // If role mismatch or other sync error, sign out immediately
           await supabase.auth.signOut().catch(() => {});
           setUser(null);
+          bootstrapUserKey.current = null;
           localStorage.removeItem(sessionKey);
+          isLoggingIn.current = false;
           return {
             error: syncData.error || "Gagal memverifikasi peran akun.",
           };
@@ -510,11 +524,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
           companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
         });
+        isLoggingIn.current = false;
+        bootstrapUserKey.current = data.user.id;
+        void loadBootstrap();
         return { role: actualRole, provisioningStatus };
       } catch (e) {
+        isLoggingIn.current = false;
         return { error: e instanceof Error ? e.message : "Gagal masuk." };
       }
     }
+    isLoggingIn.current = false;
     const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
     const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: fallbackStatus, companyName: role === "partner" ? "Universitas Indonesia" : undefined };
     setUser(nextUser);
