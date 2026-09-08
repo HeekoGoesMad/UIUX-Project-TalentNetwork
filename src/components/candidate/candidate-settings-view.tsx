@@ -10,7 +10,6 @@ import {
   Edit3,
   ExternalLink,
   FileText,
-  Loader2,
   Lock,
   Mail,
   MapPin,
@@ -21,6 +20,7 @@ import {
   Trash2,
   User,
   Briefcase,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,9 +31,9 @@ import { SecuritySettings } from "@/components/settings/security-settings";
 import { DeleteAccountModal } from "@/components/candidate/delete-account-modal";
 import { useApp } from "@/providers/app-provider";
 
-type SettingsTab = "overview" | "notifications" | "security" | "accessibility" | "danger";
+export type SettingsTab = "overview" | "notifications" | "security" | "accessibility" | "danger";
 
-type CandidateProfileData = {
+export type CandidateProfileData = {
   user: {
     id: string;
     email: string;
@@ -56,7 +56,7 @@ type CandidateProfileData = {
   } | null;
 };
 
-type NotificationPrefs = {
+export type NotificationPrefs = {
   inAppEnabled: boolean;
   emailEnabled: boolean;
   quietHours: {
@@ -65,41 +65,88 @@ type NotificationPrefs = {
   };
 };
 
-export function CandidateSettingsView() {
+type CandidateSettingsViewProps = {
+  initialProfile?: CandidateProfileData | null;
+  initialPreferences?: NotificationPrefs | null;
+};
+
+const NAV_ITEMS = [
+  {
+    id: "overview" as const,
+    label: "Profil & Akun",
+    description: "Ringkasan data & peran",
+    icon: User,
+  },
+  {
+    id: "notifications" as const,
+    label: "Notifikasi & Privasi",
+    description: "Email & jam tenang",
+    icon: Bell,
+  },
+  {
+    id: "security" as const,
+    label: "Keamanan & Sandi",
+    description: "Kata sandi & sesi login",
+    icon: Lock,
+  },
+  {
+    id: "accessibility" as const,
+    label: "Aksesibilitas",
+    description: "Tampilan & kontras warna",
+    icon: Sliders,
+  },
+  {
+    id: "danger" as const,
+    label: "Zona Berbahaya",
+    description: "Hapus akun permanen",
+    icon: AlertTriangle,
+    isDanger: true,
+  },
+];
+
+export function CandidateSettingsView({
+  initialProfile,
+  initialPreferences,
+}: CandidateSettingsViewProps) {
   const { user } = useApp();
   const [activeTab, setActiveTab] = useState<SettingsTab>("overview");
-  const [profileData, setProfileData] = useState<CandidateProfileData | null>(null);
+  const [profileData, setProfileData] = useState<CandidateProfileData | null>(
+    initialProfile ?? null
+  );
 
   // Notification Preferences State
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({
-    inAppEnabled: true,
-    emailEnabled: true,
-    quietHours: { start: "", end: "" },
-  });
-  const [loadingPrefs, setLoadingPrefs] = useState(true);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
+    initialPreferences ?? {
+      inAppEnabled: true,
+      emailEnabled: true,
+      quietHours: { start: "", end: "" },
+    }
+  );
   const [savingPrefs, setSavingPrefs] = useState(false);
 
   // Delete Account Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-  // Fetch candidate profile summary and notification preferences concurrently
+  // Fallback client fetch only if server did not provide preloaded initial data (e.g. dev mock mode)
   useEffect(() => {
+    if (initialProfile && initialPreferences) return;
+
     let isMounted = true;
-    async function loadData() {
+    async function loadFallbackData() {
       try {
         const [profileRes, prefsRes] = await Promise.all([
-          fetch("/api/profile"),
-          fetch("/api/notification-preferences"),
+          !initialProfile ? fetch("/api/profile") : Promise.resolve(null),
+          !initialPreferences ? fetch("/api/notification-preferences") : Promise.resolve(null),
         ]);
 
         if (!isMounted) return;
 
-        if (profileRes.ok) {
+        if (profileRes && profileRes.ok) {
           const data = await profileRes.json();
           setProfileData(data);
         }
 
-        if (prefsRes.ok) {
+        if (prefsRes && prefsRes.ok) {
           const prefsData = await prefsRes.json();
           if (prefsData?.preferences) {
             setNotifPrefs({
@@ -113,19 +160,15 @@ export function CandidateSettingsView() {
           }
         }
       } catch (err) {
-        console.warn("Gagal memuat data pengaturan kandidat:", err);
-      } finally {
-        if (isMounted) {
-          setLoadingPrefs(false);
-        }
+        console.warn("Gagal memuat fallback data pengaturan kandidat:", err);
       }
     }
-    loadData();
 
+    loadFallbackData();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialProfile, initialPreferences]);
 
   const handleSaveNotifPrefs = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,9 +223,22 @@ export function CandidateSettingsView() {
   const candidateId = profileData?.candidateProfile?.id;
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8 sm:py-10 space-y-8">
-      {/* 1. Header & Profile Summary Card */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-white p-6 shadow-xs sm:p-7">
+    <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-10 space-y-8">
+      {/* 1. Page Header */}
+      <div>
+        <span className="text-xs font-bold uppercase tracking-wider text-primary">
+          Workspace Kandidat
+        </span>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Pengaturan Akun
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Kelola profil, visibilitas rekruter, preferensi notifikasi, keamanan sandi, dan data akun Anda.
+        </p>
+      </div>
+
+      {/* 2. Profile Summary Card (Server-Rendered for Instant Paint) */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-white p-6 shadow-xs sm:p-7 transition-all">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4 sm:gap-5">
             {/* Avatar or Initial Badge */}
@@ -204,9 +260,9 @@ export function CandidateSettingsView() {
             {/* Candidate Details */}
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                   {displayName}
-                </h1>
+                </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                   <Shield className="size-3" />
                   Kandidat Aktif
@@ -283,179 +339,269 @@ export function CandidateSettingsView() {
         </div>
       </div>
 
-      {/* 2. Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-border/80 pb-3">
-        {[
-          { id: "overview" as const, label: "Profil & Akun", icon: User },
-          { id: "notifications" as const, label: "Notifikasi & Privasi", icon: Bell },
-          { id: "security" as const, label: "Keamanan & Sandi", icon: Lock },
-          { id: "accessibility" as const, label: "Aksesibilitas", icon: Sliders },
-          { id: "danger" as const, label: "Zona Berbahaya", icon: AlertTriangle, isDanger: true },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-
-          let tabStyle = "text-muted-foreground hover:bg-slate-100 hover:text-foreground";
+      {/* 3. Mobile Tab Bar (< md) */}
+      <div className="flex md:hidden overflow-x-auto gap-2 border-b border-border/80 pb-2 -mx-4 px-4 scrollbar-none">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const active = activeTab === item.id;
+          let mobileStyle = "text-muted-foreground bg-white border border-border/70";
           if (active) {
-            tabStyle = tab.isDanger
-              ? "bg-red-600 text-white shadow-xs"
-              : "bg-primary text-white shadow-xs";
-          } else if (tab.isDanger) {
-            tabStyle = "text-red-600 hover:bg-red-50 hover:text-red-700";
+            mobileStyle = item.isDanger
+              ? "bg-red-600 text-white border-red-600 shadow-xs"
+              : "bg-primary text-white border-primary shadow-xs";
+          } else if (item.isDanger) {
+            mobileStyle = "text-red-600 bg-red-50/50 border-red-200/80";
           }
 
           return (
             <button
-              key={tab.id}
+              key={item.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${tabStyle}`}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-all ${mobileStyle}`}
             >
-              <Icon className="size-4" />
-              {tab.label}
+              <Icon className="size-3.5" />
+              {item.label}
             </button>
           );
         })}
       </div>
 
-      {/* 3. Tab Contents */}
+      {/* 4. Desktop 2-Column Layout (Left Navigation Sidebar + Content Area) */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
+        {/* Left Sidebar Navigation (Desktop only) */}
+        <aside className="hidden md:block md:col-span-4 lg:col-span-4 sticky top-24">
+          <div className="rounded-2xl border border-border/80 bg-white p-2.5 shadow-xs space-y-1">
+            <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Menu Pengaturan
+            </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {activeTab === "overview" && (
-        <div className="space-y-6 animate-fade-up">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Ringkasan Profil &amp; Akun
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Tinjau informasi dasar akun dan status publikasi portofolio Anda di ProofyLink.
-            </p>
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+
+              if (item.isDanger) {
+                return (
+                  <div key={item.id} className="pt-2">
+                    <div className="border-t border-border/70 my-1" />
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(item.id)}
+                      className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
+                        active
+                          ? "bg-red-600 text-white shadow-xs"
+                          : "text-red-600 hover:bg-red-50/80"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex size-8 items-center justify-center rounded-lg ${
+                            active ? "bg-white/20 text-white" : "bg-red-100 text-red-600"
+                          }`}
+                        >
+                          <Icon className="size-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{item.label}</p>
+                          <p
+                            className={`text-[11px] ${
+                              active ? "text-red-100" : "text-red-500/80"
+                            }`}
+                          >
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight
+                        className={`size-4 transition-transform ${
+                          active ? "text-white translate-x-0.5" : "text-red-400 group-hover:translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
+                    active
+                      ? "bg-primary text-white shadow-xs"
+                      : "text-foreground hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex size-8 items-center justify-center rounded-lg ${
+                        active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      <Icon className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{item.label}</p>
+                      <p
+                        className={`text-[11px] ${
+                          active ? "text-purple-100" : "text-muted-foreground"
+                        }`}
+                      >
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight
+                    className={`size-4 transition-transform ${
+                      active
+                        ? "text-white translate-x-0.5"
+                        : "text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              );
+            })}
           </div>
+        </aside>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="md:col-span-2 border-border/80 shadow-xs">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="size-4 text-primary" />
-                  Informasi Akun Utama
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Data akun yang terdaftar untuk keperluan korespondensi rekruter dan pemberitahuan.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Nama Lengkap</span>
-                    <p className="font-semibold text-foreground">{displayName}</p>
-                  </div>
-                  <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Alamat Email</span>
-                    <p className="font-semibold text-foreground break-all">{email}</p>
-                  </div>
-                  <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Posisi Sasaran</span>
-                    <p className="font-semibold text-foreground">
-                      {targetRole || "Belum ditentukan"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Lokasi Domisili</span>
-                    <p className="font-semibold text-foreground">{location}</p>
-                  </div>
-                </div>
+        {/* Right Settings Content Area */}
+        <main className="md:col-span-8 lg:col-span-8">
+          {/* TAB 1: PROFIL & AKUN */}
+          {activeTab === "overview" && (
+            <div className="space-y-6 animate-fade-up">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  Profil &amp; Akun
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Informasi data akun yang digunakan untuk korespondensi dan akses ProofyLink.
+                </p>
+              </div>
 
-                <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Headline Profesional
-                  </span>
-                  <p className="text-foreground leading-relaxed">{headline}</p>
-                </div>
+              <Card className="border-border/80 shadow-xs">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="size-4 text-primary" />
+                    Detail Identitas Akun
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Informasi utama yang terhubung dengan akun login Anda.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Nama Lengkap
+                      </span>
+                      <p className="font-semibold text-foreground">{displayName}</p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Alamat Email Akun
+                      </span>
+                      <p className="font-semibold text-foreground break-all">{email}</p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Posisi Sasaran Karier
+                      </span>
+                      <p className="font-semibold text-foreground">
+                        {targetRole || "Belum ditentukan"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Lokasi Domisili
+                      </span>
+                      <p className="font-semibold text-foreground">{location}</p>
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-end pt-2">
-                  <Button asChild variant="outline" size="sm" className="gap-1.5">
-                    <Link href="/candidate/profile/edit">
-                      <Edit3 className="size-3.5" />
-                      Perbarui Data Profil
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="rounded-lg border bg-slate-50/60 p-3.5 space-y-1">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Headline Profil
+                    </span>
+                    <p className="text-foreground leading-relaxed">{headline}</p>
+                  </div>
 
-            <div className="space-y-4">
+                  <div className="flex items-center justify-end pt-2">
+                    <Button asChild variant="outline" size="sm" className="gap-1.5">
+                      <Link href="/candidate/profile/edit">
+                        <Edit3 className="size-3.5" />
+                        Perbarui Data Profil Lengkap
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Account Status Card */}
               <Card className="border-border/80 shadow-xs">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Briefcase className="size-4 text-primary" />
-                    Status Visibilitas
+                    Kebijakan Visibilitas &amp; Privasi
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-xs text-muted-foreground">
                   <div className="flex items-center justify-between border-b pb-2">
-                    <span>Status Publikasi:</span>
+                    <span>Status Publikasi Portofolio:</span>
                     <span className="font-bold text-foreground">
-                      {isPublished ? "Aktif di Search" : "Draft / Privat"}
+                      {isPublished ? "Aktif di Pencarian Rekruter" : "Draft (Tersimpan Privat)"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b pb-2">
-                    <span>Peran Pengguna:</span>
+                    <span>Peran Akun:</span>
                     <span className="font-bold text-foreground capitalize">
                       {user?.role || "Kandidat"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Akses Screening:</span>
-                    <span className="font-bold text-emerald-600">Consent-First</span>
+                    <span>Kebijakan Screening:</span>
+                    <span className="font-bold text-emerald-600">Consent-First Berizin</span>
                   </div>
-                  <p className="pt-2 text-[11px] leading-relaxed text-muted-foreground">
-                    Rekruter hanya dapat melihat ringkasan tersamar sampai Anda menyetujui permintaan
-                    screening atau scan kontak.
+                  <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Data pribadi Anda (nomor kontak, detail CV lengkap) terlindungi dan hanya dapat
+                    diakses oleh rekruter setelah Anda menyetujui permintaan screening resmi.
                   </p>
                 </CardContent>
               </Card>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* TAB 2: NOTIFIKASI & PRIVASI */}
-      {activeTab === "notifications" && (
-        <div className="space-y-6 animate-fade-up">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Preferensi Notifikasi &amp; Privasi
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Atur bagaimana dan kapan Anda menerima pemberitahuan mengenai tawaran screening dan pesan.
-            </p>
-          </div>
+          {/* TAB 2: NOTIFIKASI & PRIVASI */}
+          {activeTab === "notifications" && (
+            <div className="space-y-6 animate-fade-up">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  Notifikasi &amp; Privasi
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Kelola preferensi pemberitahuan tawaran screening, pesan rekruter, dan jam tenang.
+                </p>
+              </div>
 
-          <form onSubmit={handleSaveNotifPrefs} className="space-y-6">
-            <Card className="border-border/80 shadow-xs">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Bell className="size-4 text-primary" />
-                  Saluran Notifikasi
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Pilih saluran untuk menerima pengingat aktivitas kandidat.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingPrefs ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="size-6 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <>
+              <form onSubmit={handleSaveNotifPrefs} className="space-y-6">
+                <Card className="border-border/80 shadow-xs">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Bell className="size-4 text-primary" />
+                      Saluran Pemberitahuan
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Pilih bagaimana Anda ingin menerima update penting.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <label className="flex items-start justify-between gap-4 rounded-lg border p-4 cursor-pointer hover:bg-slate-50/60 transition">
                       <div className="space-y-0.5">
                         <span className="text-sm font-semibold text-foreground">
                           Notifikasi Dalam Aplikasi (In-App)
                         </span>
                         <p className="text-xs text-muted-foreground">
-                          Tampilkan lencana dan pemberitahuan di bilah atas aplikasi saat login.
+                          Tampilkan lencana dan notifikasi lonceng di bilah atas aplikasi saat login.
                         </p>
                       </div>
                       <input
@@ -475,7 +621,7 @@ export function CandidateSettingsView() {
                         </span>
                         <p className="text-xs text-muted-foreground">
                           Kirimkan email ke <span className="font-semibold">{email}</span> saat ada
-                          tawaran screening atau pesan penting.
+                          tawaran screening atau pesan rekruter.
                         </p>
                       </div>
                       <input
@@ -487,144 +633,144 @@ export function CandidateSettingsView() {
                         className="mt-1 size-4 rounded text-primary focus:ring-primary/20 accent-primary"
                       />
                     </label>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            <Card className="border-border/80 shadow-xs">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Clock className="size-4 text-primary" />
-                  Jam Tenang (Quiet Hours)
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Tunda pengiriman notifikasi instan pada rentang jam istirahat Anda (format 24 jam).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="quiet-start"
-                      className="text-xs font-semibold text-foreground"
-                    >
-                      Mulai Jam Tenang
-                    </label>
-                    <input
-                      id="quiet-start"
-                      type="time"
-                      value={notifPrefs.quietHours.start || ""}
-                      onChange={(e) =>
-                        setNotifPrefs({
-                          ...notifPrefs,
-                          quietHours: { ...notifPrefs.quietHours, start: e.target.value },
-                        })
-                      }
-                      className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="quiet-end"
-                      className="text-xs font-semibold text-foreground"
-                    >
-                      Selesai Jam Tenang
-                    </label>
-                    <input
-                      id="quiet-end"
-                      type="time"
-                      value={notifPrefs.quietHours.end || ""}
-                      onChange={(e) =>
-                        setNotifPrefs({
-                          ...notifPrefs,
-                          quietHours: { ...notifPrefs.quietHours, end: e.target.value },
-                        })
-                      }
-                      className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                    />
-                  </div>
+                <Card className="border-border/80 shadow-xs">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Clock className="size-4 text-primary" />
+                      Jam Tenang (Quiet Hours)
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Tunda notifikasi instan pada rentang jam istirahat Anda (format 24 jam).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="quiet-start"
+                          className="text-xs font-semibold text-foreground"
+                        >
+                          Mulai Jam Tenang
+                        </label>
+                        <input
+                          id="quiet-start"
+                          type="time"
+                          value={notifPrefs.quietHours.start || ""}
+                          onChange={(e) =>
+                            setNotifPrefs({
+                              ...notifPrefs,
+                              quietHours: { ...notifPrefs.quietHours, start: e.target.value },
+                            })
+                          }
+                          className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="quiet-end"
+                          className="text-xs font-semibold text-foreground"
+                        >
+                          Selesai Jam Tenang
+                        </label>
+                        <input
+                          id="quiet-end"
+                          type="time"
+                          value={notifPrefs.quietHours.end || ""}
+                          onChange={(e) =>
+                            setNotifPrefs({
+                              ...notifPrefs,
+                              quietHours: { ...notifPrefs.quietHours, end: e.target.value },
+                            })
+                          }
+                          className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex items-center justify-end pt-2">
+                  <Button type="submit" disabled={savingPrefs} className="gap-2">
+                    <Save className="size-4" />
+                    {savingPrefs ? "Menyimpan..." : "Simpan Preferensi Notifikasi"}
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex items-center justify-end pt-2">
-              <Button type="submit" disabled={savingPrefs} className="gap-2">
-                <Save className="size-4" />
-                {savingPrefs ? "Menyimpan..." : "Simpan Preferensi Notifikasi"}
-              </Button>
+              </form>
             </div>
-          </form>
-        </div>
-      )}
+          )}
 
-      {/* TAB 3: KEAMANAN & SANDI */}
-      {activeTab === "security" && (
-        <div className="animate-fade-up">
-          <SecuritySettings />
-        </div>
-      )}
+          {/* TAB 3: KEAMANAN & SANDI */}
+          {activeTab === "security" && (
+            <div className="animate-fade-up">
+              <SecuritySettings />
+            </div>
+          )}
 
-      {/* TAB 4: AKSESIBILITAS */}
-      {activeTab === "accessibility" && (
-        <div className="animate-fade-up">
-          <AccessibilitySettings />
-        </div>
-      )}
+          {/* TAB 4: AKSESIBILITAS */}
+          {activeTab === "accessibility" && (
+            <div className="animate-fade-up">
+              <AccessibilitySettings />
+            </div>
+          )}
 
-      {/* TAB 5: ZONA BERBAHAYA */}
-      {activeTab === "danger" && (
-        <div className="space-y-6 animate-fade-up">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-red-600 sm:text-2xl flex items-center gap-2">
-              <AlertTriangle className="size-6 text-red-600" />
-              Zona Berbahaya (Danger Zone)
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Aksi di bagian ini berdampak permanen pada akun kandidat dan tidak dapat dibatalkan.
-            </p>
-          </div>
-
-          <Card className="border-red-200/90 bg-red-50/20 shadow-xs">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-red-100 text-red-600">
-                  <Trash2 className="size-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-base text-red-950">
-                    Hapus Akun Kandidat Permanen
-                  </CardTitle>
-                  <CardDescription className="text-xs text-red-800">
-                    Hapus profil, seluruh berkas CV, riwayat lamaran, pesan, dan kredensial login secara instan.
-                  </CardDescription>
-                </div>
+          {/* TAB 5: ZONA BERBAHAYA */}
+          {activeTab === "danger" && (
+            <div className="space-y-6 animate-fade-up">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-red-600 sm:text-2xl flex items-center gap-2">
+                  <AlertTriangle className="size-6 text-red-600" />
+                  Zona Berbahaya
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Aksi di bagian ini bersifat permanen dan menghapus seluruh akun kandidat Anda.
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Setelah akun Anda dihapus, semua portofolio, file CV di cloud storage, dan riwayat
-                interaksi dengan rekruter akan segera dimusnahkan. Rekruter tidak akan lagi dapat
-                menemukan atau menghubungi Anda.
-              </p>
 
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setDeleteModalOpen(true)}
-                  className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xs"
-                >
-                  <Trash2 className="size-4" />
-                  Hapus Akun Saya
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              <Card className="border-red-200/90 bg-red-50/20 shadow-xs">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                      <Trash2 className="size-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base text-red-950">
+                        Hapus Akun Kandidat Permanen
+                      </CardTitle>
+                      <CardDescription className="text-xs text-red-800">
+                        Musnahkan profil, seluruh dokumen CV, riwayat lamaran, pesan, dan kredensial login.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Setelah akun Anda dihapus, semua berkas PDF CV, foto profil di penyimpanan awan,
+                    dan riwayat lamaran pekerjaan akan segera dihapus permanen dari server. Rekruter
+                    tidak akan lagi dapat melihat data atau menghubungi Anda.
+                  </p>
 
-      {/* 4. Delete Account Confirmation Modal */}
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => setDeleteModalOpen(true)}
+                      className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xs"
+                    >
+                      <Trash2 className="size-4" />
+                      Hapus Akun Saya
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* 5. Delete Account Confirmation Modal */}
       <DeleteAccountModal
         open={deleteModalOpen}
         onOpenChange={setDeleteModalOpen}
