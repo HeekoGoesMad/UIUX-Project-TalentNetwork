@@ -79,6 +79,9 @@ export default function RecruiterPendingPage() {
     let active = true;
 
     const poll = () => {
+      // Pause network requests if the user has navigated away to another tab
+      if (typeof document !== "undefined" && document.hidden) return;
+
       fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } } | null) => {
@@ -86,6 +89,7 @@ export default function RecruiterPendingPage() {
           if (data?.identity?.provisioningStatus) {
             const next = data.identity.provisioningStatus;
             if (next === "active") {
+              active = false;
               setLocalStatus("active");
               setProvisioningStatus("active", null);
               router.push("/dashboard");
@@ -121,12 +125,21 @@ export default function RecruiterPendingPage() {
       } catch {}
     };
 
+    // Immediately poll when the user focuses back on the tab
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden && active) {
+        poll();
+      }
+    };
+
     window.addEventListener("storage", handleStorage);
-    const interval = setInterval(poll, 3000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const interval = setInterval(poll, 10000);
 
     return () => {
       active = false;
       window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
     };
   }, [localStatus, setProvisioningStatus, router]);

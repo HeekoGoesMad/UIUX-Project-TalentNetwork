@@ -116,15 +116,6 @@ export class TalentSearchService {
 
     const whereClause = and(...conditions);
 
-    // Count total matches
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(schema.candidateProfiles)
-      .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-      .where(whereClause);
-
-    const total = Number(totalResult?.count ?? 0);
-
     // Always paginated: default limit 24, capped at 100 so direct callers can never trigger unbounded scans.
     const rawPage = Number(params?.page ?? 1);
     const rawLimit = Number(params?.limit ?? 24);
@@ -139,8 +130,14 @@ export class TalentSearchService {
       orderBy = desc(schema.candidateProfiles.updatedAt);
     }
 
-    // Select candidate slice
-    const selectQuery = db
+    // Run count and paginated slice queries concurrently
+    const countQuery = db
+      .select({ count: count() })
+      .from(schema.candidateProfiles)
+      .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+      .where(whereClause);
+
+    const sliceQuery = db
       .select({
         id: schema.candidateProfiles.id,
         name: schema.profiles.displayName,
@@ -151,9 +148,12 @@ export class TalentSearchService {
       .from(schema.candidateProfiles)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
       .where(whereClause)
-      .orderBy(orderBy);
+      .orderBy(orderBy)
+      .limit(limit)
+      .offset(offset);
 
-    const rows = await selectQuery.limit(limit).offset(offset);
+    const [[totalResult], rows] = await Promise.all([countQuery, sliceQuery]);
+    const total = Number(totalResult?.count ?? 0);
 
     if (rows.length === 0) {
       return {

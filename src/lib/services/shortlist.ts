@@ -90,8 +90,9 @@ export class ShortlistService {
       .orderBy(asc(schema.shortlistItems.createdAt));
 
     const shortlists = pageLists.map((list) => ({ ...list, items: [] as unknown[] }));
+    const shortlistMap = new Map(shortlists.map((item) => [item.id, item]));
     for (const row of items) {
-      const shortlist = shortlists.find((item) => item.id === row.shortlistId);
+      const shortlist = shortlistMap.get(row.shortlistId);
       if (!shortlist || !row.itemId) continue;
       shortlist.items.push({
         id: row.itemId,

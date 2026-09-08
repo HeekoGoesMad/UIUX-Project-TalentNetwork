@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Database, GraduationCap, Grid2X2, List, Search as SearchIcon, X } from "lucide-react";
 import { candidates } from "@/data/candidates";
-import { CandidateCard } from "@/components/talent/candidate-card";
+import { CandidateCardView } from "@/components/talent/candidate-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -338,7 +338,7 @@ function SearchResultsSkeleton() {
 // Main page
 // ────────────────────────────────────────────────────────────────
 function SearchPageContent() {
-  const { user, dbMode, bootstrapped, databaseError, partnerVerifications } = useApp();
+  const { user, dbMode, bootstrapped, databaseError, partnerVerifications, shortlisted, scans, toggleShortlist } = useApp();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -351,6 +351,9 @@ function SearchPageContent() {
   const syncedQueryRef = useRef(urlQuery);
   const urlTimerRef = useRef<number | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  const unlockedSet = useMemo(() => new Set(scans.map((s) => s.candidateId)), [scans]);
+  const shortlistedSet = useMemo(() => new Set(shortlisted), [shortlisted]);
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
@@ -612,10 +615,14 @@ function SearchPageContent() {
               }
             >
               {results.map((candidate) => (
-                <CandidateCard
+                <CandidateCardView
                   key={candidate.id}
                   candidate={candidate}
                   list={filters.view === "list"}
+                  unlocked={unlockedSet.has(candidate.id)}
+                  isShortlisted={shortlistedSet.has(candidate.id)}
+                  onToggleShortlist={toggleShortlist}
+                  partnerVerification={partnerVerifications?.[candidate.id] ?? candidate.campusVerification}
                 />
               ))}
             </div>
