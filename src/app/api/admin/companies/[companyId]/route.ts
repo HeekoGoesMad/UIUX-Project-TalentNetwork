@@ -161,3 +161,79 @@ export async function PATCH(
     return apiError("Gagal memperbarui data perusahaan.", 500, error);
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ companyId: string }> }
+) {
+  try {
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const { companyId } = await params;
+    const db = current.db;
+    const adminUser = current.user;
+
+    const [existingOrg] = await db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, companyId));
+
+    if (!existingOrg) {
+      return NextResponse.json({ error: "Perusahaan tidak ditemukan." }, { status: 404 });
+    }
+
+    // Hapus relasi turunan
+    await db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.organizationId, companyId));
+    await db.delete(schema.tokenPurchases).where(eq(schema.tokenPurchases.organizationId, companyId));
+    await db.delete(schema.tokenAccounts).where(eq(schema.tokenAccounts.organizationId, companyId));
+    await db.delete(schema.savedSearches).where(eq(schema.savedSearches.organizationId, companyId));
+    await db.delete(schema.searchAnalytics).where(eq(schema.searchAnalytics.organizationId, companyId));
+    await db.delete(schema.billingAccounts).where(eq(schema.billingAccounts.organizationId, companyId));
+    await db.delete(schema.shortlists).where(eq(schema.shortlists.organizationId, companyId));
+    await db.delete(schema.jobs).where(eq(schema.jobs.organizationId, companyId));
+    await db.delete(schema.conversations).where(eq(schema.conversations.organizationId, companyId));
+    await db.delete(schema.assessmentTemplates).where(eq(schema.assessmentTemplates.organizationId, companyId));
+    await db.delete(schema.interviews).where(eq(schema.interviews.organizationId, companyId));
+    await db.delete(schema.offers).where(eq(schema.offers.organizationId, companyId));
+    await db.delete(schema.skillAliases).where(eq(schema.skillAliases.organizationId, companyId));
+    await db.delete(schema.screeningGovernanceVersions).where(eq(schema.screeningGovernanceVersions.organizationId, companyId));
+    await db.delete(schema.screeningRuns).where(eq(schema.screeningRuns.organizationId, companyId));
+    await db.delete(schema.consentRequestBatches).where(eq(schema.consentRequestBatches.organizationId, companyId));
+
+    // Lepaskan referensi di audit logs
+    await db.update(schema.auditLogs).set({ organizationId: null }).where(eq(schema.auditLogs.organizationId, companyId));
+
+    // Hapus organization
+    await db.delete(schema.organizations).where(eq(schema.organizations.id, companyId));
+
+    // Reset status recruiter jika user tidak memiliki org lain
+    if (existingOrg.createdBy) {
+      const otherOrgs = await db
+        .select({ id: schema.organizationMembers.id })
+        .from(schema.organizationMembers)
+        .where(eq(schema.organizationMembers.userId, existingOrg.createdBy))
+        .limit(1);
+
+      if (otherOrgs.length === 0) {
+        await db
+          .update(schema.users)
+          .set({ recruiterProvisioningStatus: "pending", updatedAt: new Date() })
+          .where(eq(schema.users.id, existingOrg.createdBy));
+      }
+    }
+
+    await writeAuditLog({
+      db,
+      actorUserId: adminUser.id,
+      action: "admin.company.deleted",
+      entityType: "organization",
+      entityId: companyId,
+      metadata: { deletedCompanyName: existingOrg.name },
+    });
+
+    return NextResponse.json({ success: true, message: `Perusahaan ${existingOrg.name} berhasil dihapus.` });
+  } catch (error) {
+    return apiError("Gagal menghapus perusahaan.", 500, error);
+  }
+}
+
