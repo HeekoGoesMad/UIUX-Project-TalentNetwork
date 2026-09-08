@@ -2,7 +2,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
+  Brain,
   BriefcaseBusiness,
   Camera,
   ExternalLink,
@@ -637,6 +639,41 @@ export function CvWorkspace() {
                   placeholder="Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa."
                   rows={4}
                 />
+              </div>
+
+              {/* ── Tipe Kepribadian (16Personalities) ── */}
+              <div className="md:col-span-2 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Brain className="size-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800">Tipe Kepribadian (16Personalities)</span>
+                      {profile.personality?.type ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                          {profile.personality.type} · {profile.personality.label}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">Belum diatur</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {profile.personality?.summary || "Tampilkan tipe kepribadianmu di preview card agar dilirik oleh rekruter."}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold rounded-xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 shrink-0 self-start sm:self-center"
+                >
+                  <Link href="/candidate/career-advisor">
+                    <Sparkles className="size-3 mr-1" />
+                    Kelola di Career Advisor
+                  </Link>
+                </Button>
               </div>
             </div>
           </FormSection>

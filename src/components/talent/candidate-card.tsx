@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
+import { Bookmark, Brain, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
 import { Candidate } from "@/types";
 import { useApp } from "@/providers/app-provider";
 import { maskName } from "@/lib/candidate-display";
@@ -37,6 +37,15 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
                 >
                   <GraduationCap className="size-3 text-[#7C3AED]" />
                   Campus Verified · {verif.institution.replace("Universitas ", "UI ").replace("Institut Teknologi ", "IT ")}
+                </span>
+              )}
+              {candidate.personality && (
+                <span
+                  title={`Tipe Kepribadian (16Personalities): ${candidate.personality.type} · ${candidate.personality.label}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50/80 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-300"
+                >
+                  <Brain className="size-3 text-violet-500" />
+                  {candidate.personality.type} · {candidate.personality.label}
                 </span>
               )}
             </div>

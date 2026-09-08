@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/providers/app-provider";
+import { PersonalityAdvisorCard } from "./personality-advisor-card";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -496,6 +497,9 @@ export function CareerAdvisorWorkspace() {
           </Button>
         </div>
       </div>
+
+      {/* ─── Tes Kepribadian (16Personalities) ─── */}
+      <PersonalityAdvisorCard />
 
       {/* ─── Advice Results ─── */}
       {result && (

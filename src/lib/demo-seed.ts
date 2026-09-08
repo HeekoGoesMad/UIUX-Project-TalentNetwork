@@ -154,5 +154,11 @@ export const DEMO_CANDIDATE_CV: CvProfile = {
   openToWork: true,
   careerStatus: "open-to-work",
   talentCategory: "djoin-verified",
+  personality: {
+    type: "ENFJ",
+    label: "Protagonis",
+    tagline: "Pemimpin yang karismatik dan inspiratif, mampu memikat pendengarnya.",
+    testUrl: "https://www.16personalities.com/profiles/enfj-personality",
+  },
   updatedAt: new Date().toISOString(),
 };

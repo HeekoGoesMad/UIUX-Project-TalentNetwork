@@ -68,6 +68,16 @@ export type Candidate = {
   talentCategory: TalentCategory;
   industry: IndustryCategory;
   campusVerification?: CampusVerification;
+  personality?: CandidatePersonality;
+};
+
+export type CandidatePersonality = {
+  type: string; // e.g. "ENFJ"
+  label: string; // e.g. "Protagonis"
+  tagline?: string;
+  summary?: string;
+  testUrl?: string;
+  updatedAt?: string;
 };
 
 export type Scan = { candidateId: string; scannedAt: string };
@@ -164,6 +174,7 @@ export type CvProfile = {
   avatarUrl?: string;
   bannerUrl?: string;
   campusVerification?: CampusVerification;
+  personality?: CandidatePersonality;
   sourceFileName?: string;
   updatedAt: string;
 };

@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Bookmark,
+  Brain,
   Check,
   CircleHelp,
   Copy,
@@ -46,7 +47,43 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import type { AiSummary, Candidate, ScreeningInsight, ScreeningResult } from "@/types";
+import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
+
+function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
+  return (
+    <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+            <Brain className="size-4.5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-violet-950 dark:text-violet-100">
+                {personality.type} · {personality.label}
+              </span>
+              <Badge variant="outline" className="border-violet-200 bg-white/60 text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+                16Personalities
+              </Badge>
+            </div>
+            {personality.tagline && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {personality.tagline}
+              </p>
+            )}
+          </div>
+        </div>
+        {personality.testUrl && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-violet-700 hover:bg-violet-100 hover:text-violet-900 dark:text-violet-300 dark:hover:bg-violet-900/40" asChild>
+            <a href={personality.testUrl} target="_blank" rel="noopener noreferrer">
+              Hasil Tes <ExternalLink className="ml-1 size-3" />
+            </a>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const PORTFOLIO_LABELS: Record<string, string> = {
   "github.com": "GitHub",
@@ -597,6 +634,12 @@ export default function TalentProfile() {
                     Campus Verified · {verif.institution}
                   </Badge>
                 )}
+                {candidate.personality && (
+                  <Badge className="border-white/20 bg-white/15 text-white font-semibold backdrop-blur-xs hover:bg-white/25">
+                    <Brain className="mr-1 size-3.5 text-violet-200" />
+                    {candidate.personality.type} · {candidate.personality.label}
+                  </Badge>
+                )}
               </div>
 
               <p className="mt-2 text-2xl font-bold tracking-tight">
@@ -640,6 +683,11 @@ export default function TalentProfile() {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Summary / Ringkasan Profil</h3>
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
+
+            {/* Personality Highlight */}
+            {candidate.personality && (
+              <PersonalityOverview personality={candidate.personality} />
+            )}
 
             {/* Skills & Tools Preview */}
             <div className="grid gap-6 sm:grid-cols-2">
@@ -768,6 +816,11 @@ export default function TalentProfile() {
               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Tentang Saya</p>
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
+
+            {/* Personality Highlight */}
+            {candidate.personality && (
+              <PersonalityOverview personality={candidate.personality} />
+            )}
 
             {/* Skills & Tools */}
             <div className="grid gap-6 sm:grid-cols-2">
