@@ -192,8 +192,8 @@ export function ProfessionalSummaryModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-        <DialogHeader className="gap-1 border-b border-border pb-4">
-          <div className="flex items-center justify-between">
+        <DialogHeader className="gap-1 border-b border-border pb-4 pr-10 sm:pr-12">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Sparkles className="size-4" />
@@ -208,8 +208,9 @@ export function ProfessionalSummaryModal({
                 variant="outline"
                 size="sm"
                 onClick={handleAutoPopulate}
-                className="hidden text-xs sm:inline-flex"
+                className="hidden text-xs sm:inline-flex shrink-0 rounded-lg gap-1.5 border-primary/20 text-primary hover:bg-primary/5 shadow-2xs"
               >
+                <Sparkles className="size-3" />
                 Isi dari Data Profil
               </Button>
             )}
