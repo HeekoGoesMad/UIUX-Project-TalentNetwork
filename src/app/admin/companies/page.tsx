@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -268,6 +269,32 @@ function AdminCompaniesContent() {
     }
   };
 
+  const handleDeleteCompany = async (company: CompanyItem) => {
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin menghapus perusahaan "${company.name}" beserta seluruh relasi data terkait secara permanen? Tindakan ini tidak dapat dibatalkan.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/companies/${company.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal menghapus perusahaan.");
+      }
+      toast.success(data.message || `Perusahaan ${company.name} berhasil dihapus.`);
+      if (modalOpen && selectedCompany?.id === company.id) {
+        setModalOpen(false);
+      }
+      fetchCompanies();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal menghapus perusahaan.";
+      toast.error(msg);
+    }
+  };
+
+
   // Filtered companies
   const filtered = useMemo(() => {
     return companies.filter((c) => {
@@ -423,14 +450,25 @@ function AdminCompaniesContent() {
                             {c.tokenBalance} Token
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => openReviewModal(c)}
-                              className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 rounded-xl gap-1.5 shadow-xs"
-                            >
-                              <Eye className="size-3.5" />
-                              Review
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                onClick={() => openReviewModal(c)}
+                                className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 rounded-xl gap-1.5 shadow-xs"
+                              >
+                                <Eye className="size-3.5" />
+                                Review
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteCompany(c)}
+                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 text-xs h-8 px-2.5 rounded-xl gap-1 shadow-xs"
+                                title={`Hapus perusahaan ${c.name}`}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -729,24 +767,35 @@ function AdminCompaniesContent() {
               )}
             </div>
 
-            <DialogFooter className="border-t pt-3 flex flex-row items-center justify-end gap-2">
+            <DialogFooter className="border-t pt-3 flex flex-row items-center justify-between gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={() => setModalOpen(false)}
-                className="text-xs rounded-xl"
+                onClick={() => selectedCompany && handleDeleteCompany(selectedCompany)}
+                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs rounded-xl gap-1.5 font-medium"
               >
-                Batal
+                <Trash2 className="size-3.5" />
+                Hapus Perusahaan
               </Button>
-              <Button
-                size="sm"
-                onClick={handleSaveCompany}
-                disabled={updating}
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl font-semibold px-4"
-              >
-                {updating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-                Simpan Perubahan &amp; Sinkronisasi
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalOpen(false)}
+                  className="text-xs rounded-xl"
+                >
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveCompany}
+                  disabled={updating}
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl font-semibold px-4"
+                >
+                  {updating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
+                  Simpan Perubahan &amp; Sinkronisasi
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
