@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -113,8 +113,29 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     const value = section(type).items;
     return Array.isArray(value) ? value as T[] : [];
   };
+  const skillsContent = section("skills");
+  const rawSkills = items<string>("skills");
+  const hardCompetencies = Array.isArray(skillsContent.hardCompetencies)
+    ? (skillsContent.hardCompetencies as string[])
+    : rawSkills;
   const preferences = section("preferences");
+  const softSkills = Array.isArray(skillsContent.softSkills)
+    ? (skillsContent.softSkills as string[])
+    : Array.isArray(preferences.softSkills)
+    ? (preferences.softSkills as string[])
+    : [];
   const status = asCareerStatus(preferences.careerStatus);
+  const salary = typeof preferences.salary === "string" ? preferences.salary : undefined;
+  const personality = preferences.personality && typeof preferences.personality === "object"
+    ? (preferences.personality as CandidatePersonality)
+    : undefined;
+  const talentCategory = typeof preferences.talentCategory === "string" ? (preferences.talentCategory as TalentCategory) : undefined;
+  const campusVerification = preferences.campusVerification && typeof preferences.campusVerification === "object"
+    ? (preferences.campusVerification as CampusVerification)
+    : undefined;
+  const industries = Array.isArray(preferences.industries) ? (preferences.industries as string[]) : [];
+  const certifications = Array.isArray(preferences.certifications) ? (preferences.certifications as string[]) : [];
+
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
     fullName: base?.displayName ?? "",
@@ -123,12 +144,14 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     location: candidate?.location ?? "",
     email: payload.identity?.email ?? "",
     phone: base?.phone ?? "",
-    skills: items<string>("skills"),
+    skills: rawSkills.length > 0 ? rawSkills : hardCompetencies,
+    hardCompetencies,
     tools: items<string>("tools"),
-    industries: [],
+    softSkills,
+    industries,
     experience: items<CvProfile["experience"][number]>("experience"),
     education: items<CvProfile["education"][number]>("education"),
-    certifications: [],
+    certifications,
     portfolio: items<string>("portfolio"),
     targetRole: candidate?.targetRole ?? "",
     avatarUrl: base?.avatarUrl ?? ((candidate as Record<string, unknown> | null)?.avatarUrl as string | undefined) ?? "",
@@ -136,6 +159,10 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     workArrangement: preferences.workArrangement === "remote" || preferences.workArrangement === "onsite" ? preferences.workArrangement : "hybrid",
     openToWork: status !== "not-available",
     careerStatus: status,
+    talentCategory,
+    salary,
+    personality,
+    campusVerification,
     updatedAt: candidate?.updatedAt ?? base?.updatedAt ?? new Date().toISOString(),
   };
 }
@@ -702,7 +729,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           profile.about,
           profile.location,
           profile.targetRole,
-          profile.skills?.length,
+          profile.skills?.length || profile.hardCompetencies?.length,
+          profile.softSkills?.length,
           profile.tools?.length,
           profile.experience?.length,
           profile.education?.length,
@@ -711,7 +739,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sections: [
         { type: "experience", content: { items: profile.experience } },
         { type: "education", content: { items: profile.education } },
-        { type: "skills", content: { items: profile.skills } },
+        {
+          type: "skills",
+          content: {
+            items: profile.skills?.length ? profile.skills : (profile.hardCompetencies ?? []),
+            hardCompetencies: profile.hardCompetencies ?? profile.skills,
+            softSkills: profile.softSkills ?? [],
+          },
+        },
         { type: "tools", content: { items: profile.tools } },
         { type: "portfolio", content: { items: profile.portfolio } },
         {
@@ -719,6 +754,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           content: {
             careerStatus: profile.careerStatus,
             workArrangement: profile.workArrangement,
+            ...(profile.salary ? { salary: profile.salary } : {}),
+            ...(profile.personality ? { personality: profile.personality } : {}),
+            ...(profile.talentCategory ? { talentCategory: profile.talentCategory } : {}),
+            ...(profile.campusVerification ? { campusVerification: profile.campusVerification } : {}),
+            ...(profile.industries?.length ? { industries: profile.industries } : {}),
+            ...(profile.certifications?.length ? { certifications: profile.certifications } : {}),
             ...(profile.bannerUrl !== undefined ? { bannerUrl: profile.bannerUrl || null } : {}),
           },
         },
@@ -760,6 +801,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved: CvProfile = {
       ...state.cvProfile,
       ...profile,
+      hardCompetencies: profile.hardCompetencies ?? profile.skills,
+      softSkills: profile.softSkills ?? state.cvProfile?.softSkills ?? [],
       avatarUrl: currentAvatarUrl,
       bannerUrl: currentBannerUrl,
       campusVerification,

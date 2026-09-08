@@ -88,22 +88,26 @@ export async function POST(request: Request) {
   let browser: Browser | undefined;
 
   try {
-    // Dynamically import playwright-core on demand
-    const { chromium } = await import("playwright-core");
+    // Dynamically import playwright with playwright-core fallback
+    let chromium;
+    try {
+      chromium = (await import("playwright")).chromium;
+    } catch {
+      chromium = (await import("playwright-core")).chromium;
+    }
+
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
+    await page.setContent(html, { waitUntil: "load", timeout: 10000 });
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin:
-        templateId === "ats" || templateId === "minimal"
-          ? { top: "18mm", bottom: "18mm", left: "20mm", right: "20mm" }
-          : { top: "0", bottom: "0", left: "0", right: "0" },
+      preferCSSPageSize: true,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
     });
 
     return new NextResponse(new Uint8Array(pdf), {
