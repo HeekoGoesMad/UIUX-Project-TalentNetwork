@@ -73,22 +73,19 @@ export class ProfileService {
         .returning({ id: schema.users.id });
 
       const now = new Date();
-      const hasValidAvatarUrl =
-        typeof payload.avatarUrl === "string" && payload.avatarUrl.trim().length > 0;
-
       const [profile] = await tx
         .insert(schema.profiles)
         .values({
           userId: user.id,
           displayName: payload.displayName ?? null,
-          avatarUrl: hasValidAvatarUrl ? payload.avatarUrl : null,
+          avatarUrl: payload.avatarUrl ?? null,
           phone: payload.phone ?? null,
         })
         .onConflictDoUpdate({
           target: schema.profiles.userId,
           set: {
             displayName: payload.displayName ?? null,
-            ...(hasValidAvatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
+            ...(payload.avatarUrl !== undefined ? { avatarUrl: payload.avatarUrl } : {}),
             phone: payload.phone ?? null,
             updatedAt: now,
           },

@@ -66,6 +66,34 @@ export async function deleteProfileMedia(storageKeyOrUrl: string): Promise<boole
   }
 }
 
+export async function cleanUserStorageMedia(userId: string, type: "avatar" | "banner"): Promise<boolean> {
+  const bucket = process.env.SUPABASE_PROFILE_MEDIA_BUCKET?.trim() || "profile-media";
+  const client = await getStorageClient();
+  if (!client) return true;
+
+  try {
+    const folder = `${type}s/${userId}`;
+    const { data: files, error } = await client.storage.from(bucket).list(folder, { limit: 100 });
+    if (error || !files || files.length === 0) return true;
+
+    const pathsToDelete = files
+      .filter((f) => f.name && !f.name.startsWith("."))
+      .map((f) => `${folder}/${f.name}`);
+
+    if (pathsToDelete.length > 0) {
+      const { error: removeError } = await client.storage.from(bucket).remove(pathsToDelete);
+      if (removeError) {
+        console.warn(`[profile-storage] Gagal membersihkan media ${folder}:`, removeError);
+        return false;
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[profile-storage] Error saat membersihkan media user:`, err);
+    return false;
+  }
+}
+
 export async function storeProfileMedia(input: {
   userId: string;
   fileName: string;

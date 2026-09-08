@@ -667,8 +667,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const syncProfile = async (profile: CvProfile) => {
-    const validAvatarUrl = profile.avatarUrl?.startsWith("http") ? profile.avatarUrl : undefined;
-    const validBannerUrl = profile.bannerUrl?.startsWith("http") ? profile.bannerUrl : undefined;
     const syncPayload: Record<string, unknown> = {
       displayName: profile.fullName || null,
       phone: profile.phone || null,
@@ -702,14 +700,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           content: {
             careerStatus: profile.careerStatus,
             workArrangement: profile.workArrangement,
-            ...(validBannerUrl ? { bannerUrl: validBannerUrl } : {}),
+            ...(profile.bannerUrl !== undefined ? { bannerUrl: profile.bannerUrl || null } : {}),
           },
         },
       ],
     };
 
-    if (validAvatarUrl) {
-      syncPayload.avatarUrl = validAvatarUrl;
+    if (profile.avatarUrl !== undefined) {
+      syncPayload.avatarUrl = profile.avatarUrl?.startsWith("http") ? profile.avatarUrl : null;
     }
 
     const response = await fetch("/api/profile/sync", {
@@ -736,8 +734,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
       }
     }
-    const currentAvatarUrl = profile.avatarUrl || state.cvProfile?.avatarUrl || "";
-    const currentBannerUrl = profile.bannerUrl || state.cvProfile?.bannerUrl || "";
+    const currentAvatarUrl =
+      profile.avatarUrl !== undefined ? profile.avatarUrl : (state.cvProfile?.avatarUrl || "");
+    const currentBannerUrl =
+      profile.bannerUrl !== undefined ? profile.bannerUrl : (state.cvProfile?.bannerUrl || "");
     const saved: CvProfile = {
       ...state.cvProfile,
       ...profile,
@@ -749,6 +749,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (saved.fullName?.trim()) {
       setUser((current) => current ? { ...current, name: saved.fullName } : null);
     }
+    setProfile((current) => current ? {
+      ...current,
+      avatarUrl: currentAvatarUrl || null,
+      displayName: saved.fullName || current.displayName,
+      phone: saved.phone || current.phone,
+      updatedAt: saved.updatedAt,
+    } : null);
     setState((current) => ({
       ...current,
       cvProfile: saved,

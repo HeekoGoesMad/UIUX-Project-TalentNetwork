@@ -7,6 +7,7 @@ import { enforceRateLimit } from "@/lib/api/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
 import {
   ProfileMediaConfigurationError,
+  cleanUserStorageMedia,
   deleteProfileMedia,
   storeProfileMedia,
   validateProfileImage,
@@ -238,6 +239,7 @@ export async function DELETE(request: Request) {
       if (existing?.avatarUrl) {
         await deleteProfileMedia(existing.avatarUrl);
       }
+      await cleanUserStorageMedia(current.user.id, "avatar");
 
       await current.db
         .update(schema.profiles)
@@ -280,6 +282,7 @@ export async function DELETE(request: Request) {
         if (typeof content.bannerUrl === "string") {
           await deleteProfileMedia(content.bannerUrl);
         }
+        await cleanUserStorageMedia(current.user.id, "banner");
 
         const newContent = { ...content };
         delete newContent.bannerUrl;
