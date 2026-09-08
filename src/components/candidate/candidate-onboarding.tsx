@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   Check,
   GraduationCap,
   Hammer,
+  Loader2,
   MapPin,
   Plus,
   Rocket,
@@ -23,6 +24,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
 import {
   CAREER_STATUS_CONFIG,
   TALENT_CATEGORY_CONFIG,
@@ -195,8 +197,10 @@ function isValidDraftPayload(value: unknown): value is { form: FormState; step: 
 
 export function CandidateOnboarding() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
   const [step, setStep] = useState(0);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [form, setForm] = useState<FormState>(() => {
     const isDemo = isDemoCandidateProfile(cvProfile);
     const profile = isDemo ? null : (cvProfile ?? null);
@@ -218,42 +222,77 @@ export function CandidateOnboarding() {
   const draftAppliedRef = useRef(false);
   const publishedRef = useRef(false);
 
+  const goToStep = (targetStep: number) => {
+    if (targetStep < 0 || targetStep >= steps.length) return;
+    setStep(targetStep);
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({ form, step: targetStep }));
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     if (!bootstrapped || !user || restoredRef.current) return;
     restoredRef.current = true;
+
+    const rawParam = searchParams?.get("step");
+    const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
+    const hasValidParamStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length;
+
     const timer = window.setTimeout(() => {
       try {
         const raw = window.localStorage.getItem(draftKey);
-        if (!raw) return;
-        const parsed: unknown = JSON.parse(raw);
-        if (!isValidDraftPayload(parsed) || !isMeaningfulDraft(parsed.form)) return;
-        if (
-          parsed.form.fullName?.includes("Nadia Utami") ||
-          parsed.form.email?.includes("nadia.utami@example.com")
-        ) {
-          window.localStorage.removeItem(draftKey);
-          return;
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw);
+          if (isValidDraftPayload(parsed) && isMeaningfulDraft(parsed.form)) {
+            if (
+              parsed.form.fullName?.includes("Nadia Utami") ||
+              parsed.form.email?.includes("nadia.utami@example.com")
+            ) {
+              window.localStorage.removeItem(draftKey);
+            } else {
+              draftAppliedRef.current = true;
+              setForm(parsed.form);
+              const restoredStep = hasValidParamStep
+                ? paramStep
+                : Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1);
+              setStep(restoredStep);
+              setEdits((current) => current + 1);
+              return;
+            }
+          }
         }
-        draftAppliedRef.current = true;
-        setForm(parsed.form);
-        setStep(Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1));
-        setEdits((current) => current + 1);
       } catch {
         window.localStorage.removeItem(draftKey);
       }
+
+      if (hasValidParamStep) {
+        setStep(paramStep);
+      } else if (cvProfile && !isDemoCandidateProfile(cvProfile)) {
+        setStep(getFirstIncompleteStep(form));
+      }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [bootstrapped, user]);
+  }, [bootstrapped, user, searchParams, cvProfile, form]);
 
   useEffect(() => {
     if (!user || !bootstrapped || !cvProfile || draftAppliedRef.current) return;
     if (isDemoCandidateProfile(cvProfile)) return;
     const timer = window.setTimeout(() => {
       if (draftAppliedRef.current) return;
-      setForm(initialForm(cvProfile, careerStatus, user.email));
+      const initial = initialForm(cvProfile, careerStatus, user.email);
+      setForm(initial);
+      const rawParam = searchParams?.get("step");
+      const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
+      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
+        setStep(paramStep);
+      } else {
+        setStep(getFirstIncompleteStep(initial));
+      }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [bootstrapped, careerStatus, cvProfile, user]);
+  }, [bootstrapped, careerStatus, cvProfile, user, searchParams]);
 
   useEffect(() => {
     if (!user || !bootstrapped || cvProfile || draftAppliedRef.current) return;
@@ -376,7 +415,13 @@ export function CandidateOnboarding() {
       return;
     }
 
+    setIsPublishing(true);
+    const toastId = toast.loading("Mempublikasikan profil...", {
+      description: "Menyimpan data dan mengaktifkan profil profesional Anda.",
+    });
+
     const profile: CvProfile = {
+      ...cvProfile,
       id: cvProfile?.id ?? `cv-${Date.now()}`,
       fullName: form.fullName.trim(),
       headline: form.headline.trim(),
@@ -386,6 +431,8 @@ export function CandidateOnboarding() {
       phone: form.phone.trim(),
       skills: form.skills,
       tools: form.tools,
+      hardCompetencies: form.skills,
+      softSkills: form.softSkills,
       industries: cvProfile?.industries ?? [],
       experience: form.experience
         .filter((item) => item.company.trim() || item.role.trim())
@@ -405,13 +452,22 @@ export function CandidateOnboarding() {
       openToWork: form.careerStatus !== "not-available",
       careerStatus: form.careerStatus,
       talentCategory: form.talentCategory,
+      avatarUrl: cvProfile?.avatarUrl,
+      bannerUrl: cvProfile?.bannerUrl,
       updatedAt: new Date().toISOString(),
     };
 
     try {
       await saveCvProfile(profile);
-    } catch {
-      toast.error("Gagal mempublikasikan", { description: "Coba lagi beberapa saat. Drafmu tetap tersimpan di perangkat ini." });
+    } catch (err) {
+      toast.error("Gagal mempublikasikan", {
+        id: toastId,
+        description:
+          err instanceof Error
+            ? err.message
+            : "Coba lagi beberapa saat. Drafmu tetap tersimpan di perangkat ini.",
+      });
+      setIsPublishing(false);
       return;
     }
 
@@ -419,9 +475,12 @@ export function CandidateOnboarding() {
     try {
       window.localStorage.removeItem(draftKey);
     } catch {
-      return;
+      // ignore
     }
-    toast.success("Profil berhasil dipublikasikan", { description: "Recruiter sekarang dapat menemukan profilmu sesuai pengaturan." });
+    toast.success("Profil berhasil dipublikasikan", {
+      id: toastId,
+      description: "Recruiter sekarang dapat menemukan profilmu sesuai pengaturan.",
+    });
     router.push("/candidate");
   };
 
@@ -455,7 +514,7 @@ export function CandidateOnboarding() {
       void finish();
       return;
     }
-    setStep((current) => current + 1);
+    goToStep(step + 1);
   };
 
   return (
@@ -491,26 +550,37 @@ export function CandidateOnboarding() {
               {steps.map((item, index) => {
                 const Icon = item.icon;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={item.title}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                      index === step ? "bg-white text-foreground" : index < step ? "text-[#8de0be]" : "text-[#8fa7c0]"
+                    onClick={() => goToStep(index)}
+                    disabled={isPublishing}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                      index === step
+                        ? "bg-white text-foreground shadow-xs font-medium"
+                        : index < step
+                        ? "text-[#8de0be] hover:bg-white/10"
+                        : "text-[#8fa7c0] hover:bg-white/5"
                     }`}
                   >
                     <span
-                      className={`flex size-6 items-center justify-center rounded-full text-xs ${
-                        index === step ? "bg-secondary text-secondary-foreground" : "bg-white/10"
+                      className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs transition-colors ${
+                        index === step
+                          ? "bg-[#7C3AED] text-white font-bold"
+                          : index < step
+                          ? "bg-emerald-500/20 text-[#8de0be]"
+                          : "bg-white/10 text-[#8fa7c0]"
                       }`}
                     >
-                      {index < step ? <Check className="size-3.5" /> : <Icon className="size-3.5" />}
+                      {index < step ? <Check className="size-3.5 stroke-[2.5]" /> : <Icon className="size-3.5" />}
                     </span>
-                    <span>
-                      <strong className="block text-xs font-semibold">{item.title}</strong>
-                      <small className={`text-[11px] ${index === step ? "text-muted-foreground" : "text-[#8fa7c0]"}`}>
+                    <span className="min-w-0">
+                      <strong className="block text-xs font-semibold truncate">{item.title}</strong>
+                      <small className={`text-[11px] truncate block ${index === step ? "text-muted-foreground" : "text-[#8fa7c0]"}`}>
                         {item.note}
                       </small>
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -537,9 +607,19 @@ export function CandidateOnboarding() {
               </div>
               <div className="mt-3 flex gap-1 md:hidden">
                 {steps.map((item, index) => (
-                  <span
+                  <button
+                    type="button"
                     key={item.title}
-                    className={`h-1 flex-1 rounded-full ${index <= step ? "bg-[#7C3AED]" : "bg-muted"}`}
+                    onClick={() => goToStep(index)}
+                    disabled={isPublishing}
+                    aria-label={`Lompat ke langkah ${index + 1}: ${item.title}`}
+                    className={`h-1.5 flex-1 rounded-full transition-all cursor-pointer ${
+                      index === step
+                        ? "bg-[#7C3AED]"
+                        : index < step
+                        ? "bg-emerald-500"
+                        : "bg-muted hover:bg-muted-foreground/30"
+                    }`}
                   />
                 ))}
               </div>
@@ -584,7 +664,13 @@ export function CandidateOnboarding() {
 
               <div className="flex items-center justify-between border-t bg-card px-4 py-3 sm:px-8 sm:py-4">
                 {step > 0 ? (
-                  <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)} className="rounded-xl text-xs font-semibold px-3 sm:px-4 h-9 sm:h-10">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => goToStep(step - 1)}
+                    disabled={isPublishing}
+                    className="rounded-xl text-xs font-semibold px-3 sm:px-4 h-9 sm:h-10"
+                  >
                     <ArrowLeft className="size-4 mr-1.5" />
                     Kembali
                   </Button>
@@ -594,9 +680,28 @@ export function CandidateOnboarding() {
                     <span>Langkah 1 dari {steps.length} (Wajib)</span>
                   </div>
                 )}
-                <Button type="submit" size="lg" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10">
-                  {step === steps.length - 1 ? "Publikasikan Profil" : "Lanjut"}
-                  <ArrowRight className="size-4 ml-1.5" />
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={isPublishing}
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10 transition-all disabled:opacity-70"
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="size-4 mr-1.5 animate-spin" />
+                      Mempublikasikan Profil...
+                    </>
+                  ) : step === steps.length - 1 ? (
+                    <>
+                      Publikasikan Profil
+                      <ArrowRight className="size-4 ml-1.5" />
+                    </>
+                  ) : (
+                    <>
+                      Lanjut
+                      <ArrowRight className="size-4 ml-1.5" />
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

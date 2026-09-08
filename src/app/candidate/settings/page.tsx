@@ -8,6 +8,7 @@ import {
 } from "@/components/candidate/candidate-settings-view";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { schema } from "@/db";
+import { ProfileService } from "@/lib/services/profile";
 
 export default async function CandidateSettingsPage() {
   let initialProfile: CandidateProfileData | null = null;
@@ -27,16 +28,23 @@ export default async function CandidateSettingsPage() {
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, auth.user.id))
           .limit(1)
-          .then(([p]) =>
-            p
-              ? {
-                  displayName: p.displayName,
-                  avatarUrl: p.avatarUrl,
-                  phone: p.phone,
-                  createdAt: p.createdAt?.toISOString(),
-                }
-              : null
-          ),
+          .then(async ([p]) => {
+            if (!p) return null;
+            let avatarUrl = p.avatarUrl;
+            if (!avatarUrl) {
+              avatarUrl = await ProfileService.resolveAndRecoverAvatar(
+                auth.db,
+                auth.user.id,
+                avatarUrl
+              );
+            }
+            return {
+              displayName: p.displayName,
+              avatarUrl,
+              phone: p.phone,
+              createdAt: p.createdAt?.toISOString(),
+            };
+          }),
         auth.db
           .select({
             id: schema.candidateProfiles.id,

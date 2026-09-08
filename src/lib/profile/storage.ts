@@ -130,3 +130,25 @@ export async function storeProfileMedia(input: {
   };
 }
 
+export async function recoverAvatarFromStorage(userId: string): Promise<string | null> {
+  const bucket = process.env.SUPABASE_PROFILE_MEDIA_BUCKET?.trim() || "profile-media";
+  const client = await getStorageClient();
+  if (!client) return null;
+
+  try {
+    const { data: files, error } = await client.storage.from(bucket).list(`avatars/${userId}`, {
+      sortBy: { column: "created_at", order: "desc" },
+      limit: 10,
+    });
+    if (error || !files || files.length === 0) return null;
+
+    const validFile = files.find((f) => f.name && !f.name.startsWith("."));
+    if (!validFile) return null;
+
+    const { data } = client.storage.from(bucket).getPublicUrl(`avatars/${userId}/${validFile.name}`);
+    return data?.publicUrl ?? null;
+  } catch (err) {
+    console.warn("[profile-storage] Gagal memulihkan avatar dari storage:", err);
+    return null;
+  }
+}
