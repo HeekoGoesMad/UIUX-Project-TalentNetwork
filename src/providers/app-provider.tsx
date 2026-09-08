@@ -562,11 +562,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
-        const { data, error } = await withTimeout(supabase.auth.signUp({ email, password, options: { data: { name, role, companyName, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" } } }), 10000);
+        const { data, error } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name,
+                role,
+                companyName,
+                provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending",
+              },
+            },
+          }),
+          30000
+        );
         if (error) {
-          const msg = /already registered|already exists/i.test(error.message)
-            ? "Email sudah terdaftar. Silakan masuk dengan akun tersebut, atau gunakan email lain."
-            : error.message;
+          let msg = error.message;
+          if (/already registered|already exists/i.test(error.message)) {
+            msg = "Email sudah terdaftar. Silakan masuk dengan akun tersebut, atau gunakan email lain.";
+          } else if (/security purposes.*after (\d+)/i.test(error.message)) {
+            const seconds = error.message.match(/after (\d+)/i)?.[1] ?? "beberapa";
+            msg = `Untuk alasan keamanan, Anda baru dapat meminta verifikasi kembali setelah ${seconds} detik. Silakan periksa juga kotak masuk/spam email Anda.`;
+          }
           return { error: msg };
         }
         if (!data.session) return { needsConfirmation: true, role };

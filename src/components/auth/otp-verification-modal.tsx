@@ -25,9 +25,10 @@ export function OtpVerificationModal({
 }: OtpVerificationModalProps) {
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const canResend = countdown <= 0;
+  const canResend = countdown <= 0 && !resending && !loading && !isVerified;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on open
@@ -153,19 +154,38 @@ export function OtpVerificationModal({
 
   const handleResend = async () => {
     if (!canResend) return;
-    setCountdown(60);
+    setResending(true);
 
     try {
       const supabase = createClient();
       if (supabase && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        await supabase.auth.resend({
+        const { error } = await supabase.auth.resend({
           type: "signup",
           email,
         });
+
+        if (error) {
+          if (/security purposes.*after (\d+)/i.test(error.message)) {
+            const seconds = error.message.match(/after (\d+)/i)?.[1] ?? "beberapa";
+            toast.error(`Mohon tunggu ${seconds} detik sebelum meminta OTP baru lagi.`);
+            const secNum = parseInt(seconds, 10);
+            if (!isNaN(secNum) && secNum > 0) {
+              setCountdown(secNum);
+            }
+          } else {
+            toast.error(error.message || "Gagal mengirim ulang kode OTP.");
+          }
+          setResending(false);
+          return;
+        }
       }
+      setCountdown(60);
       toast.success(`Kode OTP baru telah dikirimkan ke ${email}`);
     } catch {
+      setCountdown(60);
       toast.success(`Kode OTP baru telah dikirimkan ke ${email}`);
+    } finally {
+      setResending(false);
     }
   };
 
@@ -251,23 +271,39 @@ export function OtpVerificationModal({
             )}
           </Button>
 
-          {/* Resend Button */}
-          <div className="text-center">
-            {canResend && !loading && !isVerified ? (
-              <button
-                type="button"
-                onClick={() => void handleResend()}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#7C3AED] hover:underline"
-              >
-                <RefreshCw className="size-3.5" /> Kirim Ulang Kode OTP
-              </button>
-            ) : isVerified ? (
+          {/* Resend Section */}
+          <div className="flex flex-col items-center justify-center gap-1.5 text-center pt-2 border-t border-slate-100">
+            {isVerified ? (
               <p className="text-xs text-emerald-700 font-medium">
                 Akun berhasil diverifikasi. Membuka workspace Anda...
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Kirim ulang kode dalam <strong className="text-slate-700">{countdown}s</strong>
+              <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+                <span className="text-slate-500">Belum menerima email?</span>
+                <button
+                  type="button"
+                  onClick={() => void handleResend()}
+                  disabled={!canResend}
+                  className={`inline-flex items-center gap-1 font-semibold transition-colors ${
+                    canResend
+                      ? "text-[#7C3AED] hover:text-[#6D28D9] hover:underline cursor-pointer"
+                      : "text-slate-400 cursor-not-allowed"
+                  }`}
+                >
+                  <RefreshCw className={`size-3.5 ${resending ? "animate-spin" : ""}`} />
+                  {resending ? (
+                    "Mengirim OTP..."
+                  ) : countdown > 0 ? (
+                    <span>Kirim Ulang ({countdown}s)</span>
+                  ) : (
+                    <span>Kirim Ulang Kode OTP</span>
+                  )}
+                </button>
+              </div>
+            )}
+            {!isVerified && countdown > 0 && (
+              <p className="text-[11px] text-slate-400">
+                Periksa juga folder Spam atau Promosi pada email Anda.
               </p>
             )}
           </div>
