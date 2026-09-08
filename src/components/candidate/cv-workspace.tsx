@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BriefcaseBusiness,
   Camera,
@@ -177,6 +177,12 @@ function CompetencyTagInput({
 export function CvWorkspace() {
   const { cvProfile, user, dbMode, saveCvProfile } = useApp();
   const [profile, setProfile] = useState<CvProfile>(cvProfile ?? blank(dbMode ? user?.email : "", dbMode ? user?.name : ""));
+  const [prevCvProfile, setPrevCvProfile] = useState(cvProfile);
+
+  if (cvProfile && cvProfile !== prevCvProfile) {
+    setPrevCvProfile(cvProfile);
+    setProfile(cvProfile);
+  }
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -233,6 +239,10 @@ export function CvWorkspace() {
       }
 
       update(isAvatar ? "avatarUrl" : "bannerUrl", data.url);
+      await saveCvProfile({
+        ...profile,
+        ...(isAvatar ? { avatarUrl: data.url } : { bannerUrl: data.url }),
+      });
       toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil diperbarui!`, { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Gagal mengunggah ${isAvatar ? "foto profil" : "sampul"}`, { id: toastId });
@@ -250,17 +260,16 @@ export function CvWorkspace() {
       }
 
       update(isAvatar ? "avatarUrl" : "bannerUrl", "");
+      await saveCvProfile({
+        ...profile,
+        ...(isAvatar ? { avatarUrl: "" } : { bannerUrl: "" }),
+      });
       toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil dihapus!`, { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}`, { id: toastId });
     }
   };
 
-  useEffect(() => {
-    if (!cvProfile) return;
-    const timer = window.setTimeout(() => setProfile(cvProfile), 0);
-    return () => window.clearTimeout(timer);
-  }, [cvProfile]);
 
   // Generic scalar updater
   const update = <K extends keyof CvProfile>(key: K, value: CvProfile[K]) =>

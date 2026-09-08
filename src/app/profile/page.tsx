@@ -120,14 +120,18 @@ export default function ProfilePage() {
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
   const avatarUrl: string =
-    (source && "avatarUrl" in source && typeof source.avatarUrl === "string" && source.avatarUrl)
-      ? source.avatarUrl
-      : (source?.fullName?.includes("Nadia") ? "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop" : "");
+    source && "avatarUrl" in source && source.avatarUrl !== undefined
+      ? (source.avatarUrl || "")
+      : (!dbMode && source?.fullName?.includes("Nadia")
+        ? "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop"
+        : "");
 
   const bannerUrl: string =
-    (source && "bannerUrl" in source && typeof source.bannerUrl === "string" && source.bannerUrl)
-      ? source.bannerUrl
-      : (source?.fullName?.includes("Nadia") ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop" : "");
+    source && "bannerUrl" in source && source.bannerUrl !== undefined
+      ? (source.bannerUrl || "")
+      : (!dbMode && source?.fullName?.includes("Nadia")
+        ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop"
+        : "");
 
   const p = {
     fullName: source?.fullName ?? "",
@@ -278,9 +282,11 @@ export default function ProfilePage() {
 
   const { pct, missing } = calcCompleteness(p);
 
-  const initials = p.fullName
-    .split(" ")
+  const initials = (p.fullName || user?.name || user?.email || "P")
+    .trim()
+    .split(/\s+/)
     .map((n) => n[0])
+    .filter(Boolean)
     .join("")
     .slice(0, 2)
     .toUpperCase();
@@ -296,7 +302,7 @@ export default function ProfilePage() {
             <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/candidate">
+            <Link href="/candidate/cv">
               <Pencil className="size-4" />
               Edit profil
             </Link>
@@ -355,42 +361,45 @@ export default function ProfilePage() {
                     {p.avatarUrl ? (
                       <img
                         src={p.avatarUrl}
-                        alt={p.fullName}
+                        alt={p.fullName || "Profil"}
                         loading="lazy"
                         decoding="async"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover z-10"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";
                         }}
                       />
                     ) : null}
-                    <span className="absolute text-3xl font-bold text-[#7C3AED] -z-10">{initials}</span>
+                    <span className="absolute text-3xl font-bold text-[#7C3AED] select-none">{initials}</span>
                   </div>
 
-                  {/* Camera & Trash buttons for avatar */}
-                  <div className="absolute bottom-0 right-0 flex items-center gap-1">
-                    <label
-                      title="Ubah Foto Profil"
-                      className="cursor-pointer flex size-8 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform hover:scale-105"
-                    >
-                      <Camera className="size-4" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={(e) => onSelectFile(e, "avatar")}
-                      />
-                    </label>
-                    {p.avatarUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedia("avatar")}
-                        title="Hapus Foto Profil"
-                        className="cursor-pointer flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md border-2 border-white transition-transform hover:scale-105"
+                  {/* Camera & Animated Peek Trash buttons for avatar */}
+                  <div className="absolute bottom-0 right-0 z-20">
+                    <div className="group relative flex flex-col items-center pt-8 -mt-8">
+                      {p.avatarUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia("avatar")}
+                          title="Hapus Foto Profil"
+                          aria-label="Hapus Foto Profil"
+                          className="absolute z-10 flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-sm border-2 border-white transition-all duration-300 ease-out -translate-y-3.5 group-hover:-translate-y-9 group-focus-within:-translate-y-9 hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto will-change-transform"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      ) : null}
+                      <label
+                        title="Ubah Foto Profil"
+                        className="relative z-20 cursor-pointer flex size-9 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform duration-200 hover:scale-105"
                       >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    ) : null}
+                        <Camera className="size-4" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => onSelectFile(e, "avatar")}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
 

@@ -108,11 +108,12 @@ export function CandidateSettingsView({
   initialProfile,
   initialPreferences,
 }: CandidateSettingsViewProps) {
-  const { user } = useApp();
+  const { user, cvProfile, profile } = useApp();
   const [activeTab, setActiveTab] = useState<SettingsTab>("overview");
   const [profileData, setProfileData] = useState<CandidateProfileData | null>(
     initialProfile ?? null
   );
+
 
   // Notification Preferences State
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
@@ -212,12 +213,29 @@ export function CandidateSettingsView({
   };
 
   const displayName =
-    profileData?.profile?.displayName || user?.name || user?.email?.split("@")[0] || "Kandidat";
-  const email = profileData?.user?.email || user?.email || "";
-  const avatarUrl = profileData?.profile?.avatarUrl;
-  const headline = profileData?.candidateProfile?.headline || "Talenta Profesional";
-  const targetRole = profileData?.candidateProfile?.targetRole;
-  const location = profileData?.candidateProfile?.location || "Indonesia";
+    cvProfile?.fullName ||
+    profile?.displayName ||
+    profileData?.profile?.displayName ||
+    user?.name ||
+    user?.email?.split("@")[0] ||
+    "Kandidat";
+  const email = cvProfile?.email || profileData?.user?.email || user?.email || "";
+  const avatarUrl =
+    cvProfile?.avatarUrl !== undefined
+      ? (cvProfile.avatarUrl || null)
+      : (profile?.avatarUrl !== undefined
+          ? profile.avatarUrl
+          : profileData?.profile?.avatarUrl);
+  const headline =
+    cvProfile?.headline ||
+    profileData?.candidateProfile?.headline ||
+    "Talenta Profesional";
+  const targetRole =
+    cvProfile?.targetRole || profileData?.candidateProfile?.targetRole;
+  const location =
+    cvProfile?.location ||
+    profileData?.candidateProfile?.location ||
+    "Indonesia";
   const isPublished = profileData?.candidateProfile?.isPublished ?? false;
   const completeness = profileData?.candidateProfile?.completeness ?? 60;
   const candidateId = profileData?.candidateProfile?.id;
