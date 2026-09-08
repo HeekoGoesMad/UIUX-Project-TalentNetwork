@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { memo, useEffect, useRef, useState, useTransition } from "react";
 import {
   Download,
   Printer,
@@ -115,7 +115,7 @@ function triggerIframePrint(htmlContent: string) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function CvDownload({ profile }: { profile: CvProfile }) {
+export const CvDownload = memo(function CvDownload({ profile }: { profile: CvProfile }) {
   const [selected, setSelected] = useState<CvTemplateId>("ats");
   const [downloading, setDownloading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -453,4 +453,5 @@ export function CvDownload({ profile }: { profile: CvProfile }) {
         </Dialog>
       </div>
   );
-}
+});
+
