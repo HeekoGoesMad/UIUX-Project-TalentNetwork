@@ -19,19 +19,17 @@ export function CandidateReviewStatus({
   initialReview?: SafeReview | null;
 }) {
   const { dbMode } = useApp();
-  const [review, setReview] = useState<SafeReview | null>(initialReview ?? null);
+  const [fetchedReview, setFetchedReview] = useState<SafeReview | null>(null);
+  const review = initialReview !== undefined ? initialReview : fetchedReview;
 
   useEffect(() => {
-    if (initialReview !== undefined) {
-      setReview(initialReview);
-      return;
-    }
+    if (initialReview !== undefined) return;
     let active = true;
     async function load() {
       if (!dbMode) {
         const invitation = invitationId ? getDemoInvitation(invitationId) : null;
         const local = invitation?.attemptId ? getDemoReview(invitation.attemptId) : null;
-        if (active) setReview(local);
+        if (active) setFetchedReview(local);
         return;
       }
       if (!invitationId) return;
@@ -40,7 +38,7 @@ export function CandidateReviewStatus({
           invitations?: Array<{ id: string; attempt?: { id: string; review?: SafeReview | null } | null }>;
         };
       const invitation = list.invitations?.find((item) => item.id === invitationId);
-      if (active) setReview(invitation?.attempt?.review ?? null);
+      if (active) setFetchedReview(invitation?.attempt?.review ?? null);
     }
     void load();
     return () => {
