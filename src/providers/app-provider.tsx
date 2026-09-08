@@ -667,30 +667,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const syncProfile = async (profile: CvProfile) => {
-    const validAvatarUrl = profile.avatarUrl?.startsWith("http") ? profile.avatarUrl : null;
-    const validBannerUrl = profile.bannerUrl?.startsWith("http") ? profile.bannerUrl : null;
+    const validAvatarUrl = profile.avatarUrl?.startsWith("http") ? profile.avatarUrl : undefined;
+    const validBannerUrl = profile.bannerUrl?.startsWith("http") ? profile.bannerUrl : undefined;
+    const syncPayload: Record<string, unknown> = {
+      displayName: profile.fullName || null,
+      phone: profile.phone || null,
+      headline: profile.headline || null,
+      targetRole: profile.targetRole || null,
+      location: profile.location || null,
+      summary: profile.about || null,
+      isPublished: true,
+      completeness: Math.min(
+        100,
+        [
+          profile.fullName,
+          profile.headline,
+          profile.about,
+          profile.location,
+          profile.targetRole,
+          profile.skills?.length,
+          profile.tools?.length,
+          profile.experience?.length,
+          profile.education?.length,
+        ].filter(Boolean).length * 10
+      ),
+      sections: [
+        { type: "experience", content: { items: profile.experience } },
+        { type: "education", content: { items: profile.education } },
+        { type: "skills", content: { items: profile.skills } },
+        { type: "tools", content: { items: profile.tools } },
+        { type: "portfolio", content: { items: profile.portfolio } },
+        {
+          type: "preferences",
+          content: {
+            careerStatus: profile.careerStatus,
+            workArrangement: profile.workArrangement,
+            ...(validBannerUrl ? { bannerUrl: validBannerUrl } : {}),
+          },
+        },
+      ],
+    };
+
+    if (validAvatarUrl) {
+      syncPayload.avatarUrl = validAvatarUrl;
+    }
+
     const response = await fetch("/api/profile/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: profile.fullName || null,
-        avatarUrl: validAvatarUrl,
-        phone: profile.phone || null,
-        headline: profile.headline || null,
-        targetRole: profile.targetRole || null,
-        location: profile.location || null,
-        summary: profile.about || null,
-        isPublished: true,
-        completeness: Math.min(100, [profile.fullName, profile.headline, profile.about, profile.location, profile.targetRole, profile.skills.length, profile.tools.length, profile.experience.length, profile.education.length].filter(Boolean).length * 10),
-        sections: [
-          { type: "experience", content: { items: profile.experience } },
-          { type: "education", content: { items: profile.education } },
-          { type: "skills", content: { items: profile.skills } },
-          { type: "tools", content: { items: profile.tools } },
-          { type: "portfolio", content: { items: profile.portfolio } },
-          { type: "preferences", content: { careerStatus: profile.careerStatus, workArrangement: profile.workArrangement, bannerUrl: validBannerUrl } },
-        ],
-      }),
+      body: JSON.stringify(syncPayload),
     });
     if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error ?? "Profil belum dapat disinkronkan.");
   };
@@ -711,7 +736,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
       }
     }
-    const saved = { ...profile, campusVerification, updatedAt: new Date().toISOString() };
+    const currentAvatarUrl = profile.avatarUrl || state.cvProfile?.avatarUrl || "";
+    const currentBannerUrl = profile.bannerUrl || state.cvProfile?.bannerUrl || "";
+    const saved: CvProfile = {
+      ...state.cvProfile,
+      ...profile,
+      avatarUrl: currentAvatarUrl,
+      bannerUrl: currentBannerUrl,
+      campusVerification,
+      updatedAt: new Date().toISOString(),
+    };
     if (saved.fullName?.trim()) {
       setUser((current) => current ? { ...current, name: saved.fullName } : null);
     }

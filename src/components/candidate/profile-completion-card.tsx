@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
 import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
@@ -20,6 +21,7 @@ export function ProfileCompletionCard() {
   const percent = Math.round((doneCount / sections.length) * 100);
   const complete = percent === 100;
   const remaining = sections.filter((section) => !section.done);
+  const targetStep = getFirstIncompleteStep(cvProfile);
 
   return (
     <Card>
@@ -66,7 +68,7 @@ export function ProfileCompletionCard() {
         )}
         {!complete ? (
           <Link
-            href="/candidate/onboarding"
+            href={`/candidate/onboarding?step=${targetStep}`}
             className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
           >
             Lanjutkan onboarding <ArrowRight className="size-4" />

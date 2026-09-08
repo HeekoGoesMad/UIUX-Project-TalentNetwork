@@ -4,8 +4,37 @@ import { eq } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { schema, type Database } from "@/db";
 import type { CandidateProfileSync } from "@/lib/profile/schema";
+import { recoverAvatarFromStorage } from "@/lib/profile/storage";
 
 export class ProfileService {
+  /**
+   * Resolve avatar URL, or recover from Supabase storage if missing in the database.
+   */
+  static async resolveAndRecoverAvatar(
+    db: Database,
+    userId: string,
+    currentAvatarUrl: string | null | undefined
+  ): Promise<string | null> {
+    if (currentAvatarUrl && currentAvatarUrl.startsWith("http")) {
+      return currentAvatarUrl;
+    }
+
+    try {
+      const recoveredUrl = await recoverAvatarFromStorage(userId);
+      if (recoveredUrl) {
+        await db
+          .update(schema.profiles)
+          .set({ avatarUrl: recoveredUrl, updatedAt: new Date() })
+          .where(eq(schema.profiles.userId, userId));
+        return recoveredUrl;
+      }
+    } catch (err) {
+      console.warn("[profile-service] Gagal memulihkan avatar dari storage:", err);
+    }
+
+    return null;
+  }
+
   /**
    * Sync candidate profile, user record, base profile, and dynamic sections.
    */
@@ -44,19 +73,22 @@ export class ProfileService {
         .returning({ id: schema.users.id });
 
       const now = new Date();
+      const hasValidAvatarUrl =
+        typeof payload.avatarUrl === "string" && payload.avatarUrl.trim().length > 0;
+
       const [profile] = await tx
         .insert(schema.profiles)
         .values({
           userId: user.id,
           displayName: payload.displayName ?? null,
-          avatarUrl: payload.avatarUrl ?? null,
+          avatarUrl: hasValidAvatarUrl ? payload.avatarUrl : null,
           phone: payload.phone ?? null,
         })
         .onConflictDoUpdate({
           target: schema.profiles.userId,
           set: {
             displayName: payload.displayName ?? null,
-            avatarUrl: payload.avatarUrl ?? null,
+            ...(hasValidAvatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
             phone: payload.phone ?? null,
             updatedAt: now,
           },
