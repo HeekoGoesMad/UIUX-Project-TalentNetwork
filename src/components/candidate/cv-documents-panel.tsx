@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FileText, ShieldCheck, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FileText, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Document = { id: string; originalFileName: string; sizeBytes: number; status: string; createdAt: string };
@@ -77,12 +75,6 @@ export function CvDocumentsPanel() {
               }}
             />
           </label>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/candidate/verifications">
-              <ShieldCheck className="size-4" />
-              Lihat status verifikasi
-            </Link>
-          </Button>
         </div>
         {message && (
           <p className="text-sm text-muted-foreground" role="status">
