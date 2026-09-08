@@ -294,24 +294,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBootstrapped(false);
     setDatabaseError(null);
     try {
-      const [response, consentResponse] = await Promise.all([
-        fetch("/api/app/bootstrap", { cache: "no-store" }),
-        fetch("/api/consent-requests", { cache: "no-store" }),
-      ]);
-      const [payload, consentPayload] = await Promise.all([
-        response.json() as Promise<{
-          identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
-          profile?: BootstrapProfile | null;
-          candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
-          candidateSections?: BootstrapSection[];
-          token?: BootstrapTokenAccount;
-          notifications?: BootstrapNotification[];
-          shortlists?: BootstrapShortlist[];
-          consentRequests?: Record<string, unknown>[];
-          error?: string;
-        }>,
-        consentResponse.json() as Promise<{ requests?: Record<string, unknown>[]; error?: string }>,
-      ]);
+      const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
+      const payload = (await response.json()) as {
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+        profile?: BootstrapProfile | null;
+        candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
+        candidateSections?: BootstrapSection[];
+        token?: BootstrapTokenAccount;
+        notifications?: BootstrapNotification[];
+        shortlists?: BootstrapShortlist[];
+        consentRequests?: Record<string, unknown>[];
+        error?: string;
+      };
+
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
       if (payload.identity?.role) {
@@ -333,16 +328,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
       setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
-      setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
-       const remoteProfile = remoteCvProfile(payload);
-       setState((current) => ({
-         ...current,
-         cvProfile: remoteProfile,
-         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
-         tokens: payload.token?.balance ?? 0,
-         screeningTokens: payload.token?.balance ?? 0,
+      const consents = payload.consentRequests ?? [];
+      setConsentRequests(consents);
+      const remoteProfile = remoteCvProfile(payload);
+      setState((current) => ({
+        ...current,
+        cvProfile: remoteProfile,
+        careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
+        tokens: payload.token?.balance ?? 0,
+        screeningTokens: payload.token?.balance ?? 0,
         shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
-         screeningConsents: Object.fromEntries((consentPayload.requests ?? payload.consentRequests ?? []).flatMap((request) => {
+        screeningConsents: Object.fromEntries(consents.flatMap((request) => {
           const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
           const status = request.status;
           if (!candidateId || typeof status !== "string") return [];

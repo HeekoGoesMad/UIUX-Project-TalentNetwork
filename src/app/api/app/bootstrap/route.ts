@@ -6,6 +6,7 @@ import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 import { createClient } from "@/lib/supabase/server";
 import { ShortlistService } from "@/lib/services/shortlist";
+import { ConsentService } from "@/lib/services/consent";
 
 export async function GET() {
   try {
@@ -27,73 +28,84 @@ export async function GET() {
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const isRecruiter = current.user.role === "recruiter";
-    const isRecruiterActive = isRecruiter && current.user.recruiterProvisioningStatus === "active";
-    
-    // Untuk rekruter (baik active maupun pending review), cari organisasi miliknya
-    let resolvedOrgId: string | null = null;
-    if (isRecruiter) {
-      const [member] = await current.db
-        .select({ organizationId: schema.organizationMembers.organizationId })
-        .from(schema.organizationMembers)
-        .where(eq(schema.organizationMembers.userId, current.user.id))
-        .limit(1);
-      resolvedOrgId = member?.organizationId ?? null;
-    }
-    const activeOrgId = isRecruiterActive ? resolvedOrgId : null;
+    const isCandidate = current.user.role === "candidate";
 
-    const [profile, candidateProfile, notifications] = await Promise.all([
+    // Batch 1: Concurrently load base profile, candidate profile, notifications, and organization membership
+    const [profileRows, candidateProfileRows, notifications, memberRows] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
-      current.db.select().from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1),
+      isCandidate
+        ? current.db.select().from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1)
+        : Promise.resolve([]),
       current.db.select().from(schema.notifications).where(eq(schema.notifications.userId, current.user.id)).orderBy(desc(schema.notifications.createdAt)).limit(50),
+      isRecruiter
+        ? current.db.select().from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, current.user.id)).limit(1)
+        : Promise.resolve([]),
     ]);
-    const candidateSections = current.user.role === "candidate" && candidateProfile[0]
-      ? await current.db.select().from(schema.candidateProfileSections)
-        .where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile[0].id))
-      : [];
 
-    const organization = resolvedOrgId
-      ? (await current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1))[0] ?? null
+    const profile = profileRows[0] ?? null;
+    const candidateProfile = candidateProfileRows[0] ?? null;
+    const recruiterMember = memberRows[0] ?? null;
+    const isRecruiterActive = isRecruiter && current.user.recruiterProvisioningStatus === "active";
+    const resolvedOrgId = recruiterMember?.organizationId ?? null;
+    const activeOrgId = isRecruiterActive ? resolvedOrgId : null;
+    const recruiterScope = activeOrgId && recruiterMember
+      ? { membership: { organizationId: activeOrgId, organizationRole: recruiterMember.role } }
       : null;
-    const shortlists = activeOrgId
-      ? (await ShortlistService.list(current.db, activeOrgId)).shortlists
-      : [];
-    const consents = current.user.role === "candidate" && candidateProfile[0]
-      ? await current.db.select().from(schema.consentRequestItems).where(eq(schema.consentRequestItems.candidateProfileId, candidateProfile[0].id))
-      : activeOrgId
-        ? await current.db.select().from(schema.consentRequestBatches).where(eq(schema.consentRequestBatches.organizationId, activeOrgId))
-        : [];
-    const screeningSummary = activeOrgId
-      ? (await current.db.select({
-        total: sql<number>`count(*)`,
-        pending: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'pending')`,
-        completed: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'completed')`,
-      }).from(schema.screeningRuns).where(eq(schema.screeningRuns.organizationId, activeOrgId)))[0]
-      : { total: 0, pending: 0, completed: 0 };
-    const token = activeOrgId
-      ? await getRecruiterTokenAccount(current.db, activeOrgId)
-      : { accountId: null, balance: 0, updatedAt: null };
+
+    // Batch 2: Concurrently load dependent resources (sections, org details, shortlists, consents, screenings, tokens)
+    const [
+      candidateSections,
+      organization,
+      shortlistResult,
+      consentResult,
+      screeningSummaryRaw,
+      token,
+    ] = await Promise.all([
+      candidateProfile
+        ? current.db.select().from(schema.candidateProfileSections).where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile.id))
+        : Promise.resolve([]),
+      resolvedOrgId
+        ? current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1).then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      activeOrgId
+        ? ShortlistService.list(current.db, activeOrgId)
+        : Promise.resolve({ shortlists: [] }),
+      (isCandidate || activeOrgId)
+        ? ConsentService.getConsentRequests(current.db, current.user, recruiterScope, { page: 1, limit: 100 })
+        : Promise.resolve({ requests: [] }),
+      activeOrgId
+        ? current.db.select({
+            total: sql<number>`count(*)`,
+            pending: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'pending')`,
+            completed: sql<number>`count(*) filter (where ${schema.screeningRuns.status} = 'completed')`,
+          }).from(schema.screeningRuns).where(eq(schema.screeningRuns.organizationId, activeOrgId)).then((rows) => rows[0])
+        : Promise.resolve({ total: 0, pending: 0, completed: 0 }),
+      activeOrgId
+        ? getRecruiterTokenAccount(current.db, activeOrgId)
+        : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
+    ]);
 
     return NextResponse.json({
       identity: {
         id: current.user.id,
         email: current.user.email,
-        name: profile[0]?.displayName ?? current.user.email?.split("@")[0] ?? "Pengguna",
+        name: profile?.displayName ?? current.user.email?.split("@")[0] ?? "Pengguna",
         role: current.user.role,
         provisioningStatus: current.user.recruiterProvisioningStatus,
         provisioningReason: current.user.recruiterRejectionReason ?? null,
       },
       organization,
-      profile: profile[0] ?? null,
-      candidateProfile: candidateProfile[0] ?? null,
+      profile,
+      candidateProfile,
       candidateSections,
-      shortlists,
-      consentRequests: consents,
+      shortlists: shortlistResult.shortlists,
+      consentRequests: consentResult.requests,
       notifications,
       token,
       screeningSummary: {
-        total: Number(screeningSummary?.total ?? 0),
-        pending: Number(screeningSummary?.pending ?? 0),
-        completed: Number(screeningSummary?.completed ?? 0),
+        total: Number(screeningSummaryRaw?.total ?? 0),
+        pending: Number(screeningSummaryRaw?.pending ?? 0),
+        completed: Number(screeningSummaryRaw?.completed ?? 0),
       },
     });
   } catch (err) {
