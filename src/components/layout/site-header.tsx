@@ -152,9 +152,9 @@ export function SiteHeader() {
     : visibleUser?.role === "candidate"
     ? [
         { href: "/candidate", label: "Workspace" },
+        { href: "/candidate/applications", label: "Lamaran Saya" },
         { href: "/candidate/cv", label: "CV & Profil" },
         { href: "/candidate/career-advisor", label: "Career Advisor" },
-        { href: "/candidate/contact-requests", label: "Permintaan Kontak" },
         { href: "/messages", label: "Pesan" },
       ]
     : visibleUser?.role === "partner"
