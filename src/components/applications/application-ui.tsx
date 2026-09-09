@@ -25,7 +25,7 @@ function demoApplications(): Application[] { try { return JSON.parse(localStorag
 function saveDemoApplication(application: Application) { localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application])); }
 function statusBadge(status: ApplicationStatus) { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>; }
 function State({ text, error = false }: { text: string; error?: boolean }) { return <div className={`rounded-2xl border p-8 text-center text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "bg-card text-muted-foreground"}`} role={error ? "alert" : "status"}>{text}</div>; }
-function useApplications() {
+export function useApplications() {
   const { dbMode } = useApp();
   const [applications, setApplications] = useState<Application[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   useEffect(() => { let active = true; setLoading(true); setError(null); if (!dbMode) { setApplications(demoApplications()); setLoading(false); return () => { active = false; }; } fetch("/api/applications", { cache: "no-store" }).then(async (response) => { const payload = await response.json() as { applications?: Application[]; error?: string }; if (!response.ok) throw new Error(payload.error ?? "Aplikasi belum dapat dimuat."); if (active) setApplications(payload.applications ?? []); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Aplikasi belum dapat dimuat."); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [dbMode]);
