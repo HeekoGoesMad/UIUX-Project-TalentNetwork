@@ -851,21 +851,33 @@ export default function TalentProfile() {
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="size-4 text-primary shrink-0" />
-                  <a href={`mailto:${candidate.email}`} className="min-w-0 truncate hover:underline">
-                    {candidate.email}
-                  </a>
+                  {candidate.email ? (
+                    <a href={`mailto:${candidate.email}`} className="min-w-0 truncate hover:underline font-medium text-foreground">
+                      {candidate.email}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs italic">Email belum dicantumkan</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Phone className="size-4 text-primary shrink-0" />
-                  <a href={`tel:${candidate.phone}`} className="hover:underline">
-                    {candidate.phone}
-                  </a>
+                  {candidate.phone ? (
+                    <a href={`tel:${candidate.phone}`} className="hover:underline font-medium text-foreground">
+                      {candidate.phone}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs italic">Nomor telepon belum dicantumkan</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Globe className="size-4 text-sky-600 shrink-0" />
-                  <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
-                    Profil LinkedIn <ExternalLink className="size-3" />
-                  </a>
+                  {candidate.linkedin ? (
+                    <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1 font-medium">
+                      Profil LinkedIn <ExternalLink className="size-3" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs italic">LinkedIn belum dicantumkan</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Banknote className="size-4 text-emerald-600 shrink-0" />
@@ -889,110 +901,6 @@ export default function TalentProfile() {
                   <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
                 </Button>
                 {completed ? <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild><Link href={`/recruiter/screenings/${candidate.id}`}><ShieldCheck className="mr-1.5 size-3.5" />Lihat Screening Selesai</Link></Button> : screeningError ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge> : <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]"><Loader2 className="mr-1.5 size-3 animate-spin" />Screening otomatis</Badge>}
-              </div>
-
-              {/* Alur Rekrutmen Terpadu (Dover-style ATS Flow) */}
-              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-3.5 dark:border-purple-900/40 dark:bg-purple-950/20">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex size-7 items-center justify-center rounded-md bg-[#7C3AED] text-white">
-                      <Sparkles className="size-3.5" />
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-purple-950 dark:text-purple-100">
-                        Alur Rekrutmen (Hiring Workflow)
-                      </p>
-                      <p className="text-[11px] text-purple-700/80 dark:text-purple-300/80">
-                        Siapkan pertanyaan AI, jadwalkan Google Meet / Zoom, kirim offer 1-click, atau tandai diterima.
-                      </p>
-                    </div>
-                  </div>
-                  {hiringOutcome === "hired" ? (
-                    <Badge className="bg-emerald-600 text-white font-semibold">
-                      <UserCheck className="mr-1 size-3.5" /> Status: Diterima (Hired)
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300">
-                      Tahap Aktif
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-purple-200/60 pt-3 dark:border-purple-900/50">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
-                    onClick={() => setQuestionModalOpen(true)}
-                  >
-                    <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
-                    Siapkan Pertanyaan
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
-                    onClick={() => setPromptModalOpen(true)}
-                  >
-                    <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
-                    Prompt Pesan / Kontak
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
-                    onClick={() => setScheduleModalOpen(true)}
-                  >
-                    <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
-                    Jadwalkan Wawancara
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-emerald-300 text-emerald-800 hover:bg-emerald-100/70 dark:border-emerald-800 dark:text-emerald-300"
-                    onClick={() => setOfferModalOpen(true)}
-                  >
-                    <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
-                    Buat Offer Letter
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={markingHired || hiringOutcome === "hired"}
-                    className="bg-emerald-600 text-white hover:bg-emerald-700"
-                    onClick={async () => {
-                      if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
-                      setMarkingHired(true);
-                      try {
-                        if (dbMode) {
-                          const res = await fetch("/api/applications", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              candidateProfileId: candidate.id,
-                              status: "hired",
-                              reason: "Kandidat diterima secara resmi melalui Talent Network.",
-                            }),
-                          });
-                          if (!res.ok) {
-                            const errData = await res.json() as { error?: string };
-                            throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
-                          }
-                        }
-                        setHiringOutcome("hired");
-                        toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
-                      } catch (err) {
-                        toast.error("Gagal menandai status Hired", {
-                          description: err instanceof Error ? err.message : "Terjadi kesalahan.",
-                        });
-                      } finally {
-                        setMarkingHired(false);
-                      }
-                    }}
-                  >
-                    {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
-                    {hiringOutcome === "hired" ? "Sudah Diterima" : "Tandai Diterima (Hired)"}
-                  </Button>
-                </div>
               </div>
             </div>
 
@@ -1268,102 +1176,111 @@ export default function TalentProfile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── STICKY QUICK-ACTION DOCK (FOR UNLOCKED TALENT) ── */}
-      {(unlocked || (dbMode && completed)) && (
+      {/* ── FLOATING DOVER ACTION WIDGET (ONLY APPEARS AFTER TOKEN SCAN) ── */}
+      {unlocked && (
         <aside
           aria-label="Aksi Cepat Rekruter"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-3xl rounded-2xl border border-purple-200/80 bg-white/95 p-2.5 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-950/60 xl:flex-col xl:items-start xl:gap-2">
+            <div className="flex items-center gap-2">
               <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED] to-pink-500 text-white shadow-xs">
                 <Sparkles className="size-3.5" />
               </span>
               <div>
-                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[140px]">
+                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[130px] xl:max-w-[170px]">
                   {candidate.name}
                 </p>
                 <p className="text-[10px] text-muted-foreground font-mono">
-                  {hiringOutcome === "hired" ? "Status: Hired" : "Pipeline Aktif"}
+                  Alur Rekrutmen Dover
                 </p>
               </div>
             </div>
+            {hiringOutcome === "hired" ? (
+              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5">
+                <UserCheck className="mr-1 size-3" /> Hired ✓
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
+                Pipeline Aktif
+              </Badge>
+            )}
+          </div>
 
-            <div className="flex flex-1 sm:flex-none items-center justify-end gap-1.5 overflow-x-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
-                onClick={() => setQuestionModalOpen(true)}
-              >
-                <Brain className="mr-1 size-3.5 text-[#7C3AED]" />
-                <span className="hidden md:inline">Pertanyaan</span> AI
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
-                onClick={() => setPromptModalOpen(true)}
-              >
-                <MessageSquareQuote className="mr-1 size-3.5 text-[#7C3AED]" />
-                Prompt
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
-                onClick={() => setScheduleModalOpen(true)}
-              >
-                <Calendar className="mr-1 size-3.5 text-[#7C3AED]" />
-                Jadwal
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300"
-                onClick={() => setOfferModalOpen(true)}
-              >
-                <FileCheck2 className="mr-1 size-3.5 text-emerald-600" />
-                Offer
-              </Button>
-              <Button
-                size="sm"
-                disabled={markingHired || hiringOutcome === "hired"}
-                className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3"
-                onClick={async () => {
-                  if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
-                  setMarkingHired(true);
-                  try {
-                    if (dbMode) {
-                      const res = await fetch("/api/applications", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          candidateProfileId: candidate.id,
-                          status: "hired",
-                          reason: "Kandidat diterima secara resmi melalui Talent Network.",
-                        }),
-                      });
-                      if (!res.ok) {
-                        const errData = (await res.json()) as { error?: string };
-                        throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
-                      }
-                    }
-                    setHiringOutcome("hired");
-                    toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
-                  } catch (err) {
-                    toast.error("Gagal menandai status Hired", {
-                      description: err instanceof Error ? err.message : "Terjadi kesalahan.",
+          <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setQuestionModalOpen(true)}
+            >
+              <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Pertanyaan AI
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setPromptModalOpen(true)}
+            >
+              <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Prompt Pesan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setScheduleModalOpen(true)}
+            >
+              <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Jadwal Wawancara
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300 xl:h-9 xl:justify-start"
+              onClick={() => setOfferModalOpen(true)}
+            >
+              <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
+              Buat Offer Letter
+            </Button>
+            <Button
+              size="sm"
+              disabled={markingHired || hiringOutcome === "hired"}
+              className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 xl:h-9 xl:w-full"
+              onClick={async () => {
+                if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
+                setMarkingHired(true);
+                try {
+                  if (dbMode) {
+                    const res = await fetch("/api/applications", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        candidateProfileId: candidate.id,
+                        status: "hired",
+                        reason: "Kandidat diterima secara resmi melalui Talent Network.",
+                      }),
                     });
-                  } finally {
-                    setMarkingHired(false);
+                    if (!res.ok) {
+                      const errData = (await res.json()) as { error?: string };
+                      throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
+                    }
                   }
-                }}
-              >
-                {markingHired ? <Loader2 className="mr-1 size-3 animate-spin" /> : <UserCheck className="mr-1 size-3" />}
-                {hiringOutcome === "hired" ? "Hired ✓" : "Hired"}
-              </Button>
-            </div>
+                  setHiringOutcome("hired");
+                  toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
+                } catch (err) {
+                  toast.error("Gagal menandai status Hired", {
+                    description: err instanceof Error ? err.message : "Terjadi kesalahan.",
+                  });
+                } finally {
+                  setMarkingHired(false);
+                }
+              }}
+            >
+              {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
+              {hiringOutcome === "hired" ? "Sudah Diterima ✓" : "Tandai Diterima (Hired)"}
+            </Button>
           </div>
         </aside>
       )}

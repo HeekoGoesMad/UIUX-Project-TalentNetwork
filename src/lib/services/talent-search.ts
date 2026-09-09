@@ -18,6 +18,9 @@ export function serializeCandidate(
     role: string | null;
     location: string | null;
     summary: string | null;
+    email?: string | null;
+    phone?: string | null;
+    avatarUrl?: string | null;
   },
   sections: Section[]
 ): Candidate {
@@ -42,6 +45,16 @@ export function serializeCandidate(
   const education = getItems<{ school: string; program: string; dates?: string }>("education");
   const preferences = sectionMap.get("preferences") ?? {};
   const status = asCareerStatus(preferences.careerStatus);
+  const salary = typeof preferences.salary === "string" && preferences.salary.trim() ? preferences.salary.trim() : "Belum dicantumkan";
+
+  const portfolio = getSectionItems<string>(sections, "portfolio");
+  const linkedinFromPortfolio = portfolio.find((url) => url.toLowerCase().includes("linkedin.com"));
+  const linkedin =
+    (typeof preferences.linkedinUrl === "string" && preferences.linkedinUrl.trim())
+      ? preferences.linkedinUrl.trim()
+      : linkedinFromPortfolio
+      ? linkedinFromPortfolio
+      : `https://linkedin.com/in/${(row.name || "talent").toLowerCase().replaceAll(" ", "-")}`;
 
   const name = row.name?.trim() || "Kandidat anonim";
 
@@ -63,14 +76,15 @@ export function serializeCandidate(
       .map((item) => [item.school, item.program].filter(Boolean).join(" · "))
       .filter(Boolean)
       .join(", "),
-    salary: "Belum dicantumkan",
+    salary,
     summary: row.summary?.trim() || "Profil kandidat belum memiliki ringkasan.",
     endorsements: [],
     certifications: [],
-    portfolio: getSectionItems<string>(sections, "portfolio"),
-    email: "",
-    phone: "",
-    linkedin: "",
+    portfolio,
+    email: row.email?.trim() || "",
+    phone: row.phone?.trim() || "",
+    linkedin,
+    avatarUrl: row.avatarUrl?.trim() || "",
     history: experience.map((item) => ({
       company: item.company,
       role: item.role,
@@ -144,9 +158,13 @@ export class TalentSearchService {
         role: schema.candidateProfiles.headline,
         location: schema.candidateProfiles.location,
         summary: schema.candidateProfiles.summary,
+        email: schema.users.email,
+        phone: schema.profiles.phone,
+        avatarUrl: schema.profiles.avatarUrl,
       })
       .from(schema.candidateProfiles)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+      .leftJoin(schema.users, eq(schema.users.id, schema.candidateProfiles.userId))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(limit)

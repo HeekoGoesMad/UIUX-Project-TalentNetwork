@@ -67,6 +67,7 @@ export type Candidate = {
   industry: IndustryCategory;
   campusVerification?: CampusVerification;
   personality?: CandidatePersonality;
+  avatarUrl?: string;
 };
 
 export type CandidatePersonality = {
