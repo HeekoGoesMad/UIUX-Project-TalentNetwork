@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Bell,
   CalendarDays,
@@ -9,7 +10,6 @@ import {
   FileText,
   GitCompareArrows,
   History,
-  Lock,
   MoreHorizontal,
   RefreshCw,
   Search,
@@ -17,12 +17,11 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { maskName } from "@/lib/candidate-display";
 import { useApp } from "@/providers/app-provider";
 
 type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
@@ -104,31 +103,6 @@ function stageLabel(stage: Stage) { return stages.find((item) => item.id === sta
 function StageBadge({ stage }: { stage: Stage }) { const item = stages.find((candidateStage) => candidateStage.id === stage); return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item?.color}`}>{item?.label}</span>; }
 function Metric({ label, value, detail, tone = "text-foreground" }: { label: string; value: string; detail: string; tone?: string }) { return <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">{label}</p><p className={`mt-2 text-2xl font-bold ${tone}`}>{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></CardContent></Card>; }
 
-function CandidateNameDisplay({
-  candidate,
-  isUnlocked,
-  className = "",
-}: {
-  candidate?: { id: string; name: string };
-  isUnlocked: boolean;
-  className?: string;
-}) {
-  if (!candidate) return <span className={className}>Kandidat</span>;
-  if (isUnlocked) {
-    return <span className={className}>{candidate.name}</span>;
-  }
-  return (
-    <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <span>{maskName(candidate.name)}</span>
-      <span
-        title="Kandidat belum di-scan dengan token untuk melihat nama lengkap."
-        className="inline-flex items-center gap-0.5 rounded border border-amber-300/80 bg-amber-50 px-1 py-0.5 text-[10px] font-semibold text-amber-800 shrink-0"
-      >
-        <Lock className="size-2.5 text-amber-700" /> Terkunci
-      </span>
-    </span>
-  );
-}
 
 export function RecruiterOperationsPage() {
   const { dbMode, scans, user } = useApp();
@@ -138,8 +112,8 @@ export function RecruiterOperationsPage() {
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [selected, setSelected] = useState<string[]>(["candidate-1", "candidate-3"]);
-  const [selectedCandidate, setSelectedCandidate] = useState("candidate-1");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState("");
   const [eventForm, setEventForm] = useState({ date: "2026-08-25T10:00", timezone: "Asia/Jakarta (WIB)", type: "Panel interview", panel: user?.name || "Tim Rekruter" });
   const [historyStage, setHistoryStage] = useState<Stage | "all">("all");
   const [historySearch, setHistorySearch] = useState("");
@@ -149,15 +123,14 @@ export function RecruiterOperationsPage() {
     return Array.from(new Set([recruiterName, ...defaultPeople]));
   }, [recruiterName]);
 
-  const isCandidateUnlocked = (candidateId: string) => {
-    // In demo mode with mock IDs, allow preview or check scans
-    return scans.some((scan) => scan.candidateId === candidateId);
-  };
-
-  const getDisplayName = (candidate?: { id: string; name: string }) => {
-    if (!candidate) return "Kandidat";
-    return isCandidateUnlocked(candidate.id) ? candidate.name : maskName(candidate.name);
-  };
+  // Anti-abuse rule: In DB mode, only candidates that have been scanned by the recruiter are unlocked and eligible to appear
+  const isCandidateUnlocked = useCallback(
+    (candidateId: string) => {
+      if (!dbMode) return true;
+      return scans.some((scan) => scan.candidateId === candidateId);
+    },
+    [dbMode, scans]
+  );
 
   // Only persist to demo storage when NOT in database mode, preserving demo state for presentations
   useEffect(() => {
@@ -166,24 +139,34 @@ export function RecruiterOperationsPage() {
     }
   }, [data, dbMode]);
 
+  // Exclude locked candidates completely from hiring operations in database mode
+  const activeCandidates = useMemo(() => {
+    if (!dbMode) return data.candidates;
+    return data.candidates.filter((candidate) => isCandidateUnlocked(candidate.id));
+  }, [dbMode, data.candidates, isCandidateUnlocked]);
+
   const visibleCandidates = useMemo(
     () =>
-      data.candidates.filter(
+      activeCandidates.filter(
         (candidate) =>
           (stageFilter === "all" || candidate.stage === stageFilter) &&
           (ownerFilter === "all" || candidate.owner === ownerFilter) &&
           `${candidate.name} ${candidate.role}`.toLowerCase().includes(query.toLowerCase())
       ),
-    [data.candidates, ownerFilter, query, stageFilter]
+    [activeCandidates, ownerFilter, query, stageFilter]
   );
 
-  const selectedCandidateData = data.candidates.find((candidate) => candidate.id === selectedCandidate) ?? data.candidates[0];
-  const scheduledInterviews = data.interviews.filter((interview) => interview.status === "Terjadwal");
-  const stageCounts = stages.map((stage) => ({ ...stage, count: data.candidates.filter((candidate) => candidate.stage === stage.id).length }));
+  const selectedCandidateData = activeCandidates.find((candidate) => candidate.id === selectedCandidate) ?? activeCandidates[0];
+  const activeCandidateIds = useMemo(() => new Set(activeCandidates.map((c) => c.id)), [activeCandidates]);
+  const scheduledInterviews = useMemo(
+    () => data.interviews.filter((interview) => interview.status === "Terjadwal" && (!dbMode || activeCandidateIds.has(interview.candidateId))),
+    [activeCandidateIds, data.interviews, dbMode]
+  );
+  const stageCounts = stages.map((stage) => ({ ...stage, count: activeCandidates.filter((candidate) => candidate.stage === stage.id).length }));
 
   // Metrics calculations
-  const activeCandidatesCount = data.candidates.filter((c) => c.stage !== "hired" && c.stage !== "rejected").length;
-  const hiredCandidates = data.candidates.filter((c) => c.stage === "hired");
+  const activeCandidatesCount = activeCandidates.filter((c) => c.stage !== "hired" && c.stage !== "rejected").length;
+  const hiredCandidates = activeCandidates.filter((c) => c.stage === "hired");
   const averageTimeToHire = useMemo(() => {
     if (hiredCandidates.length === 0) return null;
     return Math.round(
@@ -196,14 +179,14 @@ export function RecruiterOperationsPage() {
     );
   }, [hiredCandidates]);
 
-  const slaAlertCandidates = data.candidates.filter(
+  const slaAlertCandidates = activeCandidates.filter(
     (c) => c.stage === "screening" || c.stage === "interview"
   );
 
   // Dynamic Pipeline Velocity
-  const totalInPipeline = data.candidates.length;
-  const reachedInterview = data.candidates.filter((c) => ["interview", "offer", "hired"].includes(c.stage)).length;
-  const reachedOffer = data.candidates.filter((c) => ["offer", "hired"].includes(c.stage)).length;
+  const totalInPipeline = activeCandidates.length;
+  const reachedInterview = activeCandidates.filter((c) => ["interview", "offer", "hired"].includes(c.stage)).length;
+  const reachedOffer = activeCandidates.filter((c) => ["offer", "hired"].includes(c.stage)).length;
   const hiredCount = hiredCandidates.length;
 
   const convScreenToInterview = totalInPipeline > 0 ? Math.round((reachedInterview / totalInPipeline) * 100) : 0;
@@ -241,6 +224,10 @@ export function RecruiterOperationsPage() {
   };
 
   const addInterview = async () => {
+    if (!selectedCandidate) {
+      toast.error("Pilih kandidat terlebih dahulu");
+      return;
+    }
     const interview: Interview = {
       id: `interview-${Date.now()}`,
       candidateId: selectedCandidate,
@@ -274,22 +261,17 @@ export function RecruiterOperationsPage() {
 
   const exportCsv = () => {
     const rows = [
-      ["Kandidat", "Posisi", "Tahap", "Owner", "SLA", "Score", "Offer", "Kompensasi", "Status Akses"],
-      ...visibleCandidates.map((candidate) => {
-        const unlocked = isCandidateUnlocked(candidate.id);
-        const nameCol = unlocked ? candidate.name : `${maskName(candidate.name)} (Terkunci)`;
-        return [
-          nameCol,
-          candidate.role,
-          stageLabel(candidate.stage),
-          candidate.owner,
-          candidate.dueDate,
-          String(candidate.score),
-          candidate.offerStatus,
-          candidate.compensation,
-          unlocked ? "Unlocked (Scanned)" : "Locked",
-        ];
-      }),
+      ["Kandidat", "Posisi", "Tahap", "Owner", "SLA", "Score", "Offer", "Kompensasi"],
+      ...visibleCandidates.map((candidate) => [
+        candidate.name,
+        candidate.role,
+        stageLabel(candidate.stage),
+        candidate.owner,
+        candidate.dueDate,
+        String(candidate.score),
+        candidate.offerStatus,
+        candidate.compensation,
+      ]),
     ];
     const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -301,7 +283,7 @@ export function RecruiterOperationsPage() {
     toast.success("Laporan CSV diunduh");
   };
 
-  const history = data.candidates
+  const history = activeCandidates
     .flatMap((candidate) => [
       {
         candidate,
@@ -329,8 +311,10 @@ export function RecruiterOperationsPage() {
     ])
       .then(async ([appRes, candRes, intRes, offRes]) => {
         if (!active) return;
+        const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
         let mappedCandidates: Candidate[] = [];
 
+        // 1. Map applications (only for scanned candidates to prevent free tier abuse)
         if (appRes.ok) {
           type AppRow = {
             id: string;
@@ -342,64 +326,74 @@ export function RecruiterOperationsPage() {
           };
           const appData = (await appRes.json()) as { applications?: AppRow[] };
           if (appData.applications && appData.applications.length > 0) {
-            mappedCandidates = appData.applications.map((app, index) => {
-              let mappedStage: Stage = "screening";
-              if (["new", "shortlisted", "consent_requested", "consent_approved", "screening"].includes(app.status)) {
-                mappedStage = "screening";
-              } else if (["assessment", "review", "interview"].includes(app.status)) {
-                mappedStage = "interview";
-              } else if (app.status === "offer") {
-                mappedStage = "offer";
-              } else if (app.status === "hired") {
-                mappedStage = "hired";
-              } else if (["rejected", "withdrawn"].includes(app.status)) {
-                mappedStage = "rejected";
-              }
-              return {
-                id: app.candidateProfileId || app.id,
-                applicationId: app.id,
-                name: app.candidate?.name || `Kandidat #${index + 1}`,
-                role: app.job?.title || app.candidate?.headline || "Pelamar Posisi",
-                location: app.candidate?.location || "Indonesia",
-                stage: mappedStage,
-                owner: recruiterName,
-                dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
-                appliedAt: app.submittedAt ? app.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                score: 4.5,
-                feedback: "",
-                offerStatus: app.status === "offer" ? "sent" : app.status === "hired" ? "accepted" : "draft",
-                compensation: "Kompetitif",
-                reason: "",
-              };
-            });
+            mappedCandidates = appData.applications
+              .filter((app) => {
+                const targetId = app.candidateProfileId || app.id;
+                return scannedCandidateIds.has(targetId);
+              })
+              .map((app, index) => {
+                let mappedStage: Stage = "screening";
+                if (["new", "shortlisted", "consent_requested", "consent_approved", "screening"].includes(app.status)) {
+                  mappedStage = "screening";
+                } else if (["assessment", "review", "interview"].includes(app.status)) {
+                  mappedStage = "interview";
+                } else if (app.status === "offer") {
+                  mappedStage = "offer";
+                } else if (app.status === "hired") {
+                  mappedStage = "hired";
+                } else if (["rejected", "withdrawn"].includes(app.status)) {
+                  mappedStage = "rejected";
+                }
+                return {
+                  id: app.candidateProfileId || app.id,
+                  applicationId: app.id,
+                  name: app.candidate?.name || `Kandidat #${index + 1}`,
+                  role: app.job?.title || app.candidate?.headline || "Pelamar Posisi",
+                  location: app.candidate?.location || "Indonesia",
+                  stage: mappedStage,
+                  owner: recruiterName,
+                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                  appliedAt: app.submittedAt ? app.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                  score: 4.5,
+                  feedback: "",
+                  offerStatus: app.status === "offer" ? "sent" : app.status === "hired" ? "accepted" : "draft",
+                  compensation: "Kompetitif",
+                  reason: "",
+                };
+              });
           }
         }
 
-        // If no direct applications, map available candidate profiles from talent network
-        // Note: Talent candidates from pool begin in "screening" stage by default
-        if (mappedCandidates.length === 0 && candRes.ok) {
+        // 2. Map candidate profiles from talent network
+        // CRITICAL ANTI-ABUSE: Only include talent profiles that the recruiter has scanned! Unscanned candidates are NOT shown.
+        if (candRes.ok) {
           type CandRow = { id: string; name: string; role: string; location: string };
           const candData = (await candRes.json()) as { candidates?: CandRow[] };
           if (candData.candidates && candData.candidates.length > 0) {
-            mappedCandidates = candData.candidates.map((c, idx) => ({
-              id: c.id,
-              name: c.name,
-              role: c.role,
-              location: c.location,
-              stage: "screening" as Stage,
-              owner: recruiterName,
-              dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
-              appliedAt: new Date(Date.now() - (idx + 1) * 86400000).toISOString().slice(0, 10),
-              score: Number((4.0 + (idx % 10) * 0.1).toFixed(1)),
-              feedback: "",
-              offerStatus: "draft" as const,
-              compensation: "-",
-              reason: "",
-            }));
+            const scannedTalents = candData.candidates.filter((c) => scannedCandidateIds.has(c.id));
+            for (const c of scannedTalents) {
+              if (!mappedCandidates.some((m) => m.id === c.id)) {
+                mappedCandidates.push({
+                  id: c.id,
+                  name: c.name,
+                  role: c.role,
+                  location: c.location,
+                  stage: "screening" as Stage,
+                  owner: recruiterName,
+                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                  appliedAt: new Date().toISOString().slice(0, 10),
+                  score: 4.5,
+                  feedback: "",
+                  offerStatus: "draft" as const,
+                  compensation: "-",
+                  reason: "",
+                });
+              }
+            }
           }
         }
 
-        // Integrate real offers if available
+        // 3. Integrate real offers if available
         if (offRes.ok) {
           type OffRow = {
             id?: string;
@@ -429,7 +423,7 @@ export function RecruiterOperationsPage() {
           }
         }
 
-        // Integrate real interviews if available
+        // 4. Integrate real interviews if available (only for eligible scanned candidates)
         let mappedInterviews: Interview[] = [];
         if (intRes.ok) {
           type IntRow = {
@@ -443,36 +437,40 @@ export function RecruiterOperationsPage() {
           };
           const intData = (await intRes.json()) as { interviews?: IntRow[] };
           if (intData.interviews && intData.interviews.length > 0) {
-            mappedInterviews = intData.interviews.map((item) => {
-              const intObj = item.interview || item;
-              return {
-                id: intObj.id || item.id || `interview-${Date.now()}`,
-                candidateId: item.candidateProfileId || (mappedCandidates[0]?.id ?? ""),
-                date: intObj.scheduledAt || item.scheduledAt || new Date().toISOString(),
-                timezone: intObj.timezone || item.timezone || "Asia/Jakarta (WIB)",
-                type: intObj.title || item.title || "Interview",
-                panel: [recruiterName],
-                status: (intObj.status === "scheduled" || item.status === "scheduled"
-                  ? "Terjadwal"
-                  : intObj.status === "completed" || item.status === "completed"
-                  ? "Selesai"
-                  : "Dibatalkan") as Interview["status"],
-                reminder: true,
-              };
-            });
+            mappedInterviews = intData.interviews
+              .filter((item) => {
+                const candId = item.candidateProfileId || (item.interview as unknown as { candidateProfileId?: string })?.candidateProfileId;
+                return candId && scannedCandidateIds.has(candId);
+              })
+              .map((item) => {
+                const intObj = item.interview || item;
+                return {
+                  id: intObj.id || item.id || `interview-${Date.now()}`,
+                  candidateId: item.candidateProfileId || "",
+                  date: intObj.scheduledAt || item.scheduledAt || new Date().toISOString(),
+                  timezone: intObj.timezone || item.timezone || "Asia/Jakarta (WIB)",
+                  type: intObj.title || item.title || "Interview",
+                  panel: [recruiterName],
+                  status: (intObj.status === "scheduled" || item.status === "scheduled"
+                    ? "Terjadwal"
+                    : intObj.status === "completed" || item.status === "completed"
+                    ? "Selesai"
+                    : "Dibatalkan") as Interview["status"],
+                  reminder: true,
+                };
+              });
           }
         }
 
+        setIsRealData(true);
+        setData({
+          candidates: mappedCandidates,
+          interviews: mappedInterviews,
+        });
         if (mappedCandidates.length > 0) {
-          setIsRealData(true);
-          setData({
-            candidates: mappedCandidates,
-            // In live DB mode, never fallback to August 2026 demo interviews
-            interviews: mappedInterviews,
-          });
-          if (mappedCandidates[0]) {
-            setSelectedCandidate(mappedCandidates[0].id);
-          }
+          setSelectedCandidate(mappedCandidates[0].id);
+        } else {
+          setSelectedCandidate("");
         }
       })
       .catch(() => {
@@ -482,7 +480,7 @@ export function RecruiterOperationsPage() {
     return () => {
       active = false;
     };
-  }, [dbMode, recruiterName]);
+  }, [dbMode, recruiterName, scans]);
 
   return (
     <ProtectedRoute role="recruiter">
@@ -496,7 +494,7 @@ export function RecruiterOperationsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={exportCsv}>
+            <Button variant="outline" onClick={exportCsv} disabled={activeCandidates.length === 0}>
               <Download className="size-4" /> Export CSV
             </Button>
             <Button
@@ -514,8 +512,8 @@ export function RecruiterOperationsPage() {
           <div className="mt-5 rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>
               {isRealData
-                ? "✓ Mode Database Aktif: Pipeline menampilkan data riil kandidat, jadwal wawancara, & offer dari Supabase PostgreSQL."
-                : "✓ Mode Database Aktif: Terhubung ke Supabase (Data riil belum ada; menampilkan template demo yang tersimpan)."}
+                ? `✓ Mode Database Aktif: Menampilkan ${activeCandidates.length} kandidat hasil scanning Anda dari Supabase PostgreSQL.`
+                : "✓ Mode Database Aktif: Terhubung ke Supabase."}
             </span>
             <span className="font-semibold text-primary">Live Database</span>
           </div>
@@ -555,7 +553,7 @@ export function RecruiterOperationsPage() {
                 <Metric
                   label="Kandidat aktif"
                   value={String(activeCandidatesCount)}
-                  detail={dbMode ? `${data.candidates.length} total kandidat terdata` : "+3 dibanding minggu lalu"}
+                  detail={dbMode ? `${activeCandidates.length} kandidat di-scan` : "+3 dibanding minggu lalu"}
                   tone="text-primary"
                 />
                 <Metric
@@ -606,7 +604,7 @@ export function RecruiterOperationsPage() {
                               <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                                 <div
                                   className="h-full rounded-full bg-primary transition-all duration-300"
-                                  style={{ width: `${Math.max(4, percentage)}%` }}
+                                  style={{ width: `${Math.max(percentage > 0 ? 4 : 0, percentage)}%` }}
                                 />
                               </div>
                             </div>
@@ -639,37 +637,35 @@ export function RecruiterOperationsPage() {
                     <CardContent className="space-y-3">
                       {slaAlertCandidates.length === 0 ? (
                         <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-                          Semua kandidat sudah ditindaklanjuti. Tidak ada SLA yang tertunda.
+                          {activeCandidates.length === 0
+                            ? "Belum ada kandidat aktif. Silakan lakukan scanning talent terlebih dahulu."
+                            : "Semua kandidat sudah ditindaklanjuti. Tidak ada SLA yang tertunda."}
                         </div>
                       ) : (
-                        slaAlertCandidates.slice(0, 3).map((candidate) => {
-                          const isUnlocked = isCandidateUnlocked(candidate.id);
-                          return (
-                            <div key={candidate.id} className="flex items-start gap-3 rounded-lg border p-3">
-                              <span className="mt-1 size-2 shrink-0 rounded-full bg-amber-500" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">
-                                  <span>Feedback</span>
-                                  <CandidateNameDisplay candidate={candidate} isUnlocked={isUnlocked} />
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  SLA {dateLabel(candidate.dueDate)} · {candidate.owner}
-                                </p>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                aria-label={`Buka ${getDisplayName(candidate)}`}
-                                onClick={() => {
-                                  setSelectedCandidate(candidate.id);
-                                  setTab(candidate.stage === "interview" ? "interviews" : "pipeline");
-                                }}
-                              >
-                                <ChevronDown className="size-4 -rotate-90" />
-                              </Button>
+                        slaAlertCandidates.slice(0, 3).map((candidate) => (
+                          <div key={candidate.id} className="flex items-start gap-3 rounded-lg border p-3">
+                            <span className="mt-1 size-2 shrink-0 rounded-full bg-amber-500" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">
+                                <span>Feedback {candidate.name}</span>
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                SLA {dateLabel(candidate.dueDate)} · {candidate.owner}
+                              </p>
                             </div>
-                          );
-                        })
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Buka ${candidate.name}`}
+                              onClick={() => {
+                                setSelectedCandidate(candidate.id);
+                                setTab(candidate.stage === "interview" ? "interviews" : "pipeline");
+                              }}
+                            >
+                              <ChevronDown className="size-4 -rotate-90" />
+                            </Button>
+                          </div>
+                        ))
                       )}
                     </CardContent>
                   </Card>
@@ -690,7 +686,6 @@ export function RecruiterOperationsPage() {
                   setOwnerFilter={setOwnerFilter}
                   bulkChangeStage={bulkChangeStage}
                   changeStage={changeStage}
-                  isCandidateUnlocked={isCandidateUnlocked}
                   people={people}
                 />
               )}
@@ -715,13 +710,12 @@ export function RecruiterOperationsPage() {
                     </div>
                   ) : (
                     scheduledInterviews.slice(0, 3).map((interview) => {
-                      const cand = data.candidates.find((item) => item.id === interview.candidateId);
+                      const cand = activeCandidates.find((item) => item.id === interview.candidateId);
                       return (
                         <InterviewRow
                           key={interview.id}
                           interview={interview}
                           candidate={cand}
-                          isUnlocked={cand ? isCandidateUnlocked(cand.id) : false}
                         />
                       );
                     })
@@ -739,7 +733,7 @@ export function RecruiterOperationsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {data.candidates.filter((candidate) => candidate.stage === "offer").length === 0 ? (
+                  {activeCandidates.filter((candidate) => candidate.stage === "offer").length === 0 ? (
                     <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
                       <p>Belum ada penawaran kerja (offer) yang sedang berjalan.</p>
                       <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab("offers")}>
@@ -747,14 +741,13 @@ export function RecruiterOperationsPage() {
                       </Button>
                     </div>
                   ) : (
-                    data.candidates
+                    activeCandidates
                       .filter((candidate) => candidate.stage === "offer")
                       .map((candidate) => (
                         <OfferRow
                           key={candidate.id}
                           candidate={candidate}
                           updateCandidate={updateCandidate}
-                          isUnlocked={isCandidateUnlocked(candidate.id)}
                         />
                       ))
                   )}
@@ -768,24 +761,22 @@ export function RecruiterOperationsPage() {
 
           {tab === "interviews" && (
             <InterviewsView
-              data={data}
+              data={{ candidates: activeCandidates, interviews: data.interviews }}
               selectedCandidateData={selectedCandidateData}
               eventForm={eventForm}
               setEventForm={setEventForm}
               addInterview={addInterview}
               setData={setData}
-              isCandidateUnlocked={isCandidateUnlocked}
               people={people}
             />
           )}
 
           {tab === "offers" && (
             <OffersView
-              candidates={data.candidates}
+              candidates={activeCandidates}
               updateCandidate={updateCandidate}
               selected={selected}
               setSelected={setSelected}
-              isCandidateUnlocked={isCandidateUnlocked}
             />
           )}
 
@@ -824,39 +815,32 @@ export function RecruiterOperationsPage() {
                 </div>
                 {history.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                    Tidak ada riwayat aktivitas kandidat yang sesuai filter pencarian.
+                    {activeCandidates.length === 0
+                      ? "Belum ada riwayat aktivitas. Scan kandidat dari menu Cari Talent untuk memulai alur hiring."
+                      : "Tidak ada riwayat aktivitas kandidat yang sesuai filter pencarian."}
                   </div>
                 ) : (
                   <div className="divide-y">
-                    {history.map((item) => {
-                      const isUnlocked = isCandidateUnlocked(item.candidate.id);
-                      return (
-                        <div
-                          key={item.candidate.id}
-                          className="flex flex-col justify-between gap-2 py-4 sm:flex-row sm:items-center"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-primary">
-                              {isUnlocked ? (
-                                item.candidate.name.charAt(0)
-                              ) : (
-                                <Lock className="size-4 text-amber-700" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold">
-                                <CandidateNameDisplay candidate={item.candidate} isUnlocked={isUnlocked} />
-                              </p>
-                              <p className="text-xs text-muted-foreground">{item.note}</p>
-                            </div>
+                    {history.map((item) => (
+                      <div
+                        key={item.candidate.id}
+                        className="flex flex-col justify-between gap-2 py-4 sm:flex-row sm:items-center"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-primary">
+                            {item.candidate.name.charAt(0)}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <StageBadge stage={item.stage} />
-                            <span className="font-mono text-xs text-muted-foreground">{dateLabel(item.at)}</span>
+                          <div>
+                            <p className="text-sm font-semibold">{item.candidate.name}</p>
+                            <p className="text-xs text-muted-foreground">{item.note}</p>
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="flex items-center gap-3">
+                          <StageBadge stage={item.stage} />
+                          <span className="font-mono text-xs text-muted-foreground">{dateLabel(item.at)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -881,7 +865,6 @@ function PipelineView({
   setOwnerFilter,
   bulkChangeStage,
   changeStage,
-  isCandidateUnlocked,
   people,
 }: {
   candidates: Candidate[];
@@ -896,7 +879,6 @@ function PipelineView({
   setOwnerFilter: (value: string) => void;
   bulkChangeStage: (stage: Stage) => void;
   changeStage: (id: string, stage: Stage) => void;
-  isCandidateUnlocked: (candidateId: string) => boolean;
   people: string[];
 }) {
   const [compare, setCompare] = useState(false);
@@ -948,6 +930,27 @@ function PipelineView({
         </CardContent>
       </Card>
 
+      {candidates.length === 0 && (
+        <Card className="border-dashed bg-muted/10">
+          <CardContent className="flex flex-col items-center justify-center p-10 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Search className="size-6" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold">Pipeline Rekrutmen Kosong</h3>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              Kandidat yang belum di-scan tidak ditampilkan di sini untuk menjaga alur pipeline. Silakan temukan kandidat potensial di menu <strong>Cari Talent</strong> dan lakukan scanning profil untuk memasukkannya ke alur hiring.
+            </p>
+            <div className="mt-5">
+              <Button asChild>
+                <Link href="/search">
+                  <Search className="size-4" /> Cari Talent Sekarang
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {selected.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold">{selected.length} kandidat dipilih</p>
@@ -986,10 +989,9 @@ function PipelineView({
                   <th className="pb-3 pr-5">Kriteria</th>
                   {selected.slice(0, 3).map((id) => {
                     const c = candidates.find((candidate) => candidate.id === id);
-                    const unlocked = c ? isCandidateUnlocked(c.id) : false;
                     return (
                       <th key={id} className="pb-3 pr-5">
-                        {c ? (unlocked ? c.name : maskName(c.name)) : id}
+                        {c?.name ?? id}
                       </th>
                     );
                   })}
@@ -1017,21 +1019,21 @@ function PipelineView({
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stages.slice(0, 4).map((stage) => (
-          <div key={stage.id} className="rounded-2xl border bg-muted/20 p-3">
-            <div className="flex items-center justify-between px-1 pb-3">
-              <h2 className="font-semibold">{stage.label}</h2>
-              <span className="font-mono text-xs text-muted-foreground">
-                {candidates.filter((candidate) => candidate.stage === stage.id).length}
-              </span>
-            </div>
-            <div className="space-y-3">
-              {candidates
-                .filter((candidate) => candidate.stage === stage.id)
-                .map((candidate) => {
-                  const isUnlocked = isCandidateUnlocked(candidate.id);
-                  const displayName = isUnlocked ? candidate.name : maskName(candidate.name);
-                  return (
+        {stages.slice(0, 4).map((stage) => {
+          const stageCandidates = candidates.filter((candidate) => candidate.stage === stage.id);
+          return (
+            <div key={stage.id} className="rounded-2xl border bg-muted/20 p-3">
+              <div className="flex items-center justify-between px-1 pb-3">
+                <h2 className="font-semibold">{stage.label}</h2>
+                <span className="font-mono text-xs text-muted-foreground">{stageCandidates.length}</span>
+              </div>
+              <div className="space-y-3">
+                {stageCandidates.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+                    Belum ada kandidat di tahap ini
+                  </div>
+                ) : (
+                  stageCandidates.map((candidate) => (
                     <Card key={candidate.id} className="shadow-xs">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-2">
@@ -1039,7 +1041,7 @@ function PipelineView({
                             type="checkbox"
                             checked={selected.includes(candidate.id)}
                             onChange={() => toggle(candidate.id)}
-                            aria-label={`Pilih ${displayName}`}
+                            aria-label={`Pilih ${candidate.name}`}
                             className="mt-1 size-4 accent-primary"
                           />
                           <button
@@ -1047,14 +1049,12 @@ function PipelineView({
                             onClick={() => setSelectedCandidate(candidate.id)}
                             className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            <div className="text-sm font-semibold truncate">
-                              <CandidateNameDisplay candidate={candidate} isUnlocked={isUnlocked} />
-                            </div>
+                            <p className="truncate text-sm font-semibold">{candidate.name}</p>
                             <p className="mt-1 truncate text-xs text-muted-foreground">{candidate.role}</p>
                           </button>
                           <button
                             type="button"
-                            aria-label={`Menu ${displayName}`}
+                            aria-label={`Menu ${candidate.name}`}
                             className="text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <MoreHorizontal className="size-4" />
@@ -1066,7 +1066,7 @@ function PipelineView({
                         </div>
                         <div className="mt-3 flex gap-2">
                           <select
-                            aria-label={`Pindahkan ${displayName}`}
+                            aria-label={`Pindahkan ${candidate.name}`}
                             value={candidate.stage}
                             onChange={(event) => changeStage(candidate.id, event.target.value as Stage)}
                             className="field h-8 min-w-0 flex-1 px-2 text-xs"
@@ -1084,11 +1084,12 @@ function PipelineView({
                         </div>
                       </CardContent>
                     </Card>
-                  );
-                })}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -1098,12 +1099,10 @@ function InterviewRow({
   interview,
   candidate,
   action,
-  isUnlocked = false,
 }: {
   interview: Interview;
   candidate?: Candidate;
   action?: React.ReactNode;
-  isUnlocked?: boolean;
 }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border p-3">
@@ -1111,9 +1110,7 @@ function InterviewRow({
         <Video className="size-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">
-          <CandidateNameDisplay candidate={candidate} isUnlocked={isUnlocked} />
-        </div>
+        <p className="truncate text-sm font-semibold">{candidate?.name ?? "Kandidat"}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {interview.type} · {dateTimeLabel(interview.date)} · {interview.timezone}
         </p>
@@ -1127,25 +1124,20 @@ function InterviewRow({
 function OfferRow({
   candidate,
   updateCandidate,
-  isUnlocked = false,
 }: {
   candidate: Candidate;
   updateCandidate: (id: string, update: Partial<Candidate>) => void;
-  isUnlocked?: boolean;
 }) {
-  const displayName = isUnlocked ? candidate.name : maskName(candidate.name);
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <div className="font-semibold">
-          <CandidateNameDisplay candidate={candidate} isUnlocked={isUnlocked} />
-        </div>
+        <p className="font-semibold">{candidate.name}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {candidate.compensation} · Owner {candidate.owner}
         </p>
       </div>
       <select
-        aria-label={`Status offer ${displayName}`}
+        aria-label={`Status offer ${candidate.name}`}
         value={candidate.offerStatus}
         onChange={(event) => {
           updateCandidate(candidate.id, { offerStatus: event.target.value as Candidate["offerStatus"] });
@@ -1169,7 +1161,6 @@ function InterviewsView({
   setEventForm,
   addInterview,
   setData,
-  isCandidateUnlocked,
   people,
 }: {
   data: { candidates: Candidate[]; interviews: Interview[] };
@@ -1178,7 +1169,6 @@ function InterviewsView({
   setEventForm: (value: { date: string; timezone: string; type: string; panel: string }) => void;
   addInterview: () => void;
   setData: React.Dispatch<React.SetStateAction<{ candidates: Candidate[]; interviews: Interview[] }>>;
-  isCandidateUnlocked: (candidateId: string) => boolean;
   people: string[];
 }) {
   const [feedback, setFeedback] = useState(selectedCandidateData?.feedback ?? "");
@@ -1188,8 +1178,6 @@ function InterviewsView({
       ...current,
       interviews: current.interviews.map((item) => (item.id === id ? { ...item, ...update } : item)),
     }));
-
-  const isSelectedUnlocked = selectedCandidateData ? isCandidateUnlocked(selectedCandidateData.id) : false;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[.85fr_1.15fr]">
@@ -1203,7 +1191,7 @@ function InterviewsView({
             Kandidat
             <select
               aria-label="Kandidat interview"
-              value={selectedCandidateData?.id}
+              value={selectedCandidateData?.id ?? ""}
               onChange={(e) => {
                 const target = data.candidates.find((c) => c.id === e.target.value);
                 if (target) {
@@ -1211,15 +1199,17 @@ function InterviewsView({
                 }
               }}
               className="field mt-2"
+              disabled={data.candidates.length === 0}
             >
-              {data.candidates.map((c) => {
-                const unlocked = isCandidateUnlocked(c.id);
-                return (
+              {data.candidates.length === 0 ? (
+                <option value="">Belum ada kandidat (scan talent di Cari Talent dahulu)</option>
+              ) : (
+                data.candidates.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {unlocked ? c.name : `${maskName(c.name)} (🔒 Terkunci)`} ({stageLabel(c.stage)})
+                    {c.name} ({stageLabel(c.stage)})
                   </option>
-                );
-              })}
+                ))
+              )}
             </select>
           </label>
           <label className="block text-sm font-semibold">
@@ -1264,7 +1254,7 @@ function InterviewsView({
               ))}
             </select>
           </label>
-          <Button className="w-full" onClick={addInterview}>
+          <Button className="w-full" onClick={addInterview} disabled={data.candidates.length === 0}>
             <CalendarDays className="size-4" /> Simpan jadwal
           </Button>
           <Button
@@ -1296,7 +1286,6 @@ function InterviewsView({
                     key={interview.id}
                     interview={interview}
                     candidate={cand}
-                    isUnlocked={cand ? isCandidateUnlocked(cand.id) : false}
                     action={
                       <div className="flex gap-1">
                         <Button
@@ -1342,13 +1331,7 @@ function InterviewsView({
           <CardHeader>
             <CardTitle>Scorecard & feedback</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Feedback terstruktur untuk{" "}
-              {selectedCandidateData ? (
-                <CandidateNameDisplay candidate={selectedCandidateData} isUnlocked={isSelectedUnlocked} />
-              ) : (
-                "Kandidat"
-              )}
-              .
+              Feedback terstruktur untuk {selectedCandidateData?.name ?? "Kandidat"}.
             </p>
           </CardHeader>
           <CardContent>
@@ -1377,6 +1360,7 @@ function InterviewsView({
             />
             <Button
               className="mt-3"
+              disabled={!selectedCandidateData}
               onClick={() => {
                 if (selectedCandidateData) {
                   setData((current) => ({
@@ -1403,13 +1387,11 @@ function OffersView({
   updateCandidate,
   selected,
   setSelected,
-  isCandidateUnlocked,
 }: {
   candidates: Candidate[];
   updateCandidate: (id: string, update: Partial<Candidate>) => void;
   selected: string[];
   setSelected: (value: string[]) => void;
-  isCandidateUnlocked: (candidateId: string) => boolean;
 }) {
   const offerCandidates = candidates.filter((candidate) => candidate.stage === "offer" || candidate.stage === "hired");
   const [reason, setReason] = useState("");
@@ -1453,60 +1435,54 @@ function OffersView({
               Belum ada kandidat pada tahap penawaran kerja (offer). Pindahkan kandidat dari interview ke offer untuk memulai workflow ini.
             </div>
           ) : (
-            offerCandidates.map((candidate) => {
-              const isUnlocked = isCandidateUnlocked(candidate.id);
-              const displayName = isUnlocked ? candidate.name : maskName(candidate.name);
-              return (
-                <div key={candidate.id} className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[1.2fr_1fr_auto]">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-semibold">
-                        <CandidateNameDisplay candidate={candidate} isUnlocked={isUnlocked} />
-                      </div>
-                      <StageBadge stage={candidate.stage} />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {candidate.role} · {candidate.owner}
-                    </p>
+            offerCandidates.map((candidate) => (
+              <div key={candidate.id} className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[1.2fr_1fr_auto]">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{candidate.name}</p>
+                    <StageBadge stage={candidate.stage} />
                   </div>
-                  <label className="text-xs font-semibold text-muted-foreground">
-                    Kompensasi
-                    <input
-                      aria-label={`Kompensasi ${displayName}`}
-                      value={candidate.compensation}
-                      onChange={(event) => updateCandidate(candidate.id, { compensation: event.target.value })}
-                      className="field mt-1 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      aria-label={`Offer status ${displayName}`}
-                      value={candidate.offerStatus}
-                      onChange={(event) =>
-                        updateCandidate(candidate.id, { offerStatus: event.target.value as Candidate["offerStatus"] })
-                      }
-                      className="field w-auto py-2 text-xs"
-                    >
-                      <option value="draft">Draft</option>
-                      <option value="sent">Terkirim</option>
-                      <option value="accepted">Diterima</option>
-                      <option value="declined">Ditolak</option>
-                    </select>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      aria-label={`Kirim offer ${displayName}`}
-                      onClick={() => {
-                        updateCandidate(candidate.id, { offerStatus: "sent" });
-                        toast.success("Offer dikirim");
-                      }}
-                    >
-                      <Send className="size-4" />
-                    </Button>
-                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {candidate.role} · {candidate.owner}
+                  </p>
                 </div>
-              );
-            })
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Kompensasi
+                  <input
+                    aria-label={`Kompensasi ${candidate.name}`}
+                    value={candidate.compensation}
+                    onChange={(event) => updateCandidate(candidate.id, { compensation: event.target.value })}
+                    className="field mt-1 py-2 text-sm font-normal"
+                  />
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    aria-label={`Offer status ${candidate.name}`}
+                    value={candidate.offerStatus}
+                    onChange={(event) =>
+                      updateCandidate(candidate.id, { offerStatus: event.target.value as Candidate["offerStatus"] })
+                    }
+                    className="field w-auto py-2 text-xs"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Terkirim</option>
+                    <option value="accepted">Diterima</option>
+                    <option value="declined">Ditolak</option>
+                  </select>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Kirim offer ${candidate.name}`}
+                    onClick={() => {
+                      updateCandidate(candidate.id, { offerStatus: "sent" });
+                      toast.success("Offer dikirim");
+                    }}
+                  >
+                    <Send className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
           )}
 
           <div className="border-t pt-4">
