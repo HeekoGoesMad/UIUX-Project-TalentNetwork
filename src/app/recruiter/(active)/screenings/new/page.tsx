@@ -14,7 +14,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export default function NewScreeningPage() {
   const router = useRouter();
-  const { screeningTokens, screeningConsents, screeningRunStatuses, requestConsent, startScreening, dbMode, bootstrapped } = useApp();
+  const { screeningTokens, screeningConsents, screeningRunStatuses, requestConsent, startScreening, dbMode, bootstrapped, scans } = useApp();
   const [candidateId, setCandidateId] = useState("");
   const [candidate, setCandidate] = useState<{ id: string; name: string | null; role: string | null; location: string | null } | null>(null);
   const [candidateError, setCandidateError] = useState<string | null>(null);
@@ -98,6 +98,27 @@ export default function NewScreeningPage() {
       <ProtectedRoute role="recruiter">
         <main className="container mx-auto max-w-3xl px-4 py-8">
           <p className="text-muted-foreground">{candidateError ?? "Kandidat tidak ditemukan atau belum dipilih."}</p>
+        </main>
+      </ProtectedRoute>
+    );
+  }
+
+  if (!scans.some((s) => s.candidateId === candidate.id)) {
+    return (
+      <ProtectedRoute role="recruiter">
+        <main className="container mx-auto max-w-3xl px-4 py-8">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-8 text-center">
+            <ShieldCheck className="mx-auto size-10 text-amber-600" />
+            <h2 className="mt-3 text-lg font-bold text-amber-950">Kandidat Belum Di-Scan</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-amber-900">
+              Anda harus melakukan scanning profil kandidat ini di menu Cari Talent terlebih dahulu sebelum dapat memulai proses screening.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button asChild>
+                <Link href={`/talent/${candidate.id}`}>Buka Profil & Scan</Link>
+              </Button>
+            </div>
+          </div>
         </main>
       </ProtectedRoute>
     );

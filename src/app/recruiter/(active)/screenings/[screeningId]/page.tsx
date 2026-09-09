@@ -49,7 +49,7 @@ type Run = {
 
 export default function ScreeningDetailPage() {
   const { screeningId } = useParams<{ screeningId: string }>();
-  const { dbMode, bootstrapped, screeningConsents, screeningRunStatuses, screeningResults, startScreening, screeningTokens } = useApp();
+  const { dbMode, bootstrapped, screeningConsents, screeningRunStatuses, screeningResults, startScreening, screeningTokens, scans } = useApp();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +170,19 @@ export default function ScreeningDetailPage() {
           <div className="mt-8 rounded-xl border p-8 text-center">
             <p className="font-semibold">Screening tidak ditemukan</p>
             <p className="mt-1 text-sm text-muted-foreground">ID ini belum memiliki konteks kandidat yang dapat ditampilkan.</p>
+          </div>
+        ) : !scans.some((s) => s.candidateId === screeningId) ? (
+          <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50/70 p-8 text-center">
+            <ShieldCheck className="mx-auto size-10 text-amber-600" />
+            <h2 className="mt-3 text-lg font-bold text-amber-950">Kandidat Belum Di-Scan</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-amber-900">
+              Profil dan detail screening kandidat ini masih terkunci. Anda harus melakukan scanning profil menggunakan token di menu Cari Talent terlebih dahulu.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button asChild>
+                <Link href={`/talent/${screeningId}`}>Buka Profil & Scan</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <>

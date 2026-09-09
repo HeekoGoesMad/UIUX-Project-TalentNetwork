@@ -46,7 +46,7 @@ function formatDate(value?: string) {
 }
 
 export default function ScreeningQueuePage() {
-  const { dbMode, bootstrapped, databaseError, screeningConsents, screeningResults, consentRequests, screeningTokens } = useApp();
+  const { dbMode, bootstrapped, databaseError, screeningConsents, screeningResults, consentRequests, screeningTokens, scans } = useApp();
   const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
   const [tab, setTab] = useState<"all" | "action" | "history">("all");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -68,10 +68,14 @@ export default function ScreeningQueuePage() {
 
   const candidates = dbMode && remoteCandidates.length ? remoteCandidates : demoCandidates;
   const rows = useMemo<ScreeningRow[]>(() => {
+    const isCandidateScanned = (id: string) => scans.some((s) => s.candidateId === id);
+
     if (dbMode) {
       return (consentRequests as RemoteRequest[]).flatMap((request) => {
         const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
         if (!candidateId) return [];
+        // ANTI-ABUSE: Only show candidates that have been scanned by this recruiter
+        if (!isCandidateScanned(candidateId)) return [];
         const candidate = candidates.find((item) => item.id === candidateId);
         if (!candidate) return [];
         const state = typeof request.consentState === "string" && request.consentState in stateCopy ? request.consentState as ConsentState : "not-requested";
@@ -79,11 +83,13 @@ export default function ScreeningQueuePage() {
       });
     }
     return Object.entries(screeningConsents).flatMap(([candidateId, state]) => {
+      // In demo mode as well, only show candidates that have been scanned
+      if (!isCandidateScanned(candidateId)) return [];
       const candidate = candidates.find((item) => item.id === candidateId);
       if (!candidate) return [];
       return [{ id: candidateId, candidateId, name: candidate.name, role: candidate.role, location: candidate.location, state, result: screeningResults[candidateId], updatedAt: screeningResults[candidateId]?.fetchedAt, candidateRef: candidate }];
     }).sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
-  }, [candidates, consentRequests, dbMode, screeningConsents, screeningResults]);
+  }, [candidates, consentRequests, dbMode, screeningConsents, screeningResults, scans]);
 
   const visibleRows = rows.filter((row) => tab === "all" || (tab === "action" ? ["pending-candidate-consent", "consented", "disputed"].includes(row.state) : row.state === "screening-completed"));
   const actionCount = rows.filter((row) => ["pending-candidate-consent", "consented", "disputed"].includes(row.state)).length;
@@ -247,14 +253,14 @@ export default function ScreeningQueuePage() {
                 })}
               </div>
             ) : (
-              <div className="rounded-xl bg-muted p-8 text-center">
+              <div className="rounded-xl border border-dashed bg-muted/20 p-10 text-center">
                 <Sparkles className="mx-auto size-8 text-primary" />
                 <p className="mt-3 font-semibold">Belum ada aktivitas screening</p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                  Screening dimulai otomatis saat profil kandidat berhasil dibuka. Gunakan halaman ini untuk memantau status dan hasilnya.
+                  Kandidat yang belum di-scan tidak ditampilkan di sini. Silakan temukan kandidat potensial di menu <strong>Cari Talent</strong> dan lakukan scan profil terlebih dahulu untuk memulai alur screening.
                 </p>
-                <Button className="mt-4" size="sm" asChild>
-                  <Link href="/recruiter/discover">Cari kandidat</Link>
+                <Button className="mt-5" size="sm" asChild>
+                  <Link href="/search">Cari Talent Sekarang</Link>
                 </Button>
               </div>
             )}
