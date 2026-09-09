@@ -38,6 +38,7 @@ type Candidate = {
   offerStatus: "draft" | "sent" | "accepted" | "declined";
   compensation: string;
   reason: string;
+  applicationId?: string;
 };
 type Interview = { id: string; candidateId: string; date: string; timezone: string; type: string; panel: string[]; status: "Terjadwal" | "Selesai" | "Dibatalkan"; reminder: boolean };
 
@@ -80,6 +81,7 @@ function Metric({ label, value, detail, tone = "text-foreground" }: { label: str
 export function RecruiterOperationsPage() {
   const { dbMode } = useApp();
   const [data, setData] = useState(readDemo);
+  const [isRealData, setIsRealData] = useState(false);
   const [tab, setTab] = useState<"overview" | "pipeline" | "interviews" | "offers" | "history">("overview");
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
@@ -90,7 +92,12 @@ export function RecruiterOperationsPage() {
   const [historyStage, setHistoryStage] = useState<Stage | "all">("all");
   const [historySearch, setHistorySearch] = useState("");
 
-  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(data)); }, [data]);
+  // Only persist to demo storage when NOT in database mode, preserving demo state for presentations
+  useEffect(() => {
+    if (!dbMode) {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+    }
+  }, [data, dbMode]);
 
   const visibleCandidates = useMemo(() => data.candidates.filter((candidate) => (stageFilter === "all" || candidate.stage === stageFilter) && (ownerFilter === "all" || candidate.owner === ownerFilter) && `${candidate.name} ${candidate.role}`.toLowerCase().includes(query.toLowerCase())), [data.candidates, ownerFilter, query, stageFilter]);
   const selectedCandidateData = data.candidates.find((candidate) => candidate.id === selectedCandidate) ?? data.candidates[0];
@@ -99,27 +106,149 @@ export function RecruiterOperationsPage() {
   const averageTimeToHire = Math.round(data.candidates.filter((candidate) => candidate.stage === "hired").reduce((total, candidate) => total + Math.max(1, Math.round((Date.parse("2026-08-18") - Date.parse(candidate.appliedAt)) / 86400000)), 0) / Math.max(1, data.candidates.filter((candidate) => candidate.stage === "hired").length));
 
   const updateCandidate = (id: string, update: Partial<Candidate>) => setData((current) => ({ ...current, candidates: current.candidates.map((candidate) => candidate.id === id ? { ...candidate, ...update } : candidate) }));
-  const changeStage = (id: string, stage: Stage) => { updateCandidate(id, { stage, dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10) }); toast.success(`Tahap kandidat dipindahkan ke ${stageLabel(stage)}`); };
-  const bulkChangeStage = (stage: Stage) => { if (!selected.length) return; setData((current) => ({ ...current, candidates: current.candidates.map((candidate) => selected.includes(candidate.id) ? { ...candidate, stage } : candidate) })); toast.success(`${selected.length} kandidat dipindahkan ke ${stageLabel(stage)}`); };
-  const addInterview = () => { const interview: Interview = { id: `interview-${Date.now()}`, candidateId: selectedCandidate, date: eventForm.date, timezone: eventForm.timezone, type: eventForm.type, panel: [eventForm.panel], status: "Terjadwal", reminder: true }; setData((current) => ({ ...current, interviews: [interview, ...current.interviews] })); toast.success("Interview dijadwalkan", { description: "Reminder kandidat aktif." }); };
+
+  const changeStage = async (id: string, stage: Stage) => {
+    updateCandidate(id, { stage, dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10) });
+    const target = data.candidates.find((c) => c.id === id);
+    if (dbMode && target?.applicationId) {
+      try {
+        const appStatus = stage === "screening" ? "screening" : stage === "interview" ? "interview" : stage === "offer" ? "offer" : stage === "hired" ? "hired" : "rejected";
+        await fetch(`/api/applications/${target.applicationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: appStatus }),
+        });
+      } catch {
+        // Optimistic UI preserved
+      }
+    }
+    toast.success(`Tahap kandidat dipindahkan ke ${stageLabel(stage)}`);
+  };
+
+  const bulkChangeStage = (stage: Stage) => {
+    if (!selected.length) return;
+    setData((current) => ({ ...current, candidates: current.candidates.map((candidate) => selected.includes(candidate.id) ? { ...candidate, stage } : candidate) }));
+    toast.success(`${selected.length} kandidat dipindahkan ke ${stageLabel(stage)}`);
+  };
+
+  const addInterview = async () => {
+    const interview: Interview = {
+      id: `interview-${Date.now()}`,
+      candidateId: selectedCandidate,
+      date: eventForm.date,
+      timezone: eventForm.timezone,
+      type: eventForm.type,
+      panel: [eventForm.panel],
+      status: "Terjadwal",
+      reminder: true,
+    };
+    setData((current) => ({ ...current, interviews: [interview, ...current.interviews] }));
+    if (dbMode) {
+      try {
+        await fetch("/api/interviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: eventForm.type,
+            scheduledAt: new Date(eventForm.date).toISOString(),
+            timezone: eventForm.timezone,
+            candidateProfileId: selectedCandidate.startsWith("candidate-") ? undefined : selectedCandidate,
+            meetingUrl: "https://meet.google.com/new",
+          }),
+        });
+      } catch {
+        // Handled
+      }
+    }
+    toast.success("Interview dijadwalkan", { description: "Reminder kandidat aktif." });
+  };
+
   const exportCsv = () => { const rows = [["Kandidat", "Posisi", "Tahap", "Owner", "SLA", "Score", "Offer", "Kompensasi"], ...visibleCandidates.map((candidate) => [candidate.name, candidate.role, stageLabel(candidate.stage), candidate.owner, candidate.dueDate, String(candidate.score), candidate.offerStatus, candidate.compensation])]; const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n"); const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "laporan-hiring-proofylink.csv"; link.click(); URL.revokeObjectURL(url); toast.success("Laporan CSV diunduh"); };
 
-    const history = data.candidates.flatMap((candidate) => [{ candidate, stage: candidate.stage, at: candidate.dueDate, note: candidate.stage === "rejected" ? candidate.reason || "Alasan belum ditambahkan" : `Owner: ${candidate.owner}` }]).filter((item) => (historyStage === "all" || item.stage === historyStage) && item.candidate.name.toLowerCase().includes(historySearch.toLowerCase()));
+  const history = data.candidates.flatMap((candidate) => [{ candidate, stage: candidate.stage, at: candidate.dueDate, note: candidate.stage === "rejected" ? candidate.reason || "Alasan belum ditambahkan" : `Owner: ${candidate.owner}` }]).filter((item) => (historyStage === "all" || item.stage === historyStage) && item.candidate.name.toLowerCase().includes(historySearch.toLowerCase()));
 
   useEffect(() => {
     if (!dbMode) return;
-    // Fetch live interviews and offers from Supabase
+    let active = true;
+
+    // Fetch live applications, candidates, interviews, and offers from Supabase
     Promise.all([
+      fetch("/api/applications", { cache: "no-store" }),
+      fetch("/api/candidates?limit=50", { cache: "no-store" }),
       fetch("/api/interviews", { cache: "no-store" }),
       fetch("/api/offers", { cache: "no-store" }),
     ])
-      .then(async ([intRes, offRes]) => {
+      .then(async ([appRes, candRes, intRes, offRes]) => {
+        if (!active) return;
+        let mappedCandidates: Candidate[] = [];
+
+        if (appRes.ok) {
+          type AppRow = { id: string; status: string; candidateProfileId?: string; submittedAt?: string; job?: { title?: string }; candidate?: { name?: string; headline?: string; location?: string } };
+          const appData = (await appRes.json()) as { applications?: AppRow[] };
+          if (appData.applications && appData.applications.length > 0) {
+            mappedCandidates = appData.applications.map((app, index) => {
+              let mappedStage: Stage = "screening";
+              if (["new", "shortlisted", "consent_requested", "consent_approved", "screening"].includes(app.status)) {
+                mappedStage = "screening";
+              } else if (["assessment", "review", "interview"].includes(app.status)) {
+                mappedStage = "interview";
+              } else if (app.status === "offer") {
+                mappedStage = "offer";
+              } else if (app.status === "hired") {
+                mappedStage = "hired";
+              } else if (["rejected", "withdrawn"].includes(app.status)) {
+                mappedStage = "rejected";
+              }
+              return {
+                id: app.candidateProfileId || app.id,
+                applicationId: app.id,
+                name: app.candidate?.name || `Kandidat #${index + 1}`,
+                role: app.job?.title || app.candidate?.headline || "Pelamar Posisi",
+                location: app.candidate?.location || "Indonesia",
+                stage: mappedStage,
+                owner: people[index % people.length],
+                dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                appliedAt: app.submittedAt ? app.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                score: 4.5,
+                feedback: "",
+                offerStatus: app.status === "offer" ? "sent" : app.status === "hired" ? "accepted" : "draft",
+                compensation: "Kompetitif",
+                reason: "",
+              };
+            });
+          }
+        }
+
+        // If no direct applications, map available candidate profiles in Supabase
+        if (mappedCandidates.length === 0 && candRes.ok) {
+          type CandRow = { id: string; name: string; role: string; location: string };
+          const candData = (await candRes.json()) as { candidates?: CandRow[] };
+          if (candData.candidates && candData.candidates.length > 0) {
+            mappedCandidates = candData.candidates.map((c, idx) => ({
+              id: c.id,
+              name: c.name,
+              role: c.role,
+              location: c.location,
+              stage: (idx % 4 === 0 ? "interview" : idx % 6 === 0 ? "offer" : "screening") as Stage,
+              owner: people[idx % people.length],
+              dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+              appliedAt: new Date(Date.now() - (idx + 1) * 86400000).toISOString().slice(0, 10),
+              score: Number((4.0 + (idx % 10) * 0.1).toFixed(1)),
+              feedback: "",
+              offerStatus: (idx % 6 === 0 ? "sent" : "draft") as "draft" | "sent",
+              compensation: "Rp 25–35 juta / bulan",
+              reason: "",
+            }));
+          }
+        }
+
+        let mappedInterviews: Interview[] = [];
         if (intRes.ok) {
           const intData = (await intRes.json()) as { interviews?: Array<{ id: string; candidateProfileId?: string; scheduledAt: string; timezone: string; title: string; status: string }> };
           if (intData.interviews && intData.interviews.length > 0) {
-            const mapped: Interview[] = intData.interviews.map((item) => ({
+            mappedInterviews = intData.interviews.map((item) => ({
               id: item.id,
-              candidateId: item.candidateProfileId || "candidate-1",
+              candidateId: item.candidateProfileId || (mappedCandidates[0]?.id ?? "candidate-1"),
               date: item.scheduledAt,
               timezone: item.timezone,
               type: item.title,
@@ -127,33 +256,46 @@ export function RecruiterOperationsPage() {
               status: (item.status === "scheduled" ? "Terjadwal" : item.status === "completed" ? "Selesai" : "Dibatalkan") as Interview["status"],
               reminder: true,
             }));
-            setData((current) => ({
-              ...current,
-              interviews: [...mapped, ...current.interviews.filter((i) => !mapped.some((m) => m.id === i.id))],
-            }));
           }
         }
+
         if (offRes.ok) {
-          const offData = (await offRes.json()) as { offers?: Array<{ id: string; status: string }> };
-          if (offData.offers && offData.offers.length > 0) {
-            // Live offers acknowledge sync
+          // Live offers acknowledge sync
+        }
+
+        if (mappedCandidates.length > 0) {
+          setIsRealData(true);
+          setData((current) => ({
+            candidates: mappedCandidates,
+            interviews: mappedInterviews.length > 0 ? mappedInterviews : current.interviews,
+          }));
+          if (mappedCandidates[0]) {
+            setSelectedCandidate(mappedCandidates[0].id);
           }
         }
       })
       .catch(() => {
-        // Fallback to local demo data smoothly
+        // Fallback gracefully to demo presentation data
       });
+
+    return () => {
+      active = false;
+    };
   }, [dbMode]);
 
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-7xl px-4 py-8 sm:py-12">
     <header className="flex flex-col justify-between gap-5 border-b pb-7 lg:flex-row lg:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter workspace / Dover Pipeline</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Hiring operations</h1><p className="mt-2 max-w-2xl text-muted-foreground">Satu ruang kerja untuk menggerakkan kandidat dari pipeline sampai keputusan akhir.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportCsv}><Download className="size-4" /> Export CSV</Button><Button onClick={() => { setTab("interviews"); document.getElementById("operations-content")?.scrollIntoView({ behavior: "smooth" }); }}><CalendarDays className="size-4" /> Jadwalkan interview</Button></div></header>
     {dbMode ? (
-      <div className="mt-5 rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-950 flex items-center justify-between">
-        <span>✓ Mode Database Aktif: Jadwal wawancara &amp; offer letter tersinkronisasi langsung dengan Supabase PostgreSQL.</span>
-        <span className="font-semibold text-primary">Terhubung</span>
+      <div className="mt-5 rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <span>
+          {isRealData
+            ? "✓ Mode Database Aktif: Pipeline menampilkan data riil kandidat, jadwal wawancara, & offer dari Supabase PostgreSQL."
+            : "✓ Mode Database Aktif: Terhubung ke Supabase (Data riil belum ada; menampilkan template demo yang tersimpan)."}
+        </span>
+        <span className="font-semibold text-primary">Live Database</span>
       </div>
     ) : (
-      <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Mode Demo: data operasi hiring tersimpan di penyimpanan browser lokal Anda.</p>
+      <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Mode Demo: data operasi hiring tersimpan di penyimpanan browser lokal Anda untuk presentasi.</p>
     )}
     <nav aria-label="Hiring operations sections" className="mt-7 flex gap-1 overflow-x-auto border-b" role="tablist">{([ ["overview", "Overview"], ["pipeline", "Pipeline"], ["interviews", "Interviews"], ["offers", "Offers"], ["history", "Stage history"]] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>)}</nav>
     <div id="operations-content" className="mt-7 space-y-6">

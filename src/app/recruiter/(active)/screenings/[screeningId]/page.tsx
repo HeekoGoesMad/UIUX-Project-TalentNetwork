@@ -414,7 +414,7 @@ export default function ScreeningDetailPage() {
                     </p>
                   </div>
                   <div className="border-t pt-4">
-                    <p className="font-semibold">Aksi Cepat Dover</p>
+                    <p className="font-semibold">Aksi Cepat</p>
                     <div className="mt-3 flex flex-col gap-2">
                       <Button
                         variant="outline"
