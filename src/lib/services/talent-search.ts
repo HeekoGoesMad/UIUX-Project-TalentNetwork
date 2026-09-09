@@ -2,7 +2,14 @@ import "server-only";
 
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { schema, type Database } from "@/db";
-import { asCareerStatus, type Candidate, type IndustryCategory, type TalentCategory } from "@/types";
+import {
+  asCareerStatus,
+  type CampusVerification,
+  type Candidate,
+  type CandidatePersonality,
+  type IndustryCategory,
+  type TalentCategory,
+} from "@/types";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -46,9 +53,18 @@ export function serializeCandidate(
   const preferences = sectionMap.get("preferences") ?? {};
   const status = asCareerStatus(preferences.careerStatus);
   const salary = typeof preferences.salary === "string" && preferences.salary.trim() ? preferences.salary.trim() : "Belum dicantumkan";
+  const personality = preferences.personality && typeof preferences.personality === "object"
+    ? (preferences.personality as CandidatePersonality)
+    : undefined;
+  const talentCategory = typeof preferences.talentCategory === "string"
+    ? (preferences.talentCategory as TalentCategory)
+    : ("public" as TalentCategory);
+  const campusVerification = preferences.campusVerification && typeof preferences.campusVerification === "object"
+    ? (preferences.campusVerification as CampusVerification)
+    : undefined;
 
   const portfolio = getSectionItems<string>(sections, "portfolio");
-  const linkedinFromPortfolio = portfolio.find((url) => url.toLowerCase().includes("linkedin.com"));
+  const linkedinFromPortfolio = portfolio.find((url) => typeof url === "string" && url.toLowerCase().includes("linkedin.com"));
   const linkedin =
     (typeof preferences.linkedinUrl === "string" && preferences.linkedinUrl.trim())
       ? preferences.linkedinUrl.trim()
@@ -77,6 +93,8 @@ export function serializeCandidate(
       .filter(Boolean)
       .join(", "),
     salary,
+    personality,
+    campusVerification,
     summary: row.summary?.trim() || "Profil kandidat belum memiliki ringkasan.",
     endorsements: [],
     certifications: [],
@@ -121,7 +139,7 @@ export function serializeCandidate(
       years: item.dates ?? "",
     })),
     careerStatus: status,
-    talentCategory: "public" as TalentCategory,
+    talentCategory,
     industry: "technology-software" as IndustryCategory,
   };
 }

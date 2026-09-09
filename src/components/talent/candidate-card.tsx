@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { maskName } from "@/lib/candidate-display";
 import { useApp } from "@/providers/app-provider";
 import { Candidate, CampusVerification } from "@/types";
-import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
+import { Bookmark, Brain, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 import { CandidateAvatar } from "./avatar";
@@ -85,10 +85,21 @@ export const CandidateCardView = memo(function CandidateCardView({
           </div>
           <p className="text-sm text-muted-foreground">{candidate.role}</p>
 
-          {/* Career status */}
-          {candidate.careerStatus && (
-            <div className="mt-2">
-              <CandidateStatusBadge status={candidate.careerStatus} />
+          {/* Career status & Personality */}
+          {(candidate.careerStatus || candidate.personality) && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {candidate.careerStatus && (
+                <CandidateStatusBadge status={candidate.careerStatus} />
+              )}
+              {candidate.personality && (
+                <span
+                  title={`Tipe Kepribadian: ${candidate.personality.type} (${candidate.personality.label})`}
+                  className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-[#7C3AED]"
+                >
+                  <Brain className="size-3 text-[#7C3AED]" />
+                  {candidate.personality.type} · {candidate.personality.label}
+                </span>
+              )}
             </div>
           )}
 
@@ -107,17 +118,6 @@ export const CandidateCardView = memo(function CandidateCardView({
               {candidate.availability}
             </span>
           </div>
-        </div>
-
-        <div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}>
-          <p className="text-xs text-muted-foreground">Ekspektasi gaji</p>
-          {unlocked ? (
-            <p className="font-mono text-sm font-medium text-foreground">{candidate.salary}</p>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-              <Lock className="size-3 text-muted-foreground" /> Buka profil
-            </span>
-          )}
         </div>
 
         <div className={list ? "ml-auto flex items-center gap-3" : "mt-auto flex flex-col gap-3 pt-2"}>
