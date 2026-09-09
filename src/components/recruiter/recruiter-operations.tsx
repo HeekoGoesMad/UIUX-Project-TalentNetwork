@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  BarChart3,
   Bell,
   CalendarDays,
   Check,
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { downloadIcsFile } from "@/lib/calendar";
+import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 
 type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
 type Candidate = {
@@ -122,6 +124,7 @@ export function RecruiterOperationsPage() {
   const [eventForm, setEventForm] = useState({ date: "2026-08-25T10:00", timezone: "Asia/Jakarta (WIB)", type: "Panel interview", panel: user?.name || "Tim Rekruter" });
   const [historyStage, setHistoryStage] = useState<Stage | "all">("all");
   const [historySearch, setHistorySearch] = useState("");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const recruiterName = user?.name || "Tim Rekruter";
   const people = useMemo(() => {
@@ -518,6 +521,13 @@ export function RecruiterOperationsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setReportModalOpen(true)}
+              className="gap-1.5"
+            >
+              <BarChart3 className="size-4 text-primary" /> Laporan & Metrik HR
+            </Button>
             <Button variant="outline" onClick={exportCsv} disabled={activeCandidates.length === 0}>
               <Download className="size-4" /> Export CSV
             </Button>
@@ -874,6 +884,14 @@ export function RecruiterOperationsPage() {
             </Card>
           )}
         </div>
+
+        <HrReportModal
+          open={reportModalOpen}
+          onOpenChange={setReportModalOpen}
+          candidates={activeCandidates}
+          interviews={data.interviews}
+          availableJobs={availableJobs}
+        />
       </main>
     </ProtectedRoute>
   );

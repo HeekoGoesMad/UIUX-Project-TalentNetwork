@@ -224,6 +224,66 @@ export async function findOrCreateApplicationForCandidate(
   return created;
 }
 
+async function sendSystemHiringMessage(
+  tx: Database,
+  input: {
+    organizationId: string;
+    recruiterUserId: string;
+    candidateUserId: string;
+    body: string;
+  }
+) {
+  try {
+    const existing = await tx
+      .select({ id: schema.conversations.id })
+      .from(schema.conversations)
+      .innerJoin(
+        schema.conversationParticipants,
+        eq(schema.conversationParticipants.conversationId, schema.conversations.id)
+      )
+      .where(
+        and(
+          eq(schema.conversations.organizationId, input.organizationId),
+          eq(schema.conversationParticipants.userId, input.candidateUserId),
+          eq(schema.conversations.status, "active")
+        )
+      )
+      .limit(1);
+
+    let conversationId = existing[0]?.id;
+
+    if (!conversationId) {
+      const [newConv] = await tx
+        .insert(schema.conversations)
+        .values({
+          organizationId: input.organizationId,
+          createdBy: input.recruiterUserId,
+          status: "active",
+        })
+        .returning();
+      conversationId = newConv.id;
+
+      await tx.insert(schema.conversationParticipants).values([
+        { conversationId, userId: input.recruiterUserId },
+        { conversationId, userId: input.candidateUserId },
+      ]);
+    }
+
+    await tx.insert(schema.messages).values({
+      conversationId,
+      senderId: input.recruiterUserId,
+      body: input.body,
+    });
+
+    await tx
+      .update(schema.conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.conversations.id, conversationId));
+  } catch (err) {
+    console.error("Failed to send hiring message:", err);
+  }
+}
+
 export async function scheduleInterview(db: Database, input: ScheduleInterviewInput) {
   let targetAppId = input.applicationId;
   if (!targetAppId && input.candidateProfileId) {
@@ -340,7 +400,15 @@ export async function scheduleInterview(db: Database, input: ScheduleInterviewIn
       })
     );
 
-    // 6. Audit log
+    // 6. Send in-app chat message into /messages
+    await sendSystemHiringMessage(tx, {
+      organizationId: input.organizationId,
+      recruiterUserId: input.recruiterUserId,
+      candidateUserId: appRow.candidateUserId,
+      body: `📅 Undangan Wawancara: ${appRow.jobTitle}\nJadwal: ${formattedDate} (${input.timezone ?? "WIB"})\nTautan Meeting: ${input.meetingUrl ?? "Google Meet / Tautan akan dibagikan"}\n\nSilakan tinjau jadwal ini pada detail lamaran Anda dan unduh berkas kalender (.ics).`,
+    });
+
+    // 7. Audit log
     await writeAuditLog({
       db: tx,
       actorUserId: input.recruiterUserId,
@@ -644,6 +712,14 @@ export async function createOffer(db: Database, input: CreateOfferInput) {
           ),
         })
       );
+
+      // Send in-app chat message into /messages
+      await sendSystemHiringMessage(tx, {
+        organizationId: input.organizationId,
+        recruiterUserId: input.recruiterUserId,
+        candidateUserId: appRow.candidateUserId,
+        body: `🎉 Surat Penawaran Kerja: ${appRow.jobTitle}\nKompensasi: ${input.terms.salary}\nBatas Konfirmasi: ${input.expiresAt ? input.expiresAt.toISOString().slice(0, 10) : "7 hari ke depan"}\n\nSelamat! Kami telah menerbitkan Surat Penawaran Kerja resmi untuk Anda. Silakan tinjau rincian benefit dan konfirmasi penerimaan (Accept Offer) pada aplikasi Anda.`,
+      });
     }
 
     // Audit log
