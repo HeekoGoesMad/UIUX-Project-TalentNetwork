@@ -27,14 +27,28 @@ async function recruiterContext() {
 }
 
 async function jobRows(db: Awaited<ReturnType<typeof getDb>>, where: ReturnType<typeof eq> | ReturnType<typeof and>, paging: { limit: number; offset: number }) {
-  const jobs = await db.select({ job: schema.jobs, organizationName: schema.organizations.name }).from(schema.jobs)
+  const jobs = await db.select({
+    id: schema.jobs.id,
+    organizationId: schema.jobs.organizationId,
+    title: schema.jobs.title,
+    description: schema.jobs.description,
+    employmentType: schema.jobs.employmentType,
+    workArrangement: schema.jobs.workArrangement,
+    location: schema.jobs.location,
+    status: schema.jobs.status,
+    publishedAt: schema.jobs.publishedAt,
+    closedAt: schema.jobs.closedAt,
+    createdAt: schema.jobs.createdAt,
+    updatedAt: schema.jobs.updatedAt,
+    organizationName: schema.organizations.name,
+  }).from(schema.jobs)
     .innerJoin(schema.organizations, eq(schema.organizations.id, schema.jobs.organizationId))
     .where(where).orderBy(desc(schema.jobs.updatedAt)).limit(paging.limit + 1).offset(paging.offset);
   const hasMore = jobs.length > paging.limit;
   const pageJobs = hasMore ? jobs.slice(0, paging.limit) : jobs;
   if (pageJobs.length === 0) return { jobs: [] as JobRow[], hasMore: false };
   const requirements = await db.select({ id: schema.jobRequirements.id, jobId: schema.jobRequirements.jobId, type: schema.jobRequirements.type, name: schema.jobRequirements.name })
-    .from(schema.jobRequirements).where(inArray(schema.jobRequirements.jobId, pageJobs.map((row) => row.job.id)));
+    .from(schema.jobRequirements).where(inArray(schema.jobRequirements.jobId, pageJobs.map((row) => row.id)));
   const byJob = new Map<string, JobRow["requirements"]>();
   for (const requirement of requirements) {
     const list = byJob.get(requirement.jobId) ?? [];
@@ -42,7 +56,11 @@ async function jobRows(db: Awaited<ReturnType<typeof getDb>>, where: ReturnType<
     byJob.set(requirement.jobId, list);
   }
   return {
-    jobs: pageJobs.map((row) => ({ ...row.job, organizationName: row.organizationName, requirements: byJob.get(row.job.id) ?? [] }) as JobRow),
+    jobs: pageJobs.map((row) => ({
+      ...row,
+      description: row.description && row.description.length > 600 ? `${row.description.slice(0, 600)}...` : row.description,
+      requirements: byJob.get(row.id) ?? [],
+    }) as JobRow),
     hasMore,
   };
 }

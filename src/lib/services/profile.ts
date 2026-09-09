@@ -117,22 +117,27 @@ export class ProfileService {
         })
         .returning({ id: schema.candidateProfiles.id });
 
-      for (const section of payload.sections ?? []) {
-        await tx
-          .insert(schema.candidateProfileSections)
-          .values({
-            candidateProfileId: candidateProfile.id,
-            type: section.type,
-            content: section.content,
-            sortOrder: section.sortOrder ?? 0,
-          })
-          .onConflictDoUpdate({
-            target: [
-              schema.candidateProfileSections.candidateProfileId,
-              schema.candidateProfileSections.type,
-            ],
-            set: { content: section.content, sortOrder: section.sortOrder ?? 0, updatedAt: now },
-          });
+      const sections = payload.sections ?? [];
+      if (sections.length > 0) {
+        await Promise.all(
+          sections.map((section) =>
+            tx
+              .insert(schema.candidateProfileSections)
+              .values({
+                candidateProfileId: candidateProfile.id,
+                type: section.type,
+                content: section.content,
+                sortOrder: section.sortOrder ?? 0,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  schema.candidateProfileSections.candidateProfileId,
+                  schema.candidateProfileSections.type,
+                ],
+                set: { content: section.content, sortOrder: section.sortOrder ?? 0, updatedAt: now },
+              })
+          )
+        );
       }
 
       return {

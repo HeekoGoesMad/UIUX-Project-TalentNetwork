@@ -7,6 +7,15 @@ export async function updateSession(request: NextRequest, response: NextResponse
 
   if (!url || !key) return response;
 
+  // If the user has no Supabase auth cookies, skip the external HTTPS network call
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith("sb-") || c.name.includes("auth-token"));
+
+  if (!hasAuthCookie) {
+    return response;
+  }
+
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
@@ -22,3 +31,4 @@ export async function updateSession(request: NextRequest, response: NextResponse
   await supabase.auth.getUser();
   return response;
 }
+

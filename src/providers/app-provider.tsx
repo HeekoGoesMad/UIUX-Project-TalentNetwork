@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -113,8 +113,29 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     const value = section(type).items;
     return Array.isArray(value) ? value as T[] : [];
   };
+  const skillsContent = section("skills");
+  const rawSkills = items<string>("skills");
+  const hardCompetencies = Array.isArray(skillsContent.hardCompetencies)
+    ? (skillsContent.hardCompetencies as string[])
+    : rawSkills;
   const preferences = section("preferences");
+  const softSkills = Array.isArray(skillsContent.softSkills)
+    ? (skillsContent.softSkills as string[])
+    : Array.isArray(preferences.softSkills)
+    ? (preferences.softSkills as string[])
+    : [];
   const status = asCareerStatus(preferences.careerStatus);
+  const salary = typeof preferences.salary === "string" ? preferences.salary : undefined;
+  const personality = preferences.personality && typeof preferences.personality === "object"
+    ? (preferences.personality as CandidatePersonality)
+    : undefined;
+  const talentCategory = typeof preferences.talentCategory === "string" ? (preferences.talentCategory as TalentCategory) : undefined;
+  const campusVerification = preferences.campusVerification && typeof preferences.campusVerification === "object"
+    ? (preferences.campusVerification as CampusVerification)
+    : undefined;
+  const industries = Array.isArray(preferences.industries) ? (preferences.industries as string[]) : [];
+  const certifications = Array.isArray(preferences.certifications) ? (preferences.certifications as string[]) : [];
+
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
     fullName: base?.displayName ?? "",
@@ -123,12 +144,14 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     location: candidate?.location ?? "",
     email: payload.identity?.email ?? "",
     phone: base?.phone ?? "",
-    skills: items<string>("skills"),
+    skills: rawSkills.length > 0 ? rawSkills : hardCompetencies,
+    hardCompetencies,
     tools: items<string>("tools"),
-    industries: [],
+    softSkills,
+    industries,
     experience: items<CvProfile["experience"][number]>("experience"),
     education: items<CvProfile["education"][number]>("education"),
-    certifications: [],
+    certifications,
     portfolio: items<string>("portfolio"),
     targetRole: candidate?.targetRole ?? "",
     avatarUrl: base?.avatarUrl ?? ((candidate as Record<string, unknown> | null)?.avatarUrl as string | undefined) ?? "",
@@ -136,6 +159,10 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     workArrangement: preferences.workArrangement === "remote" || preferences.workArrangement === "onsite" ? preferences.workArrangement : "hybrid",
     openToWork: status !== "not-available",
     careerStatus: status,
+    talentCategory,
+    salary,
+    personality,
+    campusVerification,
     updatedAt: candidate?.updatedAt ?? base?.updatedAt ?? new Date().toISOString(),
   };
 }
@@ -213,6 +240,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
+  const isLoggingIn = useRef(false);
   const bootstrapUserKey = useRef<string | null>(null);
   // Database is the source of truth for role/provisioning. Metadata freezes
   // at signup and goes stale the moment an admin approves or SQL changes land.
@@ -221,6 +249,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
       setUser(null);
+      return;
+    }
+    // Jika proses login manual sedang memvalidasi role akun, cegah pembaruan prematur
+    if (isLoggingIn.current) {
       return;
     }
     const metadata = authUser.user_metadata ?? {};
@@ -262,24 +294,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBootstrapped(false);
     setDatabaseError(null);
     try {
-      const [response, consentResponse] = await Promise.all([
-        fetch("/api/app/bootstrap", { cache: "no-store" }),
-        fetch("/api/consent-requests", { cache: "no-store" }),
-      ]);
-      const [payload, consentPayload] = await Promise.all([
-        response.json() as Promise<{
-          identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
-          profile?: BootstrapProfile | null;
-          candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
-          candidateSections?: BootstrapSection[];
-          token?: BootstrapTokenAccount;
-          notifications?: BootstrapNotification[];
-          shortlists?: BootstrapShortlist[];
-          consentRequests?: Record<string, unknown>[];
-          error?: string;
-        }>,
-        consentResponse.json() as Promise<{ requests?: Record<string, unknown>[]; error?: string }>,
-      ]);
+      const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
+      const payload = (await response.json()) as {
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+        profile?: BootstrapProfile | null;
+        candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
+        candidateSections?: BootstrapSection[];
+        token?: BootstrapTokenAccount;
+        notifications?: BootstrapNotification[];
+        shortlists?: BootstrapShortlist[];
+        consentRequests?: Record<string, unknown>[];
+        error?: string;
+      };
+
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
       if (payload.identity?.role) {
@@ -301,16 +328,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
       setNotifications(payload.notifications ?? []);
       setShortlists(payload.shortlists ?? []);
-      setConsentRequests(consentPayload.requests ?? payload.consentRequests ?? []);
-       const remoteProfile = remoteCvProfile(payload);
-       setState((current) => ({
-         ...current,
-         cvProfile: remoteProfile,
-         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
-         tokens: payload.token?.balance ?? 0,
-         screeningTokens: payload.token?.balance ?? 0,
+      const consents = payload.consentRequests ?? [];
+      setConsentRequests(consents);
+      const remoteProfile = remoteCvProfile(payload);
+      setState((current) => ({
+        ...current,
+        cvProfile: remoteProfile,
+        careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
+        tokens: payload.token?.balance ?? 0,
+        screeningTokens: payload.token?.balance ?? 0,
         shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
-         screeningConsents: Object.fromEntries((consentPayload.requests ?? payload.consentRequests ?? []).flatMap((request) => {
+        screeningConsents: Object.fromEntries(consents.flatMap((request) => {
           const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
           const status = request.status;
           if (!candidateId || typeof status !== "string") return [];
@@ -349,6 +377,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { email?: string; user_metadata?: Record<string, unknown>; id?: string } } | null) => {
+      if (isLoggingIn.current) {
+        return;
+      }
       setSupabaseUser(session?.user ?? null);
       const userId = session?.user?.id ?? null;
       if (!userId) {
@@ -472,12 +503,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (role: UserRole, email: string, password: string): Promise<AuthResult> => {
+    isLoggingIn.current = true;
     pendingRole.current = role;
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
         const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
-        if (error) return { error: error.message };
+        if (error) {
+          isLoggingIn.current = false;
+          return { error: error.message };
+        }
 
         // Sync with expected role to check role match against database
         const syncResponse = await fetch("/api/auth/sync", {
@@ -491,7 +526,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // If role mismatch or other sync error, sign out immediately
           await supabase.auth.signOut().catch(() => {});
           setUser(null);
+          bootstrapUserKey.current = null;
           localStorage.removeItem(sessionKey);
+          isLoggingIn.current = false;
           return {
             error: syncData.error || "Gagal memverifikasi peran akun.",
           };
@@ -510,11 +547,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
           companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
         });
+        isLoggingIn.current = false;
+        bootstrapUserKey.current = data.user.id;
+        void loadBootstrap();
         return { role: actualRole, provisioningStatus };
       } catch (e) {
+        isLoggingIn.current = false;
         return { error: e instanceof Error ? e.message : "Gagal masuk." };
       }
     }
+    isLoggingIn.current = false;
     const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
     const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: fallbackStatus, companyName: role === "partner" ? "Universitas Indonesia" : undefined };
     setUser(nextUser);
@@ -683,7 +725,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           profile.about,
           profile.location,
           profile.targetRole,
-          profile.skills?.length,
+          profile.skills?.length || profile.hardCompetencies?.length,
+          profile.softSkills?.length,
           profile.tools?.length,
           profile.experience?.length,
           profile.education?.length,
@@ -692,7 +735,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sections: [
         { type: "experience", content: { items: profile.experience } },
         { type: "education", content: { items: profile.education } },
-        { type: "skills", content: { items: profile.skills } },
+        {
+          type: "skills",
+          content: {
+            items: profile.skills?.length ? profile.skills : (profile.hardCompetencies ?? []),
+            hardCompetencies: profile.hardCompetencies ?? profile.skills,
+            softSkills: profile.softSkills ?? [],
+          },
+        },
         { type: "tools", content: { items: profile.tools } },
         { type: "portfolio", content: { items: profile.portfolio } },
         {
@@ -700,6 +750,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           content: {
             careerStatus: profile.careerStatus,
             workArrangement: profile.workArrangement,
+            ...(profile.salary ? { salary: profile.salary } : {}),
+            ...(profile.personality ? { personality: profile.personality } : {}),
+            ...(profile.talentCategory ? { talentCategory: profile.talentCategory } : {}),
+            ...(profile.campusVerification ? { campusVerification: profile.campusVerification } : {}),
+            ...(profile.industries?.length ? { industries: profile.industries } : {}),
+            ...(profile.certifications?.length ? { certifications: profile.certifications } : {}),
             ...(profile.bannerUrl !== undefined ? { bannerUrl: profile.bannerUrl || null } : {}),
           },
         },
@@ -741,6 +797,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved: CvProfile = {
       ...state.cvProfile,
       ...profile,
+      hardCompetencies: profile.hardCompetencies ?? profile.skills,
+      softSkills: profile.softSkills ?? state.cvProfile?.softSkills ?? [],
       avatarUrl: currentAvatarUrl,
       bannerUrl: currentBannerUrl,
       campusVerification,

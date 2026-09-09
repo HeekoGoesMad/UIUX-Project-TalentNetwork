@@ -1,24 +1,41 @@
 "use client";
 
-import { memo } from "react";
-import Link from "next/link";
-import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
-import { Candidate } from "@/types";
-import { useApp } from "@/providers/app-provider";
-import { maskName } from "@/lib/candidate-display";
-import { CandidateAvatar } from "./avatar";
-import { CandidateStatusBadge } from "./candidate-status-badge";
-import { CandidateCategoryBadge } from "./candidate-category-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { maskName } from "@/lib/candidate-display";
+import { useApp } from "@/providers/app-provider";
+import { Candidate, CampusVerification } from "@/types";
+import { Bookmark, BriefcaseBusiness, Clock3, GraduationCap, Lock, MapPin, Wrench } from "lucide-react";
+import Link from "next/link";
+import { memo } from "react";
+import { CandidateAvatar } from "./avatar";
+import { CandidateCategoryBadge } from "./candidate-category-badge";
+import { CandidateStatusBadge } from "./candidate-status-badge";
 
-export const CandidateCard = memo(function CandidateCard({ candidate, list = false }: { candidate: Candidate; list?: boolean }) {
-  const { shortlisted, toggleShortlist, scans, partnerVerifications } = useApp();
-  const unlocked = scans.some((scan) => scan.candidateId === candidate.id);
-  const isShortlisted = shortlisted.includes(candidate.id);
+export interface CandidateCardViewProps {
+  candidate: Candidate;
+  list?: boolean;
+  unlocked: boolean;
+  isShortlisted: boolean;
+  onToggleShortlist: (id: string) => void;
+  partnerVerification?: CampusVerification;
+}
+
+/**
+ * Pure memoized candidate card view.
+ * Only re-renders when its specific candidate state (unlocked, shortlist status, verification) changes.
+ */
+export const CandidateCardView = memo(function CandidateCardView({
+  candidate,
+  list = false,
+  unlocked,
+  isShortlisted,
+  onToggleShortlist,
+  partnerVerification,
+}: CandidateCardViewProps) {
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
-  const verif = partnerVerifications?.[candidate.id] ?? candidate.campusVerification;
+  const verif = partnerVerification ?? candidate.campusVerification;
 
   return (
     <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}>
@@ -44,7 +61,7 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
               variant="ghost"
               size="icon"
               className="-mr-2 -mt-1 shrink-0"
-              onClick={() => toggleShortlist(candidate.id)}
+              onClick={() => onToggleShortlist(candidate.id)}
               aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
               aria-pressed={isShortlisted}
             >
@@ -89,7 +106,13 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
 
         <div className={list ? "hidden min-w-28 text-right sm:block" : "border-t pt-3"}>
           <p className="text-xs text-muted-foreground">Ekspektasi gaji</p>
-          <p className="font-mono text-sm font-medium">{candidate.salary}</p>
+          {unlocked ? (
+            <p className="font-mono text-sm font-medium text-foreground">{candidate.salary}</p>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+              <Lock className="size-3 text-muted-foreground" /> Buka profil
+            </span>
+          )}
         </div>
 
         <div className={list ? "ml-auto flex items-center gap-3" : "mt-auto flex flex-col gap-3 pt-2"}>
@@ -123,3 +146,42 @@ export const CandidateCard = memo(function CandidateCard({ candidate, list = fal
     </Card>
   );
 });
+
+export interface CandidateCardProps {
+  candidate: Candidate;
+  list?: boolean;
+  unlocked?: boolean;
+  isShortlisted?: boolean;
+  onToggleShortlist?: (id: string) => void;
+  partnerVerification?: CampusVerification;
+}
+
+/**
+ * Connected CandidateCard wrapper with fallback to context when props are omitted.
+ */
+export const CandidateCard = memo(function CandidateCard({
+  candidate,
+  list = false,
+  unlocked: propUnlocked,
+  isShortlisted: propIsShortlisted,
+  onToggleShortlist: propToggleShortlist,
+  partnerVerification: propPartnerVerification,
+}: CandidateCardProps) {
+  const { shortlisted, toggleShortlist, scans, partnerVerifications } = useApp();
+  const unlocked = propUnlocked ?? scans.some((scan) => scan.candidateId === candidate.id);
+  const isShortlisted = propIsShortlisted ?? shortlisted.includes(candidate.id);
+  const handleToggle = propToggleShortlist ?? toggleShortlist;
+  const verif = propPartnerVerification ?? partnerVerifications?.[candidate.id] ?? candidate.campusVerification;
+
+  return (
+    <CandidateCardView
+      candidate={candidate}
+      list={list}
+      unlocked={unlocked}
+      isShortlisted={isShortlisted}
+      onToggleShortlist={handleToggle}
+      partnerVerification={verif}
+    />
+  );
+});
+

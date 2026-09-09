@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
-  const visibleUser = hydrated ? user : null;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -61,7 +60,8 @@ export function SiteHeader() {
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
   const isOnboarding = pathname?.startsWith("/candidate/onboarding") || pathname?.startsWith("/recruiter/onboarding");
-  const isPublicHeader = (isLanding || isAuth) && !visibleUser;
+  const visibleUser = hydrated && !isAuth ? user : null;
+  const isPublicHeader = isLanding || isAuth || !visibleUser;
   const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
   useEffect(() => {

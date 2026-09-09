@@ -53,5 +53,24 @@ async function withAttempts(db: Database, rows: Array<{ invitation: typeof schem
   for (const attempt of attempts) {
     if (!latest.has(attempt.invitationId)) latest.set(attempt.invitationId, { id: attempt.id, status: attempt.status });
   }
-  return rows.map((row) => ({ ...row.invitation, templateName: row.templateName, attempt: latest.get(row.invitation.id) ?? null }));
+
+  const attemptIds = Array.from(latest.values()).map((a) => a.id);
+  const reviews = attemptIds.length > 0
+    ? await db.select({
+        attemptId: schema.assessmentReviews.attemptId,
+        status: schema.assessmentReviews.status,
+        score: schema.assessmentReviews.score,
+        reviewedAt: schema.assessmentReviews.reviewedAt,
+      }).from(schema.assessmentReviews).where(inArray(schema.assessmentReviews.attemptId, attemptIds))
+    : [];
+  const reviewMap = new Map(reviews.map((r) => [r.attemptId, { status: r.status, score: r.score, reviewedAt: r.reviewedAt }]));
+
+  return rows.map((row) => {
+    const attempt = latest.get(row.invitation.id);
+    return {
+      ...row.invitation,
+      templateName: row.templateName,
+      attempt: attempt ? { id: attempt.id, status: attempt.status, review: reviewMap.get(attempt.id) ?? null } : null,
+    };
+  });
 }

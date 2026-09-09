@@ -21,6 +21,35 @@ function label(score: number) {
   return score >= 80 ? "Sangat Direkomendasikan" : score >= 50 ? "Direkomendasikan" : score >= 21 ? "Perlu Pertimbangan" : "Perlu Review Mendalam";
 }
 
+let cachedLocalAi: ReturnType<typeof createOpenAI> | null = null;
+let cachedLocalAiKey = "";
+
+function getLocalAi(baseURL: string, apiKey: string) {
+  const key = `${baseURL}|${apiKey}`;
+  if (!cachedLocalAi || cachedLocalAiKey !== key) {
+    cachedLocalAi = createOpenAI({ baseURL, apiKey });
+    cachedLocalAiKey = key;
+  }
+  return cachedLocalAi;
+}
+
+let cachedAzure: ReturnType<typeof createAzure> | null = null;
+let cachedAzureKey = "";
+
+function getAzure(baseURL: string, apiKey: string, apiVersion?: string) {
+  const key = `${baseURL}|${apiKey}|${apiVersion ?? ""}`;
+  if (!cachedAzure || cachedAzureKey !== key) {
+    cachedAzure = createAzure({
+      baseURL,
+      apiKey,
+      apiVersion,
+      useDeploymentBasedUrls: true,
+    });
+    cachedAzureKey = key;
+  }
+  return cachedAzure;
+}
+
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
   const currentSource = getSource();
 
@@ -37,7 +66,7 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
     const model = process.env.LOCAL_AI_MODEL?.trim() ?? "llama3.2";
     const apiKey = process.env.LOCAL_AI_API_KEY?.trim() ?? "ollama";
     try {
-      const localAi = createOpenAI({ baseURL, apiKey });
+      const localAi = getLocalAi(baseURL, apiKey);
       const result = await generateObject({ model: localAi.chat(model), schema, prompt });
       return {
         ...(result.object as Record<string, unknown>),
@@ -73,12 +102,11 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
   }
 
   try {
-    const azure = createAzure({
-      baseURL: `${endpoint.replace(/\/$/, "")}/openai`,
+    const azure = getAzure(
+      `${endpoint.replace(/\/$/, "")}/openai`,
       apiKey,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION?.trim(),
-      useDeploymentBasedUrls: true,
-    });
+      process.env.AZURE_OPENAI_API_VERSION?.trim()
+    );
     const result = await generateObject({ model: azure.chat(deployment), schema, prompt });
     return {
       ...(result.object as Record<string, unknown>),

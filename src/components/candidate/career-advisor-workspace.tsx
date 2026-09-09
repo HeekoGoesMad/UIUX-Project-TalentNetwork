@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  AlertTriangle,
-  Award,
-  BookOpen,
-  Bot,
-  Calendar,
-  Check,
-  CheckCircle2,
-  Compass,
-  Download,
-  FileText,
-  GraduationCap,
-  Layers,
-  Lightbulb,
-  ShieldAlert,
-  Sparkles,
-  Target,
-  TrendingUp,
-  User,
-  Zap,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/providers/app-provider";
+import {
+    AlertTriangle,
+    Award,
+    BookOpen,
+    Bot,
+    Calendar,
+    Check,
+    CheckCircle2,
+    Compass,
+    Download,
+    FileText,
+    GraduationCap,
+    Layers,
+    Lightbulb,
+    ShieldAlert,
+    Sparkles,
+    Target,
+    TrendingUp,
+    User,
+    Zap,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -135,7 +135,9 @@ const focusPresets: { id: FocusType; label: string; icon: typeof FileText; desc:
 ];
 
 export function CareerAdvisorWorkspace() {
-  const { cvProfile } = useApp();
+  const { cvProfile, user } = useApp();
+  const avatarUrl = cvProfile?.avatarUrl || null;
+  const displayName = cvProfile?.fullName || user?.name || "Profil kamu";
   const [selectedFocus, setSelectedFocus] = useState<FocusType>("cv_review");
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -401,14 +403,25 @@ export function CareerAdvisorWorkspace() {
       <Card className="no-print border-purple-200/60 bg-gradient-to-r from-purple-50/40 via-white to-purple-50/20 shadow-xs">
         <CardContent className="p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#7C3AED] text-white shadow-xs">
-                <User className="size-6" />
+            <div className="flex items-center gap-4">
+              <div className="relative size-14 sm:size-16 shrink-0 overflow-hidden rounded-full border-2 border-purple-200 bg-purple-50 shadow-xs">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center bg-gradient-to-br from-[#7C3AED] to-purple-800 text-lg sm:text-xl font-bold text-white uppercase">
+                    {displayName.charAt(0) || <User className="size-6 text-white" />}
+                  </div>
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-foreground">
-                    {cvProfile?.fullName || "Profil kamu"}
+                    {displayName}
                   </h2>
                   <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] font-semibold">
                     Siap Ditingkatkan

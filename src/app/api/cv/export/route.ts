@@ -57,6 +57,66 @@ const exportSchema = z.object({
   templateId: z.enum(["ats", "modern", "sidebar", "minimal"]).default("ats"),
 });
 
+let cachedBrowserPromise: Promise<Browser> | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+const BROWSER_IDLE_TIMEOUT_MS = 30_000;
+
+function resetIdleTimer(browser: Browser) {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    idleTimer = null;
+    try {
+      if (browser.isConnected()) {
+        await browser.close();
+      }
+    } catch (e) {
+      console.error("[cv/export] Error closing idle browser:", e);
+    } finally {
+      cachedBrowserPromise = null;
+    }
+  }, BROWSER_IDLE_TIMEOUT_MS);
+}
+
+async function getBrowser(): Promise<Browser> {
+  if (cachedBrowserPromise) {
+    try {
+      const browser = await cachedBrowserPromise;
+      if (browser.isConnected()) {
+        return browser;
+      }
+    } catch {
+      cachedBrowserPromise = null;
+    }
+  }
+
+  cachedBrowserPromise = (async () => {
+    let chromium;
+    try {
+      chromium = (await import("playwright")).chromium;
+    } catch {
+      chromium = (await import("playwright-core")).chromium;
+    }
+
+    const browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+
+    browser.on("disconnected", () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      cachedBrowserPromise = null;
+    });
+
+    return browser;
+  })();
+
+  return cachedBrowserPromise;
+}
+
 export async function POST(request: Request) {
   const current = await getCurrentAppUser();
   if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
@@ -85,26 +145,24 @@ export async function POST(request: Request) {
     .replace(/-+$/g, "");
   const safeFileName = `proofylink-cv-${slug || "cv"}.pdf`;
 
-  let browser: Browser | undefined;
+  let context: Awaited<ReturnType<Browser["newContext"]>> | undefined;
+  let page: Awaited<ReturnType<Browser["newPage"]>> | undefined;
 
   try {
-    // Dynamically import playwright-core on demand
-    const { chromium } = await import("playwright-core");
-    browser = await chromium.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-    });
+    const browser = await getBrowser();
+    resetIdleTimer(browser);
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
+    context = await browser.newContext();
+    page = await context.newPage();
+    await page.setContent(html, { waitUntil: "load", timeout: 10000 });
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin:
-        templateId === "ats" || templateId === "minimal"
-          ? { top: "18mm", bottom: "18mm", left: "20mm", right: "20mm" }
-          : { top: "0", bottom: "0", left: "0", right: "0" },
+      preferCSSPageSize: true,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
     });
+
+    resetIdleTimer(browser);
 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
@@ -123,11 +181,18 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   } finally {
-    if (browser) {
+    if (page) {
       try {
-        await browser.close();
-      } catch (closeError) {
-        console.error("[cv/export] Failed to close browser instance:", closeError);
+        await page.close();
+      } catch (pageError) {
+        console.error("[cv/export] Failed to close page:", pageError);
+      }
+    }
+    if (context) {
+      try {
+        await context.close();
+      } catch (contextError) {
+        console.error("[cv/export] Failed to close context:", contextError);
       }
     }
   }

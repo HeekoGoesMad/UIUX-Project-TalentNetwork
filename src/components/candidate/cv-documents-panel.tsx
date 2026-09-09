@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FileText, ShieldCheck, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, FileText, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 type Document = { id: string; originalFileName: string; sizeBytes: number; status: string; createdAt: string };
 const statusLabels: Record<string, string> = { uploaded: "Uploaded", processing: "Processing", review: "Perlu review", approved: "Disetujui", rejected: "Ditolak", deleted: "Dihapus" };
@@ -13,6 +12,7 @@ export function CvDocumentsPanel() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   async function load() {
     const response = await fetch("/api/cv/documents", { cache: "no-store" });
@@ -50,16 +50,30 @@ export function CvDocumentsPanel() {
   }
 
   return (
-    <Card className="border-border shadow-xs">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <FileText className="size-4 text-primary" />
-          Dokumen CV Terunggah
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          PDF dokumen resmi, maksimal 5 MB. Dokumen disimpan aman di storage privat untuk proses verifikasi dan kurasi profil.
-        </p>
+    <Card className="border-border shadow-xs overflow-hidden">
+      <CardHeader className="cursor-pointer py-3.5 sm:py-4 hover:bg-slate-50/60 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 text-primary" />
+            <CardTitle className="text-sm sm:text-base font-semibold text-foreground">
+              Dokumen CV Terunggah
+            </CardTitle>
+            <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-[#7C3AED] border border-purple-200">
+              {documents.length} berkas
+            </span>
+          </div>
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs font-medium text-muted-foreground gap-1">
+            <span>{isExpanded ? "Sembunyikan" : "Kelola Berkas"}</span>
+            {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          </Button>
+        </div>
+        {!isExpanded && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            PDF tersimpan di storage privat. Klik untuk mengunggah atau melihat riwayat verifikasi.
+          </p>
+        )}
       </CardHeader>
+      {isExpanded && (
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-within:ring-2 focus-within:ring-ring ${busy ? "pointer-events-none opacity-60" : ""}`}>
@@ -77,12 +91,6 @@ export function CvDocumentsPanel() {
               }}
             />
           </label>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/candidate/verifications">
-              <ShieldCheck className="size-4" />
-              Lihat status verifikasi
-            </Link>
-          </Button>
         </div>
         {message && (
           <p className="text-sm text-muted-foreground" role="status">
@@ -114,6 +122,7 @@ export function CvDocumentsPanel() {
           </ul>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }
