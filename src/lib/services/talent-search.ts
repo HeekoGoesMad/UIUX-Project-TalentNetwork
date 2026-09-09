@@ -2,7 +2,14 @@ import "server-only";
 
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { schema, type Database } from "@/db";
-import { asCareerStatus, type Candidate, type IndustryCategory, type TalentCategory } from "@/types";
+import {
+  asCareerStatus,
+  type CampusVerification,
+  type Candidate,
+  type CandidatePersonality,
+  type IndustryCategory,
+  type TalentCategory,
+} from "@/types";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -18,6 +25,8 @@ export function serializeCandidate(
     role: string | null;
     location: string | null;
     summary: string | null;
+    email?: string | null;
+    phone?: string | null;
   },
   sections: Section[]
 ): Candidate {
@@ -42,6 +51,19 @@ export function serializeCandidate(
   const education = getItems<{ school: string; program: string; dates?: string }>("education");
   const preferences = sectionMap.get("preferences") ?? {};
   const status = asCareerStatus(preferences.careerStatus);
+  const salary = typeof preferences.salary === "string" && preferences.salary.trim() ? preferences.salary : "Belum dicantumkan";
+  const personality = preferences.personality && typeof preferences.personality === "object"
+    ? (preferences.personality as CandidatePersonality)
+    : undefined;
+  const talentCategory = typeof preferences.talentCategory === "string"
+    ? (preferences.talentCategory as TalentCategory)
+    : ("public" as TalentCategory);
+  const campusVerification = preferences.campusVerification && typeof preferences.campusVerification === "object"
+    ? (preferences.campusVerification as CampusVerification)
+    : undefined;
+
+  const portfolio = getSectionItems<string>(sections, "portfolio");
+  const linkedin = portfolio.find((url) => typeof url === "string" && url.includes("linkedin.com")) || "";
 
   const name = row.name?.trim() || "Kandidat anonim";
 
@@ -63,21 +85,23 @@ export function serializeCandidate(
       .map((item) => [item.school, item.program].filter(Boolean).join(" · "))
       .filter(Boolean)
       .join(", "),
-    salary: "Belum dicantumkan",
+    salary,
+    personality,
+    campusVerification,
     summary: row.summary?.trim() || "Profil kandidat belum memiliki ringkasan.",
     endorsements: [],
     certifications: [],
-    portfolio: getSectionItems<string>(sections, "portfolio"),
-    email: "",
-    phone: "",
-    linkedin: "",
+    portfolio,
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    linkedin,
     history: experience.map((item) => ({
       company: item.company,
       role: item.role,
       years: item.dates ?? "",
     })),
     careerStatus: status,
-    talentCategory: "public" as TalentCategory,
+    talentCategory,
     industry: "technology-software" as IndustryCategory,
   };
 }
@@ -144,9 +168,12 @@ export class TalentSearchService {
         role: schema.candidateProfiles.headline,
         location: schema.candidateProfiles.location,
         summary: schema.candidateProfiles.summary,
+        email: schema.users.email,
+        phone: schema.profiles.phone,
       })
       .from(schema.candidateProfiles)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+      .leftJoin(schema.users, eq(schema.users.id, schema.candidateProfiles.userId))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(limit)

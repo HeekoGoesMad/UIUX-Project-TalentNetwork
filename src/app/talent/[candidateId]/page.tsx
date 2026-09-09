@@ -43,6 +43,7 @@ import {
     ScanLine,
     ShieldCheck,
     Sparkles,
+    Unlock,
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
@@ -629,16 +630,16 @@ export default function TalentProfile() {
                 {candidate.careerStatus && (
                   <CandidateStatusBadge status={candidate.careerStatus} />
                 )}
-                {verif?.status === "verified" && (
-                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
-                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
-                    Campus Verified · {verif.institution}
-                  </Badge>
-                )}
                 {candidate.personality && (
                   <Badge className="border-white/20 bg-white/15 text-white font-semibold backdrop-blur-xs hover:bg-white/25">
                     <Brain className="mr-1 size-3.5 text-violet-200" />
                     {candidate.personality.type} · {candidate.personality.label}
+                  </Badge>
+                )}
+                {verif?.status === "verified" && (
+                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
+                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
+                    Campus Verified · {verif.institution}
                   </Badge>
                 )}
               </div>
@@ -651,11 +652,6 @@ export default function TalentProfile() {
               </p>
               <p className="mt-2 text-xs text-primary-foreground/75">
                 Pengalaman {candidate.experience} tahun · {candidate.availability}
-                {unlocked && (
-                  <span className="ml-2 font-mono font-bold text-emerald-200">
-                    · Ekspektasi Gaji: {candidate.salary}
-                  </span>
-                )}
               </p>
             </div>
             <div className="flex gap-2">
@@ -776,51 +772,140 @@ export default function TalentProfile() {
           /* UNLOCKED STATE (Talent Unlock) */
           <CardContent className="space-y-8 px-6 py-8 sm:px-10">
             {/* Contact & Links Bar */}
-            <div className="rounded-xl border bg-slate-50/80 p-5">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Kontak &amp; Profil Terbuka
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="size-4 text-primary shrink-0" />
-                  <a href={`mailto:${candidate.email}`} className="min-w-0 truncate hover:underline">
-                    {candidate.email}
-                  </a>
+            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-linear-to-b from-white to-slate-50/60 p-5 sm:p-6 shadow-xs">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                    <Unlock className="size-4" />
+                  </div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Kontak &amp; Profil Terbuka
+                  </h4>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="size-4 text-primary shrink-0" />
-                  <a href={`tel:${candidate.phone}`} className="hover:underline">
-                    {candidate.phone}
-                  </a>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                  <Check className="size-3 text-emerald-600" /> Profil Terbuka
+                </span>
+              </div>
+
+              {/* 4 Clean Attribute Rectangles (2x2 Grid) */}
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
+                {/* Email */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-purple-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
+                    <Mail className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Email Langsung
+                    </span>
+                    {candidate.email ? (
+                      <a
+                        href={`mailto:${candidate.email}`}
+                        className="mt-0.5 block text-sm font-semibold text-foreground hover:text-primary hover:underline break-all"
+                      >
+                        {candidate.email}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum dicantumkan</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe className="size-4 text-sky-600 shrink-0" />
-                  <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
-                    Profil LinkedIn <ExternalLink className="size-3" />
-                  </a>
+
+                {/* Telepon / WhatsApp */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-emerald-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Phone className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Telepon / WhatsApp
+                    </span>
+                    {candidate.phone ? (
+                      <a
+                        href={`tel:${candidate.phone}`}
+                        className="mt-0.5 block text-sm font-semibold text-foreground hover:text-primary hover:underline"
+                      >
+                        {candidate.phone}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum dicantumkan</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Banknote className="size-4 text-emerald-600 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Ekspektasi Gaji</span>
-                    <span className="font-mono font-semibold text-foreground truncate">{candidate.salary}</span>
+
+                {/* LinkedIn */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-sky-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                    <Globe className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Profil LinkedIn
+                    </span>
+                    {candidate.linkedin ? (
+                      <a
+                        href={candidate.linkedin}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 hover:text-sky-800 hover:underline break-all"
+                      >
+                        {candidate.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "in/")}
+                        <ExternalLink className="size-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum ditautkan</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ekspektasi Gaji */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-4 shadow-2xs transition-colors">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <Banknote className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">
+                      Ekspektasi Gaji
+                    </span>
+                    <p className="mt-0.5 font-mono text-sm font-bold text-emerald-950">
+                      {candidate.salary || "Belum dicantumkan"}
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Portfolio & CV buttons */}
-              <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
-                {candidate.portfolio.map((url) => (
-                  <Button key={url} variant="outline" size="sm" asChild>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> {portfolioLabel(url)}
-                    </a>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
+                    <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
-                  <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
-                </Button>
-                {completed ? <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild><Link href={`/recruiter/screenings/${candidate.id}`}><ShieldCheck className="mr-1.5 size-3.5" />Lihat Screening Selesai</Link></Button> : screeningError ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge> : <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]"><Loader2 className="mr-1.5 size-3 animate-spin" />Screening otomatis</Badge>}
+                  {completed ? (
+                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
+                      <Link href={`/recruiter/screenings/${candidate.id}`}>
+                        <ShieldCheck className="mr-1.5 size-3.5" /> Lihat Screening Selesai
+                      </Link>
+                    </Button>
+                  ) : screeningError ? (
+                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]">
+                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening otomatis
+                    </Badge>
+                  )}
+                </div>
+
+                {candidate.portfolio.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {candidate.portfolio.map((url) => (
+                      <Button key={url} variant="outline" size="sm" asChild className="h-8 text-xs text-muted-foreground hover:text-foreground">
+                        <a href={url} target="_blank" rel="noreferrer">
+                          <ExternalLink className="mr-1 size-3 text-primary" /> {portfolioLabel(url)}
+                        </a>
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -20,9 +20,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
           location: schema.candidateProfiles.location,
           summary: schema.candidateProfiles.summary,
           isPublished: schema.candidateProfiles.isPublished,
+          email: schema.users.email,
+          phone: schema.profiles.phone,
         })
         .from(schema.candidateProfiles)
         .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+        .leftJoin(schema.users, eq(schema.users.id, schema.candidateProfiles.userId))
         .where(and(eq(schema.candidateProfiles.id, candidateId), eq(schema.candidateProfiles.isPublished, true)))
         .limit(1),
       current.db
