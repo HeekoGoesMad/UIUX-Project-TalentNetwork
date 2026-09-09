@@ -338,7 +338,7 @@ function SearchResultsSkeleton() {
 // Main page
 // ────────────────────────────────────────────────────────────────
 function SearchPageContent() {
-  const { user, dbMode, bootstrapped, databaseError, partnerVerifications, shortlisted, scans, toggleShortlist } = useApp();
+  const { hydrated, user, dbMode, bootstrapped, databaseError, partnerVerifications, shortlisted, scans, toggleShortlist } = useApp();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -461,7 +461,7 @@ function SearchPageContent() {
     window.scrollTo({ top, behavior: reducedMotion ? "auto" : "smooth" });
   };
 
-  if (!user || user.role !== "recruiter") {
+  if (!hydrated || !user || user.role !== "recruiter") {
     return <ProtectedRoute role="recruiter"><div /></ProtectedRoute>;
   }
 

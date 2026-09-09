@@ -520,7 +520,7 @@ export default function TalentProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
-  if (!user || user.role !== "recruiter")
+  if (!hydrated || !user || user.role !== "recruiter")
     return (
       <ProtectedRoute role="recruiter">
         <div />
