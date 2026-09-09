@@ -26,6 +26,7 @@ import {
     Banknote,
     Bookmark,
     Brain,
+    Calendar,
     Check,
     CircleHelp,
     Copy,
@@ -37,17 +38,23 @@ import {
     Loader2,
     Lock,
     Mail,
+    MessageSquareQuote,
     Phone,
     Printer,
     RefreshCw,
     ScanLine,
     ShieldCheck,
     Sparkles,
+    UserCheck,
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
+import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
+import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
+import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -470,6 +477,15 @@ export default function TalentProfile() {
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
   const [requestingContactConsent, setRequestingContactConsent] = useState(false);
+
+  // Recruiter Hiring Flow modals
+  const [questionModalOpen, setQuestionModalOpen] = useState(false);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [hiringOutcome, setHiringOutcome] = useState<string | null>(null);
+  const [markingHired, setMarkingHired] = useState(false);
+
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
   const verif = candidate ? (partnerVerifications?.[candidate.id] ?? candidate.campusVerification) : undefined;
@@ -822,6 +838,110 @@ export default function TalentProfile() {
                 </Button>
                 {completed ? <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild><Link href={`/recruiter/screenings/${candidate.id}`}><ShieldCheck className="mr-1.5 size-3.5" />Lihat Screening Selesai</Link></Button> : screeningError ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge> : <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]"><Loader2 className="mr-1.5 size-3 animate-spin" />Screening otomatis</Badge>}
               </div>
+
+              {/* Alur Rekrutmen Terpadu (Dover-style ATS Flow) */}
+              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-3.5 dark:border-purple-900/40 dark:bg-purple-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-7 items-center justify-center rounded-md bg-[#7C3AED] text-white">
+                      <Sparkles className="size-3.5" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-purple-950 dark:text-purple-100">
+                        Alur Rekrutmen (Hiring Workflow)
+                      </p>
+                      <p className="text-[11px] text-purple-700/80 dark:text-purple-300/80">
+                        Siapkan pertanyaan AI, jadwalkan Google Meet / Zoom, kirim offer 1-click, atau tandai diterima.
+                      </p>
+                    </div>
+                  </div>
+                  {hiringOutcome === "hired" ? (
+                    <Badge className="bg-emerald-600 text-white font-semibold">
+                      <UserCheck className="mr-1 size-3.5" /> Status: Diterima (Hired)
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300">
+                      Tahap Aktif
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-purple-200/60 pt-3 dark:border-purple-900/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
+                    onClick={() => setQuestionModalOpen(true)}
+                  >
+                    <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
+                    Siapkan Pertanyaan
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
+                    onClick={() => setPromptModalOpen(true)}
+                  >
+                    <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
+                    Prompt Pesan / Kontak
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-200 hover:bg-purple-100/70 text-purple-950 dark:border-purple-800 dark:text-purple-200"
+                    onClick={() => setScheduleModalOpen(true)}
+                  >
+                    <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
+                    Jadwalkan Wawancara
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-300 text-emerald-800 hover:bg-emerald-100/70 dark:border-emerald-800 dark:text-emerald-300"
+                    onClick={() => setOfferModalOpen(true)}
+                  >
+                    <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
+                    Buat Offer Letter
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={markingHired || hiringOutcome === "hired"}
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={async () => {
+                      if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
+                      setMarkingHired(true);
+                      try {
+                        if (dbMode) {
+                          const res = await fetch("/api/applications", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              candidateProfileId: candidate.id,
+                              status: "hired",
+                              reason: "Kandidat diterima secara resmi melalui Talent Network.",
+                            }),
+                          });
+                          if (!res.ok) {
+                            const errData = await res.json() as { error?: string };
+                            throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
+                          }
+                        }
+                        setHiringOutcome("hired");
+                        toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
+                      } catch (err) {
+                        toast.error("Gagal menandai status Hired", {
+                          description: err instanceof Error ? err.message : "Terjadi kesalahan.",
+                        });
+                      } finally {
+                        setMarkingHired(false);
+                      }
+                    }}
+                  >
+                    {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
+                    {hiringOutcome === "hired" ? "Sudah Diterima" : "Tandai Diterima (Hired)"}
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* About */}
@@ -1095,6 +1215,44 @@ export default function TalentProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Recruiter Hiring Flow Modals */}
+      <InterviewQuestionModal
+        open={questionModalOpen}
+        onOpenChange={setQuestionModalOpen}
+        candidate={candidate}
+        onSaveQuestions={() => {
+          setQuestionModalOpen(false);
+          setScheduleModalOpen(true);
+        }}
+      />
+
+      <PromptedOutreachComposer
+        open={promptModalOpen}
+        onOpenChange={setPromptModalOpen}
+        candidate={candidate}
+        onMessageSent={() => {
+          setPromptModalOpen(false);
+        }}
+      />
+
+      <ScheduleInterviewModal
+        open={scheduleModalOpen}
+        onOpenChange={setScheduleModalOpen}
+        candidate={candidate}
+        onScheduled={() => {
+          setScheduleModalOpen(false);
+        }}
+      />
+
+      <CreateOfferModal
+        open={offerModalOpen}
+        onOpenChange={setOfferModalOpen}
+        candidate={candidate}
+        onOfferSent={() => {
+          setOfferModalOpen(false);
+        }}
+      />
     </div>
   );
 }
