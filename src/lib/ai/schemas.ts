@@ -182,3 +182,37 @@ export const cvImportSchema = z.object({
 });
 
 export type ProfileContext = z.infer<typeof profileContextSchema>;
+
+export const recruiterPromptInputSchema = z.object({
+  category: z.enum([
+    "interview_invitation",
+    "assessment_invitation",
+    "schedule_confirmation",
+    "offer_letter",
+    "rejection",
+  ]).default("interview_invitation"),
+  candidateName: z.string().default("Kandidat"),
+  jobTitle: z.string().default("Posisi Target"),
+  organizationName: z.string().default("Perusahaan"),
+  promptInstructions: z.string().optional().default(""),
+  tone: z.enum(["formal", "friendly", "concise"]).default("friendly"),
+  keyDetails: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const recruiterOutreachPromptSchema = z.object({
+  category: z.enum([
+    "interview_invitation",
+    "assessment_invitation",
+    "schedule_confirmation",
+    "offer_letter",
+    "rejection",
+  ]),
+  subject: z.string(),
+  message: z.string(),
+  highlights: z.array(z.string()).default([]),
+  callToAction: z.string(),
+  tone: z.enum(["formal", "friendly", "concise"]).default("friendly"),
+  modelVersion: z.string(),
+  source: z.enum(["mock", "azure", "local"]),
+});
+

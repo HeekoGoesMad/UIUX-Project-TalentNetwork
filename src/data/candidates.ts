@@ -32,6 +32,30 @@ const industries: IndustryCategory[] = [
 
 const toolsList = ["Figma", "Excel", "Notion", "Looker Studio", "Jira", "Meta Ads", "Google Workspace", "HRIS"];
 
+const sampleAvatars = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop", // Nadia Putri
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", // Rizky Pratama
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", // Clara Wijaya
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop", // Bima Santoso
+  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop", // Maya Kusuma
+  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400&auto=format&fit=crop", // Aditya Ramadhan
+  "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400&auto=format&fit=crop", // Salsabila Noor
+  "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&auto=format&fit=crop", // Kevin Hartono
+  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop", // Dewi Lestari
+  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400&auto=format&fit=crop", // Fajar Nugroho
+];
+
+const sampleBanners = [
+  "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=1600&auto=format&fit=crop",
+];
+
 export const candidates: Candidate[] = names.map((name, i) => {
   const personalityConfig = PERSONALITY_TYPES[i % PERSONALITY_TYPES.length];
 
@@ -54,6 +78,8 @@ export const candidates: Candidate[] = names.map((name, i) => {
     email: `${name.toLowerCase().replaceAll(" ", ".")}@example.com`,
     phone: "+62 812 5555 0192",
     linkedin: `https://linkedin.com/in/${name.toLowerCase().replaceAll(" ", "-")}`,
+    avatarUrl: sampleAvatars[i % sampleAvatars.length],
+    bannerUrl: sampleBanners[i % sampleBanners.length],
     history: [
       { company: ["Tokopedia","Gojek","Traveloka","Kredivo"][i % 4], role: roles[i % roles.length], years: `${2021 - (i % 3)} — Sekarang` },
       { company: "Independent Studio", role: "Konsultan", years: "2019 — 2021" },

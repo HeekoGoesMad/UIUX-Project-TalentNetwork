@@ -4,7 +4,7 @@ import { createAzure } from "@ai-sdk/azure";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { cvBuilderSchema, cvImportSchema, gapsSchema, advisorSchema, profileContextSchema, questionsSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
+import { cvBuilderSchema, cvImportSchema, gapsSchema, advisorSchema, profileContextSchema, questionsSchema, recruiterOutreachPromptSchema, recruiterPromptInputSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
 
 const defaultVersion = "proofylink-screening-v1";
 
@@ -515,3 +515,89 @@ export async function cvBuilder(input: unknown) {
 export function importCv(fileName: string) {
   return cvImportSchema.parse({ fullName: "Nadia Putri", headline: "Senior Product Designer", about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.", skills: ["Product design", "User research", "Figma"], experience: [{ company: "Studio Nusantara", role: "Senior Product Designer", dates: "2021 - sekarang", achievements: ["Meningkatkan kejelasan workflow produk."] }], education: [{ school: "Universitas Indonesia", program: "Desain Komunikasi Visual", dates: "2015 - 2019" }], suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`], source: getSource() });
 }
+
+export async function recruiterOutreachPrompt(input: unknown, options?: AiOptions) {
+  const context = recruiterPromptInputSchema.parse(input);
+
+  const fallbackData: Record<typeof context.category, { subject: string; message: string; highlights: string[]; callToAction: string }> = {
+    interview_invitation: {
+      subject: `Undangan Wawancara: ${context.jobTitle} di ${context.organizationName}`,
+      message: `Halo ${context.candidateName},\n\nKami sangat terkesan dengan profil profesional dan portofolio Anda. Kami ingin mengundang Anda ke sesi wawancara untuk posisi ${context.jobTitle} di ${context.organizationName} guna mendiskusikan pengalaman Anda lebih mendalam.\n\nSilakan konfirmasi kesediaan jadwal Anda melalui tautan yang tersedia.`,
+      highlights: [
+        "Sesi perkenalan dan diskusi studi kasus proyek",
+        "Penjelasan struktur tim dan ekspektasi peran",
+        "Sesi tanya jawab terbuka dengan interviewer",
+      ],
+      callToAction: "Konfirmasi Jadwal Wawancara",
+    },
+    assessment_invitation: {
+      subject: `Undangan Assessment Teknis: ${context.jobTitle}`,
+      message: `Halo ${context.candidateName},\n\nSebagai langkah berikutnya dalam proses seleksi posisi ${context.jobTitle} di ${context.organizationName}, kami mengundang Anda untuk mengerjakan asesmen berbasis studi kasus praktis.\n\nAsesmen ini dirancang untuk memberi Anda gambaran nyata tentang tantangan yang akan kita selesaikan bersama.`,
+      highlights: [
+        "Studi kasus berorientasi pemecahan masalah nyata",
+        "Batas waktu pengerjaan yang fleksibel",
+        "Dapat dikerjakan langsung dari portal ProofyLink",
+      ],
+      callToAction: "Mulai Kerjakan Asesmen",
+    },
+    schedule_confirmation: {
+      subject: `Konfirmasi Jadwal Wawancara: ${context.jobTitle}`,
+      message: `Halo ${context.candidateName},\n\nJadwal wawancara Anda untuk posisi ${context.jobTitle} di ${context.organizationName} telah terkonfirmasi. Kami telah menyiapkan ruang pertemuan virtual dan panelis siap berdiskusi dengan Anda.`,
+      highlights: [
+        "Tautan pertemuan sudah tertera pada detail lamaran",
+        "Durasi estimasi 45 menit",
+        "Mohon hadir 5 menit sebelum sesi dimulai",
+      ],
+      callToAction: "Buka Detail Pertemuan",
+    },
+    offer_letter: {
+      subject: `Penawaran Kerja Resmi: ${context.jobTitle} - ${context.organizationName}`,
+      message: `Halo ${context.candidateName},\n\nSelamat! Setelah melalui proses seleksi yang sangat positif, kami sangat antusias menawarkan posisi ${context.jobTitle} di ${context.organizationName}.\n\nKami percaya pengalaman, integritas, dan energi Anda akan memberikan dampak yang sangat berharga bagi tim kami. Silakan tinjau ringkasan paket penawaran kerja ini.`,
+      highlights: [
+        "Paket kompensasi dan benefit kompetitif",
+        "Peluang akselerasi karir dan kepemimpinan",
+        "Persetujuan instan satu klik melalui portal",
+      ],
+      callToAction: "Tinjau & Terima Penawaran",
+    },
+    rejection: {
+      subject: `Pembaruan Proses Seleksi: ${context.jobTitle} - ${context.organizationName}`,
+      message: `Halo ${context.candidateName},\n\nTerima kasih banyak atas waktu, dedikasi, dan ketertarikan Anda mengikuti proses seleksi posisi ${context.jobTitle} di ${context.organizationName}.\n\nSetelah pertimbangan mendalam, saat ini kami memutuskan untuk melanjutkan proses dengan kandidat yang profilnya lebih selaras dengan kebutuhan teknis mendesak peran ini. Kami sangat mengapresiasi pencapaian Anda dan akan menyimpan profil Anda di jaringan talent kami untuk peluang di masa depan.`,
+      highlights: [
+        "Apresiasi atas waktu dan keterlibatan selama proses",
+        "Profil tetap tersimpan di database talent organisasi kami",
+        "Terbuka untuk peluang dan pembukaan posisi berikutnya",
+      ],
+      callToAction: "Tetap Terhubung",
+    },
+  };
+
+  const selectedFallback = fallbackData[context.category];
+
+  const prompt =
+    `Anda adalah asisten AI rekrutmen profesional. Buatkan draft pesan rekruter ke kandidat dalam Bahasa Indonesia.\n` +
+    `- Kategori Pesan: ${context.category}\n` +
+    `- Nama Kandidat: ${context.candidateName}\n` +
+    `- Posisi / Job Title: ${context.jobTitle}\n` +
+    `- Nama Organisasi / Perusahaan: ${context.organizationName}\n` +
+    `- Nada Bicara (Tone): ${context.tone}\n` +
+    (context.promptInstructions ? `- Instruksi Tambahan dari Rekruter: ${context.promptInstructions}\n` : "") +
+    `Buatkan pesan yang ramah, menghargai, jelas, dan profesional.`;
+
+  return aiResult(
+    recruiterOutreachPromptSchema,
+    prompt,
+    {
+      category: context.category,
+      subject: selectedFallback.subject,
+      message: selectedFallback.message,
+      highlights: selectedFallback.highlights,
+      callToAction: selectedFallback.callToAction,
+      tone: context.tone,
+      modelVersion: defaultVersion,
+      source: getSource(),
+    },
+    options
+  );
+}
+

@@ -2,12 +2,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
-import { ArrowLeft, Check, Clock3, Send, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock3, Send, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { DEMO_JOBS, type Job } from "@/lib/jobs";
 
@@ -24,7 +25,7 @@ function demoApplications(): Application[] { try { return JSON.parse(localStorag
 function saveDemoApplication(application: Application) { localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application])); }
 function statusBadge(status: ApplicationStatus) { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>; }
 function State({ text, error = false }: { text: string; error?: boolean }) { return <div className={`rounded-2xl border p-8 text-center text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "bg-card text-muted-foreground"}`} role={error ? "alert" : "status"}>{text}</div>; }
-function useApplications() {
+export function useApplications() {
   const { dbMode } = useApp();
   const [applications, setApplications] = useState<Application[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   useEffect(() => { let active = true; setLoading(true); setError(null); if (!dbMode) { setApplications(demoApplications()); setLoading(false); return () => { active = false; }; } fetch("/api/applications", { cache: "no-store" }).then(async (response) => { const payload = await response.json() as { applications?: Application[]; error?: string }; if (!response.ok) throw new Error(payload.error ?? "Aplikasi belum dapat dimuat."); if (active) setApplications(payload.applications ?? []); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Aplikasi belum dapat dimuat."); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [dbMode]);
@@ -37,10 +38,295 @@ export function CandidateApplicationsPage() {
 }
 
 export function CandidateApplicationDetailPage({ applicationId }: { applicationId: string }) {
-  const { dbMode } = useApp(); const [application, setApplication] = useState<Application | null>(null); const [history, setHistory] = useState<History[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false);
-  useEffect(() => { if (!dbMode) { const item = demoApplications().find((candidateApplication) => candidateApplication.id === applicationId) ?? null; setApplication(item); setHistory(item ? [{ id: `${item.id}-history`, fromStatus: null, toStatus: "new", reason: "Lamaran dikirim kandidat.", changedBy: "demo", createdAt: item.submittedAt }] : []); setLoading(false); return; } fetch(`/api/applications/${applicationId}`, { cache: "no-store" }).then(async (response) => { const payload = await response.json() as { application?: Application; history?: History[]; error?: string }; if (!response.ok || !payload.application) throw new Error(payload.error ?? "Aplikasi tidak ditemukan."); setApplication(payload.application); setHistory(payload.history ?? []); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Aplikasi tidak ditemukan.")).finally(() => setLoading(false)); }, [applicationId, dbMode]);
-  const withdraw = async () => { if (!application) return; setSaving(true); setError(null); try { if (dbMode) { const response = await fetch(`/api/applications/${application.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "withdrawn" }) }); const payload = await response.json() as { application?: Application; error?: string }; if (!response.ok || !payload.application) throw new Error(payload.error ?? "Lamaran belum dapat ditarik."); setApplication((current) => current ? { ...current, ...payload.application } : current); } else { const next = { ...application, status: "withdrawn" as const, withdrawnAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; saveDemoApplication(next); setApplication(next); setHistory((current) => [...current, { id: `${next.id}-${Date.now()}`, fromStatus: application.status, toStatus: "withdrawn", reason: "Lamaran ditarik kandidat.", changedBy: "demo", createdAt: next.updatedAt }]); } } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Lamaran belum dapat ditarik."); } finally { setSaving(false); } };
-  return <ProtectedRoute role="candidate"><main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12"><Link href="/candidate/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Kembali ke aplikasi</Link>{loading ? <div className="mt-7"><State text="Memuat detail aplikasi..." /></div> : error || !application ? <div className="mt-7"><State text={error ?? "Aplikasi tidak ditemukan."} error /></div> : <><div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Application detail</p><h1 className="mt-2 text-3xl font-bold">{application.job?.title}</h1><p className="mt-2 text-muted-foreground">{application.job?.organizationName}</p></div>{statusBadge(application.status)}</div><Card className="mt-8"><CardHeader><CardTitle>Perjalanan aplikasi</CardTitle></CardHeader><CardContent><div className="space-y-5">{history.map((item, index) => <div key={item.id} className="flex gap-3"><div className="flex flex-col items-center"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-primary"><Check className="size-4" /></span>{index < history.length - 1 && <span className="mt-1 h-full w-px bg-border" />}</div><div className="pb-3"><p className="font-semibold">{labels[item.toStatus]}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(item.createdAt)}</p>{item.reason && <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.reason}</p>}</div></div>)}</div></CardContent></Card><Card className="mt-5"><CardHeader><CardTitle>Cover note</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{application.coverNote || "Tidak ada cover note."}</p></CardContent></Card>{error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}{canWithdraw(application.status) && <Button variant="outline" className="mt-5 text-destructive" onClick={() => void withdraw()} disabled={saving}><X className="size-4" /> {saving ? "Menarik lamaran..." : "Tarik lamaran"}</Button>}</>}</main></ProtectedRoute>;
+  const { dbMode } = useApp();
+  const [application, setApplication] = useState<Application | null>(null);
+  const [history, setHistory] = useState<History[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Hiring Flow: Interviews & Offers
+  const [interviews, setInterviews] = useState<Array<{ id: string; title: string; scheduledAt: string; timezone: string; durationMinutes: number; meetingUrl: string | null; status: string }>>([]);
+  const [offers, setOffers] = useState<Array<{ id: string; salary: number; currency: string; startDate: string; expirationDate: string; benefits: string | null; notes: string | null; status: string }>>([]);
+  const [actingOfferId, setActingOfferId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dbMode) {
+      const item = demoApplications().find((candidateApplication) => candidateApplication.id === applicationId) ?? null;
+      setApplication(item);
+      setHistory(item ? [{ id: `${item.id}-history`, fromStatus: null, toStatus: "new", reason: "Lamaran dikirim kandidat.", changedBy: "demo", createdAt: item.submittedAt }] : []);
+      setLoading(false);
+      return;
+    }
+
+    Promise.all([
+      fetch(`/api/applications/${applicationId}`, { cache: "no-store" }),
+      fetch(`/api/interviews?applicationId=${encodeURIComponent(applicationId)}`, { cache: "no-store" }),
+      fetch(`/api/offers?applicationId=${encodeURIComponent(applicationId)}`, { cache: "no-store" }),
+    ])
+      .then(async ([appRes, intRes, offRes]) => {
+        const payload = (await appRes.json()) as { application?: Application; history?: History[]; error?: string };
+        if (!appRes.ok || !payload.application) throw new Error(payload.error ?? "Aplikasi tidak ditemukan.");
+        setApplication(payload.application);
+        setHistory(payload.history ?? []);
+
+        if (intRes.ok) {
+          const intData = (await intRes.json()) as { interviews?: typeof interviews };
+          setInterviews(intData.interviews ?? []);
+        }
+        if (offRes.ok) {
+          const offData = (await offRes.json()) as { offers?: typeof offers };
+          setOffers(offData.offers ?? []);
+        }
+      })
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Aplikasi tidak ditemukan."))
+      .finally(() => setLoading(false));
+  }, [applicationId, dbMode]);
+
+  const withdraw = async () => {
+    if (!application) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (dbMode) {
+        const response = await fetch(`/api/applications/${application.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "withdrawn" }),
+        });
+        const payload = (await response.json()) as { application?: Application; error?: string };
+        if (!response.ok || !payload.application) throw new Error(payload.error ?? "Lamaran belum dapat ditarik.");
+        setApplication((current) => (current ? { ...current, ...payload.application } : current));
+      } else {
+        const next = { ...application, status: "withdrawn" as const, withdrawnAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        saveDemoApplication(next);
+        setApplication(next);
+        setHistory((current) => [...current, { id: `${next.id}-${Date.now()}`, fromStatus: application.status, toStatus: "withdrawn", reason: "Lamaran ditarik kandidat.", changedBy: "demo", createdAt: next.updatedAt }]);
+      }
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : "Lamaran belum dapat ditarik.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOfferAction = async (offerId: string, status: "accepted" | "declined") => {
+    setActingOfferId(offerId);
+    try {
+      if (dbMode) {
+        const res = await fetch(`/api/offers/${offerId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Gagal memproses keputusan penawaran.");
+      }
+      setOffers((prev) => prev.map((o) => (o.id === offerId ? { ...o, status } : o)));
+      if (status === "accepted") {
+        setApplication((prev) => (prev ? { ...prev, status: "hired" } : prev));
+        window.alert("Selamat! Anda telah menerima penawaran kerja ini (Hired).");
+      } else {
+        window.alert("Penawaran kerja telah ditolak.");
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Terjadi kesalahan.");
+    } finally {
+      setActingOfferId(null);
+    }
+  };
+
+  return (
+    <ProtectedRoute role="candidate">
+      <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
+        <Link href="/candidate/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+          <ArrowLeft className="size-4" /> Kembali ke aplikasi
+        </Link>
+        {loading ? (
+          <div className="mt-7"><State text="Memuat detail aplikasi..." /></div>
+        ) : error || !application ? (
+          <div className="mt-7"><State text={error ?? "Aplikasi tidak ditemukan."} error /></div>
+        ) : (
+          <>
+            <div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <p className="font-mono text-xs uppercase tracking-widest text-primary">Application detail</p>
+                <h1 className="mt-2 text-3xl font-bold">{application.job?.title}</h1>
+                <p className="mt-2 text-muted-foreground">{application.job?.organizationName}</p>
+              </div>
+              {statusBadge(application.status)}
+            </div>
+
+            {/* Incoming Offer Letter (Dover 1-Click Acceptance) */}
+            {offers.length > 0 && (
+              <div className="mt-8 space-y-4">
+                {offers.map((offer) => (
+                  <Card key={offer.id} className="border-emerald-300 bg-emerald-50/40 dark:border-emerald-800 dark:bg-emerald-950/20">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg text-emerald-950 dark:text-emerald-100 flex items-center gap-2">
+                          <Check className="size-5 text-emerald-600" />
+                          Surat Penawaran Kerja (Offer Letter)
+                        </CardTitle>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold uppercase ${offer.status === "accepted" ? "bg-emerald-200 text-emerald-900" : offer.status === "declined" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-900"}`}>
+                          {offer.status === "accepted" ? "Diterima (Hired)" : offer.status === "declined" ? "Ditolak" : "Menunggu Konfirmasi"}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-lg border bg-white p-3 dark:bg-slate-900">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Gaji yang Ditawarkan</p>
+                          <p className="mt-1 font-mono font-bold text-base text-emerald-700 dark:text-emerald-400">
+                            {offer.currency} {Number(offer.salary).toLocaleString("id-ID")} / bulan
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Mulai Bekerja</p>
+                          <p className="mt-1 font-semibold text-foreground">{formatDate(offer.startDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Batas Konfirmasi</p>
+                          <p className="mt-1 font-semibold text-amber-700 dark:text-amber-400">{formatDate(offer.expirationDate)}</p>
+                        </div>
+                      </div>
+
+                      {offer.benefits && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground">Fasilitas & Benefit:</p>
+                          <p className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 p-2.5 text-xs text-foreground dark:bg-slate-900">
+                            {offer.benefits}
+                          </p>
+                        </div>
+                      )}
+
+                      {offer.notes && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground">Pesan dari Rekruter:</p>
+                          <p className="mt-1 text-xs text-foreground">{offer.notes}</p>
+                        </div>
+                      )}
+
+                      {offer.status === "pending" && (
+                        <div className="flex flex-wrap gap-2 pt-2 border-t">
+                          <Button
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            disabled={actingOfferId === offer.id}
+                            onClick={() => void handleOfferAction(offer.id, "accepted")}
+                          >
+                            <Check className="mr-1.5 size-4" />
+                            {actingOfferId === offer.id ? "Memproses..." : "Accept Offer (Terima Pekerjaan)"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="text-red-700 border-red-200 hover:bg-red-50"
+                            disabled={actingOfferId === offer.id}
+                            onClick={() => void handleOfferAction(offer.id, "declined")}
+                          >
+                            Tolak Penawaran
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Scheduled Interviews Panel */}
+            {interviews.length > 0 && (
+              <Card className="mt-8 border-purple-200 bg-purple-50/30 dark:border-purple-900/40 dark:bg-purple-950/10">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-purple-950 dark:text-purple-100 flex items-center gap-2">
+                    <Clock3 className="size-4 text-[#7C3AED]" /> Jadwal Wawancara Anda
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {interviews.map((interview) => (
+                    <div key={interview.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border bg-white p-3.5 dark:bg-slate-900">
+                      <div>
+                        <p className="font-semibold text-foreground">{interview.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {formatDate(interview.scheduledAt)} ({interview.durationMinutes} menit) · {interview.timezone}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs"
+                          onClick={() => {
+                            downloadIcsFile(
+                              {
+                                title: `Interview: ${interview.title} - ${application.job?.title || "Posisi"}`,
+                                description: `Wawancara dengan ${application.job?.organizationName || "Perusahaan"}.\nTautan meeting: ${interview.meetingUrl || "Google Meet"}`,
+                                location: interview.meetingUrl || "Google Meet",
+                                start: interview.scheduledAt,
+                                timezone: interview.timezone,
+                                organizerName: application.job?.organizationName || "Tim Rekruter",
+                              },
+                              `interview-${application.job?.title ? application.job.title.toLowerCase().replace(/\s+/g, "-") : "job"}.ics`
+                            );
+                          }}
+                        >
+                          <Calendar className="size-3.5" />
+                          Kalender (.ics)
+                        </Button>
+                        {interview.meetingUrl && (
+                          <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white" asChild>
+                            <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer">
+                              Buka Google Meet / Zoom
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="mt-8">
+              <CardHeader><CardTitle>Perjalanan aplikasi</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-5">
+                  {history.map((item, index) => (
+                    <div key={item.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-primary">
+                          <Check className="size-4" />
+                        </span>
+                        {index < history.length - 1 && <span className="mt-1 h-full w-px bg-border" />}
+                      </div>
+                      <div className="pb-3">
+                        <p className="font-semibold">{labels[item.toStatus]}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatDate(item.createdAt)}</p>
+                        {item.reason && <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.reason}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-5">
+              <CardHeader><CardTitle>Cover note</CardTitle></CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{application.coverNote || "Tidak ada cover note."}</p>
+              </CardContent>
+            </Card>
+
+            {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
+            {canWithdraw(application.status) && (
+              <Button variant="outline" className="mt-5 text-destructive" onClick={() => void withdraw()} disabled={saving}>
+                <X className="size-4" /> {saving ? "Menarik lamaran..." : "Tarik lamaran"}
+              </Button>
+            )}
+          </>
+        )}
+      </main>
+    </ProtectedRoute>
+  );
 }
 
 export function RecruiterPipelinePage({ jobId }: { jobId: string }) {

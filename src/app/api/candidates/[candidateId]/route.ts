@@ -22,6 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
           isPublished: schema.candidateProfiles.isPublished,
           email: schema.users.email,
           phone: schema.profiles.phone,
+          avatarUrl: schema.profiles.avatarUrl,
         })
         .from(schema.candidateProfiles)
         .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
