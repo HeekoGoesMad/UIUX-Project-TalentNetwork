@@ -2,12 +2,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
-import { ArrowLeft, Check, Clock3, Send, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Clock3, Send, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { DEMO_JOBS, type Job } from "@/lib/jobs";
 
@@ -249,7 +250,28 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                           {formatDate(interview.scheduledAt)} ({interview.durationMinutes} menit) · {interview.timezone}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs"
+                          onClick={() => {
+                            downloadIcsFile(
+                              {
+                                title: `Interview: ${interview.title} - ${application.job?.title || "Posisi"}`,
+                                description: `Wawancara dengan ${application.job?.organizationName || "Perusahaan"}.\nTautan meeting: ${interview.meetingUrl || "Google Meet"}`,
+                                location: interview.meetingUrl || "Google Meet",
+                                start: interview.scheduledAt,
+                                timezone: interview.timezone,
+                                organizerName: application.job?.organizationName || "Tim Rekruter",
+                              },
+                              `interview-${application.job?.title ? application.job.title.toLowerCase().replace(/\s+/g, "-") : "job"}.ics`
+                            );
+                          }}
+                        >
+                          <Calendar className="size-3.5" />
+                          Kalender (.ics)
+                        </Button>
                         {interview.meetingUrl && (
                           <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white" asChild>
                             <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer">

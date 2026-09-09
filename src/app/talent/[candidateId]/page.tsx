@@ -26,6 +26,7 @@ import {
     Banknote,
     Bookmark,
     Brain,
+    Briefcase,
     Calendar,
     Check,
     CircleHelp,
@@ -55,6 +56,7 @@ import { InterviewQuestionModal } from "@/components/recruiter/interview-questio
 import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
 import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
+import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -483,6 +485,7 @@ export default function TalentProfile() {
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [hiringOutcome, setHiringOutcome] = useState<string | null>(null);
   const [markingHired, setMarkingHired] = useState(false);
 
@@ -674,7 +677,17 @@ export default function TalentProfile() {
                 )}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {unlocked && (
+                <Button
+                  variant="secondary"
+                  className="bg-white/95 text-primary hover:bg-white font-semibold text-xs h-9 shadow-xs"
+                  onClick={() => setAssignModalOpen(true)}
+                >
+                  <Briefcase className="mr-1.5 size-3.5 text-primary" />
+                  Masukkan ke Lowongan
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="icon"
@@ -1391,6 +1404,12 @@ export default function TalentProfile() {
         onOfferSent={() => {
           setOfferModalOpen(false);
         }}
+      />
+
+      <AssignToJobModal
+        open={assignModalOpen}
+        onOpenChange={setAssignModalOpen}
+        candidate={candidate}
       />
     </div>
   );

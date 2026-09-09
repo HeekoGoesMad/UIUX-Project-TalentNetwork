@@ -23,6 +23,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
+import { downloadIcsFile } from "@/lib/calendar";
 
 type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
 type Candidate = {
@@ -40,6 +41,8 @@ type Candidate = {
   compensation: string;
   reason: string;
   applicationId?: string;
+  jobId?: string;
+  jobTitle?: string;
 };
 type Interview = {
   id: string;
@@ -112,6 +115,8 @@ export function RecruiterOperationsPage() {
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
+  const [jobFilter, setJobFilter] = useState("all");
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState("");
   const [eventForm, setEventForm] = useState({ date: "2026-08-25T10:00", timezone: "Asia/Jakarta (WIB)", type: "Panel interview", panel: user?.name || "Tim Rekruter" });
@@ -122,6 +127,18 @@ export function RecruiterOperationsPage() {
   const people = useMemo(() => {
     return Array.from(new Set([recruiterName, ...defaultPeople]));
   }, [recruiterName]);
+
+  // Load available job openings for pipeline filtering
+  useEffect(() => {
+    fetch("/api/jobs")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: { jobs?: Array<{ id: string; title: string }> } | null) => {
+        if (payload?.jobs && payload.jobs.length > 0) {
+          setAvailableJobs(payload.jobs.map((j) => ({ id: j.id, title: j.title })));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Anti-abuse rule: In DB mode, only candidates that have been scanned by the recruiter are unlocked and eligible to appear
   const isCandidateUnlocked = useCallback(
@@ -151,9 +168,13 @@ export function RecruiterOperationsPage() {
         (candidate) =>
           (stageFilter === "all" || candidate.stage === stageFilter) &&
           (ownerFilter === "all" || candidate.owner === ownerFilter) &&
+          (jobFilter === "all" ||
+            candidate.jobId === jobFilter ||
+            candidate.jobTitle?.toLowerCase() === jobFilter.toLowerCase() ||
+            candidate.role.toLowerCase() === jobFilter.toLowerCase()) &&
           `${candidate.name} ${candidate.role}`.toLowerCase().includes(query.toLowerCase())
       ),
-    [activeCandidates, ownerFilter, query, stageFilter]
+    [activeCandidates, jobFilter, ownerFilter, query, stageFilter]
   );
 
   const selectedCandidateData = activeCandidates.find((candidate) => candidate.id === selectedCandidate) ?? activeCandidates[0];
@@ -320,8 +341,9 @@ export function RecruiterOperationsPage() {
             id: string;
             status: string;
             candidateProfileId?: string;
+            jobId?: string;
             submittedAt?: string;
-            job?: { title?: string };
+            job?: { id?: string; title?: string };
             candidate?: { name?: string; headline?: string; location?: string };
           };
           const appData = (await appRes.json()) as { applications?: AppRow[] };
@@ -347,6 +369,8 @@ export function RecruiterOperationsPage() {
                 return {
                   id: app.candidateProfileId || app.id,
                   applicationId: app.id,
+                  jobId: app.jobId || app.job?.id,
+                  jobTitle: app.job?.title,
                   name: app.candidate?.name || `Kandidat #${index + 1}`,
                   role: app.job?.title || app.candidate?.headline || "Pelamar Posisi",
                   location: app.candidate?.location || "Indonesia",
@@ -684,6 +708,9 @@ export function RecruiterOperationsPage() {
                   setStageFilter={setStageFilter}
                   ownerFilter={ownerFilter}
                   setOwnerFilter={setOwnerFilter}
+                  jobFilter={jobFilter}
+                  setJobFilter={setJobFilter}
+                  availableJobs={availableJobs}
                   bulkChangeStage={bulkChangeStage}
                   changeStage={changeStage}
                   people={people}
@@ -863,6 +890,9 @@ function PipelineView({
   setStageFilter,
   ownerFilter,
   setOwnerFilter,
+  jobFilter,
+  setJobFilter,
+  availableJobs,
   bulkChangeStage,
   changeStage,
   people,
@@ -877,6 +907,9 @@ function PipelineView({
   setStageFilter: (value: Stage | "all") => void;
   ownerFilter: string;
   setOwnerFilter: (value: string) => void;
+  jobFilter: string;
+  setJobFilter: (value: string) => void;
+  availableJobs: Array<{ id: string; title: string }>;
   bulkChangeStage: (stage: Stage) => void;
   changeStage: (id: string, stage: Stage) => void;
   people: string[];
@@ -899,6 +932,21 @@ function PipelineView({
             />
           </label>
           <div className="flex flex-wrap gap-2">
+            {availableJobs.length > 0 && (
+              <select
+                aria-label="Filter lowongan"
+                value={jobFilter}
+                onChange={(event) => setJobFilter(event.target.value)}
+                className="field w-auto"
+              >
+                <option value="all">Semua lowongan</option>
+                {availableJobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               aria-label="Filter stage"
               value={stageFilter}
@@ -1052,13 +1100,14 @@ function PipelineView({
                             <p className="truncate text-sm font-semibold">{candidate.name}</p>
                             <p className="mt-1 truncate text-xs text-muted-foreground">{candidate.role}</p>
                           </button>
-                          <button
-                            type="button"
-                            aria-label={`Menu ${candidate.name}`}
-                            className="text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          <Link
+                            href={`/talent/${candidate.id}`}
+                            aria-label={`Buka profil ${candidate.name}`}
+                            className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title="Buka profil & Dover hiring flow"
                           >
                             <MoreHorizontal className="size-4" />
-                          </button>
+                          </Link>
                         </div>
                         <div className="mt-4 flex items-center justify-between gap-2">
                           <span className="text-xs text-muted-foreground">{candidate.owner}</span>
@@ -1104,6 +1153,21 @@ function InterviewRow({
   candidate?: Candidate;
   action?: React.ReactNode;
 }) {
+  const handleDownloadCalendar = () => {
+    downloadIcsFile(
+      {
+        title: `Interview: ${interview.type} - ${candidate?.name ?? "Kandidat"}`,
+        description: `Panel: ${interview.panel.join(", ")}\nKandidat: ${candidate?.name ?? "-"}\nPosisi: ${candidate?.role ?? "-"}`,
+        location: "Google Meet",
+        start: interview.date,
+        timezone: interview.timezone,
+        organizerName: interview.panel[0] || "Tim Rekruter",
+      },
+      `interview-${candidate?.name ? candidate.name.toLowerCase().replace(/\s+/g, "-") : "kandidat"}.ics`
+    );
+    toast.success("File kalender (.ics) berhasil diunduh");
+  };
+
   return (
     <div className="flex items-start gap-3 rounded-lg border p-3">
       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-primary">
@@ -1116,7 +1180,18 @@ function InterviewRow({
         </p>
         <p className="mt-1 text-xs text-muted-foreground">Panel: {interview.panel.join(", ")}</p>
       </div>
-      {action ?? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{interview.status}</span>}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Button
+          size="icon"
+          variant="outline"
+          className="size-8 text-muted-foreground hover:text-primary"
+          title="Unduh kalender (.ics)"
+          onClick={handleDownloadCalendar}
+        >
+          <CalendarDays className="size-3.5" />
+        </Button>
+        {action ?? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{interview.status}</span>}
+      </div>
     </div>
   );
 }

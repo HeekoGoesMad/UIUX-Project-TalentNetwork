@@ -6,11 +6,18 @@ import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
 
+import { findOrCreateApplicationForCandidate } from "@/lib/services/recruiter-hiring";
+
 const uuid = z.string().uuid();
 const createSchema = z.object({
   jobId: uuid,
   coverNote: z.string().trim().min(20, "Cover note minimal 20 karakter.").max(4000, "Cover note maksimal 4.000 karakter."),
 }).strict();
+
+const recruiterAssignSchema = z.object({
+  candidateProfileId: uuid,
+  jobId: uuid.optional(),
+});
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -67,10 +74,32 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const parsed = createSchema.safeParse(await request.json());
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Data aplikasi tidak valid." }, { status: 400 });
+    const body = await request.json().catch(() => null);
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    // Branch for recruiters sourcing a candidate into their company job opening
+    if (current.user.role === "recruiter") {
+      const scope = await getRecruiterScope(current.db, current.user);
+      if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+      const parsedRecruiter = recruiterAssignSchema.safeParse(body);
+      if (!parsedRecruiter.success) {
+        return NextResponse.json({ error: parsedRecruiter.error.issues[0]?.message ?? "Data kandidat tidak valid." }, { status: 400 });
+      }
+
+      const application = await findOrCreateApplicationForCandidate(current.db, {
+        candidateProfileId: parsedRecruiter.data.candidateProfileId,
+        organizationId: scope.membership.organizationId,
+        recruiterUserId: current.user.id,
+        jobId: parsedRecruiter.data.jobId,
+      });
+
+      return NextResponse.json({ application }, { status: 201 });
+    }
+
+    const parsed = createSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Data aplikasi tidak valid." }, { status: 400 });
     if (current.user.role !== "candidate") return NextResponse.json({ error: "Hanya kandidat yang dapat melamar." }, { status: 403 });
 
     const [candidate] = await current.db.select({ id: schema.candidateProfiles.id }).from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1);
