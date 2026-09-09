@@ -111,11 +111,13 @@ export function SiteHeader() {
         { href: "/partner/analytics", label: "Analitik" },
       ]
     : [
+        { href: "/dashboard", label: "Dashboard" },
         { href: "/search", label: "Cari Talent" },
-         { href: "/shortlist", label: "Shortlist" },
-          { href: "/recruiter/screenings", label: "Screening" },
-         { href: "/messages", label: "Pesan" },
-         { href: "/dashboard", label: "Dashboard" },
+        { href: "/recruiter/operations", label: "Pipeline & Operasi" },
+        { href: "/recruiter/jobs", label: "Lowongan" },
+        { href: "/recruiter/screenings", label: "Screening" },
+        { href: "/shortlist", label: "Shortlist" },
+        { href: "/messages", label: "Pesan" },
       ];
 
   const isAdmin = pathname?.startsWith("/admin");

@@ -696,6 +696,45 @@ export default function TalentProfile() {
           </div>
         </div>
 
+        {/* ── DOVER HIRING PROGRESS STEPPER ── */}
+        <div className="border-b bg-slate-50/90 px-6 py-3.5 sm:px-10 dark:bg-slate-900/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="size-3.5 text-[#7C3AED]" />
+              Status Pipeline Dover
+            </span>
+            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
+              <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
+                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${unlocked || completed ? "bg-purple-600 text-white" : "bg-purple-200 text-purple-950"}`}>
+                  1
+                </span>
+                <span>Screening</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
+                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
+                  2
+                </span>
+                <span>Wawancara</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
+                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
+                  3
+                </span>
+                <span>Offer Letter</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className={`flex items-center gap-1.5 shrink-0 ${hiringOutcome === "hired" ? "text-emerald-700 font-bold" : "text-slate-400"}`}>
+                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${hiringOutcome === "hired" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                  ✓
+                </span>
+                <span>Hired</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── CARD CONTENT ── */}
         {!unlocked ? (
           /* LOCKED STATE (Candidate Preview) */
@@ -1215,6 +1254,106 @@ export default function TalentProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── STICKY QUICK-ACTION DOCK (FOR UNLOCKED TALENT) ── */}
+      {(unlocked || (dbMode && completed)) && (
+        <aside
+          aria-label="Aksi Cepat Rekruter"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-3xl rounded-2xl border border-purple-200/80 bg-white/95 p-2.5 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED] to-pink-500 text-white shadow-xs">
+                <Sparkles className="size-3.5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[140px]">
+                  {candidate.name}
+                </p>
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  {hiringOutcome === "hired" ? "Status: Hired" : "Pipeline Aktif"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-1 sm:flex-none items-center justify-end gap-1.5 overflow-x-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
+                onClick={() => setQuestionModalOpen(true)}
+              >
+                <Brain className="mr-1 size-3.5 text-[#7C3AED]" />
+                <span className="hidden md:inline">Pertanyaan</span> AI
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
+                onClick={() => setPromptModalOpen(true)}
+              >
+                <MessageSquareQuote className="mr-1 size-3.5 text-[#7C3AED]" />
+                Prompt
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800"
+                onClick={() => setScheduleModalOpen(true)}
+              >
+                <Calendar className="mr-1 size-3.5 text-[#7C3AED]" />
+                Jadwal
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300"
+                onClick={() => setOfferModalOpen(true)}
+              >
+                <FileCheck2 className="mr-1 size-3.5 text-emerald-600" />
+                Offer
+              </Button>
+              <Button
+                size="sm"
+                disabled={markingHired || hiringOutcome === "hired"}
+                className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3"
+                onClick={async () => {
+                  if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
+                  setMarkingHired(true);
+                  try {
+                    if (dbMode) {
+                      const res = await fetch("/api/applications", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          candidateProfileId: candidate.id,
+                          status: "hired",
+                          reason: "Kandidat diterima secara resmi melalui Talent Network.",
+                        }),
+                      });
+                      if (!res.ok) {
+                        const errData = (await res.json()) as { error?: string };
+                        throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
+                      }
+                    }
+                    setHiringOutcome("hired");
+                    toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
+                  } catch (err) {
+                    toast.error("Gagal menandai status Hired", {
+                      description: err instanceof Error ? err.message : "Terjadi kesalahan.",
+                    });
+                  } finally {
+                    setMarkingHired(false);
+                  }
+                }}
+              >
+                {markingHired ? <Loader2 className="mr-1 size-3 animate-spin" /> : <UserCheck className="mr-1 size-3" />}
+                {hiringOutcome === "hired" ? "Hired ✓" : "Hired"}
+              </Button>
+            </div>
+          </div>
+        </aside>
+      )}
 
       {/* Recruiter Hiring Flow Modals */}
       <InterviewQuestionModal
