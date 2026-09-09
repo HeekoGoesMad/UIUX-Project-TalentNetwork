@@ -68,6 +68,7 @@ export type Candidate = {
   campusVerification?: CampusVerification;
   personality?: CandidatePersonality;
   avatarUrl?: string;
+  bannerUrl?: string;
 };
 
 export type CandidatePersonality = {

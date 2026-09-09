@@ -26,7 +26,11 @@ async function run() {
   // Check if already scanned or unlocked
   const unlockBtn = page.locator('button:has-text("Buka Profil · 1 Token")');
   if (await unlockBtn.isVisible()) {
-    console.log("   Candidate is locked before scan. Checking floating bar...");
+    console.log("   Candidate is locked before scan.");
+    // Take screenshot before scan (locked)
+    await page.screenshot({ path: "scratch/e2e_screenshots/talent_before_scan_blurred.png", fullPage: true });
+    console.log("   📸 Saved before scan screenshot: scratch/e2e_screenshots/talent_before_scan_blurred.png");
+
     const dockBefore = page.locator('aside[aria-label="Aksi Cepat Rekruter"]');
     const isDockVisibleBefore = await dockBefore.isVisible();
     console.log(`   Floating widget visible before scan? ${isDockVisibleBefore} (Expected: false)`);
@@ -59,12 +63,19 @@ async function run() {
   const phoneText = await phoneElem.textContent();
   console.log(`   Phone displayed: "${phoneText?.trim()}"`);
 
-  // Take screenshot
-  await page.screenshot({ path: "scratch/e2e_screenshots/06_scanned_candidate_side_widget.png", fullPage: true });
-  console.log("   Screenshot saved to scratch/e2e_screenshots/06_scanned_candidate_side_widget.png");
+  // Take screenshot after scan (unblurred)
+  await page.screenshot({ path: "scratch/e2e_screenshots/talent_after_scan_unblurred.png", fullPage: true });
+  console.log("   📸 Saved after scan screenshot: scratch/e2e_screenshots/talent_after_scan_unblurred.png");
+
+  // Also test demo candidate Nadia Putri (candidate-1)
+  console.log("\n3. Testing demo candidate Nadia Putri (/talent/candidate-1)...");
+  await page.goto(`${BASE_URL}/talent/candidate-1`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "scratch/e2e_screenshots/talent_demo_candidate_1.png", fullPage: true });
+  console.log("   📸 Saved demo candidate screenshot: scratch/e2e_screenshots/talent_demo_candidate_1.png");
 
   await browser.close();
-  console.log("Test finished!");
+  console.log("\n✓ All talent scan tests and visual captures completed successfully!");
 }
 
 run().catch((err) => {

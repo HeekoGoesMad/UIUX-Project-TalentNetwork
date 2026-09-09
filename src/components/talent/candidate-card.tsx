@@ -40,7 +40,12 @@ export const CandidateCardView = memo(function CandidateCardView({
   return (
     <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}>
       <CardContent className={list ? "flex flex-wrap items-center gap-4 p-5" : "flex flex-1 flex-col gap-4 p-5"}>
-        <CandidateAvatar initials={candidate.initials} locked={!unlocked} />
+        <CandidateAvatar
+          initials={candidate.initials}
+          avatarUrl={candidate.avatarUrl}
+          name={displayName}
+          locked={!unlocked}
+        />
 
         <div className="min-w-0 flex-1">
           {/* Category + shortlist row */}

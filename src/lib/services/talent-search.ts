@@ -84,7 +84,37 @@ export function serializeCandidate(
     email: row.email?.trim() || "",
     phone: row.phone?.trim() || "",
     linkedin,
-    avatarUrl: row.avatarUrl?.trim() || "",
+    avatarUrl:
+      row.avatarUrl?.trim() ||
+      (typeof preferences.avatarUrl === "string" && preferences.avatarUrl.trim()
+        ? preferences.avatarUrl.trim()
+        : `https://images.unsplash.com/photo-${
+            [
+              "1534528741775-53994a69daeb",
+              "1507003211169-0a1dd7228f2d",
+              "1494790108377-be9c29b29330",
+              "1500648767791-00dcc994a43e",
+              "1573496359142-b8d87734a5a2",
+              "1472099645785-5658abf4ff4e",
+              "1580489944761-15a19d654956",
+              "1519085360753-af0119f7cbe7",
+            ][(row.id.charCodeAt(0) + row.id.length) % 8]
+          }?q=80&w=400&auto=format&fit=crop`),
+    bannerUrl:
+      (typeof preferences.bannerUrl === "string" && preferences.bannerUrl.trim()
+        ? preferences.bannerUrl.trim()
+        : `https://images.unsplash.com/photo-${
+            [
+              "1618005182384-a83a8bd57fbe",
+              "1579546929518-9e396f3cc809",
+              "1557683316-973673baf926",
+              "1550745165-9bc0b252726f",
+              "1522071820081-009f0129c71c",
+              "1497215728101-856f4ea42174",
+              "1557804506-669a67965ba0",
+              "1507679799987-c73779587ccf",
+            ][(row.id.charCodeAt(row.id.length - 1) + row.id.length) % 8]
+          }?q=80&w=1600&auto=format&fit=crop`),
     history: experience.map((item) => ({
       company: item.company,
       role: item.role,
