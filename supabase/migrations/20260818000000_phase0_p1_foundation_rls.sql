@@ -1,3 +1,28 @@
+-- Idempotency guard for preview branches that already have prod's equivalent policies
+do $$ begin
+  drop policy if exists "audit_logs_actor_or_member_select" on public."audit_logs";
+  drop policy if exists "billing_accounts_owner_or_manager_select" on public."billing_accounts";
+  drop policy if exists "token_packages_active_select" on public."token_packages";
+  drop policy if exists "token_purchases_member_or_admin_select" on public."token_purchases";
+  drop policy if exists "payment_events_admin_select" on public."payment_events";
+  drop policy if exists "notification_preferences_owner_select" on public."notification_preferences";
+  drop policy if exists "notification_preferences_owner_insert" on public."notification_preferences";
+  drop policy if exists "notification_preferences_owner_update" on public."notification_preferences";
+  drop policy if exists "notification_preferences_owner_delete" on public."notification_preferences";
+  drop policy if exists "notification_deliveries_owner_select" on public."notification_deliveries";
+  drop policy if exists "candidate_documents_owner_select" on public."candidate_documents";
+  drop policy if exists "candidate_documents_owner_insert" on public."candidate_documents";
+  drop policy if exists "candidate_documents_owner_update" on public."candidate_documents";
+  drop policy if exists "cv_documents_candidate_select" on public."cv_documents";
+  drop policy if exists "cv_documents_candidate_insert" on public."cv_documents";
+  drop policy if exists "cv_documents_candidate_update" on public."cv_documents";
+  drop policy if exists "cv_versions_candidate_select" on public."cv_versions";
+  drop policy if exists "candidate_verifications_candidate_select" on public."candidate_verifications";
+  drop policy if exists "candidate_verifications_candidate_or_admin_select" on public."candidate_verifications";
+  drop policy if exists "candidate_verifications_admin_update" on public."candidate_verifications";
+exception when others then null;
+end $$;
+
 -- RLS for the Phase 0/P1 audit, billing, notification, CV, and verification foundation.
 -- This migration is intentionally separate from Drizzle and is not applied remotely yet.
 -- Trusted server-side Drizzle writes remain available through the configured bypass role.

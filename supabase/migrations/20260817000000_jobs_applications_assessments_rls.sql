@@ -1,3 +1,42 @@
+-- Idempotency guard for preview branches that already have prod's equivalent policies
+do $$ begin
+  drop policy if exists "jobs_published_select" on public."jobs";
+  drop policy if exists "jobs_member_select" on public."jobs";
+  drop policy if exists "jobs_member_insert" on public."jobs";
+  drop policy if exists "jobs_manager_update" on public."jobs";
+  drop policy if exists "jobs_manager_delete" on public."jobs";
+  drop policy if exists "job_requirements_member_select" on public."job_requirements";
+  drop policy if exists "job_requirements_member_insert" on public."job_requirements";
+  drop policy if exists "job_requirements_manager_update" on public."job_requirements";
+  drop policy if exists "job_requirements_manager_delete" on public."job_requirements";
+  drop policy if exists "applications_candidate_select" on public."applications";
+  drop policy if exists "applications_member_select" on public."applications";
+  drop policy if exists "applications_candidate_insert" on public."applications";
+  drop policy if exists "applications_candidate_update" on public."applications";
+  drop policy if exists "applications_manager_update" on public."applications";
+  drop policy if exists "application_stage_history_participant_select" on public."application_stage_history";
+  drop policy if exists "assessment_templates_member_select" on public."assessment_templates";
+  drop policy if exists "assessment_templates_member_insert" on public."assessment_templates";
+  drop policy if exists "assessment_templates_manager_update" on public."assessment_templates";
+  drop policy if exists "assessment_templates_manager_delete" on public."assessment_templates";
+  drop policy if exists "assessment_questions_participant_select" on public."assessment_questions";
+  drop policy if exists "assessment_questions_member_insert" on public."assessment_questions";
+  drop policy if exists "assessment_questions_manager_delete" on public."assessment_questions";
+  drop policy if exists "assessment_invitations_participant_select" on public."assessment_invitations";
+  drop policy if exists "assessment_invitations_member_insert" on public."assessment_invitations";
+  drop policy if exists "assessment_invitations_candidate_update" on public."assessment_invitations";
+  drop policy if exists "assessment_invitations_manager_update" on public."assessment_invitations";
+  drop policy if exists "assessment_attempts_candidate_select" on public."assessment_attempts";
+  drop policy if exists "assessment_attempts_member_select" on public."assessment_attempts";
+  drop policy if exists "assessment_attempts_candidate_insert" on public."assessment_attempts";
+  drop policy if exists "assessment_attempts_candidate_update" on public."assessment_attempts";
+  drop policy if exists "assessment_answers_candidate_select" on public."assessment_answers";
+  drop policy if exists "assessment_answers_member_select" on public."assessment_answers";
+  drop policy if exists "assessment_answers_candidate_insert" on public."assessment_answers";
+  drop policy if exists "assessment_answers_candidate_update" on public."assessment_answers";
+exception when others then null;
+end $$;
+
 -- RLS for the jobs, applications, and assessment foundation.
 -- Client policies expose only published jobs, organization-owned recruiter data,
 -- and candidate-owned application/assessment data. Trusted server writes remain

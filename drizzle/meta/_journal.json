@@ -33,19 +33,26 @@
     {
       "idx": 4,
       "version": "7",
+      "when": 1787806340547,
+      "tag": "0004_add_revision_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
       "when": 1788338000000,
       "tag": "0007_company_admin_updates",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 6,
       "version": "7",
       "when": 1788739200000,
       "tag": "0008_optional_screening_consent",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 7,
       "version": "7",
       "when": 1789021778507,
       "tag": "0006_add_partnerships",

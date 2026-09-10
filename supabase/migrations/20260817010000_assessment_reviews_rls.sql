@@ -1,3 +1,12 @@
+-- Idempotency guard for preview branches that already have prod's equivalent policies
+do $$ begin
+  drop policy if exists "assessment_reviews_candidate_select" on public."assessment_reviews";
+  drop policy if exists "assessment_reviews_member_select" on public."assessment_reviews";
+  drop policy if exists "assessment_reviews_member_insert" on public."assessment_reviews";
+  drop policy if exists "assessment_reviews_member_update" on public."assessment_reviews";
+exception when others then null;
+end $$;
+
 -- RLS for reviewer scorecards. This migration is intentionally kept separate from
 -- the Drizzle migration and must be approved before being applied remotely.
 
