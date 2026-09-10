@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { ProfileService } from "@/lib/services/profile";
 
 export async function GET() {
   try {
@@ -17,6 +18,14 @@ export async function GET() {
       createdAt: schema.profiles.createdAt,
       updatedAt: schema.profiles.updatedAt,
     }).from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1);
+
+    if (profile && !profile.avatarUrl) {
+      profile.avatarUrl = await ProfileService.resolveAndRecoverAvatar(
+        current.db,
+        current.user.id,
+        profile.avatarUrl
+      );
+    }
 
     let candidateProfile;
     let sections: unknown[] = [];

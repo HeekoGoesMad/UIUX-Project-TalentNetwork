@@ -4,8 +4,37 @@ import { eq } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { schema, type Database } from "@/db";
 import type { CandidateProfileSync } from "@/lib/profile/schema";
+import { recoverAvatarFromStorage } from "@/lib/profile/storage";
 
 export class ProfileService {
+  /**
+   * Resolve avatar URL, or recover from Supabase storage if missing in the database.
+   */
+  static async resolveAndRecoverAvatar(
+    db: Database,
+    userId: string,
+    currentAvatarUrl: string | null | undefined
+  ): Promise<string | null> {
+    if (currentAvatarUrl && currentAvatarUrl.startsWith("http")) {
+      return currentAvatarUrl;
+    }
+
+    try {
+      const recoveredUrl = await recoverAvatarFromStorage(userId);
+      if (recoveredUrl) {
+        await db
+          .update(schema.profiles)
+          .set({ avatarUrl: recoveredUrl, updatedAt: new Date() })
+          .where(eq(schema.profiles.userId, userId));
+        return recoveredUrl;
+      }
+    } catch (err) {
+      console.warn("[profile-service] Gagal memulihkan avatar dari storage:", err);
+    }
+
+    return null;
+  }
+
   /**
    * Sync candidate profile, user record, base profile, and dynamic sections.
    */
@@ -56,7 +85,7 @@ export class ProfileService {
           target: schema.profiles.userId,
           set: {
             displayName: payload.displayName ?? null,
-            avatarUrl: payload.avatarUrl ?? null,
+            ...(payload.avatarUrl !== undefined ? { avatarUrl: payload.avatarUrl } : {}),
             phone: payload.phone ?? null,
             updatedAt: now,
           },
@@ -88,22 +117,27 @@ export class ProfileService {
         })
         .returning({ id: schema.candidateProfiles.id });
 
-      for (const section of payload.sections ?? []) {
-        await tx
-          .insert(schema.candidateProfileSections)
-          .values({
-            candidateProfileId: candidateProfile.id,
-            type: section.type,
-            content: section.content,
-            sortOrder: section.sortOrder ?? 0,
-          })
-          .onConflictDoUpdate({
-            target: [
-              schema.candidateProfileSections.candidateProfileId,
-              schema.candidateProfileSections.type,
-            ],
-            set: { content: section.content, sortOrder: section.sortOrder ?? 0, updatedAt: now },
-          });
+      const sections = payload.sections ?? [];
+      if (sections.length > 0) {
+        await Promise.all(
+          sections.map((section) =>
+            tx
+              .insert(schema.candidateProfileSections)
+              .values({
+                candidateProfileId: candidateProfile.id,
+                type: section.type,
+                content: section.content,
+                sortOrder: section.sortOrder ?? 0,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  schema.candidateProfileSections.candidateProfileId,
+                  schema.candidateProfileSections.type,
+                ],
+                set: { content: section.content, sortOrder: section.sortOrder ?? 0, updatedAt: now },
+              })
+          )
+        );
       }
 
       return {

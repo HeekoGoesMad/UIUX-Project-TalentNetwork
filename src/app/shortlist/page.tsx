@@ -22,11 +22,11 @@ const consentLabels: Record<string, { label: string; className: string }> = {
 };
 
 export default function Shortlist() {
-  const { shortlisted, scans, notes, saveNote, toggleShortlist, screeningConsents, requestConsentBatch, user, dbMode, bootstrapped, databaseError, shortlists } = useApp();
+  const { hydrated, shortlisted, scans, notes, saveNote, toggleShortlist, screeningConsents, requestConsentBatch, user, dbMode, bootstrapped, databaseError, shortlists } = useApp();
   const [selected, setSelected] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  if (!user || user.role !== "recruiter") return <ProtectedRoute role="recruiter"><div /></ProtectedRoute>;
+  if (!hydrated || !user || user.role !== "recruiter") return <ProtectedRoute role="recruiter"><div /></ProtectedRoute>;
   if (dbMode && !bootstrapped) return <div className="container mx-auto px-4 py-8"><div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground" role="status">Memuat shortlist...</div></div>;
   if (dbMode && databaseError) return <div className="container mx-auto px-4 py-8"><div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">Shortlist belum dapat dimuat. {databaseError}</div></div>;
 

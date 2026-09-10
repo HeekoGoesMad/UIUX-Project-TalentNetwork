@@ -33,10 +33,17 @@ export async function GET(request: Request) {
     const result = await syncAuthenticatedUser(data.user, {
       name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : undefined,
       companyName: typeof data.user.user_metadata?.companyName === "string" ? data.user.user_metadata.companyName : undefined,
-      role: requestedRole === "candidate" || requestedRole === "recruiter" ? requestedRole : undefined,
+      role: requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner" ? requestedRole : undefined,
     });
 
-    const fallback = result.role === "candidate" ? "/candidate/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending";
+    const fallback =
+      result.role === "admin"
+        ? "/admin"
+        : result.role === "candidate"
+        ? "/candidate/onboarding"
+        : result.role === "partner"
+        ? (result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
+        : (result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
     const destination = safeNext(next, fallback);
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({

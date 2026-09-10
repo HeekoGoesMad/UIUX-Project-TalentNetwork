@@ -16,9 +16,7 @@ export type IndustryCategory =
   | "technology-software";
 
 export {
-  CAREER_STATUS_CONFIG,
-  TALENT_CATEGORY_CONFIG,
-  INDUSTRY_CATEGORY_CONFIG,
+    CAREER_STATUS_CONFIG, INDUSTRY_CATEGORY_CONFIG, TALENT_CATEGORY_CONFIG
 } from "@/config/talent";
 
 
@@ -68,6 +66,18 @@ export type Candidate = {
   talentCategory: TalentCategory;
   industry: IndustryCategory;
   campusVerification?: CampusVerification;
+  personality?: CandidatePersonality;
+  avatarUrl?: string;
+  bannerUrl?: string;
+};
+
+export type CandidatePersonality = {
+  type: string; // e.g. "ENFJ"
+  label: string; // e.g. "Protagonis"
+  tagline?: string;
+  summary?: string;
+  testUrl?: string;
+  updatedAt?: string;
 };
 
 export type Scan = { candidateId: string; scannedAt: string };
@@ -97,12 +107,47 @@ export type AppState = {
   contactRequests?: Record<string, ContactRequest>;
   cvProfile: CvProfile | null;
   careerStatus: CareerStatus;
+  talentCategory?: TalentCategory;
   partnerVerifications?: Record<string, CampusVerification>;
 };
 
-export type UserRole = "candidate" | "recruiter" | "partner";
-export type ProvisioningStatus = "pending" | "active" | "rejected";
-export type DemoUser = { name: string; email: string; role: UserRole; provisioningStatus?: ProvisioningStatus; companyName?: string };
+export type UserRole = "candidate" | "recruiter" | "partner" | "admin";
+export type ProvisioningStatus = "pending" | "active" | "rejected" | "revision_required";
+export type DemoUser = {
+  name: string;
+  email: string;
+  role: UserRole;
+  provisioningStatus?: ProvisioningStatus;
+  provisioningReason?: string | null;
+  companyName?: string;
+};
+
+export type EducationLevel = "SMA/SMK" | "Diploma" | "S1" | "S2" | "S3";
+
+export type EducationItem = {
+  level?: EducationLevel | string;
+  school: string;
+  program: string;
+  gpa?: string;
+  startDate?: string;
+  endDate?: string;
+  currentlyStudying?: boolean;
+  dates: string;
+};
+
+export type EmploymentType = "Full Time" | "Internship" | "Contract" | "Freelance";
+
+export type ExperienceItem = {
+  company: string;
+  role: string;
+  employmentType?: EmploymentType | string;
+  startDate?: string;
+  endDate?: string;
+  currentPosition?: boolean;
+  dates: string;
+  description?: string;
+  achievements?: string[];
+};
 
 export type CvProfile = {
   id: string;
@@ -112,17 +157,24 @@ export type CvProfile = {
   location: string;
   email: string;
   phone: string;
-  skills: string[];
+  skills: string[]; // Hard Competencies fallback
+  hardCompetencies?: string[];
   tools: string[];
+  softSkills?: string[];
   industries: string[];
-  experience: { company: string; role: string; dates: string; achievements: string[] }[];
-  education: { school: string; program: string; dates: string }[];
+  experience: ExperienceItem[];
+  education: EducationItem[];
   certifications: string[];
   portfolio: string[];
   targetRole: string;
   workArrangement: "remote" | "hybrid" | "onsite";
   openToWork: boolean;
   careerStatus: CareerStatus;
+  talentCategory?: TalentCategory;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  salary?: string;
+  personality?: CandidatePersonality;
   campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
@@ -133,5 +185,31 @@ export type ConsentState = "not-requested" | "pending-candidate-consent" | "cons
 export function asCareerStatus(value: unknown): CareerStatus {
   return typeof value === "string" && ["open-to-work", "open-for-opportunities", "freelance-available", "internship-available", "not-available"].includes(value) ? (value as CareerStatus) : "open-to-work";
 }
+
+export type RecruiterOnboardingData = {
+  // Step 1: PIC / Recruiter
+  picName: string;
+  picTitle: string;
+  picPhone: string;
+  picEmail: string;
+  // Step 2: Company Profile
+  companyName: string;
+  industry: string;
+  companySize: string;
+  description: string;
+  websiteUrl: string;
+  linkedinUrl: string;
+  officeAddress: string;
+  city: string;
+  // Step 3: Legal Documents (NIB & NPWP)
+  nibNumber: string;
+  nibFileName?: string;
+  npwpNumber: string;
+  npwpFileName?: string;
+  aktaFileName?: string;
+  ktpFileName?: string;
+  submittedAt?: string;
+  verificationStatus: "draft" | "pending_review" | "verified" | "needs_revision";
+};
 
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };

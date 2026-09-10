@@ -49,57 +49,137 @@
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Panduan Setup & Live Dev Testing
 
-### Prerequisites
-* Node.js >= 20.0.0
-* npm
+### 1. ⚙️ Konfigurasi Environment Variables (`.env`)
 
-### Installation
+Buat file `.env` (atau `.env.local`) di root project dengan menyalin dari template `.env.example`:
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/HeekoGoesMad/UIUX-Project-TalentNetwork.git
-   cd UIUX-Project-TalentNetwork
-   ```
+```env
+# ========================================================
+# 1. SUPABASE AUTH & POSTGRESQL DATABASE
+# ========================================================
+# Diambil dari Supabase Dashboard -> Project Settings -> API
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+# Diambil dari Supabase Dashboard -> Project Settings -> Database -> Connection String (URI / Session Mode)
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
 
-3. **Set up Environment Variables:**
-   Copy `.env` or create `.env.local` in the project root (see [Environment Variables](#-environment-variables)).
+APP_ENV=development
 
-4. **Run Development Server:**
-   ```bash
-   npm run dev
-   ```
+# ========================================================
+# 2. LOCAL DEV AFFORDANCES & BYPASS FLAGS
+# ========================================================
+DEV_AUTH_BYPASS=false
+NEXT_PUBLIC_DEMO_MODE=false
+DEV_TOKEN_GRANT_ENABLED=true
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+# ========================================================
+# 3. FEATURE FLAGS
+# ========================================================
+BILLING_ENABLED=true
+DOCUMENT_STORAGE_ENABLED=true
+EMAIL_DELIVERY_ENABLED=false
+PAYMENT_PROVIDER=mock
+EMAIL_PROVIDER=mock
+
+# ========================================================
+# 4. BREVO TRANSACTIONAL EMAIL (OPSIONAL UNTUK NOTIFIKASI)
+# ========================================================
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=admin@proofylink.com
+BREVO_SENDER_NAME="ProofyLink Support"
+
+# ========================================================
+# 5. AI ENGINE (AZURE OPENAI / MOCK)
+# ========================================================
+AI_PROVIDER=mock
+# AZURE_OPENAI_ENDPOINT=
+# AZURE_OPENAI_DEPLOYMENT=
+# AZURE_OPENAI_API_KEY=
+# AZURE_OPENAI_API_VERSION=2024-08-01-preview
+```
 
 ---
 
-## 🔐 Environment Variables
+### 2. 📧 Konfigurasi OTP & Custom SMTP Brevo di Supabase
 
-Create a `.env.local` file from `.env.example` with the keys below.
+Untuk memastikan kode OTP 6-digit terkirim ke email pengguna:
 
-| Variable | Scope | Visibility | When Needed |
-| :--- | :--- | :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Build + Runtime | Public (inlined into client bundle) | Always — Supabase auth & client |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Build + Runtime | Public (inlined into client bundle) | Always — Supabase auth & client |
-| `DATABASE_URL` | Runtime | Private (server-only) | Drizzle migrations, DB queries, `/api/health`; pooled Supabase Postgres connection string |
-| `DEV_AUTH_BYPASS` | Runtime | Private (server-only) | Dev only — bypasses email verification/token charges; hard-fails in production |
-| `NEXT_PUBLIC_DEMO_MODE` | Build + Runtime | Public (client demo affordances) | Dev only — free talent scans, instant demo registrations |
-| `DEV_TOKEN_GRANT_ENABLED` | Runtime | Private (server-only) | Dev only — enables `POST /api/dev/token-grant` |
-| `AI_PROVIDER` | Runtime | Private (server-only) | `mock` \| `local` \| `azure` (default: azure); falls back to mock data if unset |
-| `LOCAL_AI_BASE_URL` / `LOCAL_AI_MODEL` / `LOCAL_AI_API_KEY` | Runtime | Private (server-only) | Only when `AI_PROVIDER=local` (Ollama / LM Studio / OpenAI-compatible server) |
-| `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | Runtime | Private (server-only) | Only when `AI_PROVIDER=azure` |
-| `E2E_RECRUITER_EMAIL` / `E2E_RECRUITER_PASSWORD` | Local e2e only | Private | Running `npm run test:e2e` locally — never set in deployed environments |
-| `E2E_CANDIDATE_EMAIL` / `E2E_CANDIDATE_PASSWORD` | Local e2e only | Private | Running `npm run test:e2e` locally — never set in deployed environments |
-| `E2E_BASE_URL` | Local e2e only | Private | Target for e2e runs (defaults to `http://localhost:3000`) |
+1. **Atur SMTP Brevo di Supabase:**
+   * Buka **Supabase Dashboard** $\rightarrow$ **Project Settings** $\rightarrow$ **Authentication** $\rightarrow$ **SMTP Settings**.
+   * Aktifkan **Custom SMTP**.
+   * **Sender email:** Email terverifikasi di Brevo Anda.
+   * **Host:** `smtp-relay.brevo.com` | **Port:** `587`.
+   * **User:** Email akun Brevo Anda.
+   * **Password:** Master SMTP Key dari Brevo (*SMTP & API $\rightarrow$ Generate SMTP Key*).
 
-> **Note:** If `AI_PROVIDER` is set to `mock` or credentials are missing, the system gracefully falls back to structured mock data powered by Zod schemas. The production build requires no env secrets (guards fail closed).
+2. **Ganti Template Email Menjadi Kode OTP:**
+   * Buka **Authentication** $\rightarrow$ **Email Templates** $\rightarrow$ **Confirm signup**.
+   * Ubah `{{ .ConfirmationURL }}` menjadi **`{{ .Token }}`**.
+   * Contoh: `Kode OTP verifikasi akun ProofyLink Anda adalah: {{ .Token }}`.
+
+3. **Set Panjang OTP Menjadi 6 Digit:**
+   * Buka **Authentication** $\rightarrow$ **Providers** $\rightarrow$ **Email**.
+   * Ubah **OTP Length** dari `8` menjadi **`6`**.
+
+---
+
+### 3. 🏃 Menjalankan Aplikasi Secara Lokal
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Sinkronkan migrasi database PostgreSQL Drizzle
+npm run db:migrate
+
+# 3. Jalankan server development
+npm run dev
+```
+
+Buka **[http://localhost:3000](http://localhost:3000)** di browser Anda.
+
+---
+
+## 🧪 Skenario Pengujian Alur Sistem (Live Testing Walkthrough)
+
+### 🧑‍💻 Skenario A: Registrasi & Onboarding Kandidat
+1. Buka [http://localhost:3000/register](http://localhost:3000/register).
+2. Pilih tab **"Kandidat"**, masukkan Nama, Email, Password, dan klik **"Buat Akun ProofyLink"**.
+3. Modal 6-Digit OTP akan muncul seketika. Masukkan kode OTP yang dikirimkan ke email Anda.
+4. Setelah verifikasi sukses, Anda langsung diarahkan ke **`/candidate/onboarding`** untuk melengkapi CV dan profil karir.
+5. Selesai onboarding, Anda langsung dapat menjelajahi lowongan, rekomendasi skill, dan tool AI karir di portal kandidat.
+
+---
+
+### 🏢 Skenario B: Registrasi, Dokumen Legalitas & Antrean Rekruter
+1. Buka [http://localhost:3000/register](http://localhost:3000/register).
+2. Pilih tab **"Rekruter"**, masukkan Nama PIC, Email Kantor, Password, Nama Perusahaan, lalu klik **"Buat Akun ProofyLink"**.
+3. Masukkan kode 6-digit OTP pada modal.
+4. Begitu OTP terverifikasi, Anda diarahkan ke **`/recruiter/onboarding`**.
+5. Lengkapi 4 langkah onboarding:
+   * Identitas PIC Rekruter
+   * Profil & Skala Bisnis Entitas
+   * Berkas Dokumen Legalitas (NIB, NPWP, Akta/SK Kemenkumham, KTP PIC)
+   * Pernyataan keabsahan dokumen $\rightarrow$ Klik **"Kirim untuk Compliance Review"**.
+6. Anda akan masuk ke halaman antrean **`/recruiter/pending`** (*Akun & Legalitas Sedang Ditinjau*). Akses dashboard pencarian masih terkunci sampai disetujui Admin.
+
+---
+
+### 🛡️ Skenario C: Review Compliance & Persetujuan di Panel Admin
+1. Buka halaman panel admin: **[http://localhost:3000/admin/recruiters](http://localhost:3000/admin/recruiters)**.
+2. Di sini Anda akan melihat statistik antrean (*Pending*, *Active*, *Rejected*).
+3. Cari nama rekruter yang baru saja mendaftar di tab **"Menunggu Review (Pending)"**.
+4. Klik **"Tinjau Berkas Legalitas"** untuk melihat pratinjau 4 dokumen (NIB, NPWP, Akta, KTP).
+5. **Pilihan Tindakan Admin:**
+   * 🟢 **Setujui (Approve):** Mengaktifkan akun rekruter di database, membuat entitas organisasi, dan saldo token.
+   * 🔴 **Tolak (Reject):** Menolak dengan menyertakan catatan/alasan perbaikan dokumen.
+   * 🗑️ **Hapus (Delete):** Menghapus data akun rekruter secara permanen beserta konfirmasi dialog.
+6. **Uji Sinkronisasi Real-Time:**
+   * Saat Admin menekan tombol **"Setujui (Approve)"**, buka kembali tab browser rekruter di `/recruiter/pending`.
+   * Halaman rekruter secara otomatis mendeteksi persetujuan (*Live Polling* / Tombol *Cek Status*) $\rightarrow$ menampilkan banner hijau $\rightarrow$ tombol **"Masuk ke Dashboard Sekarang"** aktif dan membuka rute `/dashboard`!
 
 ---
 

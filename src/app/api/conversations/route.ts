@@ -6,6 +6,7 @@ import { MessagingService } from "@/lib/services/messaging";
 
 const createConversationSchema = z.object({
   candidateProfileId: z.string().uuid(),
+  consentRequestItemId: z.string().uuid().optional(),
 });
 
 export async function GET(request: Request) {
@@ -39,15 +40,25 @@ export async function POST(request: Request) {
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-    const scope = await getRecruiterScope(current.db, current.user);
-    if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
-
-    const result = await MessagingService.createOrGetConversation(
-      current.db,
-      current.user,
-      scope,
-      parsed.data.candidateProfileId
-    );
+    const result = current.user.role === "candidate"
+      ? parsed.data.consentRequestItemId
+        ? await MessagingService.createOrGetConversationForCandidate(
+          current.db,
+          current.user.id,
+          parsed.data.candidateProfileId,
+          parsed.data.consentRequestItemId
+        )
+        : { error: "Consent request item diperlukan untuk membuka percakapan.", status: 400 as const }
+      : await (async () => {
+        const scope = await getRecruiterScope(current.db, current.user);
+        if ("error" in scope) return scope;
+        return MessagingService.createOrGetConversation(
+          current.db,
+          current.user,
+          scope,
+          parsed.data.candidateProfileId
+        );
+      })();
 
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });

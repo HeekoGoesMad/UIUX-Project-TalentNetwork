@@ -16,7 +16,7 @@ export const screeningSchema = z.object({
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const advisorSchema = z.object({
-  focus: z.enum(["ats", "headline", "star", "role", "general"]).default("ats"),
+  focus: z.enum(["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
   summary: z.string(),
   headlineSuggestions: z.array(z.string()).default([]),
   starBullets: z.array(z.object({
@@ -39,7 +39,7 @@ export const advisorSchema = z.object({
     conclusion: z.string(),
   }).optional(),
   atsDetails: z.object({
-    score: z.number().min(0).max(100),
+    readinessLevel: z.enum(["Sangat Siap ATS", "Cukup Siap", "Perlu Penguatan"]).default("Cukup Siap"),
     detectedKeywords: z.array(z.string()),
     missingKeywords: z.array(z.string()),
     sectionAudits: z.array(z.object({
@@ -88,6 +88,53 @@ export const advisorSchema = z.object({
     criticalGaps: z.array(z.string()),
     strategicRecommendations: z.array(z.string()),
   }).optional(),
+  cvReviewDetails: z.object({
+    readinessLevel: z.string(),
+    overallScore: z.number().min(0).max(100),
+    executiveSummary: z.string(),
+    sectionAudits: z.array(z.object({
+      section: z.string(),
+      status: z.enum(["good", "needs_improvement"]),
+      notes: z.array(z.string()),
+      recommendation: z.string(),
+    })),
+    formatChecks: z.array(z.object({
+      check: z.string(),
+      passed: z.boolean(),
+      tip: z.string(),
+    })),
+    priorityActionItems: z.array(z.string()),
+  }).optional(),
+  gapAnalysisDetails: z.object({
+    targetRole: z.string(),
+    matchScore: z.number().min(0).max(100),
+    matchLevel: z.string(),
+    coreCompetencies: z.array(z.object({
+      competency: z.string(),
+      candidateLevel: z.string(),
+      requiredLevel: z.string(),
+      status: z.enum(["match", "gap", "exceeds"]),
+      recommendation: z.string().optional(),
+    })),
+    criticalGaps: z.array(z.string()),
+    transferableStrengths: z.array(z.string()),
+    strategicRecommendations: z.array(z.string()),
+  }).optional(),
+  careerRoadmapDetails: z.object({
+    targetRole: z.string(),
+    targetTimeline: z.string(),
+    targetLevel: z.string(),
+    phases: z.array(z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })),
+    recommendedCertifications: z.array(z.string()),
+    strategicAdvice: z.array(z.string()),
+  }).optional(),
   answer: z.string(),
   nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
@@ -97,6 +144,75 @@ export const advisorSchema = z.object({
 export const gapsSchema = z.object({ missing: z.array(z.string()), unevidenced: z.array(z.string()), transferable: z.array(z.string()), irrelevant: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const roadmapSchema = z.object({ phases: z.array(z.object({ title: z.string(), outcome: z.string(), actions: z.array(z.string()) })), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 export const cvBuilderSchema = z.object({ headline: z.string(), about: z.string(), bullets: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
-export const cvImportSchema = z.object({ fullName: z.string(), headline: z.string(), about: z.string(), skills: z.array(z.string()), experience: z.array(z.object({ company: z.string(), role: z.string(), dates: z.string(), achievements: z.array(z.string()) })), education: z.array(z.object({ school: z.string(), program: z.string(), dates: z.string() })), suggestions: z.array(z.string()), source: z.enum(["mock", "azure", "local"]), });
+export const cvImportSchema = z.object({
+  fullName: z.string(),
+  headline: z.string(),
+  about: z.string(),
+  skills: z.array(z.string()),
+  hardCompetencies: z.array(z.string()).optional(),
+  tools: z.array(z.string()).optional(),
+  softSkills: z.array(z.string()).optional(),
+  experience: z.array(
+    z.object({
+      company: z.string(),
+      role: z.string(),
+      employmentType: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      currentPosition: z.boolean().optional(),
+      dates: z.string().optional().default(""),
+      description: z.string().optional(),
+      achievements: z.array(z.string()).default([]),
+    })
+  ),
+  education: z.array(
+    z.object({
+      level: z.string().optional(),
+      school: z.string(),
+      program: z.string(),
+      gpa: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      currentlyStudying: z.boolean().optional(),
+      dates: z.string().optional().default(""),
+    })
+  ),
+  suggestions: z.array(z.string()),
+  source: z.enum(["mock", "azure", "local"]),
+});
 
 export type ProfileContext = z.infer<typeof profileContextSchema>;
+
+export const recruiterPromptInputSchema = z.object({
+  category: z.enum([
+    "interview_invitation",
+    "assessment_invitation",
+    "schedule_confirmation",
+    "offer_letter",
+    "rejection",
+  ]).default("interview_invitation"),
+  candidateName: z.string().default("Kandidat"),
+  jobTitle: z.string().default("Posisi Target"),
+  organizationName: z.string().default("Perusahaan"),
+  promptInstructions: z.string().optional().default(""),
+  tone: z.enum(["formal", "friendly", "concise"]).default("friendly"),
+  keyDetails: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const recruiterOutreachPromptSchema = z.object({
+  category: z.enum([
+    "interview_invitation",
+    "assessment_invitation",
+    "schedule_confirmation",
+    "offer_letter",
+    "rejection",
+  ]),
+  subject: z.string(),
+  message: z.string(),
+  highlights: z.array(z.string()).default([]),
+  callToAction: z.string(),
+  tone: z.enum(["formal", "friendly", "concise"]).default("friendly"),
+  modelVersion: z.string(),
+  source: z.enum(["mock", "azure", "local"]),
+});
+

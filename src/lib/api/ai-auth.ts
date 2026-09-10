@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
+import { assertNoDevBypassInProduction, isDevBypassEnabled } from "@/lib/config/server";
 import type { Database } from "@/db";
 
 export type AllowedAiRole = "candidate" | "recruiter" | "admin" | "partner";
@@ -47,11 +48,8 @@ function finishAiAuth(context: AiAuthContext): AiAuthResult {
 export async function getAiEndpointAuth(options?: {
   allowedRoles?: AllowedAiRole[];
 }): Promise<AiAuthResult> {
-  if (process.env.NODE_ENV === "production" && process.env.DEV_AUTH_BYPASS) {
-    throw new Error("DEV_AUTH_BYPASS must not be set in production");
-  }
-  const isDevBypass =
-    process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true";
+  assertNoDevBypassInProduction();
+  const isDevBypass = isDevBypassEnabled();
 
   if (isDevBypass) {
     return finishAiAuth({ user: null, isDevBypass: true });

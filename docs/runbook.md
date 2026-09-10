@@ -54,6 +54,14 @@ Rotation steps for any secret: generate new value at provider → update in Verc
 - Approve/reject recruiters via API — `PATCH /api/admin/recruiters/{userId}` with body `{"action": "approve" | "reject", "reason": "..."}` (reason mandatory for reject); list pending recruiters first with `GET /api/admin/recruiters`. Both require a signed-in user whose `users.role` is `admin` (session cookie auth).
 - Approval flips `users.recruiter_provisioning_status` to `active`/`rejected`; audit entries land in the **`audit_logs`** table (`admin.recruiter.*` and `organization.member.updated`).
 
+## Notification Outbox Worker
+
+Polls `notification_deliveries` for due email rows (status `pending`/`failed`, `next_attempt_at` NULL or past) in small batches, claims each row with an atomic `next_attempt_at` lease (no `sending` status exists in the frozen enum), sends via the same provider contract as the app (mock unless `NODE_ENV=production` + Brevo env), backs off `next_attempt_at` on failure (5min doubling, max 24h; parked with `next_attempt_at = NULL` after `OUTBOX_MAX_ATTEMPTS` for manual retry), then exits for cron (0 = sent/nothing due, 2 = any delivery failed, 1 = config/connection error). No new dependencies: plain `node` + the repo's existing `postgres` driver.
+
+- Run: `npm run worker:outbox` (needs `DATABASE_URL`); dry-run: `npm run worker:outbox -- --dry-run`. Tuning env: `OUTBOX_BATCH_SIZE` (default 25), `OUTBOX_MAX_ATTEMPTS` (default 10), `OUTBOX_LEASE_SECONDS` (default 300).
+- Cron example (every 5 min): `*/5 * * * * cd /app && DATABASE_URL="$DATABASE_URL" NODE_ENV=production EMAIL_PROVIDER=brevo BREVO_API_KEY="$BREVO_API_KEY" BREVO_SENDER_EMAIL="$BREVO_SENDER_EMAIL" BREVO_SENDER_NAME="$BREVO_SENDER_NAME" npm run worker:outbox >> /var/log/outbox-worker.log 2>&1`.
+- Explicit non-goal: the request path still sends email inline (`createNotificationWithDeliveries` awaits `sendNotificationEmail`); the worker only retries rows left pending/failed/due. Switching the request path to enqueue-only is follow-up work behind a documented env flag, after this worker is deployed and observed.
+
 ## Pre-Release Checklist
 
 - [ ] CI green on release branch: lint + typecheck (`npx tsc --noEmit`) + build.

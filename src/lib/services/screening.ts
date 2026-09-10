@@ -2,13 +2,14 @@ import "server-only";
 
 import { and, eq, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import type { AppUser } from "@/lib/api/auth";
 import { TokenLedgerService } from "./token-ledger";
 import { screening, summary } from "@/lib/ai/provider";
 
 export class ScreeningService {
   /**
-   * Start a new screening run after verifying consent and charging tokens.
+   * Start a screening run, optionally retaining a consent link, and charge tokens.
    */
   static async startRun(
     db: Database,
@@ -16,37 +17,34 @@ export class ScreeningService {
     scope: { membership: { organizationId: string } },
     params: {
       candidateProfileId: string;
-      consentRequestItemId: string;
+      consentRequestItemId?: string | null;
       idempotencyKey: string;
     }
   ) {
     return db.transaction(async (tx) => {
       const now = new Date();
-      const [consent] = await tx
-        .select({
-          itemId: schema.consentRequestItems.id,
-          status: schema.consentRequestItems.status,
-          candidateProfileId: schema.consentRequestItems.candidateProfileId,
-          expiresAt: schema.consentRequestBatches.expiresAt,
-        })
-        .from(schema.consentRequestItems)
-        .innerJoin(
-          schema.consentRequestBatches,
-          eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
-        )
-        .where(
-          and(
-            eq(schema.consentRequestItems.id, params.consentRequestItemId),
-            eq(schema.consentRequestItems.candidateProfileId, params.candidateProfileId),
-            eq(schema.consentRequestBatches.organizationId, scope.membership.organizationId),
-            eq(schema.consentRequestItems.status, "approved"),
-            sql`(${schema.consentRequestBatches.expiresAt} is null or ${schema.consentRequestBatches.expiresAt} > ${now})`
-          )
-        )
-        .limit(1);
+      const consentRequestItemId: string | null = params.consentRequestItemId ?? null;
 
-      if (!consent) {
-        return { error: "Consent kandidat belum disetujui atau sudah kedaluwarsa.", status: 403 as const };
+      if (consentRequestItemId) {
+        const [consent] = await tx
+          .select({ itemId: schema.consentRequestItems.id })
+          .from(schema.consentRequestItems)
+          .innerJoin(
+            schema.consentRequestBatches,
+            eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
+          )
+          .where(
+            and(
+              eq(schema.consentRequestItems.id, consentRequestItemId),
+              eq(schema.consentRequestItems.candidateProfileId, params.candidateProfileId),
+              eq(schema.consentRequestBatches.organizationId, scope.membership.organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!consent) {
+          return { error: "Item consent tidak terkait dengan organisasi atau kandidat.", status: 403 as const };
+        }
       }
 
       const [account] = await tx
@@ -65,8 +63,8 @@ export class ScreeningService {
         .values({
           id: runId,
           organizationId: scope.membership.organizationId,
-          candidateProfileId: consent.candidateProfileId,
-          consentRequestItemId: consent.itemId,
+          candidateProfileId: params.candidateProfileId,
+          consentRequestItemId,
           requestedBy: user.id,
           status: "in_progress",
           tokenCost: 1,
@@ -83,8 +81,9 @@ export class ScreeningService {
           idempotencyKey: params.idempotencyKey,
           screeningRunId: run.id,
           metadata: {
-            candidateProfileId: consent.candidateProfileId,
-            consentRequestItemId: consent.itemId,
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId,
+            ...(consentRequestItemId ? {} : { consentOptional: true }),
           },
         })
         .onConflictDoNothing({ target: schema.tokenLedgerEntries.idempotencyKey })
@@ -102,15 +101,46 @@ export class ScreeningService {
         if (!existingRunId) return { error: "Charge token tidak konsisten.", status: 409 as const };
 
         const [existingRun] = await tx
-          .select({ id: schema.screeningRuns.id, status: schema.screeningRuns.status })
+          .select({
+            id: schema.screeningRuns.id,
+            organizationId: schema.screeningRuns.organizationId,
+            candidateProfileId: schema.screeningRuns.candidateProfileId,
+            consentRequestItemId: schema.screeningRuns.consentRequestItemId,
+            status: schema.screeningRuns.status,
+          })
           .from(schema.screeningRuns)
           .where(eq(schema.screeningRuns.id, existingRunId))
           .limit(1);
+
+        if (
+          existingRun &&
+          (existingRun.organizationId !== scope.membership.organizationId ||
+            existingRun.candidateProfileId !== params.candidateProfileId)
+        ) {
+          return { error: "Idempotency key sudah digunakan untuk screening lain.", status: 409 as const };
+        }
+
+        await writeAuditLog({
+          db: tx,
+          actorUserId: user.id,
+          organizationId: scope.membership.organizationId,
+          action: "screening.run.started",
+          entityType: "screening_run",
+          entityId: existingRun?.id ?? existingRunId,
+          metadata: {
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId: params.consentRequestItemId,
+            idempotent: true,
+          },
+        });
 
         return {
           runId: existingRun?.id ?? existingRunId,
           runStatus: existingRun?.status ?? ("in_progress" as const),
           idempotent: true,
+          // No new ledger entry is written on replay; the stored audit metadata
+          // from the fresh write already carries consentOptional when applicable.
+          ...(existingRun?.consentRequestItemId ? {} : { consentOptional: true }),
         };
       }
 
@@ -125,6 +155,20 @@ export class ScreeningService {
         await tx.delete(schema.screeningRuns).where(eq(schema.screeningRuns.id, run.id));
         return { error: "Token screening organisasi tidak mencukupi.", status: 402 as const };
       }
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: user.id,
+        organizationId: scope.membership.organizationId,
+        action: "screening.run.started",
+        entityType: "screening_run",
+        entityId: run.id,
+          metadata: {
+            candidateProfileId: params.candidateProfileId,
+            consentRequestItemId,
+            idempotent: false,
+          },
+      });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };
     });
@@ -195,31 +239,32 @@ export class ScreeningService {
       return { error: "Screening run tidak ditemukan.", status: 404 as const };
     }
 
-    const [profile] = await db
-      .select({
-        headline: schema.candidateProfiles.headline,
-        summary: schema.candidateProfiles.summary,
-        targetRole: schema.candidateProfiles.targetRole,
-        location: schema.candidateProfiles.location,
-      })
-      .from(schema.candidateProfiles)
-      .where(eq(schema.candidateProfiles.id, run.candidateProfileId))
-      .limit(1);
+    const [[profile], sections] = await Promise.all([
+      db
+        .select({
+          headline: schema.candidateProfiles.headline,
+          summary: schema.candidateProfiles.summary,
+          targetRole: schema.candidateProfiles.targetRole,
+          location: schema.candidateProfiles.location,
+        })
+        .from(schema.candidateProfiles)
+        .where(eq(schema.candidateProfiles.id, run.candidateProfileId))
+        .limit(1),
+      db
+        .select({ content: schema.candidateProfileSections.content })
+        .from(schema.candidateProfileSections)
+        .where(
+          and(
+            eq(schema.candidateProfileSections.candidateProfileId, run.candidateProfileId),
+            eq(schema.candidateProfileSections.type, "skills")
+          )
+        )
+        .limit(1),
+    ]);
 
     if (!profile) {
       return { error: "Profile kandidat tidak ditemukan.", status: 404 as const };
     }
-
-    const sections = await db
-      .select({ content: schema.candidateProfileSections.content })
-      .from(schema.candidateProfileSections)
-      .where(
-        and(
-          eq(schema.candidateProfileSections.candidateProfileId, run.candidateProfileId),
-          eq(schema.candidateProfileSections.type, "skills")
-        )
-      )
-      .limit(1);
 
     const storedSkills = sections[0]?.content.items;
     const skills = Array.isArray(storedSkills)

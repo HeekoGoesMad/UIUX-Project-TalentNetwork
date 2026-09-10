@@ -6,12 +6,13 @@ import { getCurrentAppUser } from "@/lib/api/auth";
 import { candidateProfileForUser, verificationTypeSchema } from "@/lib/cv/api";
 import { writeAuditLog } from "@/lib/audit";
 import { getDemoVerifications, getDemoCandidateProfileId } from "@/lib/cv/demo";
+import { isDevBypassEnabled } from "@/lib/config/server";
 
 const requestSchema = z.object({ type: verificationTypeSchema, evidence: z.record(z.string(), z.unknown()).optional() }).strict();
 
 export async function GET() {
   try {
-    if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") return NextResponse.json({ verifications: getDemoVerifications(), demo: true });
+    if (isDevBypassEnabled()) return NextResponse.json({ verifications: getDemoVerifications(), demo: true });
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     if (current.user.role === "candidate") {
@@ -28,7 +29,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") {
+    if (isDevBypassEnabled()) {
       const parsedDemo = requestSchema.safeParse(await request.json());
       if (!parsedDemo.success) return NextResponse.json({ error: "Jenis verifikasi atau bukti tidak valid." }, { status: 400 });
       const now = new Date().toISOString();

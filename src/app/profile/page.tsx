@@ -1,29 +1,37 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  BriefcaseBusiness,
-  Check,
-  ChevronDown,
-  ExternalLink,
-  FileText,
-  GraduationCap,
-  MapPin,
-  Pencil,
-  Wrench,
-} from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { ProfileSection } from "@/components/profile/profile-section";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ProfessionalSummaryModal } from "@/components/candidate/professional-summary-modal";
+import { ProfessionalSummaryCard } from "@/components/talent/professional-summary-card";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
 import { VerifiedBadge } from "@/components/talent/verified-badge";
-import { AiSummaryCard } from "@/components/talent/ai-summary-card";
-import { ProfileSection } from "@/components/profile/profile-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/shared/empty-state";
-import { useApp } from "@/providers/app-provider";
-import { CAREER_STATUS_CONFIG, CareerStatus, type AiSummary } from "@/types";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/providers/app-provider";
+import { CAREER_STATUS_CONFIG, CareerStatus, type EducationItem } from "@/types";
+import {
+    Banknote,
+    Brain,
+    BriefcaseBusiness,
+    Camera,
+    Check,
+    ChevronDown,
+    ExternalLink,
+    FileText,
+    GraduationCap,
+    MapPin,
+    Pencil,
+    Trash2,
+    Wrench,
+} from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
   "open-to-work": "Aktif mencari pekerjaan.",
@@ -38,139 +46,257 @@ const DEMO = {
   fullName: "Nadia Putri",
   headline: "Senior Product Designer | UX Research | Design Systems",
   location: "Jakarta",
+  salary: "Rp 18.000.000 – Rp 25.000.000 / bln",
+  personality: {
+    type: "ENFJ",
+    label: "Protagonis",
+    tagline: "Pemimpin yang karismatik dan inspiratif, mampu memikat pendengarnya.",
+  },
   about:
     "Product designer yang senang mengubah masalah kompleks menjadi pengalaman digital yang jelas, berguna, dan terasa manusiawi.",
   experience: [
     {
       company: "Tokopedia",
       role: "Senior Product Designer",
+      employmentType: "Full Time",
+      startDate: "2021",
+      endDate: "Present",
+      currentPosition: true,
       dates: "2021 — Present",
+      description: "Memimpin arsitektur sistem desain multi-platform dan riset pengalaman pengguna.",
       achievements: ["Memimpin design system dan discovery untuk produk commerce."],
     },
     {
       company: "Independent Studio",
       role: "Product Designer",
+      employmentType: "Full Time",
+      startDate: "2019",
+      endDate: "2021",
+      currentPosition: false,
       dates: "2019 — 2021",
+      description: "Merancang desain antarmuka aplikasi mobile dan dashboard untuk berbagai klien.",
       achievements: [],
     },
   ],
   education: [
-    { school: "Institut Teknologi Bandung", program: "Desain Komunikasi Visual", dates: "2015 — 2019" },
-  ],
+    {
+      level: "S1",
+      school: "Institut Teknologi Bandung",
+      program: "Desain Komunikasi Visual",
+      gpa: "3.80 / 4.00",
+      startDate: "2015",
+      endDate: "2019",
+      currentlyStudying: false,
+      dates: "2015 — 2019",
+    },
+  ] as EducationItem[],
   skills: ["Figma", "Product strategy", "User research", "Design systems", "Prototyping"],
+  hardCompetencies: ["Figma", "Product strategy", "User research", "Design systems", "Prototyping"],
   tools: ["Notion", "Miro", "Jira", "Google Workspace"],
+  softSkills: ["Problem Solving", "Leadership", "Team Collaboration", "Communication"],
   portfolio: [] as string[],
 };
 
 // Completeness calculator
-function calcCompleteness(p: typeof DEMO & { portfolio: string[] }): { pct: number; missing: string[] } {
+function calcCompleteness(p: {
+  about?: string;
+  headline?: string;
+  experience?: unknown[];
+  education?: unknown[];
+  skills?: string[];
+  tools?: string[];
+  portfolio?: string[];
+}): { pct: number; missing: string[] } {
   const missing: string[] = [];
   if (!p.about) missing.push("Tentang Saya");
   if (!p.headline) missing.push("Headline");
-  if (!p.experience.length) missing.push("Pengalaman Kerja");
-  if (!p.education.length) missing.push("Pendidikan");
-  if (!p.skills.length) missing.push("Skill");
-  if (!p.tools.length) missing.push("Tools");
-  if (!p.portfolio.length) missing.push("Portofolio");
+  if (!p.experience?.length) missing.push("Pengalaman Kerja");
+  if (!p.education?.length) missing.push("Pendidikan");
+  if (!p.skills?.length) missing.push("Skill");
+  if (!p.tools?.length) missing.push("Tools");
+  if (!p.portfolio?.length) missing.push("Portofolio");
   const total = 7;
   const filled = total - missing.length;
   return { pct: Math.round((filled / total) * 100), missing };
 }
 
 export default function ProfilePage() {
-  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode } = useApp();
+  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
-
-  // AI Summary state
-  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
-  const [aiLoading, setAiLoading] = useState(true);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
 
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
+  const avatarUrl: string =
+    source && "avatarUrl" in source && source.avatarUrl !== undefined
+      ? (source.avatarUrl || "")
+      : (!dbMode && source?.fullName?.includes("Nadia")
+        ? "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop"
+        : "");
+
+  const bannerUrl: string =
+    source && "bannerUrl" in source && source.bannerUrl !== undefined
+      ? (source.bannerUrl || "")
+      : (!dbMode && source?.fullName?.includes("Nadia")
+        ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop"
+        : "");
+
   const p = {
     fullName: source?.fullName ?? "",
+    avatarUrl,
+    bannerUrl,
     headline: source?.headline ?? "",
     location: source?.location ?? "",
     about: source?.about ?? "",
     experience: source?.experience ?? [],
     education: source?.education ?? [],
-    skills: source?.skills ?? [],
+    skills: source?.hardCompetencies?.length ? source.hardCompetencies : source?.skills ?? [],
+    hardCompetencies: source?.hardCompetencies?.length ? source.hardCompetencies : source?.skills ?? [],
     tools: source?.tools ?? [],
+    softSkills: source?.softSkills ?? [],
     portfolio: source?.portfolio ?? [],
+    salary: source && "salary" in source ? source.salary : undefined,
+    personality: source && "personality" in source ? source.personality : undefined,
   };
 
-  const summaryKey = JSON.stringify([
-    source?.headline ?? "",
-    source?.about ?? "",
-    source?.skills ?? [],
-    source?.location ?? "",
-    source && "targetRole" in source ? source.targetRole : (source?.headline ?? ""),
-  ]);
+  const [cropModal, setCropModal] = useState<{
+    open: boolean;
+    imageSrc: string | null;
+    type: "avatar" | "banner";
+    fileName: string;
+  }>({
+    open: false,
+    imageSrc: null,
+    type: "avatar",
+    fileName: "",
+  });
 
-  const requestAiSummary = useCallback(async (): Promise<{ ok: boolean; data?: AiSummary; error?: string }> => {
-    try {
-      const [headline, about, skills, location, targetRole] = JSON.parse(summaryKey) as [
-        string,
-        string,
-        string[],
-        string,
-        string,
-      ];
-      const response = await fetch("/api/ai/summary?strict=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          headline,
-          about,
-          skills,
-          targetRole: targetRole || "Talent",
-          location,
-          strict: true,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "Gagal memuat AI Summary.");
-      }
-      return { ok: true, data: payload as AiSummary };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "Gagal memuat AI Summary." };
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxBytes = type === "banner" ? 8 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(`Ukuran ${type === "banner" ? "banner maksimal 8MB" : "foto profil maksimal 5MB"}`);
+      return;
     }
-  }, [summaryKey]);
-
-  const regenerateAiSummary = useCallback(() => {
-    setAiLoading(true);
-    setAiError(null);
-    void requestAiSummary().then((outcome) => {
-      if (outcome.ok && outcome.data) setAiSummary(outcome.data);
-      else setAiError(outcome.error ?? "Gagal memuat AI Summary.");
-      setAiLoading(false);
-    });
-  }, [requestAiSummary]);
-
-  useEffect(() => {
-    let active = true;
-    requestAiSummary().then((outcome) => {
-      if (!active) return;
-      if (outcome.ok && outcome.data) {
-        setAiSummary(outcome.data);
-        setAiError(null);
-      } else {
-        setAiError(outcome.error ?? "Gagal memuat AI Summary.");
-      }
-      setAiLoading(false);
-    });
-    return () => {
-      active = false;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({
+        open: true,
+        imageSrc: reader.result as string,
+        type,
+        fileName: file.name,
+      });
     };
-  }, [requestAiSummary]);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const isAvatar = cropModal.type === "avatar";
+    const toastId = toast.loading(`Mengunggah foto ${isAvatar ? "profil" : "sampul"}...`);
+    try {
+      const formData = new FormData();
+      formData.append("file", croppedBlob, cropModal.fileName || `${cropModal.type}.webp`);
+      formData.append("type", cropModal.type);
+
+      const res = await fetch("/api/profile/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? `Gagal mengunggah foto ${isAvatar ? "profil" : "sampul"}.`);
+      }
+
+      const base = cvProfile || {
+        ...DEMO,
+        id: "local-profile",
+        email: user?.email || "candidate@proofylink.dev",
+        phone: "0812-3456-7890",
+        industries: [],
+        certifications: [],
+        targetRole: "Product Designer",
+        workArrangement: "hybrid" as const,
+        openToWork: true,
+        careerStatus: "open-to-work" as CareerStatus,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveCvProfile({
+        ...base,
+        ...(isAvatar ? { avatarUrl: data.url } : { bannerUrl: data.url }),
+      });
+
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil diperbarui!`, { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Gagal mengunggah ${isAvatar ? "foto profil" : "sampul"}`, { id: toastId });
+    }
+  };
+
+  const handleRemoveMedia = async (type: "avatar" | "banner") => {
+    const isAvatar = type === "avatar";
+    const toastId = toast.loading(`Menghapus foto ${isAvatar ? "profil" : "sampul"}...`);
+    try {
+      const res = await fetch(`/api/profile/media?type=${type}`, { method: "DELETE" });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}.`);
+      }
+
+      const base = cvProfile || {
+        ...DEMO,
+        id: "local-profile",
+        email: user?.email || "candidate@proofylink.dev",
+        phone: "0812-3456-7890",
+        industries: [],
+        certifications: [],
+        targetRole: "Product Designer",
+        workArrangement: "hybrid" as const,
+        openToWork: true,
+        careerStatus: "open-to-work" as CareerStatus,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveCvProfile({
+        ...base,
+        ...(isAvatar ? { avatarUrl: "" } : { bannerUrl: "" }),
+      });
+
+      toast.success(`Foto ${isAvatar ? "profil" : "sampul"} berhasil dihapus!`, { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Gagal menghapus foto ${isAvatar ? "profil" : "sampul"}`, { id: toastId });
+    }
+  };
+
+  const handleApplySummary = async (newSummary: string) => {
+    const base = cvProfile || {
+      ...DEMO,
+      id: "local-profile",
+      email: user?.email || "candidate@proofylink.dev",
+      phone: "0812-3456-7890",
+      industries: [],
+      certifications: [],
+      targetRole: "Product Designer",
+      workArrangement: "hybrid" as const,
+      openToWork: true,
+      careerStatus: "open-to-work" as CareerStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveCvProfile({
+      ...base,
+      about: newSummary,
+    });
+  };
 
   const { pct, missing } = calcCompleteness(p);
 
-  const initials = p.fullName
-    .split(" ")
+  const initials = (p.fullName || user?.name || user?.email || "P")
+    .trim()
+    .split(/\s+/)
     .map((n) => n[0])
+    .filter(Boolean)
     .join("")
     .slice(0, 2)
     .toUpperCase();
@@ -186,7 +312,7 @@ export default function ProfilePage() {
             <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/candidate">
+            <Link href="/candidate/cv">
               <Pencil className="size-4" />
               Edit profil
             </Link>
@@ -198,31 +324,131 @@ export default function ProfilePage() {
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="rounded-2xl border bg-white">
-              <div className="h-36 overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#201C45] via-[#4C1D95] to-[#7C3AED]" />
+            <section className="relative rounded-2xl border bg-white shadow-xs">
+              <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#1e1b4b] via-[#4c1d95] to-[#7c3aed]">
+                {/* Banner Photo Overlay */}
+                {p.bannerUrl ? (
+                  <img
+                    src={p.bannerUrl}
+                    alt="Foto Sampul"
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover opacity-75"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
+                
+                {/* Buttons Ubah & Hapus Foto Sampul */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <label className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-black/60 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm">
+                    <Camera className="size-3.5" />
+                    <span>Ubah Foto Sampul</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => onSelectFile(e, "banner")}
+                    />
+                  </label>
+                  {p.bannerUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMedia("banner")}
+                      title="Hapus Foto Sampul"
+                      className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-red-600/80 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span className="hidden sm:inline">Hapus</span>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
               <div className="px-6 pb-6">
-                {/* Avatar */}
-                <div className="-mt-12 flex size-24 items-center justify-center rounded-2xl border-4 border-white bg-slate-50 text-3xl font-bold text-[#7C3AED]">
-                  {initials}
+                {/* Avatar with Camera & Remove badges */}
+                <div className="-mt-16 sm:-mt-20 relative inline-block">
+                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-full border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
+                    {p.avatarUrl ? (
+                      <img
+                        src={p.avatarUrl}
+                        alt={p.fullName || "Profil"}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover z-10"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : null}
+                    <span className="absolute text-3xl font-bold text-[#7C3AED] select-none">{initials}</span>
+                  </div>
+
+                  {/* Camera & Animated Peek Trash buttons for avatar */}
+                  <div className="absolute bottom-0 right-0 z-20">
+                    <div className="group relative flex flex-col items-center pt-8 -mt-8">
+                      {p.avatarUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia("avatar")}
+                          title="Hapus Foto Profil"
+                          aria-label="Hapus Foto Profil"
+                          className="absolute z-10 flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-sm border-2 border-white transition-all duration-300 ease-out -translate-y-3.5 group-hover:-translate-y-9 group-focus-within:-translate-y-9 hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto will-change-transform"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      ) : null}
+                      <label
+                        title="Ubah Foto Profil"
+                        className="relative z-20 cursor-pointer flex size-9 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform duration-200 hover:scale-105"
+                      >
+                        <Camera className="size-4" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => onSelectFile(e, "avatar")}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-bold text-[#111827]">{p.fullName || user?.name || "Profil kamu"}</h2>
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                      {p.fullName || user?.name || "Profil Saya"}
+                    </h1>
                     <VerifiedBadge />
+                    {p.personality && (
+                      <span
+                        title={`Tipe Kepribadian: ${p.personality.type} (${p.personality.label})`}
+                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-[#7C3AED]"
+                      >
+                        <Brain className="size-3.5 text-[#7C3AED]" />
+                        {p.personality.type} · {p.personality.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Headline */}
                   {p.headline && (
-                    <p className="mt-1 font-medium text-[#7C3AED]">{p.headline}</p>
+                    <p className="mt-1 text-base font-semibold text-[#7C3AED]">{p.headline}</p>
                   )}
 
-                  {/* Location */}
-                  <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="size-3.5" />
-                    {p.location}
-                  </p>
+                  {/* Location & Salary */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="size-4 text-slate-400" />
+                      {p.location}
+                    </span>
+                    {p.salary && (
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <Banknote className="size-4 text-emerald-600" />
+                        Ekspektasi: {p.salary}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Career Status Selector */}
                   <div className="relative mt-3">
@@ -292,14 +518,11 @@ export default function ProfilePage() {
               />
             )}
 
-            {/* Tentang Saya & AI Summary */}
-            <ProfileSection title="Tentang Saya & AI Summary">
-              {p.about && <p className="max-w-2xl leading-7 text-slate-600 mb-4">{p.about}</p>}
-              <AiSummaryCard
-                data={aiSummary}
-                loading={aiLoading}
-                error={aiError}
-                onRegenerate={() => void regenerateAiSummary()}
+            {/* Professional Summary */}
+            <ProfileSection title="Professional Summary">
+              <ProfessionalSummaryCard
+                summary={p.about}
+                onOpenHelper={() => setSummaryModalOpen(true)}
               />
             </ProfileSection>
 
@@ -308,16 +531,42 @@ export default function ProfilePage() {
               <ProfileSection title="Pengalaman Kerja">
                 <div className="space-y-6 border-l-2 border-slate-200 pl-5">
                   {p.experience.map((exp, i) => (
-                    <div key={i}>
-                      <p className="font-semibold text-[#111827]">
-                        {exp.role} · {exp.company}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">{exp.dates}</p>
-                      {exp.achievements?.map((a, j) => (
-                        <p key={j} className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {a}
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-[#111827]">
+                          {exp.role} · {exp.company}
                         </p>
-                      ))}
+                        {exp.employmentType && (
+                          <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                            {exp.employmentType}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs text-muted-foreground">{exp.dates}</p>
+
+                      {exp.description && (
+                        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line pt-0.5">
+                          {exp.description}
+                        </p>
+                      )}
+
+                      {Array.isArray(exp.achievements) && exp.achievements.length > 0 ? (
+                        <div className="space-y-1 pt-1">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
+                          {exp.achievements.map((a, j) => (
+                            <p key={j} className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                              • {a}
+                            </p>
+                          ))}
+                        </div>
+                      ) : typeof exp.achievements === "string" && exp.achievements ? (
+                        <div className="pt-1">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
+                          <p className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                            • {exp.achievements}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -331,12 +580,22 @@ export default function ProfilePage() {
                   {p.education.map((edu, i) => (
                     <div key={i} className="flex items-start gap-3">
                       <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#7C3AED]" />
-                      <div>
-                        <p className="font-semibold text-[#111827]">{edu.school}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-[#111827]">{edu.school}</p>
+                          {edu.level && (
+                            <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                              {edu.level}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-700 font-medium">
                           {edu.program}
-                          {edu.dates && ` · ${edu.dates}`}
+                          {edu.gpa && <span className="text-[#7C3AED] font-semibold"> · IPK: {edu.gpa}</span>}
                         </p>
+                        {edu.dates && (
+                          <p className="text-xs text-muted-foreground">{edu.dates}</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -366,38 +625,62 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Skills */}
-            {p.skills.length > 0 && (
-              <ProfileSection title="Skill">
-                <div className="flex flex-wrap gap-2">
-                  {p.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </ProfileSection>
-            )}
+            {/* Framework Kompetensi */}
+            <ProfileSection title="Framework Kompetensi">
+              <div className="space-y-4">
+                {/* 1. Hard Competencies */}
+                {p.skills.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Hard Competencies</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="rounded-full bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-[#7C3AED]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Tools */}
-            {p.tools.length > 0 && (
-              <ProfileSection title="Tools">
-                <div className="flex flex-wrap gap-2">
-                  {p.tools.map((tool) => (
-                    <span
-                      key={tool}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#7C3AED]"
-                    >
-                      <Wrench className="size-3" />
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-              </ProfileSection>
-            )}
+                {/* 2. Tools */}
+                {p.tools.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Tools &amp; Software</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.tools.map((tool) => (
+                        <span
+                          key={tool}
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          <Wrench className="size-3" />
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Soft Skills */}
+                {p.softSkills.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Soft Skills</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.softSkills.map((softSkill) => (
+                        <span
+                          key={softSkill}
+                          className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                        >
+                          {softSkill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ProfileSection>
 
             {/* Portfolio */}
             <ProfileSection title="Portofolio">
@@ -434,6 +717,30 @@ export default function ProfilePage() {
           </aside>
         </div>
       </div>
+
+      <ProfessionalSummaryModal
+        open={summaryModalOpen}
+        onOpenChange={setSummaryModalOpen}
+        currentSummary={p.about}
+        cvProfile={cvProfile}
+        onApply={handleApplySummary}
+      />
+
+      <ImageCropDialog
+        open={cropModal.open}
+        onOpenChange={(open) => setCropModal((prev) => ({ ...prev, open }))}
+        imageSrc={cropModal.imageSrc}
+        aspectRatio={cropModal.type === "avatar" ? 1 : 3}
+        cropShape={cropModal.type === "avatar" ? "round" : "rect"}
+        title={cropModal.type === "avatar" ? "Sesuaikan Foto Profil" : "Sesuaikan Foto Sampul"}
+        description={
+          cropModal.type === "avatar"
+            ? "Geser dan perbesar untuk mengatur foto profil Anda."
+            : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
+        }
+        onCropComplete={handleCropComplete}
+      />
     </ProtectedRoute>
   );
 }
+

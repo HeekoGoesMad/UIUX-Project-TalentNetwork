@@ -15,16 +15,30 @@ const requestSchema = z.object({
   }
 });
 
-export async function GET() {
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(24),
+  candidateProfileId: z.string().uuid().optional(),
+});
+
+export async function GET(request: Request) {
   try {
-    const current = await getCurrentAppUser();
+    const url = new URL(request.url);
+    const paged = paginationSchema.safeParse({ page: url.searchParams.get("page") ?? undefined, limit: url.searchParams.get("limit") ?? undefined, candidateProfileId: url.searchParams.get("candidateProfileId") ?? undefined });
+    if (!paged.success) return NextResponse.json({ error: "Parameter pagination tidak valid." }, { status: 400 });
+    const { page, limit, candidateProfileId } = paged.data;
+    const current = await getCurrentAppUser({ allowPending: true });
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const isCandidate = current.user.role === "candidate";
+    const isPendingRecruiter = current.user.role === "recruiter" && current.user.recruiterProvisioningStatus !== "active";
+    if (isPendingRecruiter) {
+      return NextResponse.json({ requests: [], page, limit, hasMore: false });
+    }
     const scope = isCandidate ? null : await getRecruiterScope(current.db, current.user);
     if (scope && "error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
-    const result = await ConsentService.getConsentRequests(current.db, current.user, scope);
+    const result = await ConsentService.getConsentRequests(current.db, current.user, scope, { page, limit, candidateProfileId });
     return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

@@ -3,14 +3,35 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, GraduationCap, Menu, Search, ShieldCheck, UserRound, WalletCards, X, LogOut, UserPlus } from "lucide-react";
+import {
+  Bell,
+  Bookmark,
+  Briefcase,
+  ChevronDown,
+  GitBranch,
+  GraduationCap,
+  LogOut,
+  Menu,
+  Search,
+  Settings,
+  ShieldCheck,
+  UserPlus,
+  UserRound,
+  WalletCards,
+  X,
+} from "lucide-react";
 import { useApp } from "@/providers/app-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
-  const visibleUser = hydrated ? user : null;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -60,16 +81,26 @@ export function SiteHeader() {
 
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
-  const isPublicHeader = (isLanding || isAuth) && !visibleUser;
+  const isOnboarding = pathname?.includes("/onboarding");
+  const visibleUser = hydrated && !isAuth ? user : null;
+  const isPublicHeader = isLanding || isAuth || !visibleUser;
   const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const y = window.scrollY;
-      if (y > 35) {
-        setScrolled(true);
-      } else if (y < 15) {
-        setScrolled(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY;
+          if (y > 35) {
+            setScrolled(true);
+          } else if (y < 15) {
+            setScrolled(false);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
@@ -78,36 +109,82 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Navigation links based on route and auth state
-  const links = isPublicHeader
-    ? [
-        { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
-        { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
-        { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
-        { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
-      ]
-    : visibleUser?.role === "candidate"
-    ? [
-        { href: "/candidate", label: "Workspace" },
-        { href: "/candidate/cv", label: "CV & Profil" },
-         { href: "/candidate/career-advisor", label: "Career Advisor" },
-         { href: "/candidate/contact-requests", label: "Permintaan Kontak" },
-         { href: "/messages", label: "Pesan" },
-      ]
-    : visibleUser?.role === "partner"
-    ? [
-        { href: "/partner", label: "Dashboard" },
-        { href: "/partner/talent", label: "Talent Kampus" },
-        { href: "/partner/employers", label: "Akses Employer" },
-        { href: "/partner/analytics", label: "Analitik" },
-      ]
-    : [
-        { href: "/search", label: "Cari Talent" },
-         { href: "/shortlist", label: "Shortlist" },
-         { href: "/recruiter/screenings/new", label: "Screening" },
-         { href: "/messages", label: "Pesan" },
-         { href: "/dashboard", label: "Dashboard" },
-      ];
+  // Clustered recruitment features for minimalist recruiter navigation
+  const recruiterFeatures = [
+    {
+      href: "/recruiter/operations",
+      label: "Pipeline & Operasi",
+      desc: "Alur Dover, jadwal wawancara & status offer",
+      icon: GitBranch,
+    },
+    {
+      href: "/recruiter/jobs",
+      label: "Lowongan Kerja",
+      desc: "Kelola posting lowongan & pelamar masuk",
+      icon: Briefcase,
+    },
+    {
+      href: "/recruiter/screenings",
+      label: "AI Screening",
+      desc: "Hasil analisis kesesuaian role-fit & skor",
+      icon: ShieldCheck,
+    },
+    {
+      href: "/shortlist",
+      label: "Shortlist Talent",
+      desc: "Daftar kandidat potensial tersimpan",
+      icon: Bookmark,
+    },
+  ];
+
+  const isRecruiterFeatureActive = recruiterFeatures.some(
+    (item) => pathname === item.href || pathname?.startsWith(`${item.href}/`)
+  );
+
+  const isPartnerSection = pathname?.startsWith("/partner");
+  const isCandidateSection = pathname?.startsWith("/candidate");
+
+  // Top-level direct navigation links
+  const links =
+    isPartnerSection || visibleUser?.role === "partner"
+      ? [
+          { href: "/partner", label: "Dashboard" },
+          { href: "/partner/talent", label: "Talent Kampus" },
+          { href: "/partner/employers", label: "Akses Employer" },
+          { href: "/partner/analytics", label: "Analitik" },
+        ]
+      : isCandidateSection || visibleUser?.role === "candidate"
+      ? [
+          { href: "/candidate", label: "Workspace" },
+          { href: "/candidate/applications", label: "Lamaran Saya" },
+          { href: "/candidate/cv", label: "CV & Profil" },
+          { href: "/candidate/career-advisor", label: "Career Advisor" },
+          { href: "/messages", label: "Pesan" },
+        ]
+      : isPublicHeader
+      ? [
+          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
+          { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
+          { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
+          { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
+        ]
+      : [
+          { href: "/dashboard", label: "Dashboard" },
+          { href: "/search", label: "Cari Talent" },
+          { href: "/messages", label: "Pesan" },
+        ];
+
+  const isAdmin = pathname?.startsWith("/admin");
+  const isPending = pathname?.includes("/pending");
+  const settingsHref =
+    visibleUser?.role === "candidate"
+      ? "/candidate/settings"
+      : visibleUser?.role === "recruiter"
+        ? "/recruiter/settings"
+        : null;
+  if (isOnboarding || isAdmin || isPending) {
+    return null;
+  }
 
   return (
     <header
@@ -130,10 +207,10 @@ export function SiteHeader() {
         <Link
           href={
             visibleUser
-              ? visibleUser.role === "candidate"
-                ? "/candidate"
-                : visibleUser.role === "partner"
+              ? isPartnerSection || visibleUser.role === "partner"
                 ? "/partner"
+                : isCandidateSection || visibleUser.role === "candidate"
+                ? "/candidate"
                 : "/dashboard"
               : "/"
           }
@@ -180,11 +257,52 @@ export function SiteHeader() {
               </Link>
             );
           })}
+
+          {/* Minimalist Clustered Dropdown for Recruiter */}
+          {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isRecruiterFeatureActive
+                    ? "bg-[#7C3AED] text-white font-semibold shadow-xs"
+                    : isOverDarkHeader
+                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
+                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
+                )}
+              >
+                <span>Alur Rekrutmen</span>
+                <ChevronDown className="size-3.5 opacity-70 transition-transform duration-200" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64 p-2 shadow-xl border-slate-200/80 dark:border-slate-800">
+                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Fasilitas &amp; Pipeline Seleksi
+                </div>
+                {recruiterFeatures.map((feat) => {
+                  const Icon = feat.icon;
+                  const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
+                  return (
+                    <DropdownMenuItem key={feat.href} asChild className={cn("p-2 rounded-xl cursor-pointer", isActive && "bg-purple-50 text-purple-950 dark:bg-purple-950/40 dark:text-purple-100")}>
+                      <Link href={feat.href} className="flex items-start gap-2.5 w-full">
+                        <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg mt-0.5", isActive ? "bg-[#7C3AED] text-white" : "bg-purple-100 text-[#7C3AED] dark:bg-purple-950/60")}>
+                          <Icon className="size-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold leading-tight text-foreground">{feat.label}</p>
+                          <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{feat.desc}</p>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
 
         {/* Right Actions */}
         <div className="flex shrink-0 items-center gap-2">
-          {!isPublicHeader && (
+          {!isPublicHeader && !isPartnerSection && visibleUser?.role !== "partner" && (
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
               <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"} className="flex items-center gap-1.5">
                 <Search className="size-3.5" />
@@ -195,17 +313,17 @@ export function SiteHeader() {
             </Button>
           )}
 
-          {visibleUser?.role === "partner" && (
+          {(isPartnerSection || visibleUser?.role === "partner") && (
             <Link
               href="/partner"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
-              <GraduationCap className="size-4 text-primary" />
-              <span className="hidden text-muted-foreground sm:inline text-xs">Career Center</span>
+              <GraduationCap className="size-4 text-[#7C3AED]" />
+              <span className="hidden text-slate-700 sm:inline text-xs font-semibold">Career Center</span>
             </Link>
           )}
 
-          {visibleUser?.role === "recruiter" && (
+          {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
             <Link
               href="/dashboard"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
@@ -225,6 +343,21 @@ export function SiteHeader() {
               </Link>
             );
           })()}
+
+          {settingsHref && (
+            <Link
+              href={settingsHref}
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
+                pathname === settingsHref && "border-primary bg-primary/10 text-primary",
+                isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
+              )}
+              aria-label="Pengaturan Akun"
+              title="Pengaturan Akun"
+            >
+              <Settings className="size-4" />
+            </Link>
+          )}
 
           {visibleUser ? (
             <Button
@@ -315,6 +448,47 @@ export function SiteHeader() {
                 </Link>
               );
             })}
+
+            {/* Mobile Recruiter Features Group */}
+            {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
+              <div className="mt-2 border-t border-slate-100 pt-2">
+                <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Alur Rekrutmen Dover
+                </p>
+                {recruiterFeatures.map((feat) => {
+                  const Icon = feat.icon;
+                  const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
+                  return (
+                    <Link
+                      key={feat.href}
+                      href={feat.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted",
+                        isActive && "bg-purple-50 text-purple-950 font-semibold"
+                      )}
+                    >
+                      <Icon className={cn("size-4", isActive ? "text-[#7C3AED]" : "text-muted-foreground")} />
+                      <span>{feat.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {settingsHref && (
+              <Link
+                href={settingsHref}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                  pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
+                )}
+                onClick={() => setOpen(false)}
+              >
+                <Settings className="size-4 text-primary" />
+                Pengaturan
+              </Link>
+            )}
             {!visibleUser && (
               <div className="mt-2 border-t pt-3 flex flex-col gap-2">
                 {pathname !== "/login" && (

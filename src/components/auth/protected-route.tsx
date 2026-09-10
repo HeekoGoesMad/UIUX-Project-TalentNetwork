@@ -4,22 +4,70 @@ import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "@/providers/app-provider";
 import { UserRole } from "@/types";
 export function ProtectedRoute({ children, role }: { children: ReactNode; role: UserRole }) {
-  const { hydrated, bootstrapped, dbMode, user } = useApp();
+  const { hydrated, bootstrapped, dbMode, user, cvProfile } = useApp();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (!hydrated || (dbMode && !bootstrapped)) return;
-    if (user && user.role === "recruiter" && role === "recruiter" && user.provisioningStatus !== "active") {
-      router.replace("/recruiter/pending");
-    } else if (user && user.role !== role) {
-      router.replace(user.role === "candidate" ? "/candidate" : user.role === "partner" ? "/partner" : "/dashboard");
-    } else if (!user) {
+    if (!user) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
     }
-  }, [hydrated, bootstrapped, dbMode, user, role, router, pathname]);
+    // Admin has superuser preview access to inspect any workspace
+    if (user.role === "admin") {
+      return;
+    }
+    if (user.role === "recruiter" && user.provisioningStatus !== "active") {
+      // Allow recruiter to access onboarding to fill company data, or stay at pending page
+      if (pathname !== "/recruiter/pending" && pathname !== "/recruiter/onboarding") {
+        router.replace("/recruiter/pending");
+      }
+      return;
+    }
+    if (user.role === "partner" && user.provisioningStatus !== "active") {
+      // Allow partner to access onboarding or pending verification page
+      if (pathname !== "/partner/pending" && pathname !== "/partner/onboarding") {
+        router.replace(user.provisioningStatus === "revision_required" ? "/partner/onboarding" : "/partner/pending");
+      }
+      return;
+    }
+    if (user.role === "candidate" && (!cvProfile || !cvProfile.fullName?.trim())) {
+      // Require candidate to complete minimum onboarding profile before accessing workspace
+      if (pathname !== "/candidate/onboarding") {
+        router.replace("/candidate/onboarding");
+      }
+      return;
+    }
+    if (user.role !== role) {
+      const target = user.role === "candidate" ? "/candidate" : user.role === "partner" ? "/partner" : "/dashboard";
+      if (pathname !== target) {
+        router.replace(target);
+      }
+    }
+  }, [hydrated, bootstrapped, dbMode, user, cvProfile, role, router, pathname]);
 
-  if (!hydrated || (dbMode && !bootstrapped) || !user || user.role !== role || (role === "recruiter" && user.provisioningStatus !== "active")) {
+  if (!hydrated) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
+        <div className="mx-auto size-8 animate-pulse rounded-full bg-[#d7f5e8]" />
+        <p className="mt-4 text-sm text-muted-foreground">Menyiapkan workspace...</p>
+      </div>
+    );
+  }
+
+  if (user?.role === "admin") {
+    return <>{children}</>;
+  }
+
+  if (
+    (dbMode && !bootstrapped) ||
+    !user ||
+    user.role !== role ||
+    (role === "recruiter" && user.provisioningStatus !== "active" && pathname !== "/recruiter/onboarding") ||
+    (role === "partner" && user.provisioningStatus !== "active" && pathname !== "/partner/onboarding") ||
+    (role === "candidate" && (!cvProfile || !cvProfile.fullName?.trim()) && pathname !== "/candidate/onboarding")
+  ) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center">
         <div className="mx-auto size-8 animate-pulse rounded-full bg-[#d7f5e8]" />

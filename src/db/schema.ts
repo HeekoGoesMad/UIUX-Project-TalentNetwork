@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -17,7 +18,7 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).defaultNow().notNull();
 
-export const userRole = pgEnum("user_role", ["candidate", "recruiter", "admin"]);
+export const userRole = pgEnum("user_role", ["candidate", "recruiter", "partner", "admin"]);
 export const organizationMemberRole = pgEnum("organization_member_role", ["owner", "admin", "recruiter", "viewer"]);
 export const profileSectionType = pgEnum("profile_section_type", [
   "headline",
@@ -37,7 +38,50 @@ export const notificationType = pgEnum("notification_type", ["consent_requested"
 export const conversationStatus = pgEnum("conversation_status", ["active", "read_only", "blocked"]);
 export const attachmentScanStatus = pgEnum("attachment_scan_status", ["not_applicable", "pending", "clean", "quarantined"]);
 export const messageReportStatus = pgEnum("message_report_status", ["open", "reviewing", "resolved", "dismissed"]);
-export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected"]);
+export const recruiterProvisioningStatus = pgEnum("recruiter_provisioning_status", ["pending", "active", "rejected", "revision_required"]);
+export const companyVerificationStatus = pgEnum("company_verification_status", [
+  "pending",
+  "approved",
+  "need_revision",
+  "rejected",
+  "suspended",
+]);
+export const partnerVerificationStatus = pgEnum("partner_verification_status", [
+  "pending",
+  "approved",
+  "need_revision",
+  "rejected",
+]);
+export const industrySector = pgEnum("industry_sector", [
+  "Technology",
+  "Financial Services",
+  "Hospitality",
+  "Retail",
+  "Manufacturing",
+  "Education",
+  "Healthcare",
+  "Logistics",
+  "Professional Services",
+  "Other",
+]);
+export const companyScale = pgEnum("company_scale", [
+  "1-10 Karyawan",
+  "11-50 Karyawan",
+  "51-200 Karyawan",
+  "201-500 Karyawan",
+  "500+ Karyawan",
+]);
+export const subscriptionTier = pgEnum("subscription_tier", [
+  "trial",
+  "starter",
+  "professional",
+  "enterprise",
+]);
+export const subscriptionStatus = pgEnum("subscription_status", [
+  "active",
+  "expired",
+  "suspended",
+]);
 export const tokenLedgerEntryType = pgEnum("token_ledger_entry_type", ["grant", "charge", "refund"]);
 export const tokenPurchaseStatus = pgEnum("token_purchase_status", ["pending", "paid", "failed", "refunded"]);
 export const notificationDeliveryChannel = pgEnum("notification_delivery_channel", ["email", "in_app"]);
@@ -114,6 +158,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   role: userRole("role").notNull(),
   recruiterProvisioningStatus: recruiterProvisioningStatus("recruiter_provisioning_status").notNull().default("pending"),
+  recruiterRejectionReason: text("recruiter_rejection_reason"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [
@@ -136,9 +181,37 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   createdBy: uuid("created_by").notNull().references(() => users.id),
+  // Legalitas
+  nib: text("nib").unique(),
+  npwp: text("npwp").unique(),
+  // Informasi Bisnis
+  industry: industrySector("industry"),
+  companyScale: companyScale("company_scale"),
+  province: text("province"),
+  city: text("city"),
+  officeAddress: text("office_address"),
+  companyEmail: text("company_email"),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  description: text("description"),
+  // Informasi Verifikasi Admin
+  verificationStatus: companyVerificationStatus("verification_status").notNull().default("pending"),
+  verificationNotes: text("verification_notes"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  // Informasi Langganan
+  subscriptionTier: subscriptionTier("subscription_tier").notNull().default("trial"),
+  subscriptionStatus: subscriptionStatus("subscription_status").notNull().default("active"),
+  subscriptionStartDate: timestamp("subscription_start_date", { withTimezone: true }),
+  subscriptionEndDate: timestamp("subscription_end_date", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (table) => [index("organizations_created_by_idx").on(table.createdBy)]);
+}, (table) => [
+  index("organizations_created_by_idx").on(table.createdBy),
+  index("organizations_reviewed_by_idx").on(table.reviewedBy),
+  index("organizations_verification_status_idx").on(table.verificationStatus),
+  index("organizations_subscription_status_idx").on(table.subscriptionStatus),
+]);
 
 export const organizationMembers = pgTable("organization_members", {
   id: id(),
@@ -149,6 +222,25 @@ export const organizationMembers = pgTable("organization_members", {
 }, (table) => [
   unique("organization_members_org_user_unique").on(table.organizationId, table.userId),
   index("organization_members_user_idx").on(table.userId),
+]);
+
+export const partnerships = pgTable("partnerships", {
+  id: id(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  skDocumentUrl: text("sk_document_url"),
+  skNumber: text("sk_number"),
+  location: text("location"),
+  verificationStatus: partnerVerificationStatus("verification_status").notNull().default("pending"),
+  verificationNotes: text("verification_notes"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index("partnerships_user_id_idx").on(table.userId),
+  index("partnerships_verification_status_idx").on(table.verificationStatus),
+  index("partnerships_reviewed_by_idx").on(table.reviewedBy),
 ]);
 
 export const candidateProfiles = pgTable("candidate_profiles", {
@@ -162,7 +254,11 @@ export const candidateProfiles = pgTable("candidate_profiles", {
   completeness: integer("completeness").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (table) => [check("candidate_profiles_completeness_check", sql`${table.completeness} between 0 and 100`)]);
+}, (table) => [
+  check("candidate_profiles_completeness_check", sql`${table.completeness} between 0 and 100`),
+  index("candidate_profiles_published_updated_idx").on(table.isPublished, table.updatedAt),
+  index("candidate_profiles_published_location_idx").on(table.isPublished, table.location),
+]);
 
 export const candidateProfileSections = pgTable("candidate_profile_sections", {
   id: id(),
@@ -247,7 +343,7 @@ export const screeningRuns = pgTable("screening_runs", {
   id: id(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   candidateProfileId: uuid("candidate_profile_id").notNull().references(() => candidateProfiles.id),
-  consentRequestItemId: uuid("consent_request_item_id").notNull().references(() => consentRequestItems.id),
+  consentRequestItemId: uuid("consent_request_item_id").references(() => consentRequestItems.id, { onDelete: "set null" }),
   requestedBy: uuid("requested_by").notNull().references(() => users.id),
   status: screeningStatus("status").notNull().default("pending"),
   tokenCost: integer("token_cost").notNull().default(1),
@@ -302,6 +398,7 @@ export const conversations = pgTable("conversations", {
 }, (table) => [
   index("conversations_organization_idx").on(table.organizationId),
   index("conversations_created_by_idx").on(table.createdBy),
+  index("conversations_consent_item_idx").on(table.consentRequestItemId),
 ]);
 
 export const conversationParticipants = pgTable("conversation_participants", {
@@ -377,6 +474,7 @@ export const messageReports = pgTable("message_reports", {
   createdAt: createdAt(),
 }, (table) => [
   index("message_reports_conversation_idx").on(table.conversationId),
+  index("message_reports_message_idx").on(table.messageId),
   index("message_reports_reporter_idx").on(table.reporterId),
 ]);
 
@@ -590,7 +688,7 @@ export const tokenPurchases = pgTable("token_purchases", {
   packageId: uuid("package_id").notNull().references(() => tokenPackages.id, { onDelete: "restrict" }),
   purchasedBy: uuid("purchased_by").notNull().references(() => users.id),
   provider: text("provider").notNull(),
-  providerReference: text("provider_reference").unique(),
+  providerReference: text("provider_reference"),
   status: tokenPurchaseStatus("status").notNull().default("pending"),
   amountMinor: integer("amount_minor").notNull(),
   currency: text("currency").notNull(),
@@ -602,6 +700,7 @@ export const tokenPurchases = pgTable("token_purchases", {
 }, (table) => [
   check("token_purchases_amount_minor_check", sql`${table.amountMinor} >= 0`),
   check("token_purchases_token_amount_check", sql`${table.tokenAmount} > 0`),
+  uniqueIndex("token_purchases_provider_reference_unique").on(table.providerReference).where(sql`${table.providerReference} is not null`),
   index("token_purchases_organization_status_idx").on(table.organizationId, table.status),
   index("token_purchases_package_idx").on(table.packageId),
   index("token_purchases_provider_reference_idx").on(table.provider, table.providerReference),
@@ -647,6 +746,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
 }, (table) => [
   check("notification_deliveries_attempt_count_check", sql`${table.attemptCount} >= 0`),
   index("notification_deliveries_notification_status_idx").on(table.notificationId, table.status),
+  index("notification_deliveries_status_next_attempt_idx").on(table.status, table.nextAttemptAt),
 ]);
 
 export const candidateDocuments = pgTable("candidate_documents", {
@@ -786,7 +886,7 @@ export const skillAliases = pgTable("skill_aliases", {
 
 export const searchAnalytics = pgTable("search_analytics", {
   id: id(), organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }), userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), savedSearchId: uuid("saved_search_id").references(() => savedSearches.id, { onDelete: "set null" }), eventType: searchAnalyticsEventType("event_type").notNull(), query: text("query"), resultCount: integer("result_count"), metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}), createdAt: createdAt(),
-}, (table) => [index("search_analytics_organization_created_idx").on(table.organizationId, table.createdAt), index("search_analytics_saved_search_idx").on(table.savedSearchId)]);
+}, (table) => [index("search_analytics_organization_created_idx").on(table.organizationId, table.createdAt), index("search_analytics_user_idx").on(table.userId), index("search_analytics_saved_search_idx").on(table.savedSearchId)]);
 
 export const screeningGovernanceVersions = pgTable("screening_governance_versions", {
   id: id(), organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }), version: integer("version").notNull(), policy: jsonb("policy").$type<Record<string, unknown>>().notNull().default({}), publishedAt: timestamp("published_at", { withTimezone: true }), createdBy: uuid("created_by").notNull().references(() => users.id), createdAt: createdAt(),

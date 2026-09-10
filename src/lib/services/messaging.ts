@@ -1,8 +1,28 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
+import { writeAuditLog } from "@/lib/audit";
 import type { AppUser } from "@/lib/api/auth";
+
+function encodeMessageCursor(createdAt: Date | string, id: string): string {
+  const c = (createdAt instanceof Date ? createdAt : new Date(createdAt)).toISOString();
+  return Buffer.from(JSON.stringify({ c, id }), "utf8").toString("base64url");
+}
+
+function decodeMessageCursor(cursor: string): { createdAt: Date; id: string } | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const { c, id } = parsed as { c?: unknown; id?: unknown };
+    if (typeof c !== "string" || typeof id !== "string" || id.length === 0) return null;
+    const createdAt = new Date(c);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    return { createdAt, id };
+  } catch {
+    return null;
+  }
+}
 
 export class MessagingService {
   /**
@@ -39,47 +59,56 @@ export class MessagingService {
 
     const conversationIds = rows.map((row) => row.id);
 
-    // Single query: Batch fetch all participants for all retrieved conversations
-    const allParticipants = await db
-      .select({
-        conversationId: schema.conversationParticipants.conversationId,
-        id: schema.conversationParticipants.userId,
-        name: schema.profiles.displayName,
-        avatarUrl: schema.profiles.avatarUrl,
-        email: schema.users.email,
-      })
-      .from(schema.conversationParticipants)
-      .innerJoin(schema.users, eq(schema.users.id, schema.conversationParticipants.userId))
-      .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.conversationParticipants.userId))
-      .where(
-        and(
-          inArray(schema.conversationParticipants.conversationId, conversationIds),
-          isNull(schema.conversationParticipants.leftAt)
-        )
-      );
+    const idList = sql.join(
+      conversationIds.map((id) => sql`${id}`),
+      sql`, `
+    );
 
-    // Single query: Batch fetch messages to identify the latest message per conversation
-    const allMessages = await db
-      .select({
-        id: schema.messages.id,
-        conversationId: schema.messages.conversationId,
-        body: schema.messages.body,
-        senderId: schema.messages.senderId,
-        createdAt: schema.messages.createdAt,
-      })
-      .from(schema.messages)
-      .where(
-        and(
-          inArray(schema.messages.conversationId, conversationIds),
-          isNull(schema.messages.deletedAt)
-        )
-      )
-      .orderBy(desc(schema.messages.createdAt));
+    // Concurrently fetch all participants and newest non-deleted message per conversation
+    const [allParticipants, latestMessagesRaw] = await Promise.all([
+      db
+        .select({
+          conversationId: schema.conversationParticipants.conversationId,
+          id: schema.conversationParticipants.userId,
+          name: schema.profiles.displayName,
+          avatarUrl: schema.profiles.avatarUrl,
+          email: schema.users.email,
+        })
+        .from(schema.conversationParticipants)
+        .innerJoin(schema.users, eq(schema.users.id, schema.conversationParticipants.userId))
+        .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.conversationParticipants.userId))
+        .where(
+          and(
+            inArray(schema.conversationParticipants.conversationId, conversationIds),
+            isNull(schema.conversationParticipants.leftAt)
+          )
+        ),
+      db.execute(sql`
+        SELECT DISTINCT ON (m."conversation_id")
+          m."id" AS "id",
+          m."conversation_id" AS "conversationId",
+          m."body" AS "body",
+          m."sender_id" AS "senderId",
+          m."created_at" AS "createdAt"
+        FROM "messages" m
+        WHERE m."conversation_id" IN (${idList}) AND m."deleted_at" IS NULL
+        ORDER BY m."conversation_id", m."created_at" DESC, m."id" DESC
+      `),
+    ]);
+
+    const latestMessages = latestMessagesRaw as unknown as {
+      id: string;
+      conversationId: string;
+      body: string;
+      senderId: string;
+      createdAt: Date;
+    }[];
+    const latestByConversation = new Map(latestMessages.map((m) => [m.conversationId, m]));
 
     // Map participants and latest message to each conversation in memory
     const conversations = rows.map((row) => {
       const participants = allParticipants.filter((p) => p.conversationId === row.id);
-      const lastMessage = allMessages.find((m) => m.conversationId === row.id) ?? null;
+      const lastMessage = latestByConversation.get(row.id) ?? null;
       return {
         ...row,
         participants,
@@ -101,6 +130,7 @@ export class MessagingService {
   ) {
     const [approved] = await db
       .select({
+        itemId: schema.consentRequestItems.id,
         candidateUserId: schema.candidateProfiles.userId,
         organizationId: schema.consentRequestBatches.organizationId,
       })
@@ -129,48 +159,58 @@ export class MessagingService {
       };
     }
 
-    // Check if an active conversation already exists between both users in this org
-    const existingConversations = await db
-      .select({ id: schema.conversations.id })
-      .from(schema.conversations)
-      .innerJoin(
-        schema.conversationParticipants,
-        eq(schema.conversationParticipants.conversationId, schema.conversations.id)
-      )
-      .where(
-        and(
-          eq(schema.conversations.organizationId, approved.organizationId),
-          eq(schema.conversationParticipants.userId, user.id),
-          eq(schema.conversations.status, "active")
-        )
-      );
+    // Serialize concurrent creates per organization: the existence checks and
+    // the insert run in one transaction behind a FOR UPDATE lock on the parent
+    // organization row, so a racing POST waits, then sees the winner's row.
+    return db.transaction(async (tx) => {
+      await tx
+        .select({ id: schema.organizations.id })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, approved.organizationId))
+        .for("update");
 
-    if (existingConversations.length > 0) {
-      const existingIds = existingConversations.map((c) => c.id);
-      const [shared] = await db
-        .select({ conversationId: schema.conversationParticipants.conversationId })
-        .from(schema.conversationParticipants)
+      // Check if an active conversation already exists between both users in this org
+      const existingConversations = await tx
+        .select({ id: schema.conversations.id })
+        .from(schema.conversations)
+        .innerJoin(
+          schema.conversationParticipants,
+          eq(schema.conversationParticipants.conversationId, schema.conversations.id)
+        )
         .where(
           and(
-            inArray(schema.conversationParticipants.conversationId, existingIds),
-            eq(schema.conversationParticipants.userId, approved.candidateUserId),
-            isNull(schema.conversationParticipants.leftAt)
+            eq(schema.conversations.organizationId, approved.organizationId),
+            eq(schema.conversationParticipants.userId, user.id),
+            eq(schema.conversations.status, "active")
           )
-        )
-        .limit(1);
+        );
 
-      if (shared) {
-        return { conversationId: shared.conversationId, reused: true };
+      if (existingConversations.length > 0) {
+        const existingIds = existingConversations.map((c) => c.id);
+        const [shared] = await tx
+          .select({ conversationId: schema.conversationParticipants.conversationId })
+          .from(schema.conversationParticipants)
+          .where(
+            and(
+              inArray(schema.conversationParticipants.conversationId, existingIds),
+              eq(schema.conversationParticipants.userId, approved.candidateUserId),
+              isNull(schema.conversationParticipants.leftAt)
+            )
+          )
+          .limit(1);
+
+        if (shared) {
+          return { conversationId: shared.conversationId, reused: true };
+        }
       }
-    }
 
-    // Create new conversation and add participants
-    return db.transaction(async (tx) => {
+      // Create new conversation and add participants
       const [conversation] = await tx
         .insert(schema.conversations)
         .values({
           organizationId: approved.organizationId,
           createdBy: user.id,
+          consentRequestItemId: approved.itemId,
         })
         .returning({ id: schema.conversations.id });
 
@@ -184,9 +224,101 @@ export class MessagingService {
   }
 
   /**
-   * List messages in a conversation.
+   * Create or reuse the conversation selected by a candidate's approved request.
+   * The consent item identifies the exact recruiter when several recruiters have
+   * requested contact for the same candidate profile.
    */
-  static async listMessages(db: Database, userId: string, conversationId: string) {
+  static async createOrGetConversationForCandidate(
+    db: Database,
+    candidateUserId: string,
+    candidateProfileId: string,
+    consentRequestItemId: string
+  ) {
+    const [approved] = await db
+      .select({
+        organizationId: schema.consentRequestBatches.organizationId,
+        recruiterUserId: schema.consentRequestBatches.requestedBy,
+        candidateUserId: schema.candidateProfiles.userId,
+      })
+      .from(schema.consentRequestItems)
+      .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.consentRequestItems.candidateProfileId))
+      .innerJoin(schema.consentRequestBatches, eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId))
+      .where(
+        and(
+          eq(schema.consentRequestItems.id, consentRequestItemId),
+          eq(schema.consentRequestItems.candidateProfileId, candidateProfileId),
+          eq(schema.consentRequestItems.status, "approved")
+        )
+      )
+      .limit(1);
+
+    if (!approved || approved.candidateUserId !== candidateUserId) {
+      return { error: "Percakapan hanya dapat dibuat dari consent kandidat yang disetujui.", status: 403 as const };
+    }
+
+    return db.transaction(async (tx) => {
+      await tx
+        .select({ id: schema.organizations.id })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, approved.organizationId))
+        .for("update");
+
+      const existingConversations = await tx
+        .select({ id: schema.conversations.id })
+        .from(schema.conversations)
+        .innerJoin(schema.conversationParticipants, eq(schema.conversationParticipants.conversationId, schema.conversations.id))
+        .where(
+          and(
+            eq(schema.conversations.organizationId, approved.organizationId),
+            eq(schema.conversationParticipants.userId, candidateUserId),
+            eq(schema.conversations.status, "active")
+          )
+        );
+
+      if (existingConversations.length > 0) {
+        const existingIds = existingConversations.map((conversation) => conversation.id);
+        const [shared] = await tx
+          .select({ conversationId: schema.conversationParticipants.conversationId })
+          .from(schema.conversationParticipants)
+          .where(
+            and(
+              inArray(schema.conversationParticipants.conversationId, existingIds),
+              eq(schema.conversationParticipants.userId, approved.recruiterUserId),
+              isNull(schema.conversationParticipants.leftAt)
+            )
+          )
+          .limit(1);
+
+        if (shared) return { conversationId: shared.conversationId, reused: true };
+      }
+
+      const [conversation] = await tx
+        .insert(schema.conversations)
+        .values({
+          organizationId: approved.organizationId,
+          createdBy: candidateUserId,
+          consentRequestItemId,
+        })
+        .returning({ id: schema.conversations.id });
+
+      await tx.insert(schema.conversationParticipants).values([
+        { conversationId: conversation.id, userId: candidateUserId },
+        { conversationId: conversation.id, userId: approved.recruiterUserId },
+      ]);
+
+      return { conversationId: conversation.id, reused: false };
+    });
+  }
+
+  /**
+   * List messages in a conversation (newest page first, returned oldest-first).
+   */
+  static async listMessages(
+    db: Database,
+    userId: string,
+    conversationId: string,
+    options: { cursor?: string | null; limit?: number } = {}
+  ) {
     const [participant] = await db
       .select({ id: schema.conversationParticipants.id })
       .from(schema.conversationParticipants)
@@ -203,7 +335,26 @@ export class MessagingService {
       return { error: "Anda bukan peserta percakapan ini.", status: 403 as const };
     }
 
-    const messages = await db
+    const limit = Number.isInteger(options.limit)
+      ? Math.min(Math.max(options.limit as number, 1), 100)
+      : 50;
+
+    let cursorCondition = undefined;
+    if (options.cursor) {
+      const decoded = decodeMessageCursor(options.cursor);
+      if (!decoded) {
+        return { error: "Cursor tidak valid.", status: 400 as const };
+      }
+      cursorCondition = or(
+        lt(schema.messages.createdAt, decoded.createdAt),
+        and(
+          eq(schema.messages.createdAt, decoded.createdAt),
+          lt(schema.messages.id, decoded.id)
+        )
+      );
+    }
+
+    const rows = await db
       .select({
         id: schema.messages.id,
         conversationId: schema.messages.conversationId,
@@ -213,24 +364,48 @@ export class MessagingService {
         body: schema.messages.body,
         createdAt: schema.messages.createdAt,
         editedAt: schema.messages.editedAt,
+        attachmentName: schema.messages.attachmentName,
+        attachmentMimeType: schema.messages.attachmentMimeType,
+        attachmentSize: schema.messages.attachmentSize,
+        attachmentScanStatus: schema.messages.attachmentScanStatus,
       })
       .from(schema.messages)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.messages.senderId))
       .where(
         and(
           eq(schema.messages.conversationId, conversationId),
-          isNull(schema.messages.deletedAt)
+          isNull(schema.messages.deletedAt),
+          cursorCondition
         )
       )
-      .orderBy(asc(schema.messages.createdAt));
+      .orderBy(desc(schema.messages.createdAt), desc(schema.messages.id))
+      .limit(limit + 1);
 
-    return { messages };
+    const hasMore = rows.length > limit;
+    const messages = (hasMore ? rows.slice(0, limit) : rows).reverse();
+    const nextCursor =
+      hasMore && messages.length > 0
+        ? encodeMessageCursor(messages[0].createdAt, messages[0].id)
+        : null;
+
+    return { messages, nextCursor, hasMore };
   }
 
   /**
    * Send a message and dispatch recipient notifications.
    */
-  static async sendMessage(db: Database, userId: string, conversationId: string, body: string) {
+  static async sendMessage(
+    db: Database,
+    userId: string,
+    conversationId: string,
+    body: string,
+    attachment?: {
+      name: string;
+      mimeType: string;
+      sizeBytes: number;
+      storagePath: string;
+    } | null
+  ) {
     const [participant] = await db
       .select({
         id: schema.conversationParticipants.id,
@@ -261,7 +436,16 @@ export class MessagingService {
     return db.transaction(async (tx) => {
       const [message] = await tx
         .insert(schema.messages)
-        .values({ conversationId, senderId: userId, body })
+        .values({
+          conversationId,
+          senderId: userId,
+          body,
+          attachmentName: attachment?.name ?? null,
+          attachmentMimeType: attachment?.mimeType ?? null,
+          attachmentSize: attachment?.sizeBytes ?? null,
+          attachmentStoragePath: attachment?.storagePath ?? null,
+          attachmentScanStatus: attachment ? "pending" : "not_applicable",
+        })
         .returning();
 
       await tx
@@ -291,6 +475,18 @@ export class MessagingService {
           }))
         );
       }
+
+      await writeAuditLog({
+        db: tx,
+        actorUserId: userId,
+        action: "message.sent",
+        entityType: "message",
+        entityId: message.id,
+        metadata: {
+          conversationId,
+          ...(attachment ? { hasAttachment: true, attachmentName: attachment.name } : {}),
+        },
+      });
 
       return { message: { ...message, isMine: true } };
     });

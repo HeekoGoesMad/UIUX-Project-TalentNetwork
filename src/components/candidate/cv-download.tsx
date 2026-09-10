@@ -1,296 +1,457 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useEffect, useRef, useState, useTransition } from "react";
 import {
   Download,
-  CheckCircle2,
+  Printer,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Sparkles,
   ShieldCheck,
-  Loader2,
-  LayoutGrid,
   FileText,
+  Columns,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import type { CvProfile } from "@/types";
 import { cn } from "@/lib/utils";
-import { type CvTemplateId } from "@/lib/cv/templates";
+import { buildCvHtml, type CvTemplateId } from "@/lib/cv/templates";
 
 export type { CvTemplateId } from "@/lib/cv/templates";
 
-// ─── Template definitions ─────────────────────────────────────────────────────
+// ─── Template Meta Definitions ───────────────────────────────────────────────
 
-interface CvTemplate {
+interface CvTemplateMeta {
   id: CvTemplateId;
   name: string;
   tag: string;
-  desc: string;
-  recommended?: boolean;
-  preview: React.ReactNode;
+  shortDesc: string;
+  recommendedRole: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
-const templates: CvTemplate[] = [
+const TEMPLATES: CvTemplateMeta[] = [
   {
     id: "ats",
-    name: "ATS Clean",
-    tag: "Direkomendasikan",
-    desc: "Format standar ATS-friendly: hitam-putih, tanpa kolom, mudah diparsing sistem rekrutmen.",
-    recommended: true,
-    preview: (
-      <div className="w-full rounded-lg border bg-white p-4 text-[8px] leading-tight shadow-sm font-mono">
-        <div className="border-b pb-1.5 mb-1.5">
-          <div className="h-2 w-28 bg-slate-900 rounded mb-0.5" />
-          <div className="h-1.5 w-20 bg-slate-400 rounded" />
-        </div>
-        <div className="space-y-1">
-          {["PENGALAMAN KERJA", "PENDIDIKAN", "SKILL"].map((s) => (
-            <div key={s}>
-              <div className="h-1.5 w-16 bg-slate-900 rounded mb-0.5" />
-              <div className="h-1 w-full bg-slate-200 rounded mb-0.5" />
-              <div className="h-1 w-4/5 bg-slate-200 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+    name: "ATS Friendly",
+    tag: "Standar HR",
+    shortDesc: "Format standar teks lolos scanner ATS (Workday, Taleo, Greenhouse).",
+    recommendedRole: "Portal Karir & Korporasi",
+    icon: ShieldCheck,
   },
   {
     id: "modern",
-    name: "Modern Purple",
-    tag: "Populer",
-    desc: "Header dengan aksen ungu ProofyLink, layout dua kolom elegan untuk fresh graduate & professional.",
-    preview: (
-      <div className="w-full rounded-lg border overflow-hidden shadow-sm text-[8px] leading-tight">
-        <div className="bg-[#7C3AED] px-4 py-3">
-          <div className="h-2.5 w-24 bg-white/80 rounded mb-0.5" />
-          <div className="h-1.5 w-16 bg-purple-300 rounded" />
-        </div>
-        <div className="bg-white p-3 grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <div className="h-1 w-full bg-purple-100 rounded" />
-            <div className="h-1 w-4/5 bg-purple-100 rounded" />
-            <div className="h-1 w-3/5 bg-purple-100 rounded" />
-          </div>
-          <div className="space-y-1">
-            <div className="h-1 w-full bg-slate-200 rounded" />
-            <div className="h-1 w-3/4 bg-slate-200 rounded" />
-            <div className="flex flex-wrap gap-0.5 mt-1">
-              {[1, 2, 3].map((i) => <div key={i} className="h-1.5 w-5 bg-purple-200 rounded-full" />)}
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
+    name: "Creative Modern",
+    tag: "Visual Portfolio",
+    shortDesc: "Aksen pastel peach, avatar bundar, 2-kolom & timeline pengalaman.",
+    recommendedRole: "Startup, Tech & Agensi Kreatif",
+    icon: Sparkles,
   },
   {
     id: "sidebar",
-    name: "Sidebar Creative",
-    tag: "Kreatif",
-    desc: "Sidebar gelap dengan konten utama terang. Cocok untuk desainer, marketers, dan creative roles.",
-    preview: (
-      <div className="w-full rounded-lg border overflow-hidden shadow-sm text-[8px] leading-tight flex">
-        <div className="w-1/3 bg-slate-800 p-2 space-y-1.5">
-          <div className="size-6 rounded-full bg-white/30 mx-auto mb-1" />
-          <div className="h-1 w-full bg-white/40 rounded" />
-          <div className="h-1 w-3/4 bg-white/20 rounded" />
-          <div className="h-1 w-full bg-white/20 rounded" />
-          <div className="h-1 w-4/5 bg-white/20 rounded" />
-        </div>
-        <div className="flex-1 bg-white p-2 space-y-1">
-          <div className="h-1.5 w-16 bg-slate-800 rounded mb-0.5" />
-          <div className="h-1 w-full bg-slate-200 rounded" />
-          <div className="h-1 w-4/5 bg-slate-200 rounded" />
-          <div className="h-1.5 w-16 bg-slate-800 rounded mt-1 mb-0.5" />
-          <div className="h-1 w-full bg-slate-200 rounded" />
-          <div className="h-1 w-3/4 bg-slate-200 rounded" />
-        </div>
-      </div>
-    ),
+    name: "Sidebar Dark",
+    tag: "Kontras Tinggi",
+    shortDesc: "Sidebar navy gelap dengan konten utama terang.",
+    recommendedRole: "Engineering, Data & Tech Lead",
+    icon: Columns,
   },
   {
     id: "minimal",
     name: "Minimal Elegant",
-    tag: "Premium",
-    desc: "Tipografi tegas dengan batas tipis dan whitespace maksimal. Kesan high-level professional.",
-    preview: (
-      <div className="w-full rounded-lg border bg-white p-4 text-[8px] leading-tight shadow-sm">
-        <div className="flex justify-between items-start border-b border-slate-800 pb-2 mb-2">
-          <div>
-            <div className="h-2.5 w-24 bg-slate-900 rounded mb-0.5" />
-            <div className="h-1.5 w-20 bg-slate-400 rounded" />
-          </div>
-          <div className="text-right space-y-0.5">
-            <div className="h-1 w-14 bg-slate-300 rounded" />
-            <div className="h-1 w-12 bg-slate-300 rounded" />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex gap-2">
-              <div className="w-12 shrink-0 h-1 bg-slate-400 rounded mt-0.5" />
-              <div className="flex-1 space-y-0.5">
-                <div className="h-1 w-full bg-slate-200 rounded" />
-                <div className="h-1 w-4/5 bg-slate-200 rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+    tag: "Editorial",
+    shortDesc: "Tipografi serif klasik dengan whitespace luas.",
+    recommendedRole: "Konsultan, Finansial & Akademik",
+    icon: FileText,
   },
 ];
 
-// ─── Download logic ───────────────────────────────────────────────────────────
+// ─── Invisible Print Helper ───────────────────────────────────────────────────
 
-async function downloadCvPdf(
-  profile: CvProfile,
-  templateId: CvTemplateId,
-  onError: (msg: string) => void
-): Promise<void> {
-  const response = await fetch("/api/cv/export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ profile, templateId }),
-  });
-
-  if (!response.ok) {
-    const data = (await response.json().catch(() => ({}))) as { error?: string };
-    onError(data.error ?? "PDF tidak dapat dibuat. Coba lagi.");
-    return;
+function triggerIframePrint(htmlContent: string) {
+  let iframe = document.getElementById("cv-hidden-print-iframe") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "cv-hidden-print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
   }
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const safeFileName = `proofylink-cv-${(profile.fullName ?? "cv").toLowerCase().replace(/\s+/g, "-")}.pdf`;
-  link.href = url;
-  link.download = safeFileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  iframe.srcdoc = htmlContent;
+  iframe.onload = () => {
+    setTimeout(() => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch {
+        // Fallback popup if iframe print is blocked
+        const win = window.open("", "_blank");
+        if (win) {
+          win.document.open();
+          win.document.write(htmlContent);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 300);
+        }
+      }
+    }, 250);
+  };
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function CvDownload({ profile }: { profile: CvProfile }) {
+export const CvDownload = memo(function CvDownload({ profile }: { profile: CvProfile }) {
   const [selected, setSelected] = useState<CvTemplateId>("ats");
   const [downloading, setDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [zoomScale, setZoomScale] = useState<number>(0.7);
+  const [, startTransition] = useTransition();
+
+  // Debounced/Deferred live HTML generation to keep typing silky smooth
+  const [renderedHtml, setRenderedHtml] = useState(() => buildCvHtml(profile, selected));
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startTransition(() => {
+        setRenderedHtml(buildCvHtml(profile, selected));
+      });
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [profile, selected]);
+
+  const activeTpl = TEMPLATES.find((t) => t.id === selected) ?? TEMPLATES[0];
 
   const handleDownload = async () => {
     setDownloading(true);
+    let directDownloaded = false;
+
     try {
-      await downloadCvPdf(profile, selected, (msg) => {
-        toast.error("Gagal membuat PDF", { description: msg });
+      const res = await fetch("/api/cv/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, templateId: selected }),
       });
-      toast.success("CV berhasil diunduh!");
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const safeName = `proofylink-cv-${(profile.fullName || "kandidat").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${selected}.pdf`;
+        link.href = url;
+        link.download = safeName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success("CV berhasil diunduh sebagai PDF!");
+        directDownloaded = true;
+      }
     } catch {
-      toast.error("Gagal mengunduh CV. Coba lagi.");
+      // Fallback below
     } finally {
       setDownloading(false);
     }
+
+    if (!directDownloaded) {
+      toast.info("Menyiapkan dokumen — silakan pilih 'Simpan sebagai PDF' pada dialog cetak.", {
+        duration: 4500,
+      });
+      triggerIframePrint(renderedHtml);
+    }
   };
 
-  const selectedTpl = templates.find((t) => t.id === selected)!;
+  const handlePrint = () => {
+    toast.info("Membuka dialog cetak dokumen...");
+    triggerIframePrint(renderedHtml);
+  };
+
+  const adjustZoom = (delta: number) => {
+    setZoomScale((prev) => Math.min(1.3, Math.max(0.4, +(prev + delta).toFixed(2))));
+  };
+
+  const resetZoom = () => setZoomScale(0.7);
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Allow CTRL + Scroll Wheel zoom when hovering over preview canvas
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        setZoomScale((prev) => Math.min(1.3, Math.max(0.4, +(prev + delta).toFixed(2))));
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <LayoutGrid className="size-5 text-slate-700" />
-        <div>
-          <p className="font-semibold text-[#111827]">Pilih Template CV</p>
-          <p className="text-xs text-muted-foreground">Template ATS wajib untuk mendaftar via sistem rekrutmen otomatis.</p>
-        </div>
-      </div>
-
-      {/* Template Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {templates.map((tpl) => (
-          <button
-            key={tpl.id}
-            type="button"
-            onClick={() => setSelected(tpl.id)}
-            className={cn(
-              "group flex flex-col rounded-2xl border p-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900",
-              selected === tpl.id
-                ? "border-slate-900 bg-slate-50 shadow-md ring-1 ring-slate-900 -translate-y-0.5"
-                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:-translate-y-0.5"
-            )}
-          >
-            {/* Preview thumbnail */}
-            <div className="mb-3 overflow-hidden rounded-lg border bg-slate-50">
-              {tpl.preview}
-            </div>
-
-            {/* Info */}
-            <div className="flex items-start justify-between gap-1 mb-1">
-              <p className={cn("text-sm font-bold", selected === tpl.id ? "text-slate-900" : "text-[#111827]")}>
-                {tpl.name}
-              </p>
-              {selected === tpl.id && <CheckCircle2 className="size-4 shrink-0 text-slate-900 mt-0.5" />}
-            </div>
-            <span className={cn(
-              "mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit",
-              tpl.recommended
-                ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-600"
-            )}>
-              {tpl.tag}
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/70 shadow-xs">
+      {/* Top Control Bar */}
+      <div className="flex flex-col gap-3 border-b border-slate-200/80 bg-white p-3.5 sm:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#7C3AED]/10 text-[#7C3AED]">
+              <activeTpl.icon className="size-4" />
             </span>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">{tpl.desc}</p>
-          </button>
-        ))}
-      </div>
-
-      {/* Action area */}
-      <Card className="border border-slate-200 bg-white">
-        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl",
-              selected === "ats" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"
-            )}>
-              <FileText className="size-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm text-[#111827]">
-                Template: <span className="text-slate-900 font-bold">{selectedTpl.name}</span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 truncate">
+                Pratinjau Live &amp; Unduh CV
+              </h3>
+              <p className="text-[11px] text-muted-foreground truncate">
+                Disinkronkan otomatis dengan form profil Anda
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed max-w-sm">
-                {selectedTpl.desc}
-              </p>
-              {selected === "ats" && (
-                <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                  <ShieldCheck className="size-3.5 text-emerald-600" /> Format ini kompatibel dengan semua ATS (Workday, Taleo, Greenhouse, dll.)
-                </p>
-              )}
             </div>
           </div>
-          <div className="flex flex-col gap-2 shrink-0">
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button
-              onClick={() => void handleDownload()}
-              disabled={downloading}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold rounded-xl px-5"
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setPreviewOpen(true)}
+              className="size-8 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
+              aria-label="Tampilan Layar Penuh"
+              title="Buka Pratinjau Layar Penuh"
             >
-              {downloading ? (
-                <><Loader2 className="size-4 animate-spin mr-1.5" /> Membuat PDF...</>
-              ) : (
-                <><Download className="size-4 mr-1.5" /> Unduh PDF</>
-              )}
+              <Maximize2 className="size-3.5" />
             </Button>
-            <p className="text-center text-[10px] text-muted-foreground">
-              File PDF langsung diunduh ke perangkat
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* ATS tip */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-        <ShieldCheck className="size-4 shrink-0 text-amber-600 mt-0.5" />
-        <p className="text-xs text-amber-900 leading-relaxed">
-          <strong>Tips ATS:</strong> Gunakan template <strong>ATS Clean</strong> saat melamar ke perusahaan besar. Hindari tabel, kolom, dan gambar agar parser sistem rekrutmen dapat membaca semua informasimu dengan benar.
-        </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={handlePrint}
+              className="size-8 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
+              aria-label="Cetak CV"
+              title="Cetak / Simpan via Browser"
+            >
+              <Printer className="size-3.5" />
+            </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleDownload()}
+                disabled={downloading}
+                className="h-8 rounded-lg bg-[#7C3AED] px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-[#6D28D9] transition-transform active:scale-95"
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                    Menyiapkan...
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-3.5 mr-1.5" />
+                    Unduh PDF
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Template Switcher Tabs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-xl bg-slate-100/90 p-1">
+            {TEMPLATES.map((tpl) => {
+              const isCurrent = selected === tpl.id;
+              const Icon = tpl.icon;
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => setSelected(tpl.id)}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 rounded-lg px-2.5 py-1.5 text-left transition-all",
+                    isCurrent
+                      ? "bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                  )}
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span className="flex items-center gap-1 text-xs font-bold truncate">
+                      <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-[#7C3AED]" : "text-slate-400")} />
+                      {tpl.name}
+                    </span>
+                    {isCurrent && <CheckCircle2 className="size-3 text-[#7C3AED]" />}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground truncate">
+                    {tpl.tag}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Zoom & Quick Controls Bar */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-3.5 py-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+            <span className="font-semibold text-slate-800">{activeTpl.name}</span>
+            <span className="text-[10px] text-slate-400">&bull; A4 (210 &times; 297 mm)</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] font-mono font-semibold text-slate-700 px-1">
+              {Math.round(zoomScale * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => adjustZoom(-0.1)}
+              disabled={zoomScale <= 0.4}
+              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors disabled:opacity-40"
+              title="Perkecil (Ctrl + Scroll)"
+              aria-label="Perkecil"
+            >
+              <ZoomOut className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
+              title="Reset Zoom (70%)"
+              aria-label="Reset zoom"
+            >
+              <RotateCcw className="size-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustZoom(0.1)}
+              disabled={zoomScale >= 1.3}
+              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors disabled:opacity-40"
+              title="Perbesar (Ctrl + Scroll)"
+              aria-label="Perbesar"
+            >
+              <ZoomIn className="size-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Live Canvas Viewport with Unrestricted 2D Scrolling */}
+        <div
+          ref={canvasRef}
+          className="relative flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/70"
+          title="Gunakan Ctrl + Scroll untuk Zoom In/Out"
+        >
+          <div className="min-w-full min-h-full flex">
+            {/* Sized Wrapper to inform the scroll container of the scaled document boundaries */}
+            <div
+              className="m-auto shrink-0 transition-[width,height] duration-150 ease-out py-2"
+              style={{
+                width: `${Math.round(794 * zoomScale)}px`,
+                height: `${Math.round(1123 * zoomScale)}px`,
+              }}
+            >
+              <div
+                className="origin-top-left transition-transform duration-150 ease-out"
+                style={{
+                  transform: `scale(${zoomScale})`,
+                  width: "794px",
+                  height: "1123px",
+                }}
+              >
+                <div className="relative h-[1123px] w-[794px] overflow-hidden rounded-md border border-slate-300/80 bg-white shadow-xl">
+                  <iframe
+                    srcDoc={renderedHtml}
+                    title={`Live Preview CV - ${activeTpl.name}`}
+                    className="h-full w-full border-0 bg-white select-none pointer-events-none"
+                    tabIndex={-1}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Meta & Tip */}
+        <div className="border-t border-slate-200/80 bg-white px-4 py-2 text-[11px] text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-800">
+              {activeTpl.name}:
+            </span>
+            <span>{activeTpl.shortDesc}</span>
+          </div>
+          <div className="text-[10px] font-medium text-slate-400">
+            A4 &bull; 210 &times; 297 mm
+          </div>
+        </div>
+
+        {/* Fullscreen Preview Dialog */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-5xl h-[92vh] flex flex-col p-4 sm:p-6">
+            <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 pr-6">
+              <div>
+                <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Pratinjau Layar Penuh &mdash; {activeTpl.name}</span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {activeTpl.tag}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Dokumen persis seperti yang akan dihasilkan saat diekspor ke PDF.
+                </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePrint}
+                  className="gap-1.5 text-xs font-semibold"
+                >
+                  <Printer className="size-3.5" />
+                  Cetak Dokumen
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleDownload()}
+                  disabled={downloading}
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-1.5 text-xs font-semibold shadow-xs"
+                >
+                  {downloading ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
+                  Unduh PDF
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="flex-1 w-full overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4 sm:p-6 flex justify-center dark:border-slate-800 dark:bg-slate-950">
+              <div className="w-[794px] min-h-[1123px] rounded-md bg-white shadow-2xl border border-slate-300/80 overflow-hidden">
+                <iframe
+                  srcDoc={renderedHtml}
+                  title="Fullscreen CV Preview"
+                  className="w-full h-full min-h-[1123px] border-0 bg-white"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
   );
-}
+});
+

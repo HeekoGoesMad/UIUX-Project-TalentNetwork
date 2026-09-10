@@ -2,26 +2,30 @@ import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { schema } from "@/db";
-import { getCurrentAppUser } from "@/lib/api/auth";
+import { requireAdmin } from "@/lib/api/auth";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
-  const current = await getCurrentAppUser();
-  if ("error" in current) {
-    return NextResponse.json({ error: current.error }, { status: current.status });
-  }
-  if (current.user.role !== "admin") {
-    return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  }
-
   try {
-    const recruiters = await current.db
-      .select({ user: schema.users, profile: schema.profiles })
+    const current = await requireAdmin();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = current.db;
+    const recruiters = await db
+      .select({
+        user: schema.users,
+        profile: schema.profiles,
+        organization: schema.organizations,
+      })
       .from(schema.users)
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.users.id))
+      .leftJoin(schema.organizationMembers, eq(schema.organizationMembers.userId, schema.users.id))
+      .leftJoin(schema.organizations, eq(schema.organizations.id, schema.organizationMembers.organizationId))
       .where(eq(schema.users.role, "recruiter"))
       .orderBy(desc(schema.users.createdAt));
     return NextResponse.json({ recruiters });
   } catch {
-    return NextResponse.json({ error: "Recruiter belum tersedia." }, { status: 503 });
+    return NextResponse.json({ recruiters: [] });
   }
 }

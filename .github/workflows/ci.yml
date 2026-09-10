@@ -1,27 +1,45 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - dev
-      - "milestone-*"
+    branches: ["**"]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
+
       - run: npm run lint
-      - run: npx tsc --noEmit
-      # Build requires no env secrets (guards fail closed).
+
+      - run: npm run typecheck
+
+      # drizzle-kit check validates migration snapshots offline; no DATABASE_URL needed.
+      - run: npm run db:check
+
+      - run: npx playwright install --with-deps chromium
+
+      # Full suite: all specs in e2e/ are anonymous-tolerant (no secrets needed).
+      - run: npx playwright test
+        env:
+          CI: true
+
+      - run: npm run test:unit
+
       - run: npm run build

@@ -1,36 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Bookmark,
-  Check,
-  CircleHelp,
-  Copy,
-  ExternalLink,
-  FileCheck2,
-  FileText,
-  Globe,
-  GraduationCap,
-  Loader2,
-  Lock,
-  Mail,
-  Phone,
-  Printer,
-  RefreshCw,
-  ScanLine,
-  ShieldCheck,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
-import { toast } from "sonner";
-import { findCandidate } from "@/data/candidates";
-import { maskName } from "@/lib/candidate-display";
-import { UUID_RE } from "@/lib/utils";
-import { useApp } from "@/providers/app-provider";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateCategoryBadge } from "@/components/talent/candidate-category-badge";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
@@ -38,15 +9,93 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { ProtectedRoute } from "@/components/auth/protected-route";
-import type { AiSummary, Candidate, ScreeningInsight, ScreeningResult } from "@/types";
+import { findCandidate } from "@/data/candidates";
+import { maskName } from "@/lib/candidate-display";
+import { UUID_RE, cn } from "@/lib/utils";
+import { useApp } from "@/providers/app-provider";
+import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
+import {
+    AlertCircle,
+    ArrowLeft,
+    Banknote,
+    Bookmark,
+    Brain,
+    Briefcase,
+    Calendar,
+    Check,
+    CircleHelp,
+    Copy,
+    ExternalLink,
+    FileCheck2,
+    FileText,
+    Globe,
+    GraduationCap,
+    Loader2,
+    Lock,
+    Mail,
+    MessageSquareQuote,
+    Phone,
+    Printer,
+    RefreshCw,
+    ScanLine,
+    ShieldCheck,
+    Sparkles,
+    Unlock,
+    UserCheck,
+    Wrench,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
+import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
+import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
+import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
+import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
+
+function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
+  return (
+    <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+            <Brain className="size-4.5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-violet-950 dark:text-violet-100">
+                {personality.type} · {personality.label}
+              </span>
+              <Badge variant="outline" className="border-violet-200 bg-white/60 text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+                16Personalities
+              </Badge>
+            </div>
+            {personality.tagline && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {personality.tagline}
+              </p>
+            )}
+          </div>
+        </div>
+        {personality.testUrl && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-violet-700 hover:bg-violet-100 hover:text-violet-900 dark:text-violet-300 dark:hover:bg-violet-900/40" asChild>
+            <a href={personality.testUrl} target="_blank" rel="noopener noreferrer">
+              Hasil Tes <ExternalLink className="ml-1 size-3" />
+            </a>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+import { toast } from "sonner";
 
 const PORTFOLIO_LABELS: Record<string, string> = {
   "github.com": "GitHub",
@@ -122,17 +171,23 @@ function ScreeningResults({
   candidateId,
   candidate,
   completed,
+  screeningStatus,
+  screeningError,
+  onRetry,
   result,
   saveResult,
 }: {
   candidateId: string;
   candidate: Candidate;
   completed: boolean;
+  screeningStatus?: string;
+  screeningError?: string | null;
+  onRetry?: () => void;
   result?: ScreeningResult;
   saveResult: (candidateId: string, result: ScreeningResult) => void;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "error">(
-    result ? "idle" : completed ? "loading" : "idle",
+    result ? "idle" : completed || screeningStatus === "processing" || screeningStatus === "in_progress" ? "loading" : "idle",
   );
   const [error, setError] = useState("");
 
@@ -221,7 +276,7 @@ function ScreeningResults({
             Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Insight berbasis role fit dan kualitas data, ditampilkan setelah consent kandidat dan screening selesai.
+             Insight berbasis role fit dan kualitas data, ditampilkan setelah screening run selesai. Consent tetap disimpan untuk pemeriksaan finansial atau credit di masa depan.
           </p>
         </div>
         {completed && (
@@ -231,15 +286,29 @@ function ScreeningResults({
         )}
       </div>
 
-      {!completed && (
+      {screeningError && !completed ? (
+        <Card className="mt-5 border-amber-200 bg-amber-50/50">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between" role="alert">
+            <div>
+              <p className="font-semibold text-amber-950">Profil terbuka, screening belum selesai</p>
+              <p className="mt-1 text-sm text-amber-900/80">{screeningError}</p>
+            </div>
+            {onRetry && <Button variant="outline" onClick={onRetry}><RefreshCw className="mr-2 size-4" /> Coba lagi</Button>}
+          </CardContent>
+        </Card>
+      ) : !completed && (screeningStatus === "processing" || screeningStatus === "in_progress") ? (
+        <Card className="mt-5 border-purple-100 bg-purple-50/50">
+          <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground" role="status">
+            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan skor dan AI Summary...
+          </CardContent>
+        </Card>
+      ) : !completed && (
         <Card className="mt-5 border-dashed bg-muted/30">
           <CardContent className="flex gap-3 p-5">
             <CircleHelp className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
             <div>
               <p className="font-semibold text-[#111827]">Hasil belum tersedia</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Selesaikan consent kandidat dan screening terlebih dahulu. Hasil tidak ditampilkan hanya karena profil sudah dibuka.
-              </p>
+               <p className="mt-1 text-sm text-muted-foreground">Screening role fit akan dimulai otomatis setelah profil berhasil dibuka.</p>
             </div>
           </CardContent>
         </Card>
@@ -390,7 +459,8 @@ export default function TalentProfile() {
     viewed,
     user,
     hydrated,
-    screeningConsents,
+    screeningRunStatuses,
+    startScreening,
     screeningResults,
     saveScreeningResult,
     devBypass,
@@ -398,6 +468,8 @@ export default function TalentProfile() {
     bootstrapped,
     databaseError,
     partnerVerifications,
+    screeningConsents,
+    reloadBootstrap,
   } = useApp();
 
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
@@ -406,7 +478,19 @@ export default function TalentProfile() {
   const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
+  const [requestingContactConsent, setRequestingContactConsent] = useState(false);
+
+  // Recruiter Hiring Flow modals
+  const [questionModalOpen, setQuestionModalOpen] = useState(false);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [hiringOutcome, setHiringOutcome] = useState<string | null>(null);
+  const [markingHired, setMarkingHired] = useState(false);
+
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
   const verif = candidate ? (partnerVerifications?.[candidate.id] ?? candidate.campusVerification) : undefined;
@@ -438,7 +522,7 @@ export default function TalentProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
-  if (!user || user.role !== "recruiter")
+  if (!hydrated || !user || user.role !== "recruiter")
     return (
       <ProtectedRoute role="recruiter">
         <div />
@@ -464,7 +548,27 @@ export default function TalentProfile() {
     );
 
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
-  const completed = hydrated && (dbMode ? remoteScreeningCompleted : screeningConsents[candidate.id] === "screening-completed");
+  const screeningStatus = screeningRunStatuses[candidate.id];
+  const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
+  const contactConsent = screeningConsents[candidate.id];
+
+  // startScreening only reports success/failure, so attribute dbMode failures via
+  // the single-balance endpoint: token shortage is claimed only when the balance
+  // is actually empty (the screening API signals that with 402). Consent is
+  // optional since phase 6, so it is never blamed for a failure.
+  const describeScreeningFailure = async (): Promise<string> => {
+    if (!dbMode) return "Token screening tidak mencukupi.";
+    try {
+      const balanceResponse = await fetch("/api/tokens", { cache: "no-store" });
+      const balanceData = (await balanceResponse.json()) as { token?: { balance?: number } };
+      if (balanceResponse.ok && typeof balanceData.token?.balance === "number" && balanceData.token.balance <= 0) {
+        return "Saldo token screening tidak mencukupi. Beli token lalu coba lagi.";
+      }
+    } catch {
+      // Balance check is best-effort; fall through to the generic message.
+    }
+    return "Screening belum dapat dijalankan (consent bersifat opsional, bukan penyebabnya). Coba lagi.";
+  };
 
   const startScan = () => {
     if (tokens <= 0 && !devBypass) {
@@ -474,12 +578,27 @@ export default function TalentProfile() {
       setConfirmOpen(false);
       return;
     }
+    setScreeningError(null);
     setScanning(true);
-    window.setTimeout(() => {
-      scan(candidate.id);
-      setScanning(false);
+    window.setTimeout(async () => {
+      const opened = scan(candidate.id);
+      if (!opened) {
+        setScanning(false);
+        return;
+      }
       setConfirmOpen(false);
+      const started = await startScreening(candidate.id);
+      if (dbMode && started) setRemoteScreeningCompleted(true);
+      if (!started) setScreeningError(await describeScreeningFailure());
+      setScanning(false);
     }, 650);
+  };
+
+  const retryScreening = async () => {
+    setScreeningError(null);
+    const started = await startScreening(candidate.id);
+    if (dbMode && started) setRemoteScreeningCompleted(true);
+    if (!started) setScreeningError(await describeScreeningFailure());
   };
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
@@ -510,26 +629,68 @@ export default function TalentProfile() {
     }
   };
 
+  const bannerSrc =
+    candidate.bannerUrl ||
+    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop";
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <Link href="/recruiter/discover" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Kembali ke pencarian
       </Link>
 
-      <Card className="mt-6 overflow-hidden">
-        {/* Banner Hero */}
-        <div className="bg-primary px-6 py-8 text-primary-foreground sm:px-10">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <CandidateAvatar
-              initials={candidate.initials}
-              locked={!unlocked}
-              className="size-20 bg-primary-foreground/15 text-primary-foreground"
-            />
-            <div className="flex-1">
+      <Card className="mt-6 overflow-hidden border-slate-200 shadow-sm">
+        {/* Banner Hero Photo */}
+        <div className="relative h-44 sm:h-56 w-full overflow-hidden bg-linear-to-r from-purple-700 via-indigo-600 to-purple-800">
+          <img
+            src={bannerSrc}
+            alt={`Banner ${displayName}`}
+            loading="eager"
+            decoding="async"
+            className={cn(
+              "h-full w-full object-cover transition-all duration-700",
+              !unlocked ? "blur-md scale-105 opacity-70" : "blur-0 scale-100 opacity-100"
+            )}
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-black/45 via-transparent to-black/10" />
+
+          {/* Locked Overlay Badge if not yet scanned */}
+          {!unlocked && (
+            <div className="absolute top-4 right-4 z-10">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-1 text-xs font-semibold text-white/95 backdrop-blur-md border border-white/20 shadow-xs">
+                <Lock className="size-3.5 text-amber-300" />
+                Sampul & Foto Dikaburkan (Terkunci)
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Profile Info Row with Overlapping Avatar */}
+        <div className="relative bg-white px-6 pb-6 pt-3 dark:bg-slate-900 sm:px-10">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+            <div className="-mt-14 sm:-mt-18 relative shrink-0 z-20">
+              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-1 ring-slate-900/10">
+                <CandidateAvatar
+                  initials={candidate.initials}
+                  avatarUrl={candidate.avatarUrl}
+                  name={displayName}
+                  locked={!unlocked}
+                  className="size-full text-base sm:text-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <CandidateCategoryBadge category={candidate.talentCategory} />
                 {candidate.careerStatus && (
                   <CandidateStatusBadge status={candidate.careerStatus} />
+                )}
+                {candidate.personality && (
+                  <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
+                    <Brain className="mr-1 size-3.5 text-purple-600" />
+                    {candidate.personality.type} · {candidate.personality.label}
+                  </Badge>
                 )}
                 {verif?.status === "verified" && (
                   <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
@@ -539,34 +700,101 @@ export default function TalentProfile() {
                 )}
               </div>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight">
-                {displayName}
-              </p>
-              <p className="mt-1 text-primary-foreground/80">
+              <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                  {displayName}
+                </h1>
+                {unlocked && (
+                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
+                    <UserCheck className="mr-1 size-3" /> Terbuka
+                  </Badge>
+                )}
+              </div>
+
+              <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
                 {candidate.role} · {candidate.location}
               </p>
-              <p className="mt-2 text-xs text-primary-foreground/75">
+
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Pengalaman {candidate.experience} tahun · {candidate.availability}
+                {unlocked && (
+                  <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    · Ekspektasi Gaji: {candidate.salary}
+                  </span>
+                )}
               </p>
             </div>
-            <div className="flex gap-2">
+
+            {/* Quick Action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {unlocked && (
+                <Button
+                  size="sm"
+                  className="bg-purple-600 text-white hover:bg-purple-700 font-semibold text-xs h-9 shadow-xs"
+                  onClick={() => setAssignModalOpen(true)}
+                >
+                  <Briefcase className="mr-1.5 size-3.5" />
+                  Masukkan ke Lowongan
+                </Button>
+              )}
               <Button
-                variant="secondary"
+                variant="outline"
                 size="icon"
+                className="h-9 w-9 border-slate-200"
                 onClick={() => toggleShortlist(candidate.id)}
                 aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
                 aria-pressed={isShortlisted}
               >
-                <Bookmark className={isShortlisted ? "fill-primary" : ""} />
+                <Bookmark className={cn("size-4 text-slate-600", isShortlisted && "fill-purple-600 text-purple-600")} />
               </Button>
               <Button
-                variant="secondary"
+                variant="outline"
                 size="icon"
+                className="h-9 w-9 border-slate-200"
                 onClick={() => void copyProfileLink()}
                 aria-label="Salin tautan profil"
               >
-                <Copy />
+                <Copy className="size-4 text-slate-600" />
               </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── DOVER HIRING PROGRESS STEPPER ── */}
+        <div className="border-b bg-slate-50/90 px-6 py-3.5 sm:px-10 dark:bg-slate-900/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="size-3.5 text-[#7C3AED]" />
+              Status Pipeline Dover
+            </span>
+            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
+              <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
+                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${unlocked || completed ? "bg-purple-600 text-white" : "bg-purple-200 text-purple-950"}`}>
+                  1
+                </span>
+                <span>Screening</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
+                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
+                  2
+                </span>
+                <span>Wawancara</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
+                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
+                  3
+                </span>
+                <span>Offer Letter</span>
+              </div>
+              <span className="text-slate-300 font-mono text-xs">→</span>
+              <div className={`flex items-center gap-1.5 shrink-0 ${hiringOutcome === "hired" ? "text-emerald-700 font-bold" : "text-slate-400"}`}>
+                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${hiringOutcome === "hired" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                  ✓
+                </span>
+                <span>Hired</span>
+              </div>
             </div>
           </div>
         </div>
@@ -581,10 +809,15 @@ export default function TalentProfile() {
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
 
+            {/* Personality Highlight */}
+            {candidate.personality && (
+              <PersonalityOverview personality={candidate.personality} />
+            )}
+
             {/* Skills & Tools Preview */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skill</p>
+                <p className="mb-2 text-sm font-semibold">Hard Competencies</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">
@@ -662,49 +895,140 @@ export default function TalentProfile() {
           /* UNLOCKED STATE (Talent Unlock) */
           <CardContent className="space-y-8 px-6 py-8 sm:px-10">
             {/* Contact & Links Bar */}
-            <div className="rounded-xl border bg-slate-50/80 p-5">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Kontak &amp; Profil Terbuka
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="size-4 text-primary shrink-0" />
-                  <a href={`mailto:${candidate.email}`} className="min-w-0 truncate hover:underline">
-                    {candidate.email}
-                  </a>
+            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-linear-to-b from-white to-slate-50/60 p-5 sm:p-6 shadow-xs">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                    <Unlock className="size-4" />
+                  </div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Kontak &amp; Profil Terbuka
+                  </h4>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="size-4 text-primary shrink-0" />
-                  <a href={`tel:${candidate.phone}`} className="hover:underline">
-                    {candidate.phone}
-                  </a>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                  <Check className="size-3 text-emerald-600" /> Profil Terbuka
+                </span>
+              </div>
+
+              {/* 4 Clean Attribute Rectangles (2x2 Grid) */}
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
+                {/* Email */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-purple-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
+                    <Mail className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Email Langsung
+                    </span>
+                    {candidate.email ? (
+                      <a
+                        href={`mailto:${candidate.email}`}
+                        className="mt-0.5 block text-sm font-semibold text-foreground hover:text-primary hover:underline break-all"
+                      >
+                        {candidate.email}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum dicantumkan</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe className="size-4 text-sky-600 shrink-0" />
-                  <a href={candidate.linkedin} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline flex items-center gap-1">
-                    Profil LinkedIn <ExternalLink className="size-3" />
-                  </a>
+
+                {/* Telepon / WhatsApp */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-emerald-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Phone className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Telepon / WhatsApp
+                    </span>
+                    {candidate.phone ? (
+                      <a
+                        href={`tel:${candidate.phone}`}
+                        className="mt-0.5 block text-sm font-semibold text-foreground hover:text-primary hover:underline"
+                      >
+                        {candidate.phone}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum dicantumkan</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* LinkedIn */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/70 bg-white p-4 shadow-2xs transition-colors hover:border-sky-200">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                    <Globe className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                      Profil LinkedIn
+                    </span>
+                    {candidate.linkedin ? (
+                      <a
+                        href={candidate.linkedin}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 hover:text-sky-800 hover:underline break-all"
+                      >
+                        {candidate.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "in/")}
+                        <ExternalLink className="size-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">Belum ditautkan</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ekspektasi Gaji */}
+                <div className="flex items-center gap-3.5 rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-4 shadow-2xs transition-colors">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <Banknote className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">
+                      Ekspektasi Gaji
+                    </span>
+                    <p className="mt-0.5 font-mono text-sm font-bold text-emerald-950">
+                      {candidate.salary || "Belum dicantumkan"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               {/* Portfolio & CV buttons */}
-              <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
-                {candidate.portfolio.map((url) => (
-                  <Button key={url} variant="outline" size="sm" asChild>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 size-3.5 text-primary" /> {portfolioLabel(url)}
-                    </a>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
+                    <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)}>
-                  <FileText className="mr-1.5 size-3.5 text-primary" /> Pratinjau CV
-                </Button>
-                <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
-                  <Link href={completed ? `/recruiter/screenings/${candidate.id}` : `/recruiter/screenings/new?candidateId=${candidate.id}`}>
-                    <ShieldCheck className="mr-1.5 size-3.5" />
-                    {completed ? "Lihat Screening Selesai" : "Minta Screening"}
-                  </Link>
-                </Button>
+                  {completed ? (
+                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
+                      <Link href={`/recruiter/screenings/${candidate.id}`}>
+                        <ShieldCheck className="mr-1.5 size-3.5" /> Lihat Screening Selesai
+                      </Link>
+                    </Button>
+                  ) : screeningError ? (
+                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]">
+                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening otomatis
+                    </Badge>
+                  )}
+                </div>
+
+                {candidate.portfolio.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {candidate.portfolio.map((url) => (
+                      <Button key={url} variant="outline" size="sm" asChild className="h-8 text-xs text-muted-foreground hover:text-foreground">
+                        <a href={url} target="_blank" rel="noreferrer">
+                          <ExternalLink className="mr-1 size-3 text-primary" /> {portfolioLabel(url)}
+                        </a>
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -714,10 +1038,15 @@ export default function TalentProfile() {
               <p className="mt-2 leading-7 text-foreground">{candidate.summary}</p>
             </div>
 
+            {/* Personality Highlight */}
+            {candidate.personality && (
+              <PersonalityOverview personality={candidate.personality} />
+            )}
+
             {/* Skills & Tools */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-semibold">Skill</p>
+                <p className="mb-2 text-sm font-semibold">Hard Competencies</p>
                 <div className="flex flex-wrap gap-1.5">
                   {candidate.skills.map((skill) => (
                     <Badge key={skill} variant="outline">
@@ -795,27 +1124,61 @@ export default function TalentProfile() {
               <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Consent kandidat, pemotongan token, dan skor sudah tercatat. Anda dapat memulai percakapan yang berwenang.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pemotongan token dan skor sudah tercatat. Kandidat tetap perlu menyetujui permintaan kontak sebelum percakapan dimulai.
+                  </p>
                 </div>
-                <Button
-                  disabled={openingConversation}
-                  onClick={async () => {
-                    setOpeningConversation(true);
-                    try {
-                      const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
-                      const payload = await response.json() as { conversationId?: string; error?: string };
-                      if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-                      router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
-                    } catch (error) {
-                      toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
-                    } finally {
-                      setOpeningConversation(false);
-                    }
-                  }}
-                >
-                  {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                  {openingConversation ? "Membuka..." : "Mulai percakapan"}
-                </Button>
+                {contactConsent === "consented" ? (
+                  <Button
+                    disabled={openingConversation}
+                    onClick={async () => {
+                      setOpeningConversation(true);
+                      try {
+                        const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
+                        const payload = await response.json() as { conversationId?: string; error?: string };
+                        if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
+                        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
+                      } catch (error) {
+                        toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
+                      } finally {
+                        setOpeningConversation(false);
+                      }
+                    }}
+                  >
+                    {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                    {openingConversation ? "Membuka..." : "Mulai percakapan"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    disabled={requestingContactConsent || contactConsent === "pending-candidate-consent"}
+                    onClick={async () => {
+                      setRequestingContactConsent(true);
+                      try {
+                        const response = await fetch("/api/consent-requests", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            candidateProfileIds: [candidate.id],
+                            purpose: "Diskusi peluang setelah screening",
+                            message: "Recruiter ingin mendiskusikan hasil screening dan peluang yang relevan.",
+                          }),
+                        });
+                        const payload = await response.json() as { error?: string };
+                        if (!response.ok) throw new Error(payload.error ?? "Permintaan kontak belum dapat dikirim.");
+                        await reloadBootstrap();
+                        toast.success("Permintaan kontak dikirim", { description: "Tunggu persetujuan kandidat sebelum memulai percakapan." });
+                      } catch (error) {
+                        toast.error("Permintaan kontak gagal", { description: error instanceof Error ? error.message : "Coba lagi." });
+                      } finally {
+                        setRequestingContactConsent(false);
+                      }
+                    }}
+                  >
+                    {requestingContactConsent ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                    {requestingContactConsent ? "Mengirim..." : contactConsent === "pending-candidate-consent" ? "Menunggu persetujuan kandidat" : "Minta izin menghubungi"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -823,6 +1186,9 @@ export default function TalentProfile() {
             candidateId={candidate.id}
             candidate={candidate}
             completed={completed}
+            screeningStatus={screeningStatus}
+            screeningError={screeningError}
+            onRetry={() => void retryScreening()}
             result={screeningResults[candidate.id]}
             saveResult={saveScreeningResult}
           />
@@ -835,7 +1201,7 @@ export default function TalentProfile() {
           <DialogHeader>
             <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
-               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio.
+               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit akan otomatis dijalankan.
                {devBypass ? " Mode development: token scan tidak digunakan." : ` Sisa token Anda: ${tokens} token.`}
             </DialogDescription>
           </DialogHeader>
@@ -845,7 +1211,7 @@ export default function TalentProfile() {
             </Button>
             <Button disabled={scanning || (tokens <= 0 && !devBypass)} onClick={startScan}>
               {scanning && <Loader2 className="size-4 animate-spin mr-1.5" />}
-              {scanning ? "Membuka profil..." : "Konfirmasi Buka Profil · 1 Token"}
+              {scanning ? "Membuka profil & menyiapkan screening..." : "Konfirmasi Buka Profil · 1 Token"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -937,6 +1303,159 @@ export default function TalentProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── FLOATING DOVER ACTION WIDGET (ONLY APPEARS AFTER TOKEN SCAN) ── */}
+      {unlocked && (
+        <aside
+          aria-label="Aksi Cepat Rekruter"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-950/60 xl:flex-col xl:items-start xl:gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED] to-pink-500 text-white shadow-xs">
+                <Sparkles className="size-3.5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[130px] xl:max-w-[170px]">
+                  {candidate.name}
+                </p>
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  Alur Rekrutmen Dover
+                </p>
+              </div>
+            </div>
+            {hiringOutcome === "hired" ? (
+              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5">
+                <UserCheck className="mr-1 size-3" /> Hired ✓
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
+                Pipeline Aktif
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setQuestionModalOpen(true)}
+            >
+              <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Pertanyaan AI
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setPromptModalOpen(true)}
+            >
+              <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Prompt Pesan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              onClick={() => setScheduleModalOpen(true)}
+            >
+              <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              Jadwal Wawancara
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300 xl:h-9 xl:justify-start"
+              onClick={() => setOfferModalOpen(true)}
+            >
+              <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
+              Buat Offer Letter
+            </Button>
+            <Button
+              size="sm"
+              disabled={markingHired || hiringOutcome === "hired"}
+              className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 xl:h-9 xl:w-full"
+              onClick={async () => {
+                if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
+                setMarkingHired(true);
+                try {
+                  if (dbMode) {
+                    const res = await fetch("/api/applications", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        candidateProfileId: candidate.id,
+                        status: "hired",
+                        reason: "Kandidat diterima secara resmi melalui Talent Network.",
+                      }),
+                    });
+                    if (!res.ok) {
+                      const errData = (await res.json()) as { error?: string };
+                      throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
+                    }
+                  }
+                  setHiringOutcome("hired");
+                  toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
+                } catch (err) {
+                  toast.error("Gagal menandai status Hired", {
+                    description: err instanceof Error ? err.message : "Terjadi kesalahan.",
+                  });
+                } finally {
+                  setMarkingHired(false);
+                }
+              }}
+            >
+              {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
+              {hiringOutcome === "hired" ? "Sudah Diterima ✓" : "Tandai Diterima (Hired)"}
+            </Button>
+          </div>
+        </aside>
+      )}
+
+      {/* Recruiter Hiring Flow Modals */}
+      <InterviewQuestionModal
+        open={questionModalOpen}
+        onOpenChange={setQuestionModalOpen}
+        candidate={candidate}
+        onSaveQuestions={() => {
+          setQuestionModalOpen(false);
+          setScheduleModalOpen(true);
+        }}
+      />
+
+      <PromptedOutreachComposer
+        open={promptModalOpen}
+        onOpenChange={setPromptModalOpen}
+        candidate={candidate}
+        onMessageSent={() => {
+          setPromptModalOpen(false);
+        }}
+      />
+
+      <ScheduleInterviewModal
+        open={scheduleModalOpen}
+        onOpenChange={setScheduleModalOpen}
+        candidate={candidate}
+        onScheduled={() => {
+          setScheduleModalOpen(false);
+        }}
+      />
+
+      <CreateOfferModal
+        open={offerModalOpen}
+        onOpenChange={setOfferModalOpen}
+        candidate={candidate}
+        onOfferSent={() => {
+          setOfferModalOpen(false);
+        }}
+      />
+
+      <AssignToJobModal
+        open={assignModalOpen}
+        onOpenChange={setAssignModalOpen}
+        candidate={candidate}
+      />
     </div>
   );
 }

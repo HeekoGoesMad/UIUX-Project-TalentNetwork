@@ -11,11 +11,13 @@ export async function GET(request: Request) {
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
     const limitValue = Number(new URL(request.url).searchParams.get("limit") ?? 50);
     const limit = Number.isInteger(limitValue) ? Math.min(Math.max(limitValue, 1), 100) : 50;
-    const notifications = await current.db.select().from(schema.notifications)
-      .where(eq(schema.notifications.userId, current.user.id))
-      .orderBy(desc(schema.notifications.createdAt)).limit(limit);
-    const [unread] = await current.db.select({ value: count() }).from(schema.notifications)
-      .where(and(eq(schema.notifications.userId, current.user.id), isNull(schema.notifications.readAt)));
+    const [notifications, [unread]] = await Promise.all([
+      current.db.select().from(schema.notifications)
+        .where(eq(schema.notifications.userId, current.user.id))
+        .orderBy(desc(schema.notifications.createdAt)).limit(limit),
+      current.db.select({ value: count() }).from(schema.notifications)
+        .where(and(eq(schema.notifications.userId, current.user.id), isNull(schema.notifications.readAt))),
+    ]);
     return NextResponse.json({ notifications, unreadCount: unread?.value ?? 0 });
   } catch {
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

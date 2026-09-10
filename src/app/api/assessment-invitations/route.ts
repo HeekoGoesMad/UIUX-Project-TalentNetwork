@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema, type Database } from "@/db";
@@ -47,5 +47,30 @@ export async function POST(request: Request) {
 }
 
 async function withAttempts(db: Database, rows: Array<{ invitation: typeof schema.assessmentInvitations.$inferSelect; templateName: string }>) {
-  return Promise.all(rows.map(async (row) => { const [attempt] = await db.select({ id: schema.assessmentAttempts.id, status: schema.assessmentAttempts.status }).from(schema.assessmentAttempts).where(eq(schema.assessmentAttempts.invitationId, row.invitation.id)).orderBy(desc(schema.assessmentAttempts.attemptNumber)).limit(1); return { ...row.invitation, templateName: row.templateName, attempt: attempt ?? null }; }));
+  if (rows.length === 0) return [];
+  const attempts = await db.select({ invitationId: schema.assessmentAttempts.invitationId, id: schema.assessmentAttempts.id, status: schema.assessmentAttempts.status }).from(schema.assessmentAttempts).where(inArray(schema.assessmentAttempts.invitationId, rows.map((row) => row.invitation.id))).orderBy(desc(schema.assessmentAttempts.attemptNumber));
+  const latest = new Map<string, { id: string; status: typeof attempts[number]["status"] }>();
+  for (const attempt of attempts) {
+    if (!latest.has(attempt.invitationId)) latest.set(attempt.invitationId, { id: attempt.id, status: attempt.status });
+  }
+
+  const attemptIds = Array.from(latest.values()).map((a) => a.id);
+  const reviews = attemptIds.length > 0
+    ? await db.select({
+        attemptId: schema.assessmentReviews.attemptId,
+        status: schema.assessmentReviews.status,
+        score: schema.assessmentReviews.score,
+        reviewedAt: schema.assessmentReviews.reviewedAt,
+      }).from(schema.assessmentReviews).where(inArray(schema.assessmentReviews.attemptId, attemptIds))
+    : [];
+  const reviewMap = new Map(reviews.map((r) => [r.attemptId, { status: r.status, score: r.score, reviewedAt: r.reviewedAt }]));
+
+  return rows.map((row) => {
+    const attempt = latest.get(row.invitation.id);
+    return {
+      ...row.invitation,
+      templateName: row.templateName,
+      attempt: attempt ? { id: attempt.id, status: attempt.status, review: reviewMap.get(attempt.id) ?? null } : null,
+    };
+  });
 }

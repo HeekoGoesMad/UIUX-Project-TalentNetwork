@@ -1,7 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, Clock3, Filter, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  ClipboardCheck,
+  Clock3,
+  FileCheck2,
+  Filter,
+  MessageSquareQuote,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { candidates as demoCandidates } from "@/data/candidates";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -10,8 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import type { Candidate, ConsentState, ScreeningResult } from "@/types";
+import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
+import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
+import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 
-type ScreeningRow = { id: string; candidateId: string; name: string; role: string; location: string; state: ConsentState; result?: ScreeningResult; updatedAt?: string };
+type ScreeningRow = { id: string; candidateId: string; name: string; role: string; location: string; state: ConsentState; result?: ScreeningResult; updatedAt?: string; candidateRef?: Candidate };
 type RemoteRequest = { candidateProfileId?: unknown; consentState?: unknown; createdAt?: unknown; respondedAt?: unknown };
 
 const stateCopy: Record<ConsentState, { label: string; className: string }> = {
@@ -32,10 +46,16 @@ function formatDate(value?: string) {
 }
 
 export default function ScreeningQueuePage() {
-  const { dbMode, bootstrapped, databaseError, screeningConsents, screeningResults, consentRequests, screeningTokens } = useApp();
+  const { dbMode, bootstrapped, databaseError, screeningConsents, screeningResults, consentRequests, screeningTokens, scans } = useApp();
   const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
   const [tab, setTab] = useState<"all" | "action" | "history">("all");
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Dover Quick Modals State
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
@@ -48,37 +68,235 @@ export default function ScreeningQueuePage() {
 
   const candidates = dbMode && remoteCandidates.length ? remoteCandidates : demoCandidates;
   const rows = useMemo<ScreeningRow[]>(() => {
+    const isCandidateScanned = (id: string) => scans.some((s) => s.candidateId === id);
+
     if (dbMode) {
       return (consentRequests as RemoteRequest[]).flatMap((request) => {
         const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
         if (!candidateId) return [];
+        // ANTI-ABUSE: Only show candidates that have been scanned by this recruiter
+        if (!isCandidateScanned(candidateId)) return [];
         const candidate = candidates.find((item) => item.id === candidateId);
         if (!candidate) return [];
         const state = typeof request.consentState === "string" && request.consentState in stateCopy ? request.consentState as ConsentState : "not-requested";
-        return [{ id: candidateId, candidateId, name: candidate.name, role: candidate.role, location: candidate.location, state, updatedAt: typeof request.respondedAt === "string" ? request.respondedAt : typeof request.createdAt === "string" ? request.createdAt : undefined }];
+        return [{ id: candidateId, candidateId, name: candidate.name, role: candidate.role, location: candidate.location, state, updatedAt: typeof request.respondedAt === "string" ? request.respondedAt : typeof request.createdAt === "string" ? request.createdAt : undefined, candidateRef: candidate }];
       });
     }
     return Object.entries(screeningConsents).flatMap(([candidateId, state]) => {
+      // In demo mode as well, only show candidates that have been scanned
+      if (!isCandidateScanned(candidateId)) return [];
       const candidate = candidates.find((item) => item.id === candidateId);
       if (!candidate) return [];
-      return [{ id: candidateId, candidateId, name: candidate.name, role: candidate.role, location: candidate.location, state, result: screeningResults[candidateId], updatedAt: screeningResults[candidateId]?.fetchedAt }];
+      return [{ id: candidateId, candidateId, name: candidate.name, role: candidate.role, location: candidate.location, state, result: screeningResults[candidateId], updatedAt: screeningResults[candidateId]?.fetchedAt, candidateRef: candidate }];
     }).sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
-  }, [candidates, consentRequests, dbMode, screeningConsents, screeningResults]);
+  }, [candidates, consentRequests, dbMode, screeningConsents, screeningResults, scans]);
 
   const visibleRows = rows.filter((row) => tab === "all" || (tab === "action" ? ["pending-candidate-consent", "consented", "disputed"].includes(row.state) : row.state === "screening-completed"));
   const actionCount = rows.filter((row) => ["pending-candidate-consent", "consented", "disputed"].includes(row.state)).length;
 
-  return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-6xl px-4 py-8 sm:py-10">
-    <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-      <div><p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-primary"><ClipboardCheck className="size-4" /> Recruiter operations</p><h1 className="mt-3 text-3xl font-bold tracking-tight">Screening queue</h1><p className="mt-2 max-w-2xl text-muted-foreground">Pantau consent dan insight screening berbasis profil dari satu tempat. Screening bukan keputusan hire atau reject.</p></div>
-      <Button asChild><Link href="/recruiter/screenings/new"><Plus className="size-4" /> Screening baru</Link></Button>
-    </div>
-    {dbMode && databaseError && <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">Data database belum dapat dimuat. {databaseError}</div>}
-    {dbMode && loadError && <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">Daftar kandidat belum dapat dimuat. {loadError}</div>}
-    <div className="mt-8 grid gap-4 sm:grid-cols-3"><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Total screening</p><p className="mt-2 text-3xl font-bold">{rows.length}</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Perlu tindakan</p><p className="mt-2 text-3xl font-bold text-amber-700">{actionCount}</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Screening token</p><p className="mt-2 text-3xl font-bold">{screeningTokens}</p></CardContent></Card></div>
-    <Card className="mt-8"><CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Screening activity</CardTitle><p className="mt-1 text-sm text-muted-foreground">Consent tetap menjadi syarat sebelum screening dijalankan.</p></div><div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter screening"><Button variant={tab === "all" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("all")} role="tab" aria-selected={tab === "all"}><Filter className="size-3.5" /> Semua</Button><Button variant={tab === "action" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("action")} role="tab" aria-selected={tab === "action"}>Perlu tindakan</Button><Button variant={tab === "history" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("history")} role="tab" aria-selected={tab === "history"}>Riwayat</Button></div></CardHeader><CardContent className="pt-0">
-      {dbMode && !bootstrapped ? <div className="rounded-xl bg-muted p-8 text-center text-sm text-muted-foreground" role="status">Memuat screening...</div> : visibleRows.length ? <div className="divide-y">{visibleRows.map((row) => { const status = stateCopy[row.state]; return <div key={row.id} className="flex flex-col gap-4 py-5 first:pt-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-primary"><ShieldCheck className="size-5" /></div><div className="min-w-0"><p className="truncate font-semibold">{row.name}</p><p className="truncate text-sm text-muted-foreground">{row.role} · {row.location}</p><p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3" /> {formatDate(row.updatedAt)}</p></div></div><div className="flex items-center justify-between gap-3 sm:justify-end"><Badge className={status.className}>{status.label}</Badge>{row.result && <span className="font-mono text-sm font-semibold">{row.result.insight.score}/100</span>}<Button variant="outline" size="sm" asChild><Link href={`/recruiter/screenings/${row.candidateId}`}>Buka <ArrowRight className="size-3.5" /></Link></Button></div></div>; })}</div> : <div className="rounded-xl bg-muted p-8 text-center"><Sparkles className="mx-auto size-8 text-primary" /><p className="mt-3 font-semibold">Belum ada aktivitas screening</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Mulai dari profil kandidat, minta consent, lalu kembali ke queue ini untuk melihat statusnya.</p><Button className="mt-4" size="sm" asChild><Link href="/recruiter/discover">Cari kandidat</Link></Button></div>}
-    </CardContent></Card>
-    <p className="mt-5 text-xs leading-5 text-muted-foreground">{dbMode ? "Database mode: riwayat organisasi penuh belum tersedia pada API saat ini; daftar di atas bersumber dari consent aktif." : "Demo mode: status screening berasal dari state lokal browser dan bukan data produksi."}</p>
-  </main></ProtectedRoute>;
+  return (
+    <ProtectedRoute role="recruiter">
+      <main className="container mx-auto max-w-6xl px-4 py-8 sm:py-10">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-primary">
+              <ClipboardCheck className="size-4" /> Recruiter operations / Dover Flow
+            </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">Screening queue</h1>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Evaluasi hasil screening kandidat, kirim pesan outreach ber-AI, jadwalkan wawancara langsung, atau kirim offer letter satu klik.
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/recruiter/screenings/new">
+              <Plus className="size-4" /> Screening baru
+            </Link>
+          </Button>
+        </div>
+
+        {dbMode && databaseError && (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+            Data database belum dapat dimuat. {databaseError}
+          </div>
+        )}
+        {dbMode && loadError && (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+            Daftar kandidat belum dapat dimuat. {loadError}
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Total screening</p>
+              <p className="mt-2 text-3xl font-bold">{rows.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Perlu tindakan</p>
+              <p className="mt-2 text-3xl font-bold text-amber-700">{actionCount}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Screening token</p>
+              <p className="mt-2 text-3xl font-bold">{screeningTokens}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-8">
+          <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Screening activity</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Gunakan fasilitas Dover untuk mempercepat proses dari evaluasi ke penawaran.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter screening">
+              <Button variant={tab === "all" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("all")} role="tab" aria-selected={tab === "all"}>
+                <Filter className="size-3.5" /> Semua
+              </Button>
+              <Button variant={tab === "action" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("action")} role="tab" aria-selected={tab === "action"}>
+                Perlu tindakan
+              </Button>
+              <Button variant={tab === "history" ? "secondary" : "ghost"} size="sm" onClick={() => setTab("history")} role="tab" aria-selected={tab === "history"}>
+                Riwayat
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {dbMode && !bootstrapped ? (
+              <div className="rounded-xl bg-muted p-8 text-center text-sm text-muted-foreground" role="status">
+                Memuat screening...
+              </div>
+            ) : visibleRows.length ? (
+              <div className="divide-y">
+                {visibleRows.map((row) => {
+                  const status = stateCopy[row.state];
+                  const cCandidate = row.candidateRef;
+                  return (
+                    <div key={row.id} className="flex flex-col gap-4 py-5 first:pt-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-primary">
+                          <ShieldCheck className="size-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{row.name}</p>
+                          <p className="truncate text-sm text-muted-foreground">{row.role} · {row.location}</p>
+                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock3 className="size-3" /> {formatDate(row.updatedAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <Badge className={status.className}>{status.label}</Badge>
+                        {row.result && (
+                          <span className="font-mono text-sm font-semibold">{row.result.insight.score}/100</span>
+                        )}
+
+                        {/* Dover ATS Quick Actions */}
+                        {cCandidate && (
+                          <div className="flex items-center gap-1.5 ml-1 border-l pl-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-purple-700 hover:bg-purple-50"
+                              title="Prompt Pesan AI"
+                              aria-label={`Prompt Pesan ${row.name}`}
+                              onClick={() => {
+                                setSelectedCandidate(cCandidate);
+                                setPromptModalOpen(true);
+                              }}
+                            >
+                              <MessageSquareQuote className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-purple-700 hover:bg-purple-50"
+                              title="Jadwalkan Wawancara"
+                              aria-label={`Jadwalkan Wawancara ${row.name}`}
+                              onClick={() => {
+                                setSelectedCandidate(cCandidate);
+                                setScheduleModalOpen(true);
+                              }}
+                            >
+                              <Calendar className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-emerald-700 hover:bg-emerald-50"
+                              title="Buat Offer Letter"
+                              aria-label={`Buat Offer Letter ${row.name}`}
+                              onClick={() => {
+                                setSelectedCandidate(cCandidate);
+                                setOfferModalOpen(true);
+                              }}
+                            >
+                              <FileCheck2 className="size-4" />
+                            </Button>
+                          </div>
+                        )}
+
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/recruiter/screenings/${row.candidateId}`}>
+                            Buka <ArrowRight className="size-3.5" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-muted/20 p-10 text-center">
+                <Sparkles className="mx-auto size-8 text-primary" />
+                <p className="mt-3 font-semibold">Belum ada aktivitas screening</p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                  Kandidat yang belum di-scan tidak ditampilkan di sini. Silakan temukan kandidat potensial di menu <strong>Cari Talent</strong> dan lakukan scan profil terlebih dahulu untuk memulai alur screening.
+                </p>
+                <Button className="mt-5" size="sm" asChild>
+                  <Link href="/search">Cari Talent Sekarang</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <p className="mt-5 text-xs leading-5 text-muted-foreground">
+          {dbMode
+            ? "Database mode: riwayat organisasi penuh dan aksi terhubung langsung dengan Supabase PostgreSQL."
+            : "Demo mode: status screening dan aksi alur Dover berjalan di penyimpanan lokal browser Anda."}
+        </p>
+
+        {/* Dover Modals */}
+        {selectedCandidate && (
+          <>
+            <PromptedOutreachComposer
+              open={promptModalOpen}
+              onOpenChange={setPromptModalOpen}
+              candidate={selectedCandidate}
+              onMessageSent={() => setPromptModalOpen(false)}
+            />
+            <ScheduleInterviewModal
+              open={scheduleModalOpen}
+              onOpenChange={setScheduleModalOpen}
+              candidate={selectedCandidate}
+              onScheduled={() => setScheduleModalOpen(false)}
+            />
+            <CreateOfferModal
+              open={offerModalOpen}
+              onOpenChange={setOfferModalOpen}
+              candidate={selectedCandidate}
+              onOfferSent={() => setOfferModalOpen(false)}
+            />
+          </>
+        )}
+      </main>
+    </ProtectedRoute>
+  );
 }

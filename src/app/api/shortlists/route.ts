@@ -4,15 +4,23 @@ import { z } from "zod";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { ShortlistService } from "@/lib/services/shortlist";
 
-export async function GET() {
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(24),
+});
+
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const paged = paginationSchema.safeParse({ page: url.searchParams.get("page") ?? undefined, limit: url.searchParams.get("limit") ?? undefined });
+    if (!paged.success) return NextResponse.json({ error: "Parameter pagination tidak valid." }, { status: 400 });
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const scope = await getRecruiterScope(current.db, current.user);
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
-    const result = await ShortlistService.list(current.db, scope.membership.organizationId);
+    const result = await ShortlistService.list(current.db, scope.membership.organizationId, { page: paged.data.page, limit: paged.data.limit });
     return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

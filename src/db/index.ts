@@ -9,15 +9,34 @@ export type Database = PostgresJsDatabase<typeof schema>;
 
 let database: Database | undefined;
 
+const globalForDb = globalThis as unknown as { __talentNetworkDb?: Database };
+
 export function getDb(): Database {
-  if (database) return database;
+  if (globalForDb.__talentNetworkDb) return globalForDb.__talentNetworkDb;
+  if (database) {
+    globalForDb.__talentNetworkDb = database;
+    return database;
+  }
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is required to access the database.");
   }
 
-  database = drizzle(postgres(connectionString, { prepare: false }), { schema });
+  const maxConnections = process.env.DB_MAX_CONNECTIONS
+    ? Math.max(1, parseInt(process.env.DB_MAX_CONNECTIONS, 10) || 5)
+    : 5;
+
+  database = drizzle(
+    postgres(connectionString, {
+      prepare: false,
+      max: maxConnections,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    }),
+    { schema },
+  );
+  globalForDb.__talentNetworkDb = database;
   return database;
 }
 

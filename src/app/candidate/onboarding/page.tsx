@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { CandidateOnboarding } from "@/components/candidate/candidate-onboarding";
 
 export default function CandidateOnboardingPage() {
-  return <CandidateOnboarding />;
+  return (
+    <Suspense fallback={null}>
+      <CandidateOnboarding />
+    </Suspense>
+  );
 }
