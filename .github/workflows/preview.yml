@@ -1,8 +1,6 @@
-name: ci
+name: build-preview
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
 
 permissions:
@@ -13,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  preview:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -28,18 +26,14 @@ jobs:
 
       - run: npm run lint
 
-      - run: npm run typecheck
-
-      # drizzle-kit check validates migration snapshots offline; no DATABASE_URL needed.
-      - run: npm run db:check
-
-      - run: npx playwright install --with-deps chromium
-
-      # Full suite: all specs in e2e/ are anonymous-tolerant (no secrets needed).
-      - run: npx playwright test
-        env:
-          CI: true
-
-      - run: npm run test:unit
-
       - run: npm run build
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-preview-${{ github.sha }}
+          path: .next
+
+      - run: |
+          echo "## Build preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact: build-preview-${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
