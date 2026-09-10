@@ -53,7 +53,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           authUserId: authUser.id,
           email: authEmail,
           role,
-          recruiterProvisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending",
+          recruiterProvisioningStatus: role === "candidate" ? "active" : "pending",
         }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
 
     // Ensure displayName is NOT overwritten with an email prefix if an existing profile already has a name
@@ -97,6 +97,36 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
       }
       if (organizationId) await ShortlistService.ensureDefault(tx, organizationId, user.id);
+    }
+
+    if (role === "partner") {
+      const existingPartnership = await tx
+        .select({ id: schema.partnerships.id, verificationStatus: schema.partnerships.verificationStatus })
+        .from(schema.partnerships)
+        .where(eq(schema.partnerships.userId, user.id))
+        .limit(1);
+
+      let status = existingPartnership[0]?.verificationStatus;
+      if (existingPartnership.length === 0) {
+        const partnerName = input.companyName?.trim() || input.name?.trim() || resolvedName || authEmail.split("@")[0];
+        const [created] = await tx.insert(schema.partnerships).values({
+          userId: user.id,
+          name: partnerName,
+          verificationStatus: "pending",
+        }).returning({ id: schema.partnerships.id, verificationStatus: schema.partnerships.verificationStatus });
+        status = created?.verificationStatus ?? "pending";
+      }
+
+      const partnerProvisioningStatus =
+        status === "approved"
+          ? ("active" as const)
+          : status === "need_revision"
+          ? ("revision_required" as const)
+          : status === "rejected"
+          ? ("rejected" as const)
+          : ("pending" as const);
+
+      return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus };
     }
 
     return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus };

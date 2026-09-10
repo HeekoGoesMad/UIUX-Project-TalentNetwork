@@ -81,7 +81,7 @@ export function SiteHeader() {
 
   const isLanding = pathname === "/";
   const isAuth = pathname === "/login" || pathname === "/register";
-  const isOnboarding = pathname?.startsWith("/candidate/onboarding") || pathname?.startsWith("/recruiter/onboarding");
+  const isOnboarding = pathname?.includes("/onboarding");
   const visibleUser = hydrated && !isAuth ? user : null;
   const isPublicHeader = isLanding || isAuth || !visibleUser;
   const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
@@ -141,37 +141,41 @@ export function SiteHeader() {
     (item) => pathname === item.href || pathname?.startsWith(`${item.href}/`)
   );
 
+  const isPartnerSection = pathname?.startsWith("/partner");
+  const isCandidateSection = pathname?.startsWith("/candidate");
+
   // Top-level direct navigation links
-  const links = isPublicHeader
-    ? [
-        { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
-        { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
-        { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
-        { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
-      ]
-    : visibleUser?.role === "candidate"
-    ? [
-        { href: "/candidate", label: "Workspace" },
-        { href: "/candidate/applications", label: "Lamaran Saya" },
-        { href: "/candidate/cv", label: "CV & Profil" },
-        { href: "/candidate/career-advisor", label: "Career Advisor" },
-        { href: "/messages", label: "Pesan" },
-      ]
-    : visibleUser?.role === "partner"
-    ? [
-        { href: "/partner", label: "Dashboard" },
-        { href: "/partner/talent", label: "Talent Kampus" },
-        { href: "/partner/employers", label: "Akses Employer" },
-        { href: "/partner/analytics", label: "Analitik" },
-      ]
-    : [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/search", label: "Cari Talent" },
-        { href: "/messages", label: "Pesan" },
-      ];
+  const links =
+    isPartnerSection || visibleUser?.role === "partner"
+      ? [
+          { href: "/partner", label: "Dashboard" },
+          { href: "/partner/talent", label: "Talent Kampus" },
+          { href: "/partner/employers", label: "Akses Employer" },
+          { href: "/partner/analytics", label: "Analitik" },
+        ]
+      : isCandidateSection || visibleUser?.role === "candidate"
+      ? [
+          { href: "/candidate", label: "Workspace" },
+          { href: "/candidate/applications", label: "Lamaran Saya" },
+          { href: "/candidate/cv", label: "CV & Profil" },
+          { href: "/candidate/career-advisor", label: "Career Advisor" },
+          { href: "/messages", label: "Pesan" },
+        ]
+      : isPublicHeader
+      ? [
+          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
+          { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
+          { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
+          { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
+        ]
+      : [
+          { href: "/dashboard", label: "Dashboard" },
+          { href: "/search", label: "Cari Talent" },
+          { href: "/messages", label: "Pesan" },
+        ];
 
   const isAdmin = pathname?.startsWith("/admin");
-  const isPending = pathname?.startsWith("/recruiter/pending");
+  const isPending = pathname?.includes("/pending");
   const settingsHref =
     visibleUser?.role === "candidate"
       ? "/candidate/settings"
@@ -203,10 +207,10 @@ export function SiteHeader() {
         <Link
           href={
             visibleUser
-              ? visibleUser.role === "candidate"
-                ? "/candidate"
-                : visibleUser.role === "partner"
+              ? isPartnerSection || visibleUser.role === "partner"
                 ? "/partner"
+                : isCandidateSection || visibleUser.role === "candidate"
+                ? "/candidate"
                 : "/dashboard"
               : "/"
           }
@@ -255,7 +259,7 @@ export function SiteHeader() {
           })}
 
           {/* Minimalist Clustered Dropdown for Recruiter */}
-          {visibleUser?.role === "recruiter" && (
+          {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
@@ -298,7 +302,7 @@ export function SiteHeader() {
 
         {/* Right Actions */}
         <div className="flex shrink-0 items-center gap-2">
-          {!isPublicHeader && (
+          {!isPublicHeader && !isPartnerSection && visibleUser?.role !== "partner" && (
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
               <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"} className="flex items-center gap-1.5">
                 <Search className="size-3.5" />
@@ -309,17 +313,17 @@ export function SiteHeader() {
             </Button>
           )}
 
-          {visibleUser?.role === "partner" && (
+          {(isPartnerSection || visibleUser?.role === "partner") && (
             <Link
               href="/partner"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
             >
-              <GraduationCap className="size-4 text-primary" />
-              <span className="hidden text-muted-foreground sm:inline text-xs">Career Center</span>
+              <GraduationCap className="size-4 text-[#7C3AED]" />
+              <span className="hidden text-slate-700 sm:inline text-xs font-semibold">Career Center</span>
             </Link>
           )}
 
-          {visibleUser?.role === "recruiter" && (
+          {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
             <Link
               href="/dashboard"
               className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
@@ -446,7 +450,7 @@ export function SiteHeader() {
             })}
 
             {/* Mobile Recruiter Features Group */}
-            {visibleUser?.role === "recruiter" && (
+            {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
               <div className="mt-2 border-t border-slate-100 pt-2">
                 <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Alur Rekrutmen Dover

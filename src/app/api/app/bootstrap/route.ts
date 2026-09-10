@@ -29,9 +29,10 @@ export async function GET() {
 
     const isRecruiter = current.user.role === "recruiter";
     const isCandidate = current.user.role === "candidate";
+    const isPartner = current.user.role === "partner";
 
-    // Batch 1: Concurrently load base profile, candidate profile, notifications, and organization membership
-    const [profileRows, candidateProfileRows, notifications, memberRows] = await Promise.all([
+    // Batch 1: Concurrently load base profile, candidate profile, notifications, organization membership, and partnership
+    const [profileRows, candidateProfileRows, notifications, memberRows, partnershipRows] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
       isCandidate
         ? current.db.select().from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1)
@@ -40,11 +41,24 @@ export async function GET() {
       isRecruiter
         ? current.db.select().from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, current.user.id)).limit(1)
         : Promise.resolve([]),
+      isPartner
+        ? current.db.select().from(schema.partnerships).where(eq(schema.partnerships.userId, current.user.id)).limit(1)
+        : Promise.resolve([]),
     ]);
 
     const profile = profileRows[0] ?? null;
     const candidateProfile = candidateProfileRows[0] ?? null;
     const recruiterMember = memberRows[0] ?? null;
+    let partnership = partnershipRows[0] ?? null;
+    if (isPartner && !partnership) {
+      const partnerName = profile?.displayName || current.user.email?.split("@")[0] || "Mitra Kampus";
+      const [created] = await current.db.insert(schema.partnerships).values({
+        userId: current.user.id,
+        name: partnerName,
+        verificationStatus: "pending",
+      }).returning();
+      if (created) partnership = created;
+    }
     const isRecruiterActive = isRecruiter && current.user.recruiterProvisioningStatus === "active";
     const resolvedOrgId = recruiterMember?.organizationId ?? null;
     const activeOrgId = isRecruiterActive ? resolvedOrgId : null;
@@ -85,16 +99,32 @@ export async function GET() {
         : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
     ]);
 
+    let provisioningStatus = current.user.recruiterProvisioningStatus;
+    let provisioningReason = current.user.recruiterRejectionReason ?? null;
+
+    if (isPartner && partnership) {
+      provisioningStatus =
+        partnership.verificationStatus === "approved"
+          ? "active"
+          : partnership.verificationStatus === "need_revision"
+          ? "revision_required"
+          : partnership.verificationStatus === "rejected"
+          ? "rejected"
+          : "pending";
+      provisioningReason = partnership.verificationNotes ?? null;
+    }
+
     return NextResponse.json({
       identity: {
         id: current.user.id,
         email: current.user.email,
         name: profile?.displayName ?? current.user.email?.split("@")[0] ?? "Pengguna",
         role: current.user.role,
-        provisioningStatus: current.user.recruiterProvisioningStatus,
-        provisioningReason: current.user.recruiterRejectionReason ?? null,
+        provisioningStatus,
+        provisioningReason,
       },
       organization,
+      partnership,
       profile,
       candidateProfile,
       candidateSections,
