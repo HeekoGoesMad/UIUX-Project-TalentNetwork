@@ -12,10 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Candidate } from "@/types";
 
+import { useRouter } from "next/navigation";
+
 export default function Dashboard() {
+  const router = useRouter();
   const { tokens, scans, shortlisted, recentlyViewed, user, dbMode, bootstrapped, databaseError } = useApp();
   const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === "partner") {
+      router.replace("/partner");
+    }
+  }, [user, router]);
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;

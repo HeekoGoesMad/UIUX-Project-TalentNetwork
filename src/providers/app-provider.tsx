@@ -85,6 +85,7 @@ type Context = AppState & {
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
   loginAsDemoCandidate: () => void;
   loginAsFreshCandidate: () => void;
+  loginAsDemoPartner: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   scan: (id: string) => boolean;
@@ -536,16 +537,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus };
         const actualRole = synced.role ?? role;
-        const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" || actualRole === "partner" ? "active" : "pending");
+        const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" ? "active" : "pending");
         dbIdentity.current = { role: actualRole, provisioningStatus };
 
         const metadata = data.user.user_metadata ?? {};
+        const institutionName =
+          (typeof metadata.companyName === "string" && metadata.companyName.trim()) ||
+          (typeof metadata.name === "string" && metadata.name.trim()) ||
+          "Universitas Indonesia";
+        if (actualRole === "partner") {
+          setActivePartnerInstitution(institutionName);
+        }
         setUser({
           role: actualRole,
           provisioningStatus,
           email,
           name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
-          companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : undefined,
+          companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : (actualRole === "partner" ? institutionName : undefined),
         });
         isLoggingIn.current = false;
         bootstrapUserKey.current = data.user.id;
@@ -557,8 +565,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     isLoggingIn.current = false;
-    const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
+    const fallbackStatus: ProvisioningStatus = role === "candidate" ? "active" : "pending";
     const nextUser: DemoUser = { name: email.split("@")[0] || "User Demo", email, role, provisioningStatus: fallbackStatus, companyName: role === "partner" ? "Universitas Indonesia" : undefined };
+    if (role === "partner") {
+      setActivePartnerInstitution("Universitas Indonesia");
+    }
     setUser(nextUser);
     return { role, provisioningStatus: fallbackStatus };
   };
@@ -599,6 +610,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success("Masuk sebagai Kandidat Baru (Mulai Step 0)");
   };
 
+  const loginAsDemoPartner = () => {
+    const partnerUser: DemoUser = {
+      name: "Universitas Indonesia",
+      email: "mitra@ui.ac.id",
+      role: "partner",
+      provisioningStatus: "active",
+      companyName: "Universitas Indonesia",
+    };
+    setUser(partnerUser);
+    setActivePartnerInstitution("Universitas Indonesia");
+    try {
+      localStorage.setItem(sessionKey, JSON.stringify(partnerUser));
+    } catch {}
+    toast.success("Masuk sebagai Partner Demo (Universitas Indonesia)");
+  };
+
   const register = async (name: string, role: UserRole, email: string, password: string, companyName?: string): Promise<AuthResult> => {
     pendingRole.current = role;
     if (supabaseConfigured) {
@@ -613,7 +640,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 name,
                 role,
                 companyName,
-                provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending",
+                provisioningStatus: role === "candidate" ? "active" : "pending",
               },
             },
           }),
@@ -629,14 +656,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           return { error: msg };
         }
-        if (!data.session) return { needsConfirmation: true, role };
-        setUser({ role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending", email, name, companyName });
-        return { role, provisioningStatus: role === "candidate" || role === "partner" ? "active" : "pending" };
+        if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending" };
+        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name, companyName });
+        return { role, provisioningStatus: role === "candidate" ? "active" : "pending" };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Gagal mendaftar." };
       }
     }
-    const fallbackStatus: ProvisioningStatus = role === "recruiter" ? "pending" : "active";
+    const fallbackStatus: ProvisioningStatus = role === "candidate" ? "active" : "pending";
     setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName });
     return { role, provisioningStatus: fallbackStatus };
   };
@@ -1023,6 +1050,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     login,
     loginAsDemoCandidate,
     loginAsFreshCandidate,
+    loginAsDemoPartner,
     register,
     logout,
     scan,
@@ -1052,6 +1080,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       login,
       loginAsDemoCandidate,
       loginAsFreshCandidate,
+      loginAsDemoPartner,
       register,
       logout,
       scan,
@@ -1081,6 +1110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     login: (role: UserRole, email: string, password: string) => actionsRef.current.login(role, email, password),
     loginAsDemoCandidate: () => actionsRef.current.loginAsDemoCandidate(),
     loginAsFreshCandidate: () => actionsRef.current.loginAsFreshCandidate(),
+    loginAsDemoPartner: () => actionsRef.current.loginAsDemoPartner(),
     register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => actionsRef.current.register(name, role, email, password, companyName),
     logout: () => actionsRef.current.logout(),
     scan: (id: string) => actionsRef.current.scan(id),

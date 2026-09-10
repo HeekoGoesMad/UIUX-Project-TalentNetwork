@@ -46,6 +46,12 @@ export const companyVerificationStatus = pgEnum("company_verification_status", [
   "rejected",
   "suspended",
 ]);
+export const partnerVerificationStatus = pgEnum("partner_verification_status", [
+  "pending",
+  "approved",
+  "need_revision",
+  "rejected",
+]);
 export const industrySector = pgEnum("industry_sector", [
   "Technology",
   "Financial Services",
@@ -216,6 +222,25 @@ export const organizationMembers = pgTable("organization_members", {
 }, (table) => [
   unique("organization_members_org_user_unique").on(table.organizationId, table.userId),
   index("organization_members_user_idx").on(table.userId),
+]);
+
+export const partnerships = pgTable("partnerships", {
+  id: id(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  skDocumentUrl: text("sk_document_url"),
+  skNumber: text("sk_number"),
+  location: text("location"),
+  verificationStatus: partnerVerificationStatus("verification_status").notNull().default("pending"),
+  verificationNotes: text("verification_notes"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index("partnerships_user_id_idx").on(table.userId),
+  index("partnerships_verification_status_idx").on(table.verificationStatus),
+  index("partnerships_reviewed_by_idx").on(table.reviewedBy),
 ]);
 
 export const candidateProfiles = pgTable("candidate_profiles", {

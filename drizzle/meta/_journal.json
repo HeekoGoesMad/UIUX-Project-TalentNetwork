@@ -43,6 +43,13 @@
       "when": 1788739200000,
       "tag": "0008_optional_screening_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789021778507,
+      "tag": "0006_add_partnerships",
+      "breakpoints": true
     }
   ]
 }
