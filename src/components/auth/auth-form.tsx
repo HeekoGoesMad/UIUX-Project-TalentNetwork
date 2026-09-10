@@ -9,6 +9,7 @@ import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { ConsentModal } from "./consent-modal";
 import { OtpVerificationModal } from "./otp-verification-modal";
 import { RoleSelector } from "./role-selector";
@@ -45,6 +46,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const registrationDest = (chosenRole: UserRole) =>
+    chosenRole === "recruiter"
+      ? "/recruiter/onboarding"
+      : chosenRole === "partner"
+      ? "/partner/onboarding"
+      : "/candidate/onboarding";
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -74,12 +82,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     if (mode === "register") {
       setLoading(false);
       const chosenRole = result.role ?? role;
-      const dest =
-        chosenRole === "recruiter"
-          ? "/recruiter/onboarding"
-          : chosenRole === "partner"
-          ? "/partner/onboarding"
-          : "/candidate/onboarding";
+      const dest = registrationDest(chosenRole);
+      if (result.emailResent) toast.info("Akun sudah terdaftar — masukkan kode OTP dari email Anda.");
       setPendingRegistration({ email, role: chosenRole, destinationPath: dest, name, companyName });
       setOtpModalOpen(true);
       return;
@@ -343,6 +347,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           </>
         )}
       </Button>
+
+      {mode === "register" && (
+        <button
+          type="button"
+          className="text-xs font-semibold text-[#7C3AED] hover:underline underline-offset-2"
+          onClick={() => {
+            const typedEmail = (document.getElementById("email") as HTMLInputElement | null)?.value?.trim();
+            if (!typedEmail) {
+              toast.error("Masukkan email Anda terlebih dahulu.");
+              return;
+            }
+            setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
+            setOtpModalOpen(true);
+          }}
+        >
+          Sudah menerima kode OTP? Verifikasi sekarang
+        </button>
+      )}
 
       {supabaseConfigured && (
         <>

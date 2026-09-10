@@ -60,7 +60,7 @@ type BootstrapTokenAccount = { accountId: string | null; balance: number; update
 type BootstrapNotification = { id: string; type: string; title: string; body: string | null; data: Record<string, unknown>; readAt: string | null; createdAt: string };
 type BootstrapShortlist = { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; items: Array<{ id: string; candidateProfileId: string; status: string; notes: string | null; createdAt: string; candidate?: { name: string | null; role: string | null; location: string | null } }> };
 type BootstrapSection = { type: string; content: Record<string, unknown> };
-type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus };
+type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus; emailResent?: boolean };
 
 type Context = AppState & {
   hydrated: boolean;
@@ -649,7 +649,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (error) {
           let msg = error.message;
           if (/already registered|already exists/i.test(error.message)) {
-            msg = "Email sudah terdaftar. Silakan masuk dengan akun tersebut, atau gunakan email lain.";
+            let resendError: unknown = null;
+            try {
+              const { error: rErr } = await supabase.auth.resend({ type: "signup", email });
+              resendError = rErr;
+            } catch {
+              resendError = true;
+            }
+            return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending", emailResent: !resendError };
           } else if (/security purposes.*after (\d+)/i.test(error.message)) {
             const seconds = error.message.match(/after (\d+)/i)?.[1] ?? "beberapa";
             msg = `Untuk alasan keamanan, Anda baru dapat meminta verifikasi kembali setelah ${seconds} detik. Silakan periksa juga kotak masuk/spam email Anda.`;
