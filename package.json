@@ -20,7 +20,7 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
-    "@ai-sdk/azure": "^4.0.33",
+    "@ai-sdk/azure": "^4.0.68",
     "@ai-sdk/openai": "^4.0.60",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
