@@ -20,10 +20,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [role, setRole] = useState<UserRole>("recruiter");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
   const [consentAgreed, setConsentAgreed] = useState(false);
+  const [pendingGoogleAuth, setPendingGoogleAuth] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{
     email: string;
     role: UserRole;
@@ -33,11 +35,33 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   } | null>(null);
 
   useEffect(() => {
-    if (hydrated && user && !loading && !otpModalOpen && mode === "login") {
+    if (hydrated && user && !loading && !googleLoading && !otpModalOpen && mode === "login") {
       const dest = destination(user.role, getNext(), false, user.provisioningStatus);
       window.location.href = dest;
     }
-  }, [hydrated, user, loading, mode, otpModalOpen]);
+  }, [hydrated, user, loading, googleLoading, mode, otpModalOpen]);
+
+  // Reset loading indicators if the user navigates back from external Google OAuth page (bfcache)
+  useEffect(() => {
+    const handlePageRestore = () => {
+      setLoading(false);
+      setGoogleLoading(false);
+      setPendingGoogleAuth(false);
+    };
+
+    window.addEventListener("pageshow", handlePageRestore);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        setGoogleLoading(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageRestore);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     const error = new URLSearchParams(window.location.search).get("error");
@@ -99,8 +123,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     window.location.href = dest;
   };
 
-  const signInWithGoogle = async () => {
-    setLoading(true);
+  const handleGoogleClick = () => {
+    setErrorMessage(null);
+    setPendingGoogleAuth(true);
+    setConsentModalOpen(true);
+  };
+
+  const executeGoogleSignIn = async () => {
+    setGoogleLoading(true);
     setErrorMessage(null);
 
     try {
@@ -111,11 +141,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       const { error } = await createClient().auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectUrl.toString() },
+        options: {
+          redirectTo: redirectUrl.toString(),
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
+        },
       });
       if (error) throw error;
     } catch (error) {
-      setLoading(false);
+      setGoogleLoading(false);
       setErrorMessage(`Tidak dapat masuk dengan Google: ${error instanceof Error ? error.message : "Coba lagi."}`);
     }
   };
@@ -327,7 +363,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       <Button
         type="submit"
         className="mt-1 w-full rounded-xl bg-[#7C3AED] h-11 sm:h-12 text-xs sm:text-sm font-semibold hover:bg-[#6D28D9] shadow-sm text-white"
-        disabled={loading || otpModalOpen}
+        disabled={loading || googleLoading || otpModalOpen}
       >
         {loading ? (
           <>
@@ -377,11 +413,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             type="button"
             variant="outline"
             className="h-11 w-full rounded-xl text-xs sm:text-sm"
-            disabled={loading}
-            onClick={signInWithGoogle}
+            disabled={loading || googleLoading}
+            onClick={handleGoogleClick}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
-            {loading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
+            {googleLoading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
+            {googleLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
           </Button>
         </>
       )}
@@ -528,10 +564,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <ConsentModal
         isOpen={consentModalOpen}
-        onClose={() => setConsentModalOpen(false)}
+        actionTitle={pendingGoogleAuth ? "Lanjutkan dengan Google" : undefined}
+        onClose={() => {
+          setConsentModalOpen(false);
+          setPendingGoogleAuth(false);
+        }}
         onAccept={() => {
           setConsentAgreed(true);
           setErrorMessage(null);
+          if (pendingGoogleAuth) {
+            setPendingGoogleAuth(false);
+            void executeGoogleSignIn();
+          }
         }}
       />
     </form>

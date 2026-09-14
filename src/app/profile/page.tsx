@@ -45,6 +45,7 @@ const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
 const DEMO = {
   fullName: "Nadia Putri",
   headline: "Senior Product Designer | UX Research | Design Systems",
+  targetRole: "Lead Product Designer",
   location: "Jakarta",
   salary: "Rp 18.000.000 – Rp 25.000.000 / bln",
   personality: {
@@ -155,6 +156,7 @@ export default function ProfilePage() {
     tools: source?.tools ?? [],
     softSkills: source?.softSkills ?? [],
     portfolio: source?.portfolio ?? [],
+    targetRole: source && "targetRole" in source ? (source.targetRole as string | undefined) : undefined,
     salary: source && "salary" in source ? source.salary : undefined,
     personality: source && "personality" in source ? source.personality : undefined,
   };
@@ -436,12 +438,18 @@ export default function ProfilePage() {
                     <p className="mt-1 text-base font-semibold text-[#7C3AED]">{p.headline}</p>
                   )}
 
-                  {/* Location & Salary */}
+                  {/* Location, Target Role & Salary */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <MapPin className="size-4 text-slate-400" />
                       {p.location}
                     </span>
+                    {p.targetRole && (
+                      <span className="flex items-center gap-1.5 text-blue-700 font-medium">
+                        <BriefcaseBusiness className="size-4 text-blue-600" />
+                        Target: {p.targetRole}
+                      </span>
+                    )}
                     {p.salary && (
                       <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
                         <Banknote className="size-4 text-emerald-600" />

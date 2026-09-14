@@ -23,6 +23,7 @@ export function serializeCandidate(
     id: string;
     name: string | null;
     role: string | null;
+    targetRole?: string | null;
     location: string | null;
     summary: string | null;
     email?: string | null;
@@ -83,6 +84,7 @@ export function serializeCandidate(
       .join("")
       .slice(0, 3),
     role: row.role?.trim() || "Role belum tersedia",
+    targetRole: row.targetRole?.trim() || undefined,
     location: row.location?.trim() || "Lokasi belum tersedia",
     experience: experience.length,
     availability: status === "not-available" ? "Tidak tersedia" : "Terbuka untuk peluang",
@@ -166,6 +168,7 @@ export class TalentSearchService {
         or(
           ilike(schema.profiles.displayName, searchPattern),
           ilike(schema.candidateProfiles.headline, searchPattern),
+          ilike(schema.candidateProfiles.targetRole, searchPattern),
           ilike(schema.candidateProfiles.location, searchPattern),
           ilike(schema.candidateProfiles.summary, searchPattern)
         )!
@@ -204,6 +207,7 @@ export class TalentSearchService {
         id: schema.candidateProfiles.id,
         name: schema.profiles.displayName,
         role: schema.candidateProfiles.headline,
+        targetRole: schema.candidateProfiles.targetRole,
         location: schema.candidateProfiles.location,
         summary: schema.candidateProfiles.summary,
         email: schema.users.email,

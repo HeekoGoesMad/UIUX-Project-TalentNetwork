@@ -717,6 +717,11 @@ export default function TalentProfile() {
 
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Pengalaman {candidate.experience} tahun · {candidate.availability}
+                {candidate.targetRole && (
+                  <span className="text-blue-700 dark:text-blue-400 font-medium">
+                    {" "}· Target Peran: {candidate.targetRole}
+                  </span>
+                )}
                 {unlocked && (
                   <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                     · Ekspektasi Gaji: {candidate.salary}

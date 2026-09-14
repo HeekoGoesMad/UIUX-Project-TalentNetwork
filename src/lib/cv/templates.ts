@@ -21,6 +21,14 @@ const safeAvatarUrl = (url: string): string | null => {
 const portfolioLink = (u: string): string =>
   `<a href="${escapeHtml(safeUrl(u))}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px;">${escapeHtml(u)}</a>`;
 
+export const getCvDisplayRole = (p: CvProfile): string => {
+  if (p.headline?.trim()) return p.headline.trim();
+  const currentRole = p.experience?.find((e) => e.role?.trim())?.role?.trim();
+  if (currentRole) return currentRole;
+  if (p.targetRole?.trim()) return p.targetRole.trim();
+  return "";
+};
+
 const commonPrintCss = `
   @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
@@ -122,7 +130,7 @@ function renderAtsBody(p: CvProfile): string {
   <div class="ats-doc">
     <div class="header">
       <h1>${escapeHtml(p.fullName || "Nama Lengkap")}</h1>
-      ${p.headline || p.targetRole ? `<div class="headline">${escapeHtml(p.targetRole || p.headline || "")}</div>` : ""}
+      ${getCvDisplayRole(p) ? `<div class="headline">${escapeHtml(getCvDisplayRole(p))}</div>` : ""}
       <div class="contact">${contactParts.join(" &bull; ")}</div>
     </div>
 
@@ -256,7 +264,7 @@ function renderModernBody(p: CvProfile): string {
     <div class="col-right">
       <div style="margin-bottom:20px" class="page-break-avoid">
         <h1 class="name-title">${escapeHtml(p.fullName || "Nama Kandidat")}</h1>
-        <div class="role-sub">${escapeHtml(p.targetRole || p.headline || "Profesional")}</div>
+        <div class="role-sub">${escapeHtml(getCvDisplayRole(p) || "Profesional")}</div>
         <div class="divider-line"></div>
       </div>
 
@@ -346,7 +354,7 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
   <div class="sidebar">
     ${avatarMarkup}
     <div class="name">${escapeHtml(p.fullName || "Nama Lengkap")}</div>
-    <div class="headline-side">${escapeHtml(p.targetRole || p.headline || "")}</div>
+    ${getCvDisplayRole(p) ? `<div class="headline-side">${escapeHtml(getCvDisplayRole(p))}</div>` : ""}
     <div class="sidebar-section">
       <div class="sidebar-title">Kontak</div>
       ${p.email ? `<div class="contact-item">📧 ${escapeHtml(p.email)}</div>` : ""}
@@ -395,7 +403,7 @@ const themes: Record<CvTemplateId, { css: string; body: (p: CvProfile) => string
     <div class="header">
       <div>
         <h1>${escapeHtml(p.fullName || "Nama Lengkap")}</h1>
-        <div class="headline">${escapeHtml(p.targetRole || p.headline || "")}</div>
+        ${getCvDisplayRole(p) ? `<div class="headline">${escapeHtml(getCvDisplayRole(p))}</div>` : ""}
       </div>
       <div class="contact">
         ${p.email ? `<div>${escapeHtml(p.email)}</div>` : ""}

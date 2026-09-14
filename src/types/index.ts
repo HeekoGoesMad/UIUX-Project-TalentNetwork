@@ -47,6 +47,7 @@ export type Candidate = {
   name: string;
   initials: string;
   role: string;
+  targetRole?: string;
   location: string;
   experience: number;
   availability: string;

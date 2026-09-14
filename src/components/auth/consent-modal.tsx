@@ -10,9 +10,10 @@ interface ConsentModalProps {
   onClose: () => void;
   onAccept: () => void;
   initialStep?: 1 | 2;
+  actionTitle?: string;
 }
 
-export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: ConsentModalProps) {
+export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actionTitle }: ConsentModalProps) {
   const [step, setStep] = useState<1 | 2>(initialStep);
 
   const handleNext = () => {
@@ -23,13 +24,19 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
     setStep(1);
   };
 
+  const handleClose = () => {
+    setStep(initialStep);
+    onClose();
+  };
+
   const handleFinalAgree = () => {
+    setStep(initialStep);
     onAccept();
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90dvh] flex flex-col p-0 overflow-hidden rounded-2xl border-purple-100 shadow-2xl">
         {/* Header with Step Indicator */}
         <div className="bg-gradient-to-r from-[#7C3AED] to-[#9333EA] p-4 sm:p-6 text-white shrink-0">
@@ -143,7 +150,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
         <DialogFooter className="p-3 sm:p-5 bg-slate-50 border-t flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
           {step === 1 ? (
             <>
-              <Button type="button" variant="ghost" size="sm" onClick={onClose} className="w-full sm:w-auto text-slate-500">
+              <Button type="button" variant="ghost" size="sm" onClick={handleClose} className="w-full sm:w-auto text-slate-500">
                 Batal
               </Button>
               <Button
@@ -167,7 +174,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1 }: Con
                 className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-bold shadow-sm text-xs sm:text-sm"
               >
                 <CheckCircle2 className="size-4" />
-                Saya Setuju &amp; Lanjutkan Pendaftaran
+                {actionTitle ? `Saya Setuju & ${actionTitle}` : "Saya Setuju & Lanjutkan"}
               </Button>
             </>
           )}

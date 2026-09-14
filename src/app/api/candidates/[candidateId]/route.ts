@@ -17,6 +17,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
           id: schema.candidateProfiles.id,
           name: schema.profiles.displayName,
           role: schema.candidateProfiles.headline,
+          targetRole: schema.candidateProfiles.targetRole,
           location: schema.candidateProfiles.location,
           summary: schema.candidateProfiles.summary,
           isPublished: schema.candidateProfiles.isPublished,
