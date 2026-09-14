@@ -273,16 +273,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? (metadata.provisioningStatus as ProvisioningStatus)
               : "pending");
 
+      const existingCustomName =
+        current?.name && current.name !== current.email?.split("@")[0] ? current.name : null;
+
       return {
         role,
         provisioningStatus,
         provisioningReason: dbIdentity.current.provisioningReason ?? current?.provisioningReason ?? null,
         email: authUser.email ?? "",
-        name: typeof metadata.name === "string" && metadata.name.trim()
+        name: existingCustomName || (typeof metadata.name === "string" && metadata.name.trim()
           ? metadata.name
-          : current?.name && current.name !== current.email?.split("@")[0]
-            ? current.name
-            : authUser.email?.split("@")[0] ?? "Pengguna",
+          : authUser.email?.split("@")[0] ?? "Pengguna"),
         companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
       };
     });
@@ -297,8 +298,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null };
         profile?: BootstrapProfile | null;
+        organization?: { id: string; name: string } | null;
+        partnership?: { id: string; name: string } | null;
         candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
         candidateSections?: BootstrapSection[];
         token?: BootstrapTokenAccount;
@@ -315,13 +318,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const role = payload.identity.role;
         const status: ProvisioningStatus = payload.identity.provisioningStatus ?? (role === "recruiter" ? "pending" : "active");
         const resolvedName = payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || payload.identity?.email?.split("@")[0] || "Pengguna";
+        const resolvedCompanyName =
+          payload.organization?.name?.trim() ||
+          payload.identity?.companyName?.trim() ||
+          (role === "partner" ? payload.partnership?.name?.trim() : null) ||
+          undefined;
+
         setUser((current) => ({
           email: payload.identity?.email ?? current?.email ?? "",
           name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
           role,
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
-          companyName: current?.companyName,
+          companyName: resolvedCompanyName ?? current?.companyName,
         }));
       }
 

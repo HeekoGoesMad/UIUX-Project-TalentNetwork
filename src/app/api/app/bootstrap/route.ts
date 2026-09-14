@@ -69,7 +69,8 @@ export async function GET() {
     // Batch 2: Concurrently load dependent resources (sections, org details, shortlists, consents, screenings, tokens)
     const [
       candidateSections,
-      organization,
+      organizationFromMember,
+      organizationByCreator,
       shortlistResult,
       consentResult,
       screeningSummaryRaw,
@@ -80,6 +81,9 @@ export async function GET() {
         : Promise.resolve([]),
       resolvedOrgId
         ? current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1).then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      (!resolvedOrgId && isRecruiter)
+        ? current.db.select().from(schema.organizations).where(eq(schema.organizations.createdBy, current.user.id)).limit(1).then((rows) => rows[0] ?? null)
         : Promise.resolve(null),
       activeOrgId
         ? ShortlistService.list(current.db, activeOrgId)
@@ -99,6 +103,8 @@ export async function GET() {
         : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
     ]);
 
+    const organization = organizationFromMember ?? organizationByCreator ?? null;
+
     let provisioningStatus = current.user.recruiterProvisioningStatus;
     let provisioningReason = current.user.recruiterRejectionReason ?? null;
 
@@ -114,6 +120,9 @@ export async function GET() {
       provisioningReason = partnership.verificationNotes ?? null;
     }
 
+    const companyName =
+      organization?.name ?? (current.user.role === "partner" ? partnership?.name : null) ?? null;
+
     return NextResponse.json({
       identity: {
         id: current.user.id,
@@ -122,6 +131,7 @@ export async function GET() {
         role: current.user.role,
         provisioningStatus,
         provisioningReason,
+        companyName,
       },
       organization,
       partnership,
