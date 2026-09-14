@@ -402,7 +402,7 @@ function SearchPageContent() {
   const candidateSearchTextMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of source) {
-      map.set(c.id, `${c.name} ${c.role} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase());
+      map.set(c.id, `${c.name} ${c.role} ${c.targetRole ?? ""} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase());
     }
     return map;
   }, [source]);
