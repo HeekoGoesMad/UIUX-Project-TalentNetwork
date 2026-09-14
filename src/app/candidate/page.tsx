@@ -30,7 +30,7 @@ export default function CandidateHome() {
   const { applications } = useApplications();
 
   // Candidate Name & Headline
-  const candidateName = user?.name || cvProfile?.fullName || "Kandidat Profesional";
+  const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
   const candidateRole = cvProfile?.targetRole || cvProfile?.headline || "Talent Network Member";
   const candidateLocation = cvProfile?.location || "Indonesia";
 

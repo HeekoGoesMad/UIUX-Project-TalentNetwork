@@ -40,10 +40,10 @@ export async function GET(request: Request) {
       result.role === "admin"
         ? "/admin"
         : result.role === "candidate"
-        ? "/candidate/onboarding"
+        ? (result.isNew ? "/candidate/onboarding" : "/candidate")
         : result.role === "partner"
-        ? (result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
-        : (result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
+        ? (result.isNew ? "/partner/onboarding" : result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
+        : (result.isNew ? "/recruiter/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
     const destination = safeNext(next, fallback);
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({
@@ -54,6 +54,26 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(destination, requestUrl.origin));
   } catch (error) {
     console.error("Verifikasi email gagal:", error);
+
+    // Handle ROLE_MISMATCH specifically so the user sees which role tab to switch to
+    if (error instanceof Error && error.message.startsWith("ROLE_MISMATCH:")) {
+      // Sign out the session created by exchangeCodeForSession so the
+      // client-side onAuthStateChange listener doesn't auto-redirect the user
+      const supabase = await createClient();
+      await supabase.auth.signOut().catch(() => {});
+
+      const [, actualRole] = error.message.split(":");
+      const roleLabel =
+        actualRole === "candidate" ? "Talent / Candidate"
+        : actualRole === "recruiter" ? "Recruiter / Hiring"
+        : actualRole === "partner" ? "Partnership"
+        : actualRole;
+      const msg = encodeURIComponent(
+        `Akun Google ini terdaftar sebagai ${roleLabel}. Silakan pilih peran ${roleLabel} untuk masuk.`
+      );
+      return NextResponse.redirect(new URL(`/login?error=${msg}`, requestUrl.origin));
+    }
+
     return NextResponse.redirect(new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin));
   }
 }

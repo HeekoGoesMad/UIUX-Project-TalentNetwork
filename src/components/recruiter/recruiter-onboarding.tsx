@@ -36,6 +36,7 @@ const recruiterSteps = [
 const INDUSTRY_OPTIONS = [
   "Teknologi & Perangkat Lunak (SaaS / IT)",
   "Fintech & Layanan Keuangan",
+  "Hospitality, Pariwisata & Hotel",
   "E-Commerce & Retail Modern",
   "FMCG & Manufaktur",
   "Kesehatan, Farmasi & Medtech",
@@ -141,7 +142,7 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
 
 export function RecruiterOnboarding() {
   const router = useRouter();
-  const { user, logout, setProvisioningStatus } = useApp();
+  const { user, logout, setProvisioningStatus, reloadBootstrap } = useApp();
 
   const [step, setStep] = useState<number>(() => {
     const draft = getSavedDraft();
@@ -254,6 +255,7 @@ export function RecruiterOnboarding() {
         // ignore
       }
       setProvisioningStatus("pending");
+      await reloadBootstrap();
       toast.success("Dokumen legalitas berhasil dikirim ke antrean review compliance!");
       router.push("/recruiter/pending");
     } catch (err) {

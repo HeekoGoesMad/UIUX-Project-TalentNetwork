@@ -66,7 +66,7 @@ export default function Dashboard() {
               <ShieldCheck className="size-4" /> Workspace Recruiter
             </p>
             <h1 className="mt-3 text-3xl font-bold text-[#1A1A2E]">
-              Selamat datang kembali, {user?.name || "Recruiter"}.
+              Selamat datang kembali, {user?.companyName || user?.name || "Recruiter"}.
             </h1>
             <p className="mt-2 text-muted-foreground">Lanjutkan pencarian dengan talent yang tepat.</p>
           </div>
