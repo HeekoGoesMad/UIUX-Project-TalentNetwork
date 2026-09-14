@@ -9,14 +9,21 @@ import { writeAuditLog } from "@/lib/audit";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const emptyToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
+
 const updateCompanySchema = z
   .object({
+    name: z.string().trim().min(2).optional(),
+    description: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    officeAddress: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    picName: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    picPhone: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     verificationStatus: z
       .enum(["pending", "approved", "need_revision", "rejected", "suspended"])
       .optional(),
-    verificationNotes: z.string().trim().max(1000).optional().nullable(),
-    nib: z.string().trim().optional().nullable(),
-    npwp: z.string().trim().optional().nullable(),
+    verificationNotes: z.preprocess(emptyToNull, z.string().trim().max(1000).optional().nullable()),
+    nib: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    npwp: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     industry: z
       .enum([
         "Technology",
@@ -42,11 +49,11 @@ const updateCompanySchema = z
       ])
       .optional()
       .nullable(),
-    province: z.string().trim().optional().nullable(),
-    city: z.string().trim().optional().nullable(),
-    companyEmail: z.string().email().optional().nullable(),
-    website: z.string().trim().optional().nullable(),
-    linkedinUrl: z.string().trim().optional().nullable(),
+    province: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    city: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    companyEmail: z.preprocess(emptyToNull, z.string().email().optional().nullable()),
+    website: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    linkedinUrl: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     subscriptionTier: z.enum(["trial", "starter", "professional", "enterprise"]).optional(),
     subscriptionStatus: z.enum(["active", "expired", "suspended"]).optional(),
   })
@@ -85,6 +92,9 @@ export async function PATCH(
       updatedAt: new Date(),
     };
 
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
+    if (parsed.data.officeAddress !== undefined) updateData.officeAddress = parsed.data.officeAddress;
     if (parsed.data.verificationStatus !== undefined) {
       updateData.verificationStatus = parsed.data.verificationStatus;
       updateData.reviewedAt = new Date();
@@ -110,6 +120,17 @@ export async function PATCH(
       .set(updateData)
       .where(eq(schema.organizations.id, companyId))
       .returning();
+
+    // Update PIC profile jika ada
+    if (updatedOrg.createdBy && (parsed.data.picName !== undefined || parsed.data.picPhone !== undefined)) {
+      const profileSet: Record<string, unknown> = { updatedAt: new Date() };
+      if (parsed.data.picName !== undefined) profileSet.displayName = parsed.data.picName;
+      if (parsed.data.picPhone !== undefined) profileSet.phone = parsed.data.picPhone;
+      await db
+        .update(schema.profiles)
+        .set(profileSet)
+        .where(eq(schema.profiles.userId, updatedOrg.createdBy));
+    }
 
     // SINKRONISASI: Jika perusahaan disetujui, otomatis aktifkan recruiter provisioning status untuk owner / PIC
     if (parsed.data.verificationStatus === "approved" && updatedOrg.createdBy) {
@@ -156,7 +177,25 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ success: true, company: updatedOrg });
+    const [ownerProfile] = updatedOrg.createdBy
+      ? await db.select().from(schema.profiles).where(eq(schema.profiles.userId, updatedOrg.createdBy)).limit(1)
+      : [null];
+    const [ownerUser] = updatedOrg.createdBy
+      ? await db.select().from(schema.users).where(eq(schema.users.id, updatedOrg.createdBy)).limit(1)
+      : [null];
+
+    return NextResponse.json({
+      success: true,
+      company: {
+        ...updatedOrg,
+        owner: {
+          userId: updatedOrg.createdBy,
+          name: ownerProfile?.displayName ?? null,
+          email: ownerUser?.email ?? null,
+          phone: ownerProfile?.phone ?? null,
+        },
+      },
+    });
   } catch (error) {
     return apiError("Gagal memperbarui data perusahaan.", 500, error);
   }

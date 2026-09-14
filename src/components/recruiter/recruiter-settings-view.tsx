@@ -100,10 +100,13 @@ export function RecruiterSettingsView() {
     e.preventDefault();
     setSaving(true);
     try {
+      const payload = { ...form };
+      delete (payload as Record<string, unknown>).picEmail;
+      delete (payload as Record<string, unknown>).verificationStatus;
       const res = await fetch("/api/recruiter/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan perubahan");
