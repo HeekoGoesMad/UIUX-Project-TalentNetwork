@@ -457,9 +457,13 @@ export default function NotificationsPage() {
           ) : (
             filteredNotifications.map((notif) => {
               const unread = !notif.readAt;
-              const href = "href" in notif ? (notif as { href?: string }).href : undefined;
+              const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
               const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
               const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
+              const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
+              const displayBody = notif.body
+                ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
+                : "";
 
               return (
                 <Card
@@ -518,8 +522,8 @@ export default function NotificationsPage() {
                         </time>
                       </div>
 
-                      {notif.body && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{notif.body}</p>
+                      {displayBody && (
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
                       )}
 
                       {unread && (
