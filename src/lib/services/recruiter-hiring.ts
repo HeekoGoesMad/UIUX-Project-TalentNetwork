@@ -717,6 +717,32 @@ export async function updateInterview(db: Database, input: UpdateInterviewInput)
   });
 }
 
+export async function deleteInterview(
+  db: Database,
+  input: { interviewId: string; organizationId: string; actorUserId?: string }
+) {
+  const [interview] = await db
+    .select()
+    .from(schema.interviews)
+    .where(
+      and(
+        eq(schema.interviews.id, input.interviewId),
+        eq(schema.interviews.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!interview) {
+    throw new Error("Wawancara tidak ditemukan.");
+  }
+
+  await db
+    .delete(schema.interviews)
+    .where(eq(schema.interviews.id, input.interviewId));
+
+  return { success: true };
+}
+
 export async function submitInterviewFeedback(db: Database, input: SubmitInterviewFeedbackInput) {
   return await db.transaction(async (tx) => {
     // 1. Get or create interview panel member

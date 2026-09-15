@@ -862,6 +862,7 @@ export function RecruiterOperationsPage() {
               people={people}
               onSendInvitation={handleSendInterviewInvitation}
               sendingInterviewId={sendingInterviewId}
+              dbMode={dbMode}
             />
           )}
 
@@ -1314,6 +1315,7 @@ function InterviewsView({
   people,
   onSendInvitation,
   sendingInterviewId,
+  dbMode,
 }: {
   data: { candidates: Candidate[]; interviews: Interview[] };
   selectedCandidateData?: Candidate;
@@ -1324,6 +1326,7 @@ function InterviewsView({
   people: string[];
   onSendInvitation?: (interview: Interview, cand?: Candidate) => void;
   sendingInterviewId?: string | null;
+  dbMode?: boolean;
 }) {
   const [feedback, setFeedback] = useState(selectedCandidateData?.feedback ?? "");
   const selectedInterviews = data.interviews.filter((interview) => interview.candidateId === selectedCandidateData?.id);
@@ -1332,6 +1335,23 @@ function InterviewsView({
       ...current,
       interviews: current.interviews.map((item) => (item.id === id ? { ...item, ...update } : item)),
     }));
+
+  const deleteInterview = async (id: string) => {
+    setData((current) => ({
+      ...current,
+      interviews: current.interviews.filter((item) => item.id !== id),
+    }));
+    if (dbMode && !id.startsWith("interview-")) {
+      try {
+        await fetch(`/api/interviews/${id}`, {
+          method: "DELETE",
+        });
+      } catch {
+        // Optimistic UI preserved
+      }
+    }
+    toast.success("Jadwal interview berhasil dihapus");
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[.85fr_1.15fr]">
@@ -1495,11 +1515,10 @@ function InterviewsView({
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Batalkan interview"
-                          onClick={() => {
-                            updateInterview(interview.id, { status: "Dibatalkan" });
-                            toast.success("Interview dibatalkan");
-                          }}
+                          className="hover:bg-red-50 hover:text-red-600"
+                          aria-label="Hapus jadwal interview"
+                          title="Hapus jadwal interview"
+                          onClick={() => deleteInterview(interview.id)}
                         >
                           <X className="size-4" />
                         </Button>
