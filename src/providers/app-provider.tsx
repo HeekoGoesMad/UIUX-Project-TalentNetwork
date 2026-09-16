@@ -712,6 +712,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast.error("Token Anda habis", { description: "Tambah token untuk membuka profil lainnya." });
       return false;
     }
+    const companyName = user?.companyName || "Perusahaan Mitra";
+    const notifItem: BootstrapNotification = {
+      id: `notif-scan-${id}-${Date.now()}`,
+      type: "system",
+      title: "Profil kamu sedang ditinjau ✨",
+      body: `Profil dan portofolio kamu baru saja dibuka dan sedang ditinjau oleh tim rekruter di ${companyName}.`,
+      data: { candidateProfileId: id, companyName },
+      readAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    setNotifications((prev) => [notifItem, ...prev]);
+
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,

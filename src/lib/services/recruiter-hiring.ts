@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { schema, type Database } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
 import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
@@ -18,6 +18,7 @@ export type ScheduleInterviewInput = {
   meetingUrl?: string;
   panelMemberUserIds?: string[];
   criteria?: Record<string, unknown>;
+  sendInvitation?: boolean;
 };
 
 export type UpdateInterviewInput = {
@@ -181,7 +182,47 @@ export async function findOrCreateApplicationForCandidate(
     )
     .limit(1);
 
-  if (existing) return existing;
+  const [[candidateProfile], [org]] = await Promise.all([
+    db
+      .select({ userId: schema.candidateProfiles.userId })
+      .from(schema.candidateProfiles)
+      .where(eq(schema.candidateProfiles.id, input.candidateProfileId))
+      .limit(1),
+    db
+      .select({ name: schema.organizations.name })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, input.organizationId))
+      .limit(1),
+  ]);
+
+  const orgName = org?.name || "Perusahaan Mitra";
+
+  if (existing) {
+    if (existing.status === "new" || existing.status === "screening") {
+      await db
+        .update(schema.applications)
+        .set({ status: "review", updatedAt: new Date() })
+        .where(eq(schema.applications.id, existing.id));
+      await db.insert(schema.applicationStageHistory).values({
+        applicationId: existing.id,
+        fromStatus: existing.status,
+        toStatus: "review",
+        changedBy: input.recruiterUserId,
+        reason: "Profil dibuka oleh rekruter melalui Talent Network.",
+      });
+    }
+
+    if (candidateProfile?.userId) {
+      await ensureProfileViewedNotification(db, {
+        userId: candidateProfile.userId,
+        organizationId: input.organizationId,
+        orgName,
+        applicationId: existing.id,
+      });
+    }
+
+    return existing;
+  }
 
   let targetJobId = input.jobId;
   if (!targetJobId) {
@@ -215,13 +256,86 @@ export async function findOrCreateApplicationForCandidate(
     .values({
       jobId: targetJobId,
       candidateProfileId: input.candidateProfileId,
-      status: "screening",
+      status: "review",
       source: "recruiter_invitation",
-      coverNote: "Kandidat diundang langsung oleh rekruter melalui Talent Network.",
+      coverNote: "Profil dibuka dan sedang ditinjau langsung oleh tim rekruter melalui Talent Network.",
     })
     .returning();
 
+  await db.insert(schema.applicationStageHistory).values({
+    applicationId: created.id,
+    fromStatus: null,
+    toStatus: "review",
+    changedBy: input.recruiterUserId,
+    reason: "Profil dibuka oleh rekruter melalui Talent Network.",
+  });
+
+  await writeAuditLog({
+    db,
+    actorUserId: input.recruiterUserId,
+    organizationId: input.organizationId,
+    action: "application.created",
+    entityType: "application",
+    entityId: created.id,
+    metadata: {
+      jobId: targetJobId,
+      candidateProfileId: input.candidateProfileId,
+      source: "recruiter_invitation",
+      status: "review",
+    },
+  });
+
+  if (candidateProfile?.userId) {
+    await ensureProfileViewedNotification(db, {
+      userId: candidateProfile.userId,
+      organizationId: input.organizationId,
+      orgName,
+      applicationId: created.id,
+    });
+  }
+
   return created;
+}
+
+async function ensureProfileViewedNotification(
+  db: Database,
+  params: {
+    userId: string;
+    organizationId: string;
+    orgName: string;
+    applicationId: string;
+  }
+) {
+  const [existingNotif] = await db
+    .select({ id: schema.notifications.id })
+    .from(schema.notifications)
+    .where(
+      and(
+        eq(schema.notifications.userId, params.userId),
+        sql`${schema.notifications.data}->>'applicationId' = ${params.applicationId}`
+      )
+    )
+    .limit(1);
+
+  if (existingNotif) return;
+
+  await createNotificationWithDeliveries(
+    db,
+    systemNotification({
+      userId: params.userId,
+      title: `Profil kamu dibuka oleh ${params.orgName} ✨`,
+      body: `${params.orgName} baru saja membuka profil lengkapmu dan sedang meninjau kualifikasimu.`,
+      data: notificationData(
+        `application:${params.applicationId}:review`,
+        `/candidate/applications`,
+        {
+          applicationId: params.applicationId,
+          organizationId: params.organizationId,
+          organizationName: params.orgName,
+        }
+      ),
+    })
+  );
 }
 
 async function sendSystemHiringMessage(
@@ -380,35 +494,36 @@ export async function scheduleInterview(db: Database, input: ScheduleInterviewIn
       metadata: { scheduledAt: input.scheduledAt.toISOString(), meetingUrl: input.meetingUrl },
     });
 
-    // 5. Notify candidate (in-app + external email)
+    // 5. Notify candidate & send in-app chat message if sendInvitation is requested
     const formattedDate = new Intl.DateTimeFormat("id-ID", {
       dateStyle: "full",
       timeStyle: "short",
     }).format(input.scheduledAt);
 
-    await createNotificationWithDeliveries(
-      tx,
-      systemNotification({
-        userId: appRow.candidateUserId,
-        title: `Undangan Wawancara: ${appRow.jobTitle}`,
-        body: `Wawancara dijadwalkan pada ${formattedDate} (${input.timezone ?? "WIB"}).${input.meetingUrl ? ` Link: ${input.meetingUrl}` : ""}`,
-        data: notificationData(
-          `interview:${interview.id}:scheduled`,
-          `/candidate/applications/${targetAppId}`,
-          { interviewId: interview.id, applicationId: targetAppId }
-        ),
-      })
-    );
+    if (input.sendInvitation) {
+      await createNotificationWithDeliveries(
+        tx,
+        systemNotification({
+          userId: appRow.candidateUserId,
+          title: `Undangan Wawancara: ${appRow.jobTitle}`,
+          body: `Wawancara dijadwalkan pada ${formattedDate} (${input.timezone ?? "WIB"}). Tautan meeting telah dikirimkan ke pesan chat Anda.`,
+          data: notificationData(
+            `interview:${interview.id}:scheduled`,
+            `/messages`,
+            { interviewId: interview.id, applicationId: targetAppId }
+          ),
+        })
+      );
 
-    // 6. Send in-app chat message into /messages
-    await sendSystemHiringMessage(tx, {
-      organizationId: input.organizationId,
-      recruiterUserId: input.recruiterUserId,
-      candidateUserId: appRow.candidateUserId,
-      body: `📅 Undangan Wawancara: ${appRow.jobTitle}\nJadwal: ${formattedDate} (${input.timezone ?? "WIB"})\nTautan Meeting: ${input.meetingUrl ?? "Google Meet / Tautan akan dibagikan"}\n\nSilakan tinjau jadwal ini pada detail lamaran Anda dan unduh berkas kalender (.ics).`,
-    });
+      await sendSystemHiringMessage(tx, {
+        organizationId: input.organizationId,
+        recruiterUserId: input.recruiterUserId,
+        candidateUserId: appRow.candidateUserId,
+        body: `📅 Undangan Wawancara: ${appRow.jobTitle}\nJadwal: ${formattedDate} (${input.timezone ?? "WIB"})\nTautan Meeting: ${input.meetingUrl || "Google Meet / Tautan akan segera dibagikan"}\n\nSilakan bergabung tepat waktu melalui tautan di atas. Anda dapat membalas pesan ini jika ada kendala atau pertanyaan terkait jadwal.`,
+      });
+    }
 
-    // 7. Audit log
+    // 6. Audit log
     await writeAuditLog({
       db: tx,
       actorUserId: input.recruiterUserId,
@@ -420,6 +535,99 @@ export async function scheduleInterview(db: Database, input: ScheduleInterviewIn
     });
 
     return interview;
+  });
+}
+
+export async function sendInterviewInvitation(
+  db: Database,
+  input: {
+    interviewId: string;
+    organizationId: string;
+    recruiterUserId: string;
+  }
+) {
+  const [row] = await db
+    .select({
+      interview: schema.interviews,
+      jobTitle: schema.jobs.title,
+      candidateUserId: schema.candidateProfiles.userId,
+      candidateName: schema.profiles.displayName,
+      organizationName: schema.organizations.name,
+      applicationId: schema.applications.id,
+    })
+    .from(schema.interviews)
+    .innerJoin(schema.applications, eq(schema.applications.id, schema.interviews.applicationId))
+    .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
+    .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
+    .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+    .leftJoin(schema.organizations, eq(schema.organizations.id, schema.interviews.organizationId))
+    .where(
+      and(
+        eq(schema.interviews.id, input.interviewId),
+        eq(schema.interviews.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    throw new Error("Wawancara tidak ditemukan.");
+  }
+
+  const formattedDate = new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(row.interview.scheduledAt));
+
+  const orgName = row.organizationName || "Tim Rekruter";
+  const meetingUrl = row.interview.meetingUrl || "Tautan meeting akan segera diperbarui.";
+
+  return await db.transaction(async (tx) => {
+    // 1. Send in-app notification WITHOUT showing the raw link
+    await createNotificationWithDeliveries(
+      tx,
+      systemNotification({
+        userId: row.candidateUserId,
+        title: `Undangan Wawancara: ${row.jobTitle}`,
+        body: `Wawancara dijadwalkan pada ${formattedDate} (${row.interview.timezone}). Tautan meeting telah dikirimkan ke pesan chat Anda.`,
+        data: notificationData(
+          `interview:${row.interview.id}:invitation`,
+          `/messages`,
+          {
+            interviewId: row.interview.id,
+            applicationId: row.applicationId,
+            organizationName: orgName,
+          }
+        ),
+      })
+    );
+
+    // 2. Send automated chat message containing the meeting link to /messages
+    await sendSystemHiringMessage(tx, {
+      organizationId: input.organizationId,
+      recruiterUserId: input.recruiterUserId,
+      candidateUserId: row.candidateUserId,
+      body: `📅 Undangan Wawancara: ${row.jobTitle}\nJadwal: ${formattedDate} (${row.interview.timezone})\nTautan Meeting: ${meetingUrl}\n\nSilakan bergabung melalui tautan di atas tepat waktu. Jika ada pertanyaan atau kendala jadwal, Anda dapat membalas pesan ini.`,
+    });
+
+    // 3. Record event & audit log
+    await tx.insert(schema.interviewEvents).values({
+      interviewId: row.interview.id,
+      actorUserId: input.recruiterUserId,
+      type: "updated",
+      metadata: { action: "invitation_sent", sentAt: new Date().toISOString() },
+    });
+
+    await writeAuditLog({
+      db: tx,
+      actorUserId: input.recruiterUserId,
+      organizationId: input.organizationId,
+      action: "interview.invitation_sent",
+      entityType: "interview",
+      entityId: row.interview.id,
+      metadata: { applicationId: row.applicationId, meetingUrl: row.interview.meetingUrl },
+    });
+
+    return { success: true, sentAt: new Date().toISOString() };
   });
 }
 
@@ -507,6 +715,32 @@ export async function updateInterview(db: Database, input: UpdateInterviewInput)
 
     return updated;
   });
+}
+
+export async function deleteInterview(
+  db: Database,
+  input: { interviewId: string; organizationId: string; actorUserId?: string }
+) {
+  const [interview] = await db
+    .select()
+    .from(schema.interviews)
+    .where(
+      and(
+        eq(schema.interviews.id, input.interviewId),
+        eq(schema.interviews.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!interview) {
+    throw new Error("Wawancara tidak ditemukan.");
+  }
+
+  await db
+    .delete(schema.interviews)
+    .where(eq(schema.interviews.id, input.interviewId));
+
+  return { success: true };
 }
 
 export async function submitInterviewFeedback(db: Database, input: SubmitInterviewFeedbackInput) {

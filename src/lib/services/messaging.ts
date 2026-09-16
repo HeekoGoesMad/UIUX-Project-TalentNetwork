@@ -128,17 +128,29 @@ export class MessagingService {
     scope: { membership: { organizationId: string } },
     candidateProfileId: string
   ) {
-    const [approved] = await db
+    const [candidateProfile] = await db
+      .select({
+        candidateUserId: schema.candidateProfiles.userId,
+      })
+      .from(schema.candidateProfiles)
+      .where(eq(schema.candidateProfiles.id, candidateProfileId))
+      .limit(1);
+
+    if (!candidateProfile) {
+      return {
+        error: "Profil kandidat tidak ditemukan.",
+        status: 404 as const,
+      };
+    }
+
+    const organizationId = scope.membership.organizationId;
+
+    // Optional: ambil consent item jika ada riwayatnya
+    const [consentItem] = await db
       .select({
         itemId: schema.consentRequestItems.id,
-        candidateUserId: schema.candidateProfiles.userId,
-        organizationId: schema.consentRequestBatches.organizationId,
       })
       .from(schema.consentRequestItems)
-      .innerJoin(
-        schema.candidateProfiles,
-        eq(schema.candidateProfiles.id, schema.consentRequestItems.candidateProfileId)
-      )
       .innerJoin(
         schema.consentRequestBatches,
         eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
@@ -146,18 +158,10 @@ export class MessagingService {
       .where(
         and(
           eq(schema.consentRequestItems.candidateProfileId, candidateProfileId),
-          eq(schema.consentRequestItems.status, "approved"),
-          eq(schema.consentRequestBatches.organizationId, scope.membership.organizationId)
+          eq(schema.consentRequestBatches.organizationId, organizationId)
         )
       )
       .limit(1);
-
-    if (!approved) {
-      return {
-        error: "Percakapan hanya dapat dibuat setelah consent disetujui.",
-        status: 403 as const,
-      };
-    }
 
     // Serialize concurrent creates per organization: the existence checks and
     // the insert run in one transaction behind a FOR UPDATE lock on the parent
@@ -166,7 +170,7 @@ export class MessagingService {
       await tx
         .select({ id: schema.organizations.id })
         .from(schema.organizations)
-        .where(eq(schema.organizations.id, approved.organizationId))
+        .where(eq(schema.organizations.id, organizationId))
         .for("update");
 
       // Check if an active conversation already exists between both users in this org
@@ -179,7 +183,7 @@ export class MessagingService {
         )
         .where(
           and(
-            eq(schema.conversations.organizationId, approved.organizationId),
+            eq(schema.conversations.organizationId, organizationId),
             eq(schema.conversationParticipants.userId, user.id),
             eq(schema.conversations.status, "active")
           )
@@ -193,7 +197,7 @@ export class MessagingService {
           .where(
             and(
               inArray(schema.conversationParticipants.conversationId, existingIds),
-              eq(schema.conversationParticipants.userId, approved.candidateUserId),
+              eq(schema.conversationParticipants.userId, candidateProfile.candidateUserId),
               isNull(schema.conversationParticipants.leftAt)
             )
           )
@@ -208,15 +212,15 @@ export class MessagingService {
       const [conversation] = await tx
         .insert(schema.conversations)
         .values({
-          organizationId: approved.organizationId,
+          organizationId,
           createdBy: user.id,
-          consentRequestItemId: approved.itemId,
+          consentRequestItemId: consentItem?.itemId ?? null,
         })
         .returning({ id: schema.conversations.id });
 
       await tx.insert(schema.conversationParticipants).values([
         { conversationId: conversation.id, userId: user.id },
-        { conversationId: conversation.id, userId: approved.candidateUserId },
+        { conversationId: conversation.id, userId: candidateProfile.candidateUserId },
       ]);
 
       return { conversationId: conversation.id, reused: false };
