@@ -205,8 +205,10 @@ export type RecruiterOnboardingData = {
   // Step 3: Legal Documents (NIB & NPWP)
   nibNumber: string;
   nibFileName?: string;
+  nibDocumentUrl?: string;
   npwpNumber: string;
   npwpFileName?: string;
+  npwpDocumentUrl?: string;
   aktaFileName?: string;
   ktpFileName?: string;
   submittedAt?: string;
