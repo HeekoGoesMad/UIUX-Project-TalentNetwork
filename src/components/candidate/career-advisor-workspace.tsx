@@ -18,7 +18,6 @@ import {
     SlidersHorizontal,
     Sparkles,
     Target,
-    User,
     Zap,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -134,11 +133,9 @@ const focusPresets: { id: FocusType; label: string; icon: typeof FileText; desc:
   },
 ];
 
-export function CareerAdvisorWorkspace() {
-  const { cvProfile, user } = useApp();
-  const avatarUrl = cvProfile?.avatarUrl || null;
-  const displayName = cvProfile?.fullName || user?.name || "Profil kamu";
-  const [selectedFocus, setSelectedFocus] = useState<FocusType>("cv_review");
+export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initialFocus?: FocusType } = {}) {
+  const { cvProfile, saveCvProfile } = useApp();
+  const [selectedFocus, setSelectedFocus] = useState<FocusType>(initialFocus);
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [result, setResult] = useState<AdvisorResult | null>(null);
@@ -151,8 +148,45 @@ export function CareerAdvisorWorkspace() {
 
   const [customRoleInput, setCustomRoleInput] = useState<string | null>(null);
   const [customInstruction, setCustomInstruction] = useState("");
+  const [appliedToCv, setAppliedToCv] = useState(false);
   // Quick prompt chip selection — keyset, auto-reset saat ganti pilar
   const [selectedQuickPrompts, setSelectedQuickPrompts] = useState<Set<string>>(new Set());
+
+  // Sync initialFocus when prop changes
+  const [prevInitialFocus, setPrevInitialFocus] = useState(initialFocus);
+  if (initialFocus !== prevInitialFocus) {
+    setPrevInitialFocus(initialFocus);
+    setSelectedFocus(initialFocus);
+  }
+
+  const handleApplyToCv = () => {
+    if (!cvProfile) {
+      toast.error("Profil CV belum tersedia untuk disinkronkan.");
+      return;
+    }
+
+    // Collect new recommended skills or actions
+    const newSkills = new Set(cvProfile.skills || []);
+    if (result?.gapAnalysisDetails?.coreCompetencies) {
+      result.gapAnalysisDetails.coreCompetencies.forEach((c) => {
+        if (c.status === "match" || c.status === "exceeds") {
+          newSkills.add(c.competency);
+        }
+      });
+    }
+
+    const updatedProfile = {
+      ...cvProfile,
+      skills: Array.from(newSkills),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveCvProfile(updatedProfile);
+    setAppliedToCv(true);
+    toast.success("Rekomendasi AI berhasil diterapkan ke draf CV Anda!", {
+      description: "Buka halaman CV & Profil untuk meninjau pratinjau ATS terbaru.",
+    });
+  };
 
   const activeTargetRole = (customRoleInput !== null ? customRoleInput.trim() : "") || defaultTargetRole;
 
@@ -532,50 +566,6 @@ export function CareerAdvisorWorkspace() {
         }
       `}</style>
 
-      {/* ─── Profile Baseline Header ─── */}
-      <Card className="no-print border-purple-200/60 bg-gradient-to-r from-purple-50/40 via-white to-purple-50/20 shadow-xs">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative size-14 sm:size-16 shrink-0 overflow-hidden rounded-full border-2 border-purple-200 bg-purple-50 shadow-xs">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt={displayName}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-gradient-to-br from-[#7C3AED] to-purple-800 text-lg sm:text-xl font-bold text-white uppercase">
-                    {displayName.charAt(0) || <User className="size-6 text-white" />}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-foreground">
-                    {displayName}
-                  </h2>
-                  <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] font-semibold">
-                    Siap Ditingkatkan
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm font-medium text-slate-700">{headline}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Peran Dituju: <span className="font-semibold text-foreground">{activeTargetRole}</span> • {skills.length} Skill Terdaftar
-                </p>
-              </div>
-            </div>
-
-            <Link href="/candidate/cv">
-              <Button variant="outline" size="sm" className="gap-2 border-[#7C3AED] text-[#7C3AED] hover:bg-purple-50 rounded-xl font-medium">
-                <FileText className="size-4" /> Edit di CV Workspace
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* ─── 3 Main Pillars Selection ─── */}
       <div className="no-print space-y-3">
         <div>
@@ -594,23 +584,23 @@ export function CareerAdvisorWorkspace() {
                 key={preset.id}
                 type="button"
                 onClick={() => handleFocusChange(preset.id)}
-                className={`flex flex-col justify-between rounded-2xl border p-4.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${
+                className={`flex flex-col justify-between rounded-2xl border p-4.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-xs cursor-pointer ${
                   isSelected
-                    ? "border-[#7C3AED] bg-purple-50/50 ring-2 ring-[#7C3AED]/20 shadow-xs"
-                    : "border-border bg-card hover:border-purple-300"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-xs"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-muted/20"
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between">
                     <div
                       className={`flex size-9 items-center justify-center rounded-xl ${
-                        isSelected ? "bg-[#7C3AED] text-white" : "bg-muted text-muted-foreground"
+                        isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       <Icon className="size-4.5" />
                     </div>
                     {isSelected ? (
-                      <Badge className="bg-[#7C3AED] text-[11px] text-white font-semibold">Aktif</Badge>
+                      <Badge className="bg-primary text-primary-foreground text-[11px] font-semibold">Aktif</Badge>
                     ) : (
                       <span className="text-[11px] font-semibold text-muted-foreground">{preset.badge}</span>
                     )}
@@ -624,11 +614,11 @@ export function CareerAdvisorWorkspace() {
         </div>
 
         {/* ─── Command Controls & Custom Instructions Panel ─── */}
-        <div className="rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/50 via-white to-purple-50/20 p-5 space-y-4 shadow-2xs">
+        <div className="rounded-2xl border border-border/80 bg-card p-5 space-y-4 shadow-2xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <SlidersHorizontal className="size-4 text-[#7C3AED]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              <SlidersHorizontal className="size-4 text-primary" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Kontrol Perintah AI &amp; Target Peran (Opsional)
               </h3>
             </div>
@@ -639,46 +629,46 @@ export function CareerAdvisorWorkspace() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-foreground mb-1">
                 Target Posisi / Peran yang Ingin Diuji:
               </label>
               <Input
                 value={customRoleInput !== null ? customRoleInput : defaultTargetRole}
                 onChange={(e) => setCustomRoleInput(e.target.value)}
                 placeholder="misal: Senior Product Designer, Lead UX..."
-                className="bg-white text-xs border-purple-200 focus-visible:ring-[#7C3AED]"
+                className="bg-card text-xs border-border focus-visible:ring-primary"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-foreground mb-1">
                 Catatan / Instruksi Khusus ke AI:
               </label>
               <Input
                 value={customInstruction}
                 onChange={(e) => setCustomInstruction(e.target.value)}
                 placeholder="misal: Fokus industri Fintech SaaS, tekankan kepemimpinan..."
-                className="bg-white text-xs border-purple-200 focus-visible:ring-[#7C3AED]"
+                className="bg-card text-xs border-border focus-visible:ring-primary"
               />
             </div>
           </div>
 
           {/* Dynamic Quick Prompts — chip toggle per pilar, auto-reset saat ganti pilar */}
-          <div className="space-y-2.5 pt-2.5 border-t border-purple-100">
+          <div className="space-y-2.5 pt-2.5 border-t border-border/80">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                <Zap className="size-3.5 text-amber-500" /> Fokus Analisis Cepat:
+              <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className="size-3.5 text-primary" /> Fokus Analisis Cepat:
               </span>
               <div className="flex items-center gap-2">
                 {selectedQuickPrompts.size > 0 && (
                   <button
                     type="button"
                     onClick={() => setSelectedQuickPrompts(new Set())}
-                    className="text-[10px] text-muted-foreground hover:text-red-500 font-medium transition-colors underline cursor-pointer"
+                    className="text-[10px] text-muted-foreground hover:text-destructive font-medium transition-colors underline cursor-pointer"
                   >
                     Hapus pilihan ({selectedQuickPrompts.size})
                   </button>
                 )}
-                <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-purple-50 border border-purple-100">
+                <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted border border-border">
                   {focusPresets.find((p) => p.id === selectedFocus)?.label}
                 </span>
               </div>
@@ -691,10 +681,10 @@ export function CareerAdvisorWorkspace() {
                     key={i}
                     type="button"
                     onClick={() => toggleQuickPrompt(qp.text)}
-                    className={`inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-xl border transition-all font-medium cursor-pointer active:scale-95 ${
+                    className={`inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-xl border transition-all font-medium cursor-pointer ${
                       isActive
-                        ? "bg-[#7C3AED] border-[#7C3AED] text-white shadow-xs"
-                        : "bg-white border-purple-200 text-purple-800 hover:bg-purple-50 hover:border-purple-400"
+                        ? "bg-primary border-primary text-primary-foreground shadow-2xs"
+                        : "bg-card border-border text-foreground hover:bg-muted/50 hover:border-primary/40"
                     }`}
                   >
                     <span className="text-base leading-none">{qp.icon}</span>
@@ -705,17 +695,17 @@ export function CareerAdvisorWorkspace() {
               })}
             </div>
             {selectedQuickPrompts.size > 0 && (
-              <p className="text-[10px] text-[#7C3AED] font-medium flex items-center gap-1">
+              <p className="text-[10px] text-primary font-medium flex items-center gap-1">
                 <Sparkles className="size-3" />
                 {selectedQuickPrompts.size} fokus dipilih — AI akan memprioritaskan aspek ini dalam analisis
               </p>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-purple-100/60">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60">
             <p className="text-xs text-muted-foreground">
               Evaluasi akan dijalankan untuk pilar:{" "}
-              <strong className="text-[#7C3AED]">
+              <strong className="text-primary font-semibold">
                 {focusPresets.find((p) => p.id === selectedFocus)?.label}
               </strong>
             </p>
@@ -723,7 +713,7 @@ export function CareerAdvisorWorkspace() {
               onClick={() => void runAdvisor()}
               disabled={loading}
               size="lg"
-              className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] font-bold text-white shadow-sm rounded-xl px-6"
+              className="gap-2 font-semibold shadow-xs rounded-xl px-6"
             >
               {loading ? (
                 <>
@@ -731,7 +721,7 @@ export function CareerAdvisorWorkspace() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-4.5 text-white" /> Analisis &amp; Hasilkan Rekomendasi
+                  <Sparkles className="size-4.5" /> Analisis &amp; Hasilkan Rekomendasi
                 </>
               )}
             </Button>
@@ -751,12 +741,12 @@ export function CareerAdvisorWorkspace() {
 
           <div className="no-print flex flex-wrap items-center justify-between gap-3 border-b pb-4">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] gap-1 px-3 py-1 font-semibold text-xs">
+              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary gap-1 px-3 py-1 font-semibold text-xs">
                 <Sparkles className="size-3.5" /> Hasil Analisis Siap
               </Badge>
               {isStreaming && (
-                <span className="flex items-center gap-1.5 text-xs text-[#7C3AED] font-mono animate-pulse">
-                  <span className="inline-block size-2 rounded-full bg-[#7C3AED]" /> Memproses... ({streamProgress}%)
+                <span className="flex items-center gap-1.5 text-xs text-primary font-mono animate-pulse">
+                  <span className="inline-block size-2 rounded-full bg-primary" /> Memproses... ({streamProgress}%)
                 </span>
               )}
             </div>
@@ -766,17 +756,17 @@ export function CareerAdvisorWorkspace() {
                 onClick={handleCopyAdvice}
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-border text-slate-700 hover:bg-slate-50 rounded-xl text-xs"
+                className="gap-1.5 border-border text-foreground hover:bg-muted/40 rounded-xl text-xs"
               >
-                <Copy className="size-3.5 text-[#7C3AED]" /> Salin Rekomendasi
+                <Copy className="size-3.5 text-primary" /> Salin Rekomendasi
               </Button>
               <Button
                 onClick={handleDownloadPdf}
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-border text-slate-700 hover:bg-slate-50 rounded-xl text-xs"
+                className="gap-1.5 border-border text-foreground hover:bg-muted/40 rounded-xl text-xs"
               >
-                <Download className="size-3.5 text-[#7C3AED]" /> Unduh PDF
+                <Download className="size-3.5 text-primary" /> Unduh PDF
               </Button>
             </div>
           </div>
@@ -787,10 +777,10 @@ export function CareerAdvisorWorkspace() {
           {(result.focus === "cv_review" || result.focus === "ats") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-slate-50/80 border-b pb-4">
+                <CardHeader className="bg-muted/30 border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <FileText className="size-5 text-[#7C3AED]" />
+                      <FileText className="size-5 text-primary" />
                       <CardTitle className="text-lg text-foreground">Review CV Keseluruhan &amp; Kesiapan Melamar Kerja</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
@@ -804,24 +794,24 @@ export function CareerAdvisorWorkspace() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                   {/* Executive Summary */}
-                  <div className="rounded-xl border border-purple-100 bg-purple-50/30 p-4 space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#7C3AED] flex items-center gap-1.5">
-                      <Sparkles className="size-4 text-[#7C3AED]" /> Ringkasan Eksekutif Evaluasi CV:
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                      <Sparkles className="size-4 text-primary" /> Ringkasan Eksekutif Evaluasi CV:
                     </span>
-                    <p className="text-sm leading-relaxed text-slate-800">
+                    <p className="text-sm leading-relaxed text-foreground">
                       {cvReviewData.executiveSummary}
                     </p>
                   </div>
 
                   {/* Priority Action Items */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                       <Zap className="size-4 text-amber-500" /> Rekomendasi Perbaikan Prioritas:
                     </h4>
                     <div className="space-y-2">
                       {cvReviewData.priorityActionItems.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs text-xs text-slate-700">
-                          <CheckCircle2 className="size-4 text-[#7C3AED] shrink-0 mt-0.5" />
+                        <div key={idx} className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3 shadow-2xs text-xs text-foreground">
+                          <CheckCircle2 className="size-4 text-primary shrink-0 mt-0.5" />
                           <span className="leading-relaxed font-medium">{item}</span>
                         </div>
                       ))}
@@ -830,22 +820,22 @@ export function CareerAdvisorWorkspace() {
 
                   {/* Section Audits */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Audit per Bagian CV:</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Audit per Bagian CV:</h4>
                     <div className="space-y-3">
                       {cvReviewData.sectionAudits.map((sec, i) => (
-                        <div key={i} className="rounded-xl border p-4 bg-white space-y-2.5 shadow-2xs">
+                        <div key={i} className="rounded-xl border p-4 bg-card space-y-2.5 shadow-2xs">
                           <div className="flex items-center justify-between">
-                            <strong className="text-sm font-bold text-foreground">{sec.section}</strong>
+                            <strong className="text-sm font-semibold text-foreground">{sec.section}</strong>
                             <Badge variant="outline" className={sec.status === "good" ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px]" : "bg-amber-50 text-amber-800 border-amber-200 text-[11px]"}>
                               {sec.status === "good" ? "✓ Sudah Baik" : "⚠️ Perlu Penguatan"}
                             </Badge>
                           </div>
-                          <ul className="text-xs space-y-1 text-slate-600 list-disc pl-4">
+                          <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
                             {sec.notes.map((n, ni) => (
                               <li key={ni}>{n}</li>
                             ))}
                           </ul>
-                          <p className="text-xs bg-slate-50 p-2.5 rounded-lg border text-slate-700">
+                          <p className="text-xs bg-muted/40 p-2.5 rounded-lg border text-foreground">
                             <strong>Saran Perbaikan:</strong> {sec.recommendation}
                           </p>
                         </div>
@@ -855,10 +845,10 @@ export function CareerAdvisorWorkspace() {
 
                   {/* Format & Readability Checks */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Pemeriksaan Kerapian Format &amp; Keterbacaan Rekruter:</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pemeriksaan Kerapian Format &amp; Keterbacaan Rekruter:</h4>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {cvReviewData.formatChecks.map((check, i) => (
-                        <div key={i} className="rounded-xl border p-3 bg-white flex items-start gap-2.5 shadow-2xs">
+                        <div key={i} className="rounded-xl border p-3 bg-card flex items-start gap-2.5 shadow-2xs">
                           {check.passed ? (
                             <CheckCircle2 className="size-4 text-emerald-600 shrink-0 mt-0.5" />
                           ) : (
@@ -883,10 +873,10 @@ export function CareerAdvisorWorkspace() {
           {(result.focus === "gap_analysis" || result.focus === "headline") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-purple-50/50 border-b pb-4">
+                <CardHeader className="bg-muted/30 border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <Target className="size-5 text-[#7C3AED]" />
+                      <Target className="size-5 text-primary" />
                       <div>
                         <CardTitle className="text-lg text-foreground">Gap Analysis &amp; Evaluasi Karir Hari Ini</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -896,7 +886,7 @@ export function CareerAdvisorWorkspace() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground font-medium">Kecocokan Profil:</span>
-                      <Badge className="bg-[#7C3AED] text-white text-xs font-bold px-3 py-1">
+                      <Badge className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1">
                         {gapData.matchScore}% Match ({gapData.matchLevel})
                       </Badge>
                     </div>
@@ -905,17 +895,17 @@ export function CareerAdvisorWorkspace() {
                 <CardContent className="p-6 space-y-6">
                   {/* Core Competencies Matrix */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Layers className="size-4 text-[#7C3AED]" /> Matriks Evaluasi Kompetensi Inti:
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Layers className="size-4 text-primary" /> Matriks Evaluasi Kompetensi Inti:
                     </h4>
                     <div className="space-y-3">
                       {gapData.coreCompetencies.map((comp, i) => (
-                        <div key={i} className="rounded-xl border p-4 bg-white space-y-2 shadow-2xs">
+                        <div key={i} className="rounded-xl border p-4 bg-card space-y-2 shadow-2xs">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <strong className="text-sm font-bold text-foreground">{comp.competency}</strong>
+                            <strong className="text-sm font-semibold text-foreground">{comp.competency}</strong>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-muted-foreground">
-                                Levelmu: <strong className="text-slate-800">{comp.candidateLevel}</strong> / Target: <strong className="text-slate-800">{comp.requiredLevel}</strong>
+                                Levelmu: <strong className="text-foreground font-semibold">{comp.candidateLevel}</strong> / Target: <strong className="text-foreground font-semibold">{comp.requiredLevel}</strong>
                               </span>
                               <Badge
                                 className={
@@ -931,8 +921,8 @@ export function CareerAdvisorWorkspace() {
                             </div>
                           </div>
                           {comp.recommendation && (
-                            <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border">
-                              <strong>Rekomendasi Peningkatan:</strong> {comp.recommendation}
+                            <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg border">
+                              <strong className="text-foreground">Rekomendasi Peningkatan:</strong> {comp.recommendation}
                             </p>
                           )}
                         </div>
@@ -943,7 +933,7 @@ export function CareerAdvisorWorkspace() {
                   {/* 2-Column: Critical Gaps vs Transferable Strengths */}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2.5">
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
                         <AlertTriangle className="size-4 text-amber-600" /> Kesenjangan Kritis yang Perlu Ditutup:
                       </span>
                       <ul className="space-y-2 text-xs text-amber-950">
@@ -957,7 +947,7 @@ export function CareerAdvisorWorkspace() {
                     </div>
 
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2.5">
-                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
                         <CheckCircle2 className="size-4 text-emerald-600" /> Keunggulan Unik &amp; Kekuatan Transferable:
                       </span>
                       <ul className="space-y-2 text-xs text-emerald-950">
@@ -972,11 +962,11 @@ export function CareerAdvisorWorkspace() {
                   </div>
 
                   {/* Strategic Upskilling Action Items */}
-                  <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 space-y-2.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#7C3AED] flex items-center gap-1.5">
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2.5">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
                       <Lightbulb className="size-4 text-amber-500" /> Rekomendasi Aksi Peningkatan Hari Ini:
                     </span>
-                    <ul className="text-xs space-y-1.5 text-slate-700 list-disc pl-4">
+                    <ul className="text-xs space-y-1.5 text-foreground list-disc pl-4">
                       {gapData.strategicRecommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>
                       ))}
@@ -993,10 +983,10 @@ export function CareerAdvisorWorkspace() {
           {(result.focus === "career_consultation" || result.focus === "career_roadmap" || result.focus === "star") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-purple-50/70 via-white to-purple-50/40 border-b pb-4">
+                <CardHeader className="bg-muted/30 border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <Compass className="size-5 text-[#7C3AED]" />
+                      <Compass className="size-5 text-primary" />
                       <div>
                         <CardTitle className="text-lg text-foreground">Career Consultation &amp; Panduan Menghadapi HRD</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -1005,10 +995,10 @@ export function CareerAdvisorWorkspace() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] text-xs font-semibold px-3 py-1">
+                      <Badge variant="outline" className="border-border bg-muted/50 text-foreground text-xs font-semibold px-3 py-1">
                         Timeline: {consultationData.targetTimeline}
                       </Badge>
-                      <Badge className="bg-[#7C3AED] text-white text-xs font-bold px-3 py-1">
+                      <Badge className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1">
                         {consultationData.targetLevel}
                       </Badge>
                     </div>
@@ -1016,40 +1006,40 @@ export function CareerAdvisorWorkspace() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                   {/* 3 Strategic Phases */}
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Sparkles className="size-4 text-[#7C3AED]" /> 3 Tahapan Strategis Menuju Target Peran:
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-primary" /> 3 Tahapan Strategis Menuju Target Peran:
                     </h4>
                     <div className="grid gap-4 md:grid-cols-3">
                       {consultationData.phases.map((phase) => (
-                        <div key={phase.phaseNumber} className="flex flex-col justify-between rounded-xl border border-purple-100 bg-white p-4 shadow-2xs space-y-3">
+                        <div key={phase.phaseNumber} className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 shadow-2xs space-y-3 hover:border-primary/40 transition-colors">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="inline-flex size-6 items-center justify-center rounded-full bg-purple-100 text-purple-800 text-xs font-bold">
+                              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
                                 {phase.phaseNumber}
                               </span>
-                              <Badge variant="outline" className="text-[10px] text-muted-foreground border-purple-200">
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
                                 {phase.timeframe}
                               </Badge>
                             </div>
-                            <h5 className="font-bold text-sm text-foreground">{phase.phaseName}</h5>
-                            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border">
-                              <strong>Hasil:</strong> {phase.outcome}
+                            <h5 className="font-semibold text-sm text-foreground">{phase.phaseName}</h5>
+                            <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/60">
+                              <strong className="text-foreground">Hasil:</strong> {phase.outcome}
                             </p>
-                            <div className="space-y-1 pt-1">
-                              <span className="text-[11px] font-semibold text-slate-700 block">Aksi Utama:</span>
-                              <ul className="space-y-1 text-xs text-slate-600">
+                            <div className="space-y-1.5 pt-1">
+                              <span className="text-[11px] font-semibold text-foreground block">Aksi Utama:</span>
+                              <ul className="space-y-1 text-xs text-muted-foreground">
                                 {phase.keyActions.map((action, ai) => (
                                   <li key={ai} className="flex items-start gap-1.5">
-                                    <CheckCircle2 className="size-3.5 text-[#7C3AED] shrink-0 mt-0.5" />
+                                    <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0 mt-0.5" />
                                     <span className="leading-relaxed">{action}</span>
                                   </li>
                                 ))}
                               </ul>
                             </div>
                           </div>
-                          <div className="pt-2 border-t border-purple-100/60">
-                            <span className="text-[11px] font-bold text-[#7C3AED] flex items-center gap-1">
+                          <div className="pt-2 border-t border-border/60">
+                            <span className="text-[11px] font-semibold text-primary flex items-center gap-1">
                               🎯 Milestone: {phase.milestone}
                             </span>
                           </div>
@@ -1061,14 +1051,14 @@ export function CareerAdvisorWorkspace() {
                   {/* 2-Column: Interview Pitch Tips vs Strategic Recruiter Advice */}
                   <div className="grid gap-4 md:grid-cols-2">
                     {/* Interview Pitch Tips */}
-                    <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-2.5">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#7C3AED] flex items-center gap-1.5">
-                        <Zap className="size-4 text-amber-500" /> Tips Pitching &amp; Wawancara Kerja (HRD Perspective):
+                    <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <Zap className="size-4 text-primary" /> Tips Pitching &amp; Wawancara Kerja (HRD Perspective):
                       </span>
-                      <ul className="space-y-2 text-xs text-slate-800">
+                      <ul className="space-y-2 text-xs text-muted-foreground">
                         {(consultationData.interviewPitchTips || []).map((tip, i) => (
                           <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-[#7C3AED] mt-1.5 shrink-0" />
+                            <span className="size-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
                             <span className="leading-relaxed font-medium">{tip}</span>
                           </li>
                         ))}
@@ -1076,14 +1066,14 @@ export function CareerAdvisorWorkspace() {
                     </div>
 
                     {/* Strategic Advice */}
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-2.5">
-                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
-                        <Lightbulb className="size-4 text-indigo-600" /> Saran Strategis dari Sudut Pandang Perekrut:
+                    <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <Lightbulb className="size-4 text-primary" /> Saran Strategis dari Sudut Pandang Perekrut:
                       </span>
-                      <ul className="space-y-2 text-xs text-indigo-950">
+                      <ul className="space-y-2 text-xs text-muted-foreground">
                         {consultationData.strategicAdvice.map((adv, i) => (
                           <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-indigo-600 mt-1.5 shrink-0" />
+                            <span className="size-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
                             <span className="leading-relaxed font-medium">{adv}</span>
                           </li>
                         ))}
@@ -1092,13 +1082,13 @@ export function CareerAdvisorWorkspace() {
                   </div>
 
                   {/* Recommended Certifications & Topics */}
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2.5 shadow-2xs">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Layers className="size-4 text-[#7C3AED]" /> Topik Pelatihan &amp; Sertifikasi Umum yang Relevan:
+                  <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Layers className="size-4 text-primary" /> Topik Pelatihan &amp; Sertifikasi Umum yang Relevan:
                     </span>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {consultationData.recommendedCertifications.map((cert, i) => (
-                        <Badge key={i} variant="outline" className="px-3 py-1 bg-slate-50 border-slate-200 text-slate-700 text-xs font-medium">
+                        <Badge key={i} variant="outline" className="px-3 py-1 bg-muted/40 border-border text-foreground text-xs font-medium">
                           {cert}
                         </Badge>
                       ))}
@@ -1110,11 +1100,20 @@ export function CareerAdvisorWorkspace() {
           )}
 
           {/* ─── Executive Summary & Action Steps ─── */}
-          <Card className="no-print border-purple-200 bg-gradient-to-r from-purple-50/50 via-white to-purple-50/20 shadow-xs">
-            <CardHeader className="pb-3 border-b bg-white/60">
+          <Card className="no-print border-border/80 bg-card shadow-xs">
+            <CardHeader className="pb-3 border-b bg-muted/20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                <Zap className="size-4.5 text-[#7C3AED]" /> Rangkuman Saran &amp; Langkah Selanjutnya
+                <Zap className="size-4.5 text-primary" /> Rangkuman Saran &amp; Langkah Selanjutnya
               </CardTitle>
+              <Button
+                size="sm"
+                variant={appliedToCv ? "outline" : "default"}
+                onClick={handleApplyToCv}
+                className="shrink-0 gap-1.5 text-xs font-semibold"
+              >
+                <Sparkles className="size-3.5" />
+                {appliedToCv ? "Tersinkron ke CV ✓" : "Terapkan Saran ke CV"}
+              </Button>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1141,12 +1140,12 @@ export function CareerAdvisorWorkspace() {
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t">
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border/60">
                 <p className="text-xs text-muted-foreground">
                   Gunakan rekomendasi evaluasi di atas untuk memperbarui profil dan portofoliomu.
                 </p>
                 <Link href="/candidate/cv">
-                  <Button className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs">
+                  <Button className="gap-2 font-semibold rounded-xl shadow-xs">
                     <FileText className="size-4" /> Buka CV Workspace &amp; Edit
                   </Button>
                 </Link>
@@ -1157,7 +1156,7 @@ export function CareerAdvisorWorkspace() {
           {/* AI Disclosure Footer */}
           <div className="rounded-xl border bg-muted/40 p-4 text-xs text-muted-foreground space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-              <span className="font-mono uppercase tracking-wider text-[#7C3AED] font-bold flex items-center gap-1.5 text-[11px]">
+              <span className="font-mono uppercase tracking-wider text-primary font-semibold flex items-center gap-1.5 text-[11px]">
                 <Bot className="size-3.5" /> Dihasilkan oleh Antarmuka AI ProofyLink
               </span>
               <div className="flex items-center gap-2 text-[11px]">

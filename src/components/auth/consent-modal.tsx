@@ -37,22 +37,22 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90dvh] flex flex-col p-0 overflow-hidden rounded-2xl border-purple-100 shadow-2xl">
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90dvh] flex flex-col p-0 overflow-hidden rounded-2xl border-border shadow-2xl">
         {/* Header with Step Indicator */}
-        <div className="bg-gradient-to-r from-[#7C3AED] to-[#9333EA] p-4 sm:p-6 text-white shrink-0">
+        <div className="bg-gradient-to-r from-primary to-primary/80 p-4 sm:p-6 text-white shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-full text-purple-50">
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-full text-primary-foreground">
               <ShieldCheck className="size-3.5" />
               {step === 1 ? "Tahap 1 dari 2: Ketentuan & Akses Data" : "Tahap 2 dari 2: Kebijakan Privasi"}
             </span>
-            <span className="text-[11px] sm:text-xs font-medium text-purple-100">
+            <span className="text-xs font-medium text-primary-foreground/80">
               Wajib ditinjau sebelum pendaftaran
             </span>
           </div>
           <DialogTitle className="text-lg sm:text-xl font-bold text-white">
             {step === 1 ? "Syarat, Ketentuan & Persetujuan Akses Data" : "Kebijakan Privasi & Perlindungan Data"}
           </DialogTitle>
-          <DialogDescription className="text-purple-100 text-xs mt-1">
+          <DialogDescription className="text-primary-foreground/80 text-xs mt-1">
             Harap baca dan pahami ketentuan berikut sebelum bergabung dengan Talent Network ProofyLink.
           </DialogDescription>
         </div>
@@ -62,15 +62,15 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
           {step === 1 ? (
             <>
               {/* Highlight Box: FEATURE 8 DATA ACCESS CONSENT */}
-              <div className="rounded-xl border-2 border-purple-300 bg-purple-50/80 p-4 space-y-2 shadow-xs">
-                <div className="flex items-center gap-2 text-[#7C3AED] font-bold text-sm">
+              <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-2 shadow-xs">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
                   <Sparkles className="size-4.5 shrink-0" />
                   <span>Persetujuan Akses Data (Data Access Consent)</span>
                 </div>
                 <p className="font-semibold text-slate-900 leading-snug">
                   Saat registrasi, Anda menyatakan dan menyetujui bahwa:
                 </p>
-                <blockquote className="border-l-4 border-[#7C3AED] pl-3 py-1 text-slate-800 italic bg-white/80 rounded-r-lg font-medium text-xs sm:text-[13px]">
+                <blockquote className="border-l-4 border-primary pl-3 py-1 text-slate-800 italic bg-white/80 rounded-r-lg font-medium text-xs sm:text-[13px]">
                   &ldquo;Data yang dimasukkan ke dalam platform dapat diakses oleh DJoin dan recruiter yang telah terverifikasi sesuai Kebijakan Privasi dan Ketentuan Penggunaan yang berlaku.&rdquo;
                 </blockquote>
               </div>
@@ -78,7 +78,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
               {/* Terms Section 1 */}
               <div className="space-y-2 border-b pb-4">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <FileText className="size-4 text-[#7C3AED]" /> 1. Ketentuan Penggunaan Platform
+                  <FileText className="size-4 text-primary" /> 1. Ketentuan Penggunaan Platform
                 </h4>
                 <p className="text-slate-600">
                   ProofyLink menyediakan platform jaringan talenta cerdas yang menghubungkan talenta terverifikasi dari berbagai universitas/institusi dengan rekruter dan perusahaan kredibel. Dengan mendaftar, Anda setuju untuk memberikan data yang akurat, jujur, dan dapat dipertanggungjawabkan.
@@ -88,7 +88,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
               {/* Terms Section 2 */}
               <div className="space-y-2 border-b pb-4">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Lock className="size-4 text-[#7C3AED]" /> 2. Hak Akses &amp; Kerahasiaan
+                  <Lock className="size-4 text-primary" /> 2. Hak Akses &amp; Kerahasiaan
                 </h4>
                 <p className="text-slate-600">
                   Data profil, framework kompetensi (Hard Competencies, Tools, Soft Skills), serta riwayat pendidikan dan pengalaman kerja Anda akan ditampilkan kepada rekruter terverifikasi untuk tujuan pencarian talent, screening kualifikasi, dan penawaran kesempatan karier.
@@ -98,7 +98,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
               {/* Terms Section 3 */}
               <div className="space-y-2">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <ShieldCheck className="size-4 text-[#7C3AED]" /> 3. Integritas Verifikasi Kampus
+                  <ShieldCheck className="size-4 text-primary" /> 3. Integritas Verifikasi Kampus
                 </h4>
                 <p className="text-slate-600">
                   Talent yang berafiliasi dengan Career Center kampus partner menyetujui validasi data kelulusan/akademik oleh institusi kampus masing-masing untuk memperoleh badge verifikasi resmi.
@@ -156,7 +156,7 @@ export function ConsentModal({ isOpen, onClose, onAccept, initialStep = 1, actio
               <Button
                 type="button"
                 onClick={handleNext}
-                className="w-full sm:w-auto bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2 font-semibold shadow-xs text-xs sm:text-sm"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white gap-2 font-semibold shadow-xs text-xs sm:text-sm"
               >
                 Lanjut ke Kebijakan Privasi
                 <ArrowRight className="size-4" />

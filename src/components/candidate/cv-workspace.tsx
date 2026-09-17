@@ -65,7 +65,6 @@ function blank(email = "", fullName = ""): CvProfile {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
-// ─── Helpers ────────────────────────────────────────────────────
 function Field({
   label,
   hint,
@@ -143,7 +142,7 @@ function CompetencyTagInput({
   };
 
   const badgeStyles = {
-    purple: "bg-purple-50 text-[#7C3AED] border-purple-200",
+    purple: "bg-primary/10 text-primary border-primary/20",
     slate: "bg-slate-100 text-slate-700 border-slate-200",
     emerald: "bg-emerald-50 text-emerald-800 border-emerald-200",
   };
@@ -263,7 +262,6 @@ export function CvWorkspace() {
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [shaking, setShaking] = useState(false);
   const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [personalityModalOpen, setPersonalityModalOpen] = useState(false);
@@ -283,30 +281,6 @@ export function CvWorkspace() {
     return serializeCvData(profile) !== savedSnapshot;
   }, [profile, savedSnapshot]);
 
-  const triggerShake = () => {
-    setShaking(true);
-    setTimeout(() => setShaking(false), 600);
-  };
-
-  const profileRef = useRef(profile);
-  const isShakingRef = useRef(false);
-  const hasGuardedHistoryRef = useRef(false);
-
-  useEffect(() => {
-    profileRef.current = profile;
-  }, [profile]);
-
-  useEffect(() => {
-    isShakingRef.current = shaking;
-  }, [shaking]);
-
-  // Clean up any stale unsavedGuard state from a previous session on mount
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.history.state?.unsavedGuard) {
-      window.history.replaceState({ ...window.history.state, unsavedGuard: undefined }, "", window.location.href);
-    }
-  }, []);
-
   // Browser-level tab close / refresh protection
   useEffect(() => {
     if (!isDirty) return;
@@ -316,83 +290,6 @@ export function CvWorkspace() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
-
-  // Client-side link navigation guard (vibrates floating bar if user clicks a link while unsaved)
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleLinkClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest("a");
-      if (!target) return;
-      const href = target.getAttribute("href");
-      if (!href || href.startsWith("#") || href.startsWith("blob:") || href.startsWith("data:")) return;
-
-      if (isShakingRef.current) {
-        const leave = window.confirm(
-          "Ada perubahan profil yang belum disimpan. Tinggalkan halaman ini dan buang perubahan?"
-        );
-        if (leave) {
-          hasGuardedHistoryRef.current = false;
-          setSavedSnapshot(serializeCvData(profileRef.current));
-          return;
-        }
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-      window.dispatchEvent(new Event("navigation-abort"));
-      triggerShake();
-    };
-
-    document.addEventListener("click", handleLinkClick, { capture: true });
-    return () => document.removeEventListener("click", handleLinkClick, { capture: true });
-  }, [isDirty]);
-
-  // Browser history (Back / Forward button) guard for unsaved changes
-  useEffect(() => {
-    if (!isDirty) {
-      if (hasGuardedHistoryRef.current) {
-        hasGuardedHistoryRef.current = false;
-        if (window.history.state?.unsavedGuard) {
-          window.history.back();
-        }
-      }
-      return;
-    }
-
-    // Push a dummy guard entry to browser history stack when dirty
-    if (!hasGuardedHistoryRef.current) {
-      window.history.pushState({ unsavedGuard: true }, "", window.location.href);
-      hasGuardedHistoryRef.current = true;
-    }
-
-    const handlePopState = () => {
-      // If user repeatedly presses back while already vibrating, offer option to confirm exit
-      if (isShakingRef.current) {
-        const leave = window.confirm(
-          "Ada perubahan profil yang belum disimpan. Tinggalkan halaman ini dan buang perubahan?"
-        );
-        if (leave) {
-          hasGuardedHistoryRef.current = false;
-          setSavedSnapshot(serializeCvData(profileRef.current));
-          window.history.back();
-          return;
-        }
-      }
-
-      // Intercept and prevent navigating away
-      window.dispatchEvent(new Event("navigation-abort"));
-      triggerShake();
-
-      // Re-push guard entry so URL stays on /candidate/cv and form inputs are preserved
-      window.history.pushState({ unsavedGuard: true }, "", window.location.href);
-      hasGuardedHistoryRef.current = true;
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
   }, [isDirty]);
 
   const handleReset = () => {
@@ -702,7 +599,7 @@ export function CvWorkspace() {
           className={cn(
             "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
             mobileTab === "editor"
-              ? "bg-[#7C3AED] text-white shadow-xs"
+              ? "bg-primary text-primary-foreground shadow-xs"
               : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
           )}
         >
@@ -715,7 +612,7 @@ export function CvWorkspace() {
           className={cn(
             "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
             mobileTab === "preview"
-              ? "bg-[#7C3AED] text-white shadow-xs"
+              ? "bg-primary text-primary-foreground shadow-xs"
               : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
           )}
         >
@@ -783,8 +680,8 @@ export function CvWorkspace() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {saving ? (
-                  <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] text-[11px] font-semibold gap-1.5 py-0.5">
-                    <Loader2 className="size-3 animate-spin text-[#7C3AED]" />
+                  <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-[11px] font-semibold gap-1.5 py-0.5">
+                    <Loader2 className="size-3 animate-spin text-primary" />
                     Menyimpan...
                   </Badge>
                 ) : isDirty ? (
@@ -814,7 +711,7 @@ export function CvWorkspace() {
                       el.scrollIntoView({ behavior: "smooth", block: "start" });
                     }
                   }}
-                  className="cursor-pointer inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-purple-300 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors shadow-2xs"
+                  className="cursor-pointer inline-flex items-center rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground transition-colors shadow-2xs"
                 >
                   {sec.label}
                 </button>
@@ -836,7 +733,7 @@ export function CvWorkspace() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                      <Camera className="size-3.5 text-[#7C3AED]" />
+                      <Camera className="size-3.5 text-primary" />
                       <span>Upload Foto Profil</span>
                       <input
                         type="file"
@@ -862,14 +759,14 @@ export function CvWorkspace() {
               <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Sampul (Banner)</span>
                 <div className="flex items-center gap-4">
-                  <div className="relative h-16 w-32 shrink-0 rounded-xl border-2 border-white bg-gradient-to-r from-[#1e1b4b] to-[#7c3aed] shadow-2xs overflow-hidden">
+                  <div className="relative h-16 w-32 shrink-0 rounded-xl border-2 border-white bg-gradient-to-r from-dark-navy to-primary/80 shadow-2xs overflow-hidden">
                     {profile.bannerUrl ? (
                       <img src={profile.bannerUrl} alt="Foto Sampul" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                      <Camera className="size-3.5 text-[#7C3AED]" />
+                      <Camera className="size-3.5 text-primary" />
                       <span>Upload Sampul</span>
                       <input
                         type="file"
@@ -979,10 +876,10 @@ export function CvWorkspace() {
               </Field>
 
               {/* ── Tipe Kepribadian (16Personalities) ── */}
-              <div className="md:col-span-2 rounded-xl border border-purple-200/70 bg-gradient-to-r from-purple-50/40 via-white to-purple-50/20 p-4">
+              <div className="md:col-span-2 rounded-xl border border-border/80 bg-card p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-[#7C3AED] border border-purple-200/60">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
                       <Brain className="size-4.5" />
                     </div>
                     <div className="min-w-0">
@@ -991,7 +888,7 @@ export function CvWorkspace() {
                           Tes Kepribadian (16Personalities)
                         </span>
                         {profile.personality?.type ? (
-                          <Badge className="bg-[#7C3AED] text-white font-bold text-[10px] px-2 py-0.5">
+                          <Badge className="bg-primary text-primary-foreground font-bold text-[10px] px-2 py-0.5">
                             {profile.personality.type} · {profile.personality.label}
                           </Badge>
                         ) : (
@@ -1011,7 +908,7 @@ export function CvWorkspace() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPersonalityModalOpen(true)}
-                    className="shrink-0 border-purple-200 text-[#7C3AED] hover:bg-purple-50 hover:text-[#6D28D9] rounded-xl text-xs font-semibold h-8.5 px-3 self-start sm:self-center"
+                    className="shrink-0 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-xs font-semibold h-8.5 px-3 self-start sm:self-center"
                   >
                     <Brain className="mr-1.5 size-3.5" />
                     {profile.personality?.type ? "Ubah Kepribadian" : "Pilih Kepribadian"}
@@ -1063,7 +960,7 @@ export function CvWorkspace() {
                     {/* Card Header with numbering, entity preview, reorder arrows, and delete button */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-[11px] font-bold text-[#7C3AED] border border-purple-200/60">
+                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary border border-primary/20">
                           {i + 1}
                         </span>
                         <div className="min-w-0">
@@ -1181,12 +1078,12 @@ export function CvWorkspace() {
                           type="checkbox"
                           checked={Boolean(exp.currentPosition)}
                           onChange={(e) => updateExp(i, "currentPosition", e.target.checked)}
-                          className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                          className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
                         />
                         <span>Saya saat ini masih bekerja di posisi / perusahaan ini</span>
                       </label>
                       {exp.currentPosition && (
-                        <span className="text-[11px] font-semibold text-[#7C3AED]">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
+                        <span className="text-[11px] font-semibold text-primary">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
                       )}
                     </div>
 
@@ -1243,7 +1140,7 @@ export function CvWorkspace() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="gap-1.5 text-xs font-semibold text-slate-700 hover:text-[#7C3AED] hover:border-purple-300 shadow-2xs"
+                          className="gap-1.5 text-xs font-semibold text-foreground hover:text-primary hover:border-primary/40 shadow-2xs"
                           onClick={() => addExpAchievement(i)}
                         >
                           <Plus className="size-3.5" /> Tambah Poin Pencapaian
@@ -1276,7 +1173,7 @@ export function CvWorkspace() {
                     {/* Card Header with numbering, school preview, reorder arrows, and delete button */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-[11px] font-bold text-[#7C3AED] border border-purple-200/60">
+                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary border border-primary/20">
                           {i + 1}
                         </span>
                         <div className="min-w-0">
@@ -1402,19 +1299,19 @@ export function CvWorkspace() {
                           type="checkbox"
                           checked={Boolean(edu.currentlyStudying)}
                           onChange={(e) => updateEdu(i, "currentlyStudying", e.target.checked)}
-                          className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                          className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
                         />
                         <span>Saya saat ini masih menempuh pendidikan di sini</span>
                       </label>
                       {edu.currentlyStudying && (
-                        <span className="text-[11px] font-semibold text-[#7C3AED]">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
+                        <span className="text-[11px] font-semibold text-primary">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
                       )}
                     </div>
 
                     {partnerMatch && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-purple-100 bg-purple-50/50 p-3 text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-700 font-medium">
-                          <GraduationCap className="size-3.5 text-[#7C3AED]" /> Terhubung ke <strong>{partnerMatch} Career Center</strong>
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+                        <span className="flex items-center gap-1.5 text-foreground font-medium">
+                          <GraduationCap className="size-3.5 text-primary" /> Terhubung ke <strong>{partnerMatch} Career Center</strong>
                         </span>
                         <span className={isVerified
                           ? "inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 font-semibold text-emerald-800"
@@ -1553,7 +1450,7 @@ export function CvWorkspace() {
     <CvUnsavedBar
       show={isDirty || saving}
       saving={saving}
-      shaking={shaking}
+      shaking={false}
       onSave={handleSave}
       onReset={handleReset}
     />

@@ -144,6 +144,14 @@ export function SiteHeader() {
   const isPartnerSection = pathname?.startsWith("/partner");
   const isCandidateSection = pathname?.startsWith("/candidate");
 
+  const isLinkActive = (href: string) => {
+    if (href === "/candidate") return pathname === href || pathname?.startsWith("/candidate");
+    if (href === "/jobs") return pathname === href || pathname?.startsWith("/jobs");
+    if (href === "/messages")
+      return pathname === href || pathname?.startsWith(`${href}/`) || pathname?.endsWith("/messages");
+    return pathname === href || pathname?.startsWith(`${href}/`);
+  };
+
   // Top-level direct navigation links
   const links =
     isPartnerSection || visibleUser?.role === "partner"
@@ -156,9 +164,7 @@ export function SiteHeader() {
       : isCandidateSection || visibleUser?.role === "candidate"
       ? [
           { href: "/candidate", label: "Workspace" },
-          { href: "/candidate/applications", label: "Lamaran Saya" },
-          { href: "/candidate/cv", label: "CV & Profil" },
-          { href: "/candidate/career-advisor", label: "Career Advisor" },
+          { href: "/jobs", label: "Lowongan Kerja" },
           { href: "/messages", label: "Pesan" },
         ]
       : isPublicHeader
@@ -250,7 +256,7 @@ export function SiteHeader() {
                   isOverDarkHeader
                     ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
+                  isLinkActive(link.href) && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
                 )}
               >
                 {link.label}
@@ -337,7 +343,7 @@ export function SiteHeader() {
           {visibleUser && (() => {
             const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href="/notifications" className="relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+              <Link href="/notifications" className={cn("relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50", pathname?.startsWith("/notifications") && "border-primary bg-primary/10 text-primary")} aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
                 <Bell className="size-4" />
                 {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
@@ -441,7 +447,10 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                  className={cn(
+                    "rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                    isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
+                  )}
                   onClick={() => setOpen(false)}
                 >
                   {link.label}

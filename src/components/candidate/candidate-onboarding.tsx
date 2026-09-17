@@ -530,29 +530,29 @@ export function CandidateOnboarding() {
       <div className="fixed inset-0 z-10 flex flex-col overflow-hidden bg-background md:p-3 lg:p-6">
         <div className="mx-auto flex h-full w-full max-w-7xl flex-col md:flex-row overflow-hidden border-border bg-card md:rounded-2xl md:border md:shadow-2xl">
           {/* Mobile Brand Top Bar */}
-          <div className="flex items-center justify-between border-b bg-[#0b2342] px-4 py-3 text-white md:hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-dark-navy px-4 py-3 text-white md:hidden">
             <div className="flex items-center gap-2 font-bold text-sm">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="size-4" />
               </span>
               <span>ProofyLink</span>
             </div>
-            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-[#7aaee0]">
+            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-purple-200">
               Kandidat
             </span>
           </div>
 
-          <aside className="hidden w-[285px] shrink-0 flex-col bg-[#0b2342] p-7 text-white md:flex">
+          <aside className="hidden w-[285px] shrink-0 flex-col bg-dark-navy p-7 text-white md:flex">
             <div className="flex items-center gap-2 font-bold">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="size-5" />
               </span>
               ProofyLink
             </div>
             <div className="mt-16">
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#7aaee0]">Onboarding kandidat</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-purple-200">Onboarding kandidat</p>
               <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight">Bangun profil yang terasa seperti kamu.</h1>
-              <p className="mt-4 text-sm leading-6 text-[#b7c8dc]">Jawab beberapa pertanyaan singkat. Kamu tetap memegang kendali sebelum profil dipublikasikan.</p>
+              <p className="mt-4 text-sm leading-6 text-slate-300">Jawab beberapa pertanyaan singkat. Kamu tetap memegang kendali sebelum profil dipublikasikan.</p>
             </div>
             <div className="mt-auto space-y-2">
               {steps.map((item, index) => {
@@ -567,24 +567,24 @@ export function CandidateOnboarding() {
                       index === step
                         ? "bg-white text-foreground shadow-xs font-medium"
                         : index < step
-                        ? "text-[#8de0be] hover:bg-white/10"
-                        : "text-[#8fa7c0] hover:bg-white/5"
+                        ? "text-emerald-300 hover:bg-white/10"
+                        : "text-slate-400 hover:bg-white/5"
                     }`}
                   >
                     <span
                       className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs transition-colors ${
                         index === step
-                          ? "bg-[#7C3AED] text-white font-bold"
+                          ? "bg-primary text-white font-bold"
                           : index < step
-                          ? "bg-emerald-500/20 text-[#8de0be]"
-                          : "bg-white/10 text-[#8fa7c0]"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-white/10 text-slate-400"
                       }`}
                     >
                       {index < step ? <Check className="size-3.5 stroke-[2.5]" /> : <Icon className="size-3.5" />}
                     </span>
                     <span className="min-w-0">
                       <strong className="block text-xs font-semibold truncate">{item.title}</strong>
-                      <small className={`text-[11px] truncate block ${index === step ? "text-muted-foreground" : "text-[#8fa7c0]"}`}>
+                      <small className={`text-[11px] truncate block ${index === step ? "text-muted-foreground" : "text-slate-400"}`}>
                         {item.note}
                       </small>
                     </span>
@@ -598,7 +598,7 @@ export function CandidateOnboarding() {
             <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-widest text-[#7C3AED]">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-primary">
                     Langkah {String(step + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
                   </p>
                   <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">{steps[step].title}</h2>
@@ -607,7 +607,7 @@ export function CandidateOnboarding() {
                   <p className="text-xs font-semibold text-muted-foreground">{Math.round(((step + 1) / steps.length) * 100)}% selesai</p>
                   <div className="mt-2 h-1.5 w-28 overflow-hidden rounded-full bg-muted sm:w-40">
                     <div
-                      className="h-full rounded-full bg-[#7C3AED] transition-all duration-300"
+                      className="h-full rounded-full bg-primary transition-all duration-300"
                       style={{ width: `${((step + 1) / steps.length) * 100}%` }}
                     />
                   </div>
@@ -623,7 +623,7 @@ export function CandidateOnboarding() {
                     aria-label={`Lompat ke langkah ${index + 1}: ${item.title}`}
                     className={`h-1.5 flex-1 rounded-full transition-all cursor-pointer ${
                       index === step
-                        ? "bg-[#7C3AED]"
+                        ? "bg-primary"
                         : index < step
                         ? "bg-emerald-500"
                         : "bg-muted hover:bg-muted-foreground/30"
@@ -684,7 +684,7 @@ export function CandidateOnboarding() {
                   </Button>
                 ) : (
                   <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-[#7C3AED]" />
+                    <span className="size-2 rounded-full bg-primary" />
                     <span>Langkah 1 dari {steps.length} (Wajib)</span>
                   </div>
                 )}
@@ -692,7 +692,7 @@ export function CandidateOnboarding() {
                   type="submit"
                   size="lg"
                   disabled={isPublishing}
-                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10 transition-all disabled:opacity-70"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10 transition-all disabled:opacity-70"
                 >
                   {isPublishing ? (
                     <>
@@ -737,12 +737,12 @@ function TalentCategoryStep({ value, onChange }: { value: TalentCategory; onChan
               onClick={() => onChange(category)}
               aria-pressed={isSelected}
               className={`rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                isSelected ? "border-[#7C3AED] bg-purple-50/50 ring-2 ring-[#7C3AED]/20 shadow-xs" : "bg-card border-border"
+                isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-xs" : "bg-card border-border"
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-2xl">{config.badge}</span>
-                {isSelected && <span className="text-xs font-bold text-[#7C3AED] bg-purple-100 px-2 py-0.5 rounded-full">Dipilih</span>}
+                {isSelected && <span className="text-xs font-bold text-primary bg-secondary px-2 py-0.5 rounded-full">Dipilih</span>}
               </div>
               <strong className="mt-3 block text-base font-bold text-foreground">{config.label}</strong>
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
@@ -767,7 +767,7 @@ function StatusStep({ value, onChange }: { value: CareerStatus; onChange: (value
               onClick={() => onChange(status)}
               aria-pressed={value === status}
               className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                value === status ? "border-[#7C3AED] bg-secondary ring-2 ring-[#7C3AED]/20" : "bg-card"
+                value === status ? "border-primary bg-secondary ring-2 ring-primary/20" : "bg-card"
               }`}
             >
               <span className="text-xl">{config.emoji}</span>
@@ -957,11 +957,11 @@ function HistoryStep({
           <Card key={index} className="p-5 border-border space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                <span className="font-mono text-xs uppercase tracking-widest text-primary font-bold">
                   Pengalaman {index + 1}
                 </span>
                 {item.employmentType && (
-                  <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                  <span className="bg-secondary text-primary text-[11px] font-bold px-2 py-0.5 rounded-md">
                     {item.employmentType}
                   </span>
                 )}
@@ -1043,7 +1043,7 @@ function HistoryStep({
                   type="checkbox"
                   checked={Boolean(item.currentPosition)}
                   onChange={(event) => update(index, "currentPosition", event.target.checked)}
-                  className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                  className="size-4 rounded border-input text-primary focus:ring-primary"
                 />
                 <span>Masih Bekerja di Sini (Current Position)</span>
               </label>
@@ -1108,8 +1108,8 @@ function EducationStep({
     >
       <div className="space-y-4">
         {/* Partner campus quick suggestions */}
-        <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3.5 text-xs">
-          <p className="font-semibold text-[#7C3AED] mb-1.5 flex items-center gap-1.5">
+        <div className="rounded-xl border border-primary/20 bg-secondary/60 p-3.5 text-xs">
+          <p className="font-semibold text-primary mb-1.5 flex items-center gap-1.5">
             <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi Djoin untuk Verifikasi Otomatis:
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1125,7 +1125,7 @@ function EducationStep({
                     update(0, "school", campus);
                   }
                 }}
-                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-purple-100/70 transition-colors"
+                className="rounded-lg border border-primary/20 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 + {campus}
               </button>
@@ -1142,11 +1142,11 @@ function EducationStep({
             <Card key={index} className="p-5 border-border">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                  <span className="font-mono text-xs uppercase tracking-widest text-primary font-bold">
                     Pendidikan {index + 1}
                   </span>
                   {item.level && (
-                    <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-secondary text-primary text-[11px] font-bold px-2 py-0.5 rounded-md">
                       {item.level}
                     </span>
                   )}
@@ -1245,14 +1245,14 @@ function EducationStep({
                       type="checkbox"
                       checked={Boolean(item.currentlyStudying)}
                       onChange={(event) => update(index, "currentlyStudying", event.target.checked)}
-                      className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                      className="size-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span>Masih Menempuh Pendidikan (Currently Studying)</span>
                   </label>
                 </div>
 
                 {partnerMatch && (
-                  <div className="flex items-center gap-2 rounded-lg bg-purple-50 p-2.5 text-xs text-[#7C3AED] font-medium border border-purple-100">
+                  <div className="flex items-center gap-2 rounded-lg bg-secondary/60 p-2.5 text-xs text-primary font-medium border border-border">
                     <GraduationCap className="size-4 shrink-0" />
                     <span>
                       Terhubung ke Career Center <strong>{partnerMatch}</strong>. Profilmu akan masuk ke antrean verifikasi resmi!
@@ -1292,7 +1292,7 @@ function TagsStep({
           {form[kind].map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-[#7C3AED]"
+              className="inline-flex items-center gap-1 rounded-full bg-secondary border border-primary/20 px-2.5 py-1 text-xs font-semibold text-primary"
             >
               {tag}
               <button type="button" aria-label={`Hapus ${tag}`} onClick={() => removeTag(kind, tag)}>
@@ -1367,12 +1367,12 @@ function ArrangementStep({
             onClick={() => onChange(option.value)}
             aria-pressed={value === option.value}
             className={`flex w-full items-start gap-4 rounded-xl border p-5 text-left transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              value === option.value ? "border-[#7C3AED] bg-purple-50/50 ring-2 ring-[#7C3AED]/20" : "bg-card border-border"
+              value === option.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "bg-card border-border"
             }`}
           >
             <span
               className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${
-                value === option.value ? "border-[#7C3AED] bg-[#7C3AED] text-white" : "border-input"
+                value === option.value ? "border-primary bg-primary text-primary-foreground" : "border-input"
               }`}
             >
               {value === option.value && <Check className="size-3.5" />}
@@ -1394,23 +1394,23 @@ function ReviewStep({ form }: { form: FormState }) {
   return (
     <Intro title="Satu langkah lagi." text="Tinjau detailmu sebelum profil ini ditemukan recruiter.">
       <Card className="overflow-hidden border-border shadow-sm">
-        <div className="bg-[#0b2342] p-6 text-white">
+        <div className="bg-dark-navy p-6 text-white">
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-white/10 px-2.5 py-0.5 rounded-full font-medium text-[#8de0be]">
+            <span className="text-xs bg-white/10 px-2.5 py-0.5 rounded-full font-medium text-emerald-300">
               {careerLabels[form.careerStatus]}
             </span>
-            <span className="text-xs bg-purple-500/30 text-purple-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span className="text-xs bg-white/10 text-purple-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
               <span>{talentConfig.badge}</span> {talentConfig.label}
             </span>
           </div>
           <h3 className="mt-3 text-2xl font-bold">{form.fullName || "Nama kamu"}</h3>
-          <p className="mt-1 text-sm text-[#b7c8dc]">{form.headline || "Headline profesional"}</p>
-          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[#b7c8dc]">
+          <p className="mt-1 text-sm text-slate-300">{form.headline || "Headline profesional"}</p>
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-300">
             <MapPin className="size-3.5 text-emerald-400" />
             <span>{form.location || "Lokasi belum diisi"}</span>
-            <span className="text-[#55718f]">•</span>
+            <span className="text-slate-500">•</span>
             <span>{form.workArrangement}</span>
-            <span className="text-[#55718f]">•</span>
+            <span className="text-slate-500">•</span>
             <span>{form.phone || "No. Telepon belum diisi"}</span>
           </p>
         </div>
@@ -1429,8 +1429,8 @@ function ReviewStep({ form }: { form: FormState }) {
           <Summary label="Status kontak" value={form.email} />
         </div>
       </Card>
-      <div className="mt-5 flex gap-3 rounded-lg bg-purple-50 border border-purple-100 p-4 text-sm text-purple-900">
-        <ShieldCheck className="size-5 shrink-0 text-[#7C3AED]" />
+      <div className="mt-5 flex gap-3 rounded-xl bg-secondary/50 border border-primary/20 p-4 text-sm text-foreground">
+        <ShieldCheck className="size-5 shrink-0 text-primary" />
         <p className="text-xs leading-relaxed">
           Dengan mempublikasikan, profilmu akan langsung terdaftar di Talent Network sesuai status karier, preferensi kerja, dan kategori yang kamu pilih.
         </p>

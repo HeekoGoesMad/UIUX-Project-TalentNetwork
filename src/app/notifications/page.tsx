@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Calendar,
+  Check,
   CheckCheck,
   ChevronRight,
   FileCheck2,
   Mail,
   Save,
   Settings2,
+  ShieldCheck,
   SlidersHorizontal,
   Smartphone,
+  UserRound,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -28,13 +32,28 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
+import type { ConsentState } from "@/types";
 
 type QuietHours = { start?: string; end?: string; timezone?: string };
 type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean; quietHours: QuietHours };
 const preferencesKey = "proofylink-demo-notification-preferences-v1";
 const defaultPreferences: NotificationPreferences = { inAppEnabled: true, emailEnabled: true, quietHours: {} };
 
-type NotificationCategory = "all" | "recruitment" | "system";
+type NotificationCategory = "all" | "requests" | "recruitment" | "system";
+
+const TAB_PARAMS: Record<NotificationCategory, string> = {
+  all: "all",
+  requests: "contact-requests",
+  recruitment: "recruitment",
+  system: "system",
+};
+
+function parseTab(value: string | null): NotificationCategory {
+  if (value === "contact-requests") return "requests";
+  if (value === "recruitment") return "recruitment";
+  if (value === "system") return "system";
+  return "all";
+}
 
 export default function NotificationsPage() {
   const {
@@ -45,23 +64,43 @@ export default function NotificationsPage() {
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
+    consentRequests,
+    screeningConsents,
+    contactRequests,
+    respondToConsent,
   } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const tabParam = searchParams.get("tab");
-  const initialTab: NotificationCategory =
-    tabParam === "recruitment" || tabParam === "system" ? tabParam : "all";
+  const initialTab = parseTab(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<NotificationCategory>(initialTab);
+  const [actingRequestId, setActingRequestId] = useState<string | null>(null);
+  const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
+
+  // Preferences state
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [preferencesLoading, setPreferencesLoading] = useState(true);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  const changeTab = (tab: NotificationCategory) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTab(parseTab(new URLSearchParams(window.location.search).get("tab")));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   useEffect(() => {
     if (hydrated && !user) router.replace(`/login?next=${encodeURIComponent("/notifications")}`);
   }, [hydrated, user, router]);
 
+  // Load Preferences
   useEffect(() => {
     if (!hydrated || !user) return;
     let active = true;
@@ -97,10 +136,66 @@ export default function NotificationsPage() {
     };
   }, [dbMode, hydrated, user]);
 
+  // Normalized contact requests for candidate
+  const formattedRequests = useMemo(() => {
+    if (user?.role !== "candidate") return [];
+    if (dbMode) {
+      return consentRequests
+        .map((req) => ({
+          itemId: typeof req.itemId === "string" ? req.itemId : String(req.candidateProfileId),
+          candidateId: typeof req.candidateProfileId === "string" ? req.candidateProfileId : "",
+          state: (req.consentState as ConsentState) || "pending-candidate-consent",
+          recruiterName: typeof req.recruiterName === "string" ? req.recruiterName : "Tim Rekruter",
+          company: typeof req.organizationName === "string" ? req.organizationName : "Organisasi Mitra",
+          email: typeof req.recruiterEmail === "string" ? req.recruiterEmail : null,
+          requestedAt: typeof req.createdAt === "string" ? req.createdAt : new Date().toISOString(),
+        }))
+        .filter((r) => r.candidateId);
+    }
+    return Object.entries(screeningConsents)
+      .filter(([, state]) => state !== "not-requested")
+      .map(([candidateId, state]) => ({
+        itemId: candidateId,
+        candidateId,
+        state,
+        recruiterName: contactRequests?.[candidateId]?.recruiterName || "Tim Rekruter",
+        company: contactRequests?.[candidateId]?.company || "Perusahaan Mitra",
+        email: contactRequests?.[candidateId]?.email || null,
+        requestedAt: contactRequests?.[candidateId]?.requestedAt || new Date().toISOString(),
+      }));
+  }, [user, dbMode, consentRequests, screeningConsents, contactRequests]);
+
+  const pendingRequestsCount = formattedRequests.filter((r) => r.state === "pending-candidate-consent").length;
   const unreadNotificationsCount = notifications.filter((n) => !n.readAt).length;
 
   if (!hydrated || !user) return <StateMessage text="Menyiapkan notifikasi..." />;
   if (dbMode && !bootstrapped) return <StateMessage text="Memuat notifikasi..." />;
+
+  const handleConsentAction = async (candidateId: string, itemId: string, state: "consented" | "declined") => {
+    setActingRequestId(itemId);
+    try {
+      const ok = await respondToConsent(candidateId, state, itemId);
+      if (ok) {
+        toast.success(state === "consented" ? "Izin kontak telah diberikan" : "Permintaan kontak telah ditolak");
+      } else {
+        setStaleIds((prev) => new Set(prev).add(itemId));
+      }
+    } catch {
+      toast.error("Gagal memperbarui izin kontak");
+    } finally {
+      setActingRequestId(null);
+    }
+  };
+
+  const handleMarkRead = async (id: string) => {
+    const ok = await markNotificationRead(id);
+    if (!ok) toast.error("Gagal menandai notifikasi sebagai dibaca");
+  };
+
+  const handleMarkAllRead = async () => {
+    const ok = await markAllNotificationsRead();
+    if (!ok) toast.error("Gagal menandai semua notifikasi sebagai dibaca");
+  };
 
   const savePreferences = async () => {
     setPreferencesSaving(true);
@@ -126,9 +221,9 @@ export default function NotificationsPage() {
     }
   };
 
-  // Filtered notifications
+  // Filtered notifications — tabs filter, never blank the feed
   const filteredNotifications = notifications.filter((n) => {
-    if (activeTab === "all") return true;
+    if (activeTab === "all" || activeTab === "requests") return true;
     if (activeTab === "recruitment") {
       return n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received";
     }
@@ -152,56 +247,57 @@ export default function NotificationsPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           {unreadNotificationsCount > 0 && (
-            <Button variant="outline" size="sm" onClick={() => void markAllNotificationsRead()} className="text-xs">
+            <Button variant="outline" size="sm" onClick={() => void handleMarkAllRead()} className="text-xs">
               <CheckCheck className="mr-1.5 size-3.5" /> Tandai semua dibaca
             </Button>
           )}
 
-          {/* Preferences Settings Modal */}
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
-                <Settings2 className="mr-1.5 size-3.5" /> Pengaturan
+              <Button variant="outline" size="sm" className="text-xs">
+                <SlidersHorizontal className="mr-1.5 size-3.5" />
+                Preferensi
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <SlidersHorizontal className="size-4 text-primary" /> Preferensi Notifikasi
+                <DialogTitle className="flex items-center gap-2 text-base">
+                  <Settings2 className="size-4 text-primary" />
+                  Preferensi &amp; Waktu Tenang
                 </DialogTitle>
-                <DialogDescription>
-                  Pilih kanal pemberitahuan yang boleh digunakan untuk pembaruan akun dan rekrutmen.
+                <DialogDescription className="text-xs">
+                  Atur saluran pengiriman notifikasi serta jam bebas gangguan (Quiet Hours).
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-3">
+              <div className="space-y-4 pt-2">
                 {preferencesLoading ? (
-                  <p className="text-xs text-muted-foreground">Memuat preferensi...</p>
+                  <p className="py-6 text-center text-xs text-muted-foreground">Memuat preferensi...</p>
                 ) : (
                   <>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       <PreferenceToggle
-                        icon={<Smartphone className="size-4 text-primary" />}
-                        label="Notifikasi dalam aplikasi"
+                        icon={<Smartphone className="size-4 text-muted-foreground" />}
+                        label="Notifikasi In-App"
                         checked={preferences.inAppEnabled}
                         onChange={(checked) => setPreferences((curr) => ({ ...curr, inAppEnabled: checked }))}
                       />
                       <PreferenceToggle
-                        icon={<Mail className="size-4 text-primary" />}
-                        label="Pemberitahuan email"
+                        icon={<Mail className="size-4 text-muted-foreground" />}
+                        label="Notifikasi Email Ringkasan"
                         checked={preferences.emailEnabled}
                         onChange={(checked) => setPreferences((curr) => ({ ...curr, emailEnabled: checked }))}
                       />
                     </div>
 
-                    <div className="rounded-xl border bg-slate-50/70 p-3.5 dark:bg-slate-900/50">
-                      <p className="text-xs font-semibold text-foreground">Jam Tenang (Opsional)</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Pemberitahuan email ditunda pada rentang jam ini.
+                    <div className="rounded-xl border bg-muted/30 p-3.5 space-y-2.5">
+                      <p className="text-xs font-semibold text-foreground">Waktu Tenang (Quiet Hours)</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Notifikasi non-kritis akan dijeda selama periode jam ini.
                       </p>
-                      <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <label className="text-[11px] text-muted-foreground">
-                          Mulai
+                          Mulai:
                           <input
                             type="time"
                             value={preferences.quietHours.start ?? ""}
@@ -215,7 +311,7 @@ export default function NotificationsPage() {
                           />
                         </label>
                         <label className="text-[11px] text-muted-foreground">
-                          Selesai
+                          Selesai:
                           <input
                             type="time"
                             value={preferences.quietHours.end ?? ""}
@@ -244,6 +340,12 @@ export default function NotificationsPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button variant="ghost" size="sm" asChild className="text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/candidate/settings?tab=notif">
+              <Settings2 className="mr-1.5 size-3.5" /> Kelola di Pengaturan
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -252,20 +354,130 @@ export default function NotificationsPage() {
         <TabButton
           label="Semua"
           active={activeTab === "all"}
-          onClick={() => setActiveTab("all")}
-          count={unreadNotificationsCount}
+          onClick={() => changeTab("all")}
+          count={unreadNotificationsCount + pendingRequestsCount}
         />
+        {user?.role === "candidate" && (
+          <TabButton
+            label="Permintaan Kontak"
+            active={activeTab === "requests"}
+            onClick={() => changeTab("requests")}
+            count={pendingRequestsCount}
+            highlightCount={pendingRequestsCount > 0}
+          />
+        )}
         <TabButton
-          label="Rekrutmen & Wawancara"
+          label="Rekrutmen &amp; Wawancara"
           active={activeTab === "recruitment"}
-          onClick={() => setActiveTab("recruitment")}
+          onClick={() => changeTab("recruitment")}
         />
         <TabButton
           label="Sistem"
           active={activeTab === "system"}
-          onClick={() => setActiveTab("system")}
+          onClick={() => changeTab("system")}
         />
       </div>
+
+      {/* ── CANDIDATE CONTACT REQUESTS (Only on 'requests' tab or when active on 'all') ── */}
+      {user?.role === "candidate" && (activeTab === "requests" || (activeTab === "all" && pendingRequestsCount > 0)) && (
+        <section className="mt-6 space-y-3" aria-label="Permintaan Kontak Rekruter">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4.5 text-primary" />
+              <h2 className="text-sm font-bold text-foreground">Permintaan Akses Kontak &amp; Skrining</h2>
+              {pendingRequestsCount > 0 && (
+                <Badge className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2">
+                  {pendingRequestsCount} Perlu Ditanggapi
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" asChild className="text-xs text-primary">
+              <Link href="/candidate/contact-requests">
+                Semua Izin <ChevronRight className="ml-1 size-3.5" />
+              </Link>
+            </Button>
+          </div>
+
+          {formattedRequests.map((req) => {
+            const isPending = req.state === "pending-candidate-consent";
+            const isConsented = req.state === "consented";
+            return (
+              <Card
+                key={req.itemId}
+                className={`border transition-all duration-150 ${
+                  isPending
+                    ? "border-amber-300 bg-amber-50/20 dark:border-amber-700/50 dark:bg-amber-950/20 shadow-2xs"
+                    : "border-border bg-card"
+                }`}
+              >
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                        isPending
+                          ? "bg-amber-100 text-amber-800"
+                          : isConsented
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <UserRound className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">
+                        <span className="font-bold">{req.recruiterName}</span> ({req.company}) meminta izin untuk melihat detail kontak dan verifikasi Anda.
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Status: <strong className="capitalize">{req.state.replace(/-/g, " ")}</strong> • Diajukan:{" "}
+                        {new Date(req.requestedAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Action Buttons */}
+                  {isPending ? (
+                    staleIds.has(req.itemId) ? (
+                      <p className="shrink-0 pt-2 text-xs text-muted-foreground sm:pt-0">
+                        Sudah ditanggapi — segarkan halaman.
+                      </p>
+                    ) : (
+                      <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
+                        <Button
+                          size="sm"
+                          disabled={actingRequestId === req.itemId}
+                          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 shadow-xs"
+                          onClick={() => void handleConsentAction(req.candidateId, req.itemId, "consented")}
+                        >
+                          <Check className="mr-1.5 size-3.5" /> Izinkan Kontak
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={actingRequestId === req.itemId}
+                          className="h-8 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 px-3"
+                          onClick={() => void handleConsentAction(req.candidateId, req.itemId, "declined")}
+                        >
+                          Tolak
+                        </Button>
+                      </div>
+                    )
+                  ) : isConsented ? (
+                    <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
+                      <Link href="/messages">
+                        Buka Pesan <ChevronRight className="ml-1 size-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
+      )}
 
       {/* ── GENERAL NOTIFICATIONS FEED ── */}
       <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
@@ -293,20 +505,20 @@ export default function NotificationsPage() {
                 key={notif.id}
                 className={`transition-all duration-150 hover:shadow-xs ${
                   unread
-                    ? "border-l-4 border-l-[#7C3AED] bg-purple-50/30 dark:bg-purple-950/15"
-                    : "bg-white dark:bg-slate-900 border-border"
+                    ? "border-l-4 border-l-primary bg-primary/5"
+                    : "bg-card border-border"
                 }`}
               >
                 <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
                   <span
                     className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
                       isInterview
-                        ? "bg-purple-100 text-[#7C3AED]"
+                        ? "bg-primary/10 text-primary"
                         : isOffer
                         ? "bg-emerald-100 text-emerald-700"
                         : unread
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-slate-100 text-slate-500"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {isInterview ? (
@@ -351,8 +563,8 @@ export default function NotificationsPage() {
 
                     {unread && (
                       <button
-                        onClick={() => void markNotificationRead(notif.id)}
-                        className="mt-2 text-[11px] font-semibold text-primary hover:underline"
+                        onClick={() => void handleMarkRead(notif.id)}
+                        className="mt-2 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
                       >
                         Tandai dibaca
                       </button>
@@ -384,9 +596,9 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
         active
-          ? "bg-[#7C3AED] text-white shadow-xs"
+          ? "bg-primary text-primary-foreground shadow-2xs"
           : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
       }`}
     >
@@ -395,7 +607,7 @@ function TabButton({
         <span
           className={`flex size-4.5 items-center justify-center rounded-full text-[10px] font-bold ${
             active
-              ? "bg-white text-primary"
+              ? "bg-primary-foreground text-primary"
               : highlightCount
               ? "bg-emerald-600 text-white"
               : "bg-muted-foreground/20 text-foreground"
@@ -429,7 +641,7 @@ function PreferenceToggle({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="size-4 accent-primary"
+        className="size-4 accent-primary cursor-pointer"
       />
     </label>
   );

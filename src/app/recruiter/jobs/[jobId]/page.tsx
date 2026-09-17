@@ -1,2 +1,2 @@
-import { JobManagePage } from "@/components/jobs/job-ui";
+import { JobManagePage } from "@/components/recruiter/jobs-manage";
 export default async function Page({ params }: { params: Promise<{ jobId: string }> }) { return <JobManagePage jobId={(await params).jobId} />; }
