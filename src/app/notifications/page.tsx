@@ -6,6 +6,7 @@ import {
   Calendar,
   Check,
   CheckCheck,
+  ChevronLeft,
   ChevronRight,
   FileCheck2,
   Mail,
@@ -31,7 +32,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
+import { cn } from "@/lib/utils";
 import type { ConsentState } from "@/types";
 
 type QuietHours = { start?: string; end?: string; timezone?: string };
@@ -72,8 +75,10 @@ export default function NotificationsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const PAGE_SIZE = 6;
   const initialTab = parseTab(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<NotificationCategory>(initialTab);
+  const [currentPage, setCurrentPage] = useState(1);
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
 
@@ -85,12 +90,14 @@ export default function NotificationsPage() {
 
   const changeTab = (tab: NotificationCategory) => {
     setActiveTab(tab);
+    setCurrentPage(1);
     window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
   };
 
   useEffect(() => {
     const onPopState = () => {
       setActiveTab(parseTab(new URLSearchParams(window.location.search).get("tab")));
+      setCurrentPage(1);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -221,9 +228,12 @@ export default function NotificationsPage() {
     }
   };
 
-  // Filtered notifications — tabs filter, never blank the feed
+  // Filtered notifications — tabs filter
   const filteredNotifications = notifications.filter((n) => {
-    if (activeTab === "all" || activeTab === "requests") return true;
+    if (activeTab === "all") return true;
+    if (activeTab === "requests") {
+      return n.type === "consent_request" || n.type === "contact_request" || n.title.toLowerCase().includes("kontak") || n.title.toLowerCase().includes("izin");
+    }
     if (activeTab === "recruitment") {
       return n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received";
     }
@@ -233,14 +243,26 @@ export default function NotificationsPage() {
     return true;
   });
 
+  const recruitmentCount = notifications.filter(
+    (n) => !n.readAt && (n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received")
+  ).length;
+  const systemCount = notifications.filter(
+    (n) => !n.readAt && (n.type === "system" || n.type === "verification_result")
+  ).length;
+
+  const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, filteredNotifications.length);
+  const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
+
   return (
     <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
       {/* Header */}
-      <div className="flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row sm:items-end">
+      <div className="flex flex-col justify-between gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">Pusat Aktivitas</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Notifikasi</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Notifikasi</h1>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
             Kelola jadwal wawancara, pembaruan rekrutmen, dan pengumuman sistem di satu tempat.
           </p>
         </div>
@@ -370,11 +392,13 @@ export default function NotificationsPage() {
           label="Rekrutmen &amp; Wawancara"
           active={activeTab === "recruitment"}
           onClick={() => changeTab("recruitment")}
+          count={recruitmentCount}
         />
         <TabButton
           label="Sistem"
           active={activeTab === "system"}
           onClick={() => changeTab("system")}
+          count={systemCount}
         />
       </div>
 
@@ -404,22 +428,24 @@ export default function NotificationsPage() {
             return (
               <Card
                 key={req.itemId}
-                className={`border transition-all duration-150 ${
+                className={cn(
+                  "border transition-all duration-150",
                   isPending
-                    ? "border-amber-300 bg-amber-50/20 dark:border-amber-700/50 dark:bg-amber-950/20 shadow-2xs"
-                    : "border-border bg-card"
-                }`}
+                    ? "border-amber-300/80 bg-amber-50/25 dark:border-amber-700/50 dark:bg-amber-950/20 shadow-2xs"
+                    : "border-border/70 bg-card"
+                )}
               >
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <span
-                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                      className={cn(
+                        "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
                         isPending
                           ? "bg-amber-100 text-amber-800"
                           : isConsented
                           ? "bg-emerald-100 text-emerald-800"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                      )}
                     >
                       <UserRound className="size-4" />
                     </span>
@@ -482,15 +508,18 @@ export default function NotificationsPage() {
       {/* ── GENERAL NOTIFICATIONS FEED ── */}
       <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
         {filteredNotifications.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-10 text-center">
-            <Bell className="mx-auto size-8 text-muted-foreground/50" />
-            <p className="mt-3 font-semibold text-sm text-foreground">Tidak ada notifikasi di kategori ini</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Semua pembaruan rekrutmen dan sistem akan muncul di sini.
-            </p>
-          </div>
+          <EmptyState
+            icon={Bell}
+            title="Tidak ada notifikasi"
+            description={
+              activeTab === "all"
+                ? "Semua pembaruan rekrutmen dan sistem akan muncul di sini."
+                : "Tidak ada notifikasi pada kategori ini saat ini."
+            }
+            className="border-dashed py-12"
+          />
         ) : (
-          filteredNotifications.map((notif) => {
+          paginatedNotifications.map((notif) => {
             const unread = !notif.readAt;
             const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
             const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
@@ -503,45 +532,56 @@ export default function NotificationsPage() {
             return (
               <Card
                 key={notif.id}
-                className={`transition-all duration-150 hover:shadow-xs ${
+                className={cn(
+                  "border transition-all duration-150 hover:shadow-xs",
                   unread
-                    ? "border-l-4 border-l-primary bg-primary/5"
-                    : "bg-card border-border"
-                }`}
+                    ? "border-primary/30 bg-primary/[0.02]"
+                    : "border-border/70 bg-card"
+                )}
               >
                 <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
-                  <span
-                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                      isInterview
-                        ? "bg-primary/10 text-primary"
-                        : isOffer
-                        ? "bg-emerald-100 text-emerald-700"
-                        : unread
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {isInterview ? (
-                      <Calendar className="size-4" />
-                    ) : isOffer ? (
-                      <FileCheck2 className="size-4" />
-                    ) : (
-                      <Bell className="size-4" />
+                  <div className="relative shrink-0">
+                    <span
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                        isInterview
+                          ? "bg-primary/10 text-primary"
+                          : isOffer
+                          ? "bg-emerald-50 text-emerald-700"
+                          : unread
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {isInterview ? (
+                        <Calendar className="size-4" />
+                      ) : isOffer ? (
+                        <FileCheck2 className="size-4" />
+                      ) : (
+                        <Bell className="size-4" />
+                      )}
+                    </span>
+                    {unread && (
+                      <span
+                        className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-background"
+                        aria-hidden="true"
+                      />
                     )}
-                  </span>
+                  </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
-                      <h3 className={`text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground/80"}`}>
+                      <h3 className={cn("text-sm", unread ? "font-bold text-foreground" : "font-medium text-foreground/85")}>
                         {href ? (
                           <Link
                             href={href}
                             onClick={() => {
                               if (unread) void markNotificationRead(notif.id);
                             }}
-                            className="hover:text-primary transition-colors flex items-center gap-1.5"
+                            className="hover:text-primary transition-colors inline-flex items-center gap-1.5"
                           >
-                            {notif.title} <ChevronRight className="size-3 text-muted-foreground" />
+                            <span>{notif.title}</span>
+                            <ChevronRight className="size-3 text-muted-foreground" />
                           </Link>
                         ) : (
                           notif.title
@@ -564,9 +604,10 @@ export default function NotificationsPage() {
                     {unread && (
                       <button
                         onClick={() => void handleMarkRead(notif.id)}
-                        className="mt-2 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                        className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
                       >
-                        Tandai dibaca
+                        <Check className="size-3" />
+                        <span>Tandai dibaca</span>
                       </button>
                     )}
                   </div>
@@ -575,9 +616,81 @@ export default function NotificationsPage() {
             );
           })
         )}
+
+        {/* ── PAGINATION CONTROLS ── */}
+        {filteredNotifications.length > PAGE_SIZE && (
+          <nav
+            className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/70 pt-4"
+            aria-label="Navigasi halaman notifikasi"
+          >
+            <p className="text-xs text-muted-foreground">
+              Menampilkan <span className="font-semibold text-foreground">{startIndex + 1}–{endIndex}</span> dari{" "}
+              <span className="font-semibold text-foreground">{filteredNotifications.length}</span> notifikasi
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage === 1}
+                className="h-8 gap-1 text-xs font-medium"
+              >
+                <ChevronLeft className="size-3.5" />
+                <span className="hidden sm:inline">Sebelumnya</span>
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {getPageItems(totalPages, safeCurrentPage).map((item, index) =>
+                  item === "gap" ? (
+                    <span key={`gap-${index}`} className="px-1.5 text-xs text-muted-foreground">
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={item}
+                      size="sm"
+                      variant={item === safeCurrentPage ? "default" : "outline"}
+                      aria-current={item === safeCurrentPage ? "page" : undefined}
+                      onClick={() => setCurrentPage(item)}
+                      className="h-8 min-w-8 px-2 text-xs font-medium"
+                    >
+                      {item}
+                    </Button>
+                  )
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage === totalPages}
+                className="h-8 gap-1 text-xs font-medium"
+              >
+                <span className="hidden sm:inline">Berikutnya</span>
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </nav>
+        )}
       </section>
     </main>
   );
+}
+
+function getPageItems(totalPages: number, currentPage: number): (number | "gap")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const wanted = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const pages = [...wanted].filter((n) => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+  const result: (number | "gap")[] = [];
+  let prev = 0;
+  for (const p of pages) {
+    if (prev && p - prev > 1) result.push("gap");
+    result.push(p);
+    prev = p;
+  }
+  return result;
 }
 
 function TabButton({

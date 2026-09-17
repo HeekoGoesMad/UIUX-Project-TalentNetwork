@@ -7,12 +7,12 @@ export default function CandidateCvPage() {
   return (
     <ProtectedRoute role="candidate">
       <div className="space-y-6">
-        <div className="border-b border-border/60 pb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            CV Studio &amp; Profil ATS
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            CV &amp; Profil Studio
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-            Lengkapi riwayat profesional, sinkronkan rekomendasi AI, dan unduh CV berstandar ATS berakurasi tinggi.
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Kelola profil profesional kamu, kurasi riwayat karir, dan unduh dokumen CV berstandar ATS.
           </p>
         </div>
 
@@ -25,4 +25,5 @@ export default function CandidateCvPage() {
     </ProtectedRoute>
   );
 }
+
 

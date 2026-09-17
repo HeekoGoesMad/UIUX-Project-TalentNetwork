@@ -24,11 +24,11 @@ export function ProfileCompletionCard() {
               {readiness.complete ? <ShieldCheck className="size-5" /> : <ClipboardList className="size-5" />}
             </span>
             <div>
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-foreground">Kesiapan Profil &amp; Skor ATS</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-foreground">Kesiapan profil</p>
                 <Badge
                   variant="outline"
-                  className={`text-[11px] font-semibold ${
+                  className={`text-[11px] font-medium ${
                     readiness.complete
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border-primary/20 bg-primary/5 text-primary"
@@ -39,12 +39,12 @@ export function ProfileCompletionCard() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {readiness.complete
-                  ? "Profil prima! Semua bagian utama telah terisi dan siap lolos seleksi ATS."
-                  : `${readiness.missingSections.length} bagian penting belum dilengkapi agar profilmu optimal.`}
+                  ? "Semua bagian utama terisi. Profil siap dilamar dan lolos pindaian ATS."
+                  : `${readiness.missingSections.length} bagian penting belum dilengkapi agar profil optimal.`}
               </p>
             </div>
           </div>
-          <p className={`font-mono text-2xl font-bold tracking-tight ${readiness.tierColor}`}>
+          <p className={`font-mono text-2xl font-bold tabular-nums tracking-tight ${readiness.tierColor}`}>
             {readiness.percent}%
           </p>
         </div>
@@ -67,8 +67,8 @@ export function ProfileCompletionCard() {
 
         {!readiness.complete && (
           <div className="mt-4 space-y-2">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              Bagian yang perlu dilengkapi:
+            <p className="text-xs font-medium text-muted-foreground">
+              Bagian yang perlu dilengkapi
             </p>
             <div className="flex flex-wrap gap-1.5">
               {readiness.missingSections.map((section) => (
@@ -84,26 +84,26 @@ export function ProfileCompletionCard() {
             </div>
           </div>
         )}
-        <div className="mt-5 border-t border-border/60 pt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
           {!readiness.complete ? (
             <>
               <Link
                 href={readiness.firstIncompleteAnchor}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
               >
-                Lengkapi di CV Workspace <ArrowRight className="size-4" />
+                Lengkapi di CV Studio <ArrowRight className="size-4" />
               </Link>
               <Link
                 href="/candidate/career-advisor"
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
                 <Sparkles className="size-3.5 text-primary" />
-                Minta Rekomendasi AI
+                Minta saran AI
               </Link>
             </>
           ) : (
-            <p className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-emerald-700">
-              <CheckCircle2 className="size-4" /> Profil aktif dan dapat ditemukan rekruter terverifikasi
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+              <CheckCircle2 className="size-4" /> Profil aktif dan dapat ditemukan rekruter
             </p>
           )}
         </div>

@@ -1,2 +1,2 @@
 import { ReactNode } from "react";
-export function ProfileSection({ title, children }: { title: string; children: ReactNode }) { return <section className="rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">{title}</h2><div className="mt-5">{children}</div></section>; }
+export function ProfileSection({ title, children }: { title: string; children: ReactNode }) { return <section className="rounded-lg border bg-card p-6 shadow-xs"><h2 className="text-sm font-semibold text-foreground">{title}</h2><div className="mt-3">{children}</div></section>; }

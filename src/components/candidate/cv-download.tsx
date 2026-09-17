@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   FileText,
   Columns,
-  CheckCircle2,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,34 +44,34 @@ interface CvTemplateMeta {
 const TEMPLATES: CvTemplateMeta[] = [
   {
     id: "ats",
-    name: "ATS Friendly",
+    name: "Executive ATS",
     tag: "Standar HR",
-    shortDesc: "Format standar teks lolos scanner ATS (Workday, Taleo, Greenhouse).",
+    shortDesc: "Format standar teks lolos scanner ATS (Workday, Taleo, Greenhouse). Tipografi serif klasik.",
     recommendedRole: "Portal Karir & Korporasi",
     icon: ShieldCheck,
   },
   {
     id: "modern",
-    name: "Creative Modern",
-    tag: "Visual Portfolio",
-    shortDesc: "Aksen pastel peach, avatar bundar, 2-kolom & timeline pengalaman.",
-    recommendedRole: "Startup, Tech & Agensi Kreatif",
+    name: "Contemporary Studio",
+    tag: "Startup & Produk",
+    shortDesc: "Tata letak kontemporer dengan tipografi modern, pill tags keahlian, dan timeline karir.",
+    recommendedRole: "Startup, Product, Tech & Agensi",
     icon: Sparkles,
   },
   {
     id: "sidebar",
-    name: "Sidebar Dark",
-    tag: "Kontras Tinggi",
-    shortDesc: "Sidebar navy gelap dengan konten utama terang.",
-    recommendedRole: "Engineering, Data & Tech Lead",
+    name: "Technical Architecture",
+    tag: "Engineering & Data",
+    shortDesc: "Split layout terstruktur dengan font monospaced untuk tech stack dan metrik rekayasa.",
+    recommendedRole: "Software Engineer, Data & Tech Lead",
     icon: Columns,
   },
   {
     id: "minimal",
-    name: "Minimal Elegant",
-    tag: "Editorial",
-    shortDesc: "Tipografi serif klasik dengan whitespace luas.",
-    recommendedRole: "Konsultan, Finansial & Akademik",
+    name: "Editorial Swiss",
+    tag: "Konsultan & Eksekutif",
+    shortDesc: "Disiplin tipografi grid Swiss dengan gutter tanggal terstruktur dan kontras tinggi.",
+    recommendedRole: "Konsultan, Finansial & Advisory",
     icon: FileText,
   },
 ];
@@ -206,210 +205,189 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
   }, []);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/70 shadow-xs">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs">
       {/* Top Control Bar */}
-      <div className="flex flex-col gap-3 border-b border-slate-200/80 bg-white p-3.5 sm:p-4">
+      <div className="flex flex-col gap-3 border-b border-border/60 p-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <activeTpl.icon className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-sm font-bold text-foreground truncate">
-                Pratinjau Live &amp; Unduh CV
-              </h3>
-              <p className="text-[11px] text-muted-foreground truncate">
-                Disinkronkan otomatis dengan form profil Anda
-              </p>
-            </div>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-foreground">
+              Pratinjau CV Langsung
+            </h3>
+            <p className="truncate text-xs text-muted-foreground">
+              Tersinkron otomatis secara instan
+            </p>
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => setPreviewOpen(true)}
-              className="size-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted hover:text-foreground transition-colors"
-              aria-label="Tampilan Layar Penuh"
-              title="Buka Pratinjau Layar Penuh"
+              className="size-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Tampilan layar penuh"
+              title="Buka pratinjau layar penuh"
             >
-              <Maximize2 className="size-3.5" />
+              <Maximize2 className="h-4 w-4" />
             </Button>
 
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={handlePrint}
-              className="size-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="size-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Cetak CV"
-              title="Cetak / Simpan via Browser"
+              title="Cetak via browser"
             >
-              <Printer className="size-3.5" />
+              <Printer className="h-4 w-4" />
             </Button>
 
-              <Button
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleDownload()}
+              disabled={downloading}
+              className="h-8 rounded-md px-3 text-xs font-medium shadow-xs"
+            >
+              {downloading ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Menyiapkan...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Unduh PDF
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Template Switcher Tabs */}
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-muted/60 p-1.5">
+          {TEMPLATES.map((tpl) => {
+            const isCurrent = selected === tpl.id;
+            const Icon = tpl.icon;
+            return (
+              <button
+                key={tpl.id}
                 type="button"
-                size="sm"
-                onClick={() => void handleDownload()}
-                disabled={downloading}
-                className="h-8 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-transform active:scale-95"
-              >
-                {downloading ? (
-                  <>
-                    <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-                    Menyiapkan...
-                  </>
-                ) : (
-                  <>
-                    <Download className="size-3.5 mr-1.5" />
-                    Unduh PDF
-                  </>
+                onClick={() => setSelected(tpl.id)}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left transition-all min-w-0 w-full overflow-hidden border",
+                  isCurrent
+                    ? "bg-card text-foreground shadow-xs border-border/80 ring-1 ring-primary/25"
+                    : "border-transparent text-muted-foreground hover:bg-card/60 hover:text-foreground"
                 )}
-              </Button>
-            </div>
-          </div>
+              >
+                <div className="flex items-center gap-1.5 w-full min-w-0">
+                  <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} />
+                  <span className="truncate text-xs font-semibold text-foreground">{tpl.name}</span>
+                </div>
+                <span className="truncate text-[11px] text-muted-foreground/80 pl-5 w-full">
+                  {tpl.tag}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-          {/* Template Switcher Tabs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-xl bg-muted/60 p-1">
-            {TEMPLATES.map((tpl) => {
-              const isCurrent = selected === tpl.id;
-              const Icon = tpl.icon;
-              return (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => setSelected(tpl.id)}
-                  className={cn(
-                    "flex flex-col items-start gap-0.5 rounded-lg px-2.5 py-1.5 text-left transition-all",
-                    isCurrent
-                      ? "bg-card text-foreground shadow-xs ring-1 ring-border"
-                      : "text-muted-foreground hover:text-foreground hover:bg-card/50"
-                  )}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="flex items-center gap-1 text-xs font-semibold truncate">
-                      <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} />
-                      {tpl.name}
-                    </span>
-                    {isCurrent && <CheckCircle2 className="size-3 text-primary" />}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    {tpl.tag}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Zoom & Quick Controls Bar */}
+      <div className="flex items-center justify-between border-b border-border/50 bg-muted/30 px-3.5 py-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{activeTpl.name}</span>
+          <span className="text-[11px] text-muted-foreground/80">· Standar A4</span>
         </div>
 
-        {/* Zoom & Quick Controls Bar */}
-        <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-3.5 py-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-            <span className="font-semibold text-slate-800">{activeTpl.name}</span>
-            <span className="text-[10px] text-slate-400">&bull; A4 (210 &times; 297 mm)</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] font-mono font-semibold text-slate-700 px-1">
-              {Math.round(zoomScale * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => adjustZoom(-0.1)}
-              disabled={zoomScale <= 0.4}
-              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors disabled:opacity-40"
-              title="Perkecil (Ctrl + Scroll)"
-              aria-label="Perkecil"
-            >
-              <ZoomOut className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={resetZoom}
-              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
-              title="Reset Zoom (70%)"
-              aria-label="Reset zoom"
-            >
-              <RotateCcw className="size-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => adjustZoom(0.1)}
-              disabled={zoomScale >= 1.3}
-              className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors disabled:opacity-40"
-              title="Perbesar (Ctrl + Scroll)"
-              aria-label="Perbesar"
-            >
-              <ZoomIn className="size-3.5" />
-            </button>
-          </div>
+        <div className="flex items-center gap-1">
+          <span className="px-1 font-mono text-xs text-muted-foreground">
+            {Math.round(zoomScale * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => adjustZoom(-0.1)}
+            disabled={zoomScale <= 0.4}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-40"
+            title="Perkecil (Ctrl + Scroll)"
+            aria-label="Perkecil"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={resetZoom}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            title="Reset zoom (70%)"
+            aria-label="Reset zoom"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => adjustZoom(0.1)}
+            disabled={zoomScale >= 1.3}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-40"
+            title="Perbesar (Ctrl + Scroll)"
+            aria-label="Perbesar"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
         </div>
+      </div>
 
-        {/* Live Canvas Viewport with Unrestricted 2D Scrolling */}
-        <div
-          ref={canvasRef}
-          className="relative flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/70"
-          title="Gunakan Ctrl + Scroll untuk Zoom In/Out"
-        >
-          <div className="min-w-full min-h-full flex">
-            {/* Sized Wrapper to inform the scroll container of the scaled document boundaries */}
+      {/* Live Canvas Viewport with Unrestricted 2D Scrolling */}
+      <div
+        ref={canvasRef}
+        className="relative flex-1 overflow-auto bg-muted/50 p-4 pb-12 sm:p-6 sm:pb-16"
+        title="Gunakan Ctrl + Scroll untuk zoom"
+      >
+        <div className="flex min-h-full min-w-full">
+          {/* Sized Wrapper to inform the scroll container of the scaled document boundaries */}
+          <div
+            className="m-auto shrink-0 py-2"
+            style={{
+              width: `${Math.round(794 * zoomScale)}px`,
+              height: `${Math.round(1123 * zoomScale)}px`,
+            }}
+          >
             <div
-              className="m-auto shrink-0 transition-[width,height] duration-150 ease-out py-2"
+              className="origin-top-left"
               style={{
-                width: `${Math.round(794 * zoomScale)}px`,
-                height: `${Math.round(1123 * zoomScale)}px`,
+                transform: `scale(${zoomScale})`,
+                width: "794px",
+                height: "1123px",
               }}
             >
-              <div
-                className="origin-top-left transition-transform duration-150 ease-out"
-                style={{
-                  transform: `scale(${zoomScale})`,
-                  width: "794px",
-                  height: "1123px",
-                }}
-              >
-                <div className="relative h-[1123px] w-[794px] overflow-hidden rounded-md border border-slate-300/80 bg-white shadow-xl">
-                  <iframe
-                    srcDoc={renderedHtml}
-                    title={`Live Preview CV - ${activeTpl.name}`}
-                    className="h-full w-full border-0 bg-white select-none pointer-events-none"
-                    tabIndex={-1}
-                  />
-                </div>
+              <div className="relative h-[1123px] w-[794px] overflow-hidden rounded-md border bg-white shadow-sm">
+                <iframe
+                  srcDoc={renderedHtml}
+                  title={`Pratinjau CV - ${activeTpl.name}`}
+                  className="pointer-events-none h-full w-full select-none border-0 bg-white"
+                  tabIndex={-1}
+                />
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Footer Meta & Tip */}
-        <div className="border-t border-slate-200/80 bg-white px-4 py-2 text-[11px] text-muted-foreground flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-800">
-              {activeTpl.name}:
-            </span>
-            <span>{activeTpl.shortDesc}</span>
-          </div>
-          <div className="text-[10px] font-medium text-slate-400">
-            A4 &bull; 210 &times; 297 mm
-          </div>
-        </div>
-
-        {/* Fullscreen Preview Dialog */}
+      {/* Fullscreen Preview Dialog */}
         <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-          <DialogContent className="max-w-5xl h-[92vh] flex flex-col p-4 sm:p-6">
+          <DialogContent className="flex h-[92vh] max-w-5xl flex-col p-4 sm:p-6">
             <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 pr-6">
               <div>
-                <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span>Pratinjau Layar Penuh &mdash; {activeTpl.name}</span>
-                  <Badge variant="secondary" className="text-[10px]">
+                <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <span>Pratinjau — {activeTpl.name}</span>
+                  <Badge variant="secondary" className="text-xs">
                     {activeTpl.tag}
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Dokumen persis seperti yang akan dihasilkan saat diekspor ke PDF.
+                  Tampilan persis seperti hasil ekspor PDF.
                 </DialogDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -418,34 +396,34 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
                   size="sm"
                   variant="outline"
                   onClick={handlePrint}
-                  className="gap-1.5 text-xs font-semibold"
+                  className="gap-1.5 rounded-md text-xs font-medium"
                 >
-                  <Printer className="size-3.5" />
-                  Cetak Dokumen
+                  <Printer className="h-4 w-4" />
+                  Cetak
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => void handleDownload()}
                   disabled={downloading}
-                  className="gap-1.5 text-xs font-semibold shadow-xs"
+                  className="gap-1.5 rounded-md text-xs font-medium shadow-xs"
                 >
                   {downloading ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Download className="size-3.5" />
+                    <Download className="h-4 w-4" />
                   )}
                   Unduh PDF
                 </Button>
               </div>
             </DialogHeader>
 
-            <div className="flex-1 w-full overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4 sm:p-6 flex justify-center dark:border-slate-800 dark:bg-slate-950">
-              <div className="w-[794px] min-h-[1123px] rounded-md bg-white shadow-2xl border border-slate-300/80 overflow-hidden">
+            <div className="flex w-full flex-1 justify-center overflow-auto rounded-md border bg-muted p-4 sm:p-6">
+              <div className="min-h-[1123px] w-[794px] overflow-hidden rounded-md border bg-white shadow-sm">
                 <iframe
                   srcDoc={renderedHtml}
-                  title="Fullscreen CV Preview"
-                  className="w-full h-full min-h-[1123px] border-0 bg-white"
+                  title="Pratinjau CV layar penuh"
+                  className="h-full min-h-[1123px] w-full border-0 bg-white"
                 />
               </div>
             </div>

@@ -284,28 +284,28 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute role="candidate">
-      <div className="space-y-6 pb-12">
+      <div className="container mx-auto max-w-4xl space-y-6 px-4 py-8">
         {/* Page header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Profil Publik Kamu</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu secara komprehensif.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Profil Publik</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Lihat representasi profil profesionalmu saat ditinjau oleh rekruter dan mitra industri.</p>
           </div>
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" className="rounded-md" asChild>
             <Link href="/candidate/cv">
-              <Pencil className="size-4" />
+              <Pencil className="h-4 w-4" />
               Edit profil
             </Link>
           </Button>
         </div>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_300px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
           {/* ── Main column ── */}
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="relative rounded-2xl border bg-card shadow-xs">
-              <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r from-dark-navy via-slate-900 to-primary/80">
+            <section className="relative rounded-xl border border-border/70 bg-card shadow-xs overflow-hidden">
+              <div className="relative h-36 sm:h-44 w-full overflow-hidden bg-muted">
                 {/* Banner Photo Overlay */}
                 {p.bannerUrl ? (
                   <img
@@ -313,16 +313,19 @@ export default function ProfilePage() {
                     alt="Foto Sampul"
                     loading="lazy"
                     decoding="async"
-                    className="h-full w-full object-cover opacity-75"
+                    className="h-full w-full object-cover"
                   />
-                ) : null}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
-                
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted/40 text-xs text-muted-foreground/60">
+                    Foto sampul belum diatur
+                  </div>
+                )}
+
                 {/* Buttons Ubah & Hapus Foto Sampul */}
-                <div className="absolute top-4 right-4 flex items-center gap-2">
-                  <label className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-black/60 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm">
+                <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <label className="cursor-pointer flex items-center gap-1.5 rounded-lg border border-border/80 bg-card/90 backdrop-blur-sm px-2.5 py-1.5 text-xs font-medium text-foreground shadow-xs hover:bg-muted transition-colors">
                     <Camera className="size-3.5" />
-                    <span>Ubah Foto Sampul</span>
+                    <span className="hidden sm:inline">Ubah sampul</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -335,10 +338,10 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => handleRemoveMedia("banner")}
                       title="Hapus Foto Sampul"
-                      className="cursor-pointer flex items-center gap-1.5 rounded-xl bg-black/40 hover:bg-red-600/80 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-sm"
+                      aria-label="Hapus foto sampul"
+                      className="cursor-pointer flex items-center justify-center size-7 rounded-lg border border-border/80 bg-card/90 backdrop-blur-sm text-muted-foreground shadow-xs hover:bg-muted hover:text-destructive transition-colors"
                     >
                       <Trash2 className="size-3.5" />
-                      <span className="hidden sm:inline">Hapus</span>
                     </button>
                   ) : null}
                 </div>
@@ -346,8 +349,8 @@ export default function ProfilePage() {
 
               <div className="px-6 pb-6">
                 {/* Avatar with Camera & Remove badges */}
-                <div className="-mt-16 sm:-mt-20 relative inline-block">
-                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-full border-4 border-card bg-muted shadow-md overflow-hidden ring-1 ring-border">
+                <div className="-mt-12 sm:-mt-14 relative inline-block">
+                  <div className="relative flex size-20 sm:size-24 items-center justify-center rounded-full border-4 border-card bg-muted shadow-sm overflow-hidden">
                     {p.avatarUrl ? (
                       <img
                         src={p.avatarUrl}
@@ -360,52 +363,51 @@ export default function ProfilePage() {
                         }}
                       />
                     ) : null}
-                    <span className="absolute text-3xl font-bold text-primary select-none">{initials}</span>
+                    <span className="absolute text-xl font-bold text-muted-foreground select-none">{initials}</span>
                   </div>
 
-                  {/* Camera & Animated Peek Trash buttons for avatar */}
-                  <div className="absolute bottom-0 right-0 z-20">
-                    <div className="group relative flex flex-col items-center pt-8 -mt-8">
-                      {p.avatarUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedia("avatar")}
-                          title="Hapus Foto Profil"
-                          aria-label="Hapus Foto Profil"
-                          className="absolute z-10 flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-sm border-2 border-card transition-all duration-300 ease-out -translate-y-3.5 group-hover:-translate-y-9 group-focus-within:-translate-y-9 hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto will-change-transform"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      ) : null}
-                      <label
-                        title="Ubah Foto Profil"
-                        className="relative z-20 cursor-pointer flex size-9 items-center justify-center rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md border-2 border-card transition-transform duration-200 hover:scale-105"
+                  {/* Camera & Remove buttons for avatar */}
+                  <div className="absolute bottom-0 right-0 z-20 flex items-center gap-1">
+                    {p.avatarUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia("avatar")}
+                        title="Hapus Foto Profil"
+                        aria-label="Hapus foto profil"
+                        className="flex size-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-xs hover:bg-muted hover:text-destructive transition-colors"
                       >
-                        <Camera className="size-4" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={(e) => onSelectFile(e, "avatar")}
-                        />
-                      </label>
-                    </div>
+                        <Trash2 className="size-3" />
+                      </button>
+                    ) : null}
+                    <label
+                      title="Ubah Foto Profil"
+                      aria-label="Ubah foto profil"
+                      className="cursor-pointer flex size-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      <Camera className="size-3.5" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => onSelectFile(e, "avatar")}
+                      />
+                    </label>
                   </div>
                 </div>
 
                 {/* Name + headline + location + status */}
-                <div className="mt-4">
+                <div className="mt-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                       {p.fullName || user?.name || "Profil Saya"}
                     </h2>
                     <VerifiedBadge />
                     {p.personality && (
                       <span
                         title={`Tipe Kepribadian: ${p.personality.type} (${p.personality.label})`}
-                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-semibold text-primary"
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary"
                       >
-                        <Brain className="size-3.5 text-primary" />
+                        <Brain className="size-3 text-primary" />
                         {p.personality.type} · {p.personality.label}
                       </span>
                     )}
@@ -413,31 +415,31 @@ export default function ProfilePage() {
 
                   {/* Headline */}
                   {p.headline && (
-                    <p className="mt-1 text-base font-medium text-primary">{p.headline}</p>
+                    <p className="mt-1 text-sm font-medium text-muted-foreground sm:text-base leading-relaxed">{p.headline}</p>
                   )}
 
                   {/* Location, Target Role & Salary */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
-                      <MapPin className="size-4 text-muted-foreground" />
+                      <MapPin className="size-3.5 text-muted-foreground" />
                       {p.location}
                     </span>
                     {p.targetRole && (
-                      <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400 font-medium">
-                        <BriefcaseBusiness className="size-4 text-blue-600" />
-                        Target: {p.targetRole}
+                      <span className="flex items-center gap-1.5">
+                        <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
+                        Target: <span className="font-semibold text-foreground">{p.targetRole}</span>
                       </span>
                     )}
                     {p.salary && (
-                      <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                        <Banknote className="size-4 text-emerald-600" />
-                        Ekspektasi: {p.salary}
+                      <span className="flex items-center gap-1.5">
+                        <Banknote className="size-3.5 text-muted-foreground" />
+                        Ekspektasi: <span className="font-semibold text-foreground">{p.salary}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Career Status Selector */}
-                  <div className="relative mt-3">
+                  <div className="relative mt-3.5">
                     <button
                       id="career-status-btn"
                       onClick={() => setStatusOpen((prev) => !prev)}
@@ -448,7 +450,7 @@ export default function ProfilePage() {
                       <CandidateStatusBadge status={careerStatus} />
                       <ChevronDown
                         className={cn(
-                          "size-3.5 text-muted-foreground transition-transform",
+                          "h-4 w-4 text-muted-foreground transition-transform",
                           statusOpen && "rotate-180",
                         )}
                       />
@@ -458,11 +460,8 @@ export default function ProfilePage() {
                       <div
                         role="listbox"
                         aria-label="Pilih status karier"
-                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border bg-white p-1.5 shadow-xl"
+                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border bg-card p-1 shadow-md"
                       >
-                        <p className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Status Karier
-                        </p>
                         {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
                           const cfg = CAREER_STATUS_CONFIG[key];
                           const isActive = careerStatus === key;
@@ -473,18 +472,17 @@ export default function ProfilePage() {
                               aria-selected={isActive}
                               onClick={() => { saveCareerStatus(key); setStatusOpen(false); }}
                               className={cn(
-                                "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-slate-50",
-                                isActive && "bg-slate-50",
+                                "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted",
+                                isActive && "bg-muted",
                               )}
                             >
-                              <span className="mt-0.5 text-base leading-none">{cfg.emoji}</span>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold">{cfg.label}</p>
+                                <p className="text-sm font-medium">{cfg.label}</p>
                                 <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
                                   {CAREER_STATUS_DESCRIPTIONS[key]}
                                 </p>
                               </div>
-                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-primary" />}
+                              {isActive && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
                             </button>
                           );
                         })}
@@ -500,58 +498,54 @@ export default function ProfilePage() {
                 icon={FileText}
                 title="Profil belum tersedia"
                 description="Belum ada profil kandidat dari database. Lengkapi CV dan profilmu agar informasi yang tampil benar-benar milikmu."
-                action={<Button asChild><Link href="/candidate/cv">Lengkapi CV &amp; profil</Link></Button>}
+                action={<Button asChild><Link href="/candidate/cv">Lengkapi CV & profil</Link></Button>}
               />
             )}
 
             {/* Professional Summary */}
-            <ProfileSection title="Professional Summary">
-              <ProfessionalSummaryCard
-                summary={p.about}
-                onOpenHelper={() => setSummaryModalOpen(true)}
-              />
-            </ProfileSection>
+            <ProfessionalSummaryCard
+              summary={p.about}
+              onOpenHelper={() => setSummaryModalOpen(true)}
+            />
 
             {/* Pengalaman Kerja */}
             {p.experience.length > 0 && (
-              <ProfileSection title="Pengalaman Kerja">
-                <div className="space-y-6 border-l-2 border-border pl-5">
+              <ProfileSection title="Pengalaman kerja">
+                <div className="divide-y divide-border">
                   {p.experience.map((exp, i) => (
-                    <div key={i} className="space-y-1.5">
+                    <div key={i} className="space-y-1.5 py-4 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-foreground">
+                        <p className="text-sm font-semibold text-foreground">
                           {exp.role} · {exp.company}
                         </p>
                         {exp.employmentType && (
-                          <span className="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             {exp.employmentType}
                           </span>
                         )}
                       </div>
-                      <p className="font-mono text-xs text-muted-foreground">{exp.dates}</p>
+                      <p className="text-xs text-muted-foreground">{exp.dates}</p>
 
                       {exp.description && (
-                        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line pt-0.5">
+                        <p className="whitespace-pre-line pt-0.5 text-sm leading-relaxed text-muted-foreground">
                           {exp.description}
                         </p>
                       )}
 
                       {Array.isArray(exp.achievements) && exp.achievements.length > 0 ? (
-                        <div className="space-y-1 pt-1">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pencapaian:</p>
+                        <ul className="list-disc space-y-1 pl-5 pt-1 text-sm text-muted-foreground">
                           {exp.achievements.map((a, j) => (
-                            <p key={j} className="text-xs leading-relaxed text-foreground/80 pl-2 border-l-2 border-primary/30">
-                              • {a}
-                            </p>
+                            <li key={j} className="leading-relaxed">
+                              {a}
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       ) : typeof exp.achievements === "string" && exp.achievements ? (
-                        <div className="pt-1">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pencapaian:</p>
-                          <p key="str-ach" className="text-xs leading-relaxed text-foreground/80 pl-2 border-l-2 border-primary/30">
-                            • {exp.achievements}
-                          </p>
-                        </div>
+                        <ul className="list-disc space-y-1 pl-5 pt-1 text-sm text-muted-foreground">
+                          <li key="str-ach" className="leading-relaxed">
+                            {exp.achievements}
+                          </li>
+                        </ul>
                       ) : null}
                     </div>
                   ))}
@@ -565,19 +559,19 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {p.education.map((edu, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-foreground">{edu.school}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">{edu.school}</p>
                           {edu.level && (
-                            <span className="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                               {edu.level}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-foreground/90 font-medium">
+                        <p className="text-sm font-medium text-muted-foreground">
                           {edu.program}
-                          {edu.gpa && <span className="text-primary font-semibold"> · IPK: {edu.gpa}</span>}
+                          {edu.gpa && <span className="font-semibold"> · IPK: {edu.gpa}</span>}
                         </p>
                         {edu.dates && (
                           <p className="text-xs text-muted-foreground">{edu.dates}</p>
@@ -591,43 +585,41 @@ export default function ProfilePage() {
           </div>
 
           {/* ── Sidebar ── */}
-          <aside className="space-y-5">
+          <aside className="space-y-4">
             {/* Profile completeness */}
             <Card className="border-border/80 bg-card shadow-xs">
               <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kesiapan Profil ATS</p>
-                  <span className={`font-mono text-xs font-bold ${readiness.tierColor}`}>{readiness.tier}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Kesiapan profil ATS</p>
+                  <span className="text-xs font-medium text-muted-foreground">{readiness.tier}</span>
                 </div>
-                <p className={`mt-2 font-mono text-3xl font-bold ${readiness.tierColor}`}>{readiness.percent}%</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{readiness.percent}%</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      readiness.complete ? "bg-emerald-500" : "bg-primary"
-                    }`}
+                    className="h-full rounded-full bg-primary transition-all duration-500"
                     style={{ width: `${readiness.percent}%` }}
                   />
                 </div>
                 {readiness.missingSections.length > 0 && (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Lengkapi <Link href={readiness.missingSections[0].anchor} className="font-semibold text-primary hover:underline">{readiness.missingSections[0].label}</Link> di CV Workspace.
+                    Lengkapi <Link href={readiness.missingSections[0].anchor} className="font-medium text-primary hover:underline">{readiness.missingSections[0].label}</Link> di CV Workspace.
                   </p>
                 )}
               </CardContent>
             </Card>
 
             {/* Framework Kompetensi */}
-            <ProfileSection title="Framework Kompetensi">
+            <ProfileSection title="Framework kompetensi">
               <div className="space-y-4">
                 {/* 1. Hard Competencies */}
                 {p.skills.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hard Competencies</p>
+                    <p className="text-xs font-medium text-muted-foreground">Hard competencies</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.skills.map((skill) => (
                         <span
                           key={skill}
-                          className="rounded-full bg-primary/5 border border-primary/20 px-2.5 py-1 text-xs font-medium text-primary"
+                          className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground/85"
                         >
                           {skill}
                         </span>
@@ -639,14 +631,14 @@ export default function ProfilePage() {
                 {/* 2. Tools */}
                 {p.tools.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tools &amp; Software</p>
+                    <p className="text-xs font-medium text-muted-foreground">Tools & software</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.tools.map((tool) => (
                         <span
                           key={tool}
-                          className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
+                          className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground/85"
                         >
-                          <Wrench className="size-3" />
+                          <Wrench className="h-3 w-3 text-muted-foreground" />
                           {tool}
                         </span>
                       ))}
@@ -657,12 +649,12 @@ export default function ProfilePage() {
                 {/* 3. Soft Skills */}
                 {p.softSkills.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Soft Skills</p>
+                    <p className="text-xs font-medium text-muted-foreground">Soft skills</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.softSkills.map((softSkill) => (
                         <span
                           key={softSkill}
-                          className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40"
+                          className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground/85"
                         >
                           {softSkill}
                         </span>
@@ -683,11 +675,11 @@ export default function ProfilePage() {
                       href={item.startsWith("http") ? item : `https://${item}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-primary transition-colors hover:bg-muted/40"
+                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                     >
-                      <BriefcaseBusiness className="size-4 shrink-0" />
+                      <BriefcaseBusiness className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 truncate">{item}</span>
-                      <ExternalLink className="ml-auto size-3 shrink-0 text-muted-foreground" />
+                      <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
                     </a>
                   ))}
                 </div>
@@ -701,7 +693,7 @@ export default function ProfilePage() {
                       <Link href="/candidate">Tambah portofolio</Link>
                     </Button>
                   }
-                  className="rounded-xl border-dashed bg-transparent p-5 shadow-none"
+                  className="rounded-lg border-dashed bg-transparent p-5 shadow-none"
                 />
               )}
             </ProfileSection>

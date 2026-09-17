@@ -9,6 +9,7 @@ import { ArrowLeft, Check, Clock3, FileQuestion, Plus, Save, Send, Trash2 } from
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useApp } from "@/providers/app-provider";
 import { createDemoInvitation, getDemoInvitation, getDemoTemplate, listDemoInvitations, listDemoTemplates, saveDemoAnswer, saveDemoTemplate, startDemoAttempt, submitDemoAttempt, type DemoQuestion, type DemoTemplate } from "@/lib/assessment-demo";
 
@@ -61,29 +62,49 @@ export function CandidateAssessmentList() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-          Asesmen Kompetensi
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Asesmen
         </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground max-w-2xl">
-          Kerjakan evaluasi teknis dan situasional yang dikirimkan oleh rekruter untuk memvalidasi kesiapan peranmu.
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Kerjakan tes dari rekruter untuk memvalidasi kesiapan Anda pada peran yang dilamar.
         </p>
       </div>
 
       {loading ? (
-        <Card className="border-border bg-card">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Memuat daftar asesmen...
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[1, 2].map((i) => (
+            <Card key={i} className="border-border/80 bg-card shadow-xs">
+              <CardHeader className="border-b pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-3.5 w-full" />
+                  <Skeleton className="h-3.5 w-4/5" />
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-8 w-24 rounded-md" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : invitations.length === 0 ? (
         <Card className="border-dashed border-border bg-card/50">
           <CardContent className="flex flex-col items-center justify-center py-14 text-center">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <FileQuestion className="size-6" />
             </div>
-            <h2 className="mt-4 text-base font-semibold text-foreground">Belum Ada Undangan Asesmen</h2>
-            <p className="mt-1 text-xs text-muted-foreground max-w-md leading-relaxed">
-              Ketika rekruter mengundangmu untuk mengerjakan tes kualifikasi pada lamaran yang aktif, tautan tes akan muncul di sini.
+            <h2 className="mt-4 text-base font-semibold text-foreground">Belum ada undangan asesmen</h2>
+            <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
+              Undangan tes dari rekruter untuk lamaran aktif Anda akan muncul di sini.
             </p>
           </CardContent>
         </Card>
@@ -94,27 +115,27 @@ export function CandidateAssessmentList() {
             const isStarted = invite.status === "started";
 
             return (
-              <Card key={invite.id} className="border-border/80 bg-card shadow-xs transition-all hover:border-primary/40">
-                <CardHeader className="pb-3 border-b">
+                <Card key={invite.id} className="border-border/80 bg-card shadow-xs transition-colors hover:bg-muted/40">
+                <CardHeader className="border-b pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="text-base font-bold text-foreground">
+                      <CardTitle className="text-sm font-semibold text-foreground">
                         {invite.templateName}
                       </CardTitle>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Kandidat: <span className="font-medium text-foreground">{invite.candidateName}</span>
+                        Untuk <span className="font-medium text-foreground">{invite.candidateName}</span>
                       </p>
                     </div>
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      className={`inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
                         isSubmitted
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                           : isStarted
-                          ? "bg-primary/10 text-primary border border-primary/20"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                          ? "border-primary/20 bg-primary/10 text-primary"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
                       }`}
                     >
-                      {isSubmitted ? "Terkirim ✓" : isStarted ? "Sedang Berlangsung" : "Menunggu Dikerjakan"}
+                      {isSubmitted ? "Terkirim" : isStarted ? "Berlangsung" : "Belum dikerjakan"}
                     </span>
                   </div>
                 </CardHeader>
@@ -326,12 +347,12 @@ export function CandidateAssessmentDetail({ invitationId }: { invitationId: stri
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-4">
+      <div className="flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href="/candidate/assessments"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="size-4" /> Kembali ke Asesmen
+          <ArrowLeft className="size-4" /> Kembali ke asesmen
         </Link>
 
         {attemptId && !submitted && (
@@ -358,11 +379,11 @@ export function CandidateAssessmentDetail({ invitationId }: { invitationId: stri
       </div>
 
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {template?.name ?? invitation.templateName}
         </h1>
-        <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-          {template?.description || "Jawablah dengan jujur sesuai pengalaman dan kemampuan Anda."}
+        <p className="mt-1 text-sm text-muted-foreground">
+          {template?.description || "Jawab sesuai pengalaman dan kemampuan Anda."}
         </p>
       </div>
 

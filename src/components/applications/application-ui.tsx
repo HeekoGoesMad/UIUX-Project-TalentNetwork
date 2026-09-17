@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { DEMO_JOBS, type Job } from "@/lib/jobs";
@@ -30,7 +31,7 @@ export const applicationStatuses = ["new", "shortlisted", "consent_requested", "
 export type ApplicationStatus = (typeof applicationStatuses)[number];
 export type Application = { id: string; jobId: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
 type History = { id: string; fromStatus: ApplicationStatus | null; toStatus: ApplicationStatus; reason: string | null; changedBy: string; createdAt: string };
-const labels: Record<ApplicationStatus, string> = { new: "New", shortlisted: "Shortlisted", consent_requested: "Consent requested", consent_approved: "Consent approved", screening: "Screening", assessment: "Assessment", review: "Sedang Ditinjau", interview: "Interview", offer: "Offer", hired: "Hired", rejected: "Rejected", withdrawn: "Withdrawn" };
+const labels: Record<ApplicationStatus, string> = { new: "Baru", shortlisted: "Shortlist", consent_requested: "Menunggu izin", consent_approved: "Izin disetujui", screening: "Skrining", assessment: "Asesmen", review: "Ditinjau", interview: "Wawancara", offer: "Penawaran", hired: "Diterima", rejected: "Ditolak", withdrawn: "Ditarik" };
 const activeStatuses = applicationStatuses.filter((status) => status !== "withdrawn");
 const stageColors: Record<ApplicationStatus, string> = { new: "bg-muted text-muted-foreground", shortlisted: "bg-muted text-muted-foreground", consent_requested: "bg-muted text-muted-foreground", consent_approved: "bg-muted text-muted-foreground", screening: "bg-muted text-muted-foreground", assessment: "bg-muted text-muted-foreground", review: "bg-muted text-muted-foreground", interview: "bg-primary/10 text-primary", offer: "bg-emerald-50 text-emerald-700", hired: "bg-emerald-50 text-emerald-700", rejected: "bg-red-50 text-red-700", withdrawn: "bg-muted text-muted-foreground" };
 
@@ -81,11 +82,11 @@ export function CandidateApplicationsPage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Lamaran Kerja Saya
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Lamaran
             </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
-              Pantau perkembangan seleksi, jadwal wawancara, dan tawaran kerja aktif Anda.
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pantau tahapan seleksi, jadwal wawancara, dan penawaran kerja Anda.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -138,7 +139,28 @@ export function CandidateApplicationsPage() {
         {/* Application Cards List */}
         <div className="mt-4">
           {loading ? (
-            <State text="Memuat daftar lamaran..." />
+            <div className="grid gap-3.5">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-border/80 bg-card shadow-xs">
+                  <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <Skeleton className="h-8 w-20 rounded-md" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ) : error ? (
             <div className="space-y-3">
               <State text={error} error />
@@ -187,7 +209,7 @@ export function CandidateApplicationsPage() {
                       <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end shrink-0">
                         {statusBadge(application.status)}
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
-                          Detail Alur Seleksi
+                          Detail
                           <ArrowRight className="size-3.5" />
                         </span>
                       </div>
@@ -310,11 +332,11 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
 
   // Pipeline phases for candidate visualization
   const PIPELINE_PHASES = [
-    { key: "applied", label: "Lamaran Terkirim", desc: "Diterima sistem", statuses: ["new", "shortlisted"] },
-    { key: "screening", label: "Skrining Profil", desc: "Consent-first verifikasi", statuses: ["consent_requested", "consent_approved", "screening"] },
-    { key: "assessment", label: "Asesmen Kompetensi", desc: "Uji keahlian", statuses: ["assessment", "review"] },
+    { key: "applied", label: "Lamaran terkirim", desc: "Berkas diterima sistem", statuses: ["new", "shortlisted"] },
+    { key: "screening", label: "Skrining profil", desc: "Verifikasi atas izin Anda", statuses: ["consent_requested", "consent_approved", "screening"] },
+    { key: "assessment", label: "Asesmen", desc: "Uji keahlian", statuses: ["assessment", "review"] },
     { key: "interview", label: "Wawancara", desc: "Sesi temu tim", statuses: ["interview"] },
-    { key: "decision", label: "Keputusan & Penawaran", desc: "Offer / Hasil", statuses: ["offer", "hired", "rejected"] },
+    { key: "decision", label: "Keputusan", desc: "Penawaran atau hasil akhir", statuses: ["offer", "hired", "rejected"] },
   ];
 
   const currentPhaseIndex = useMemo(() => {
@@ -339,8 +361,55 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            <State text="Memuat rincian alur lamaran..." />
+          <div className="space-y-6">
+            {/* Top Summary Banner Skeleton */}
+            <Card className="border-border/80 bg-card shadow-xs">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-7 w-64" />
+                      <Skeleton className="h-6 w-24 rounded-full" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pipeline Stepper Skeleton */}
+            <Card className="border-border/80 bg-card shadow-xs p-5 sm:p-6 space-y-4">
+              <Skeleton className="h-4 w-44" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <div key={s} className="space-y-2 rounded-xl border border-border/60 p-3">
+                    <Skeleton className="size-6 rounded-full" />
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Detail Content Grid Skeleton */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+              <Card className="border-border/80 bg-card shadow-xs p-6 space-y-4">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-3/4" />
+              </Card>
+              <Card className="border-border/80 bg-card shadow-xs p-6 space-y-4">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </Card>
+            </div>
           </div>
         ) : error || !application ? (
           <div className="space-y-4 py-8">
@@ -395,35 +464,36 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
-            {/* Dover-Style Visual Hiring Pipeline Stepper */}
-            <Card className="border-border/80 bg-card p-5 sm:p-6 shadow-2xs">
+            {/* Visual hiring pipeline */}
+            <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Tahapan Seleksi &amp; Alur Rekrutmen
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Tahapan seleksi
                   </h2>
-                  <span className="text-xs font-medium text-primary">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     Tahap {currentPhaseIndex + 1} dari 5
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
+                <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-5">
                   {PIPELINE_PHASES.map((phase, idx) => {
                     const isPassed = idx < currentPhaseIndex;
                     const isCurrent = idx === currentPhaseIndex;
                     return (
                       <div
                         key={phase.key}
-                        className={`relative flex flex-col rounded-xl border p-3.5 transition-colors ${
+                        aria-current={isCurrent ? "step" : undefined}
+                        className={`relative flex flex-col rounded-xl border p-3.5 ${
                           isCurrent
-                            ? "border-primary bg-primary/5 shadow-2xs"
+                            ? "border-primary/40 bg-primary/5"
                             : isPassed
-                            ? "border-emerald-200 bg-emerald-50/40 text-emerald-950"
-                            : "border-border/60 bg-muted/20 text-muted-foreground opacity-75"
+                            ? "border-border/70 bg-muted/30"
+                            : "border-border/60 bg-muted/20 text-muted-foreground"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-1 mb-1.5">
-                          <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        <div className="mb-1.5 flex items-center justify-between gap-1">
+                          <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums ${
                             isCurrent
                               ? "bg-primary text-primary-foreground"
                               : isPassed
@@ -432,14 +502,11 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                           }`}>
                             {isPassed ? <Check className="size-3.5" /> : idx + 1}
                           </span>
-                          {isCurrent && (
-                            <span className="inline-flex size-2 rounded-full bg-primary animate-ping" />
-                          )}
                         </div>
-                        <p className={`text-xs font-bold truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>
+                        <p className={`truncate text-xs font-semibold ${isCurrent ? "text-primary" : "text-foreground"}`}>
                           {phase.label}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">
+                        <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
                           {phase.desc}
                         </p>
                       </div>
@@ -449,16 +516,16 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </div>
             </Card>
 
-            {/* Incoming Offer Letter (Dover 1-Click Acceptance) */}
+            {/* Offer letter */}
             {offers.length > 0 && (
               <div className="space-y-4">
                 {offers.map((offer) => (
-                  <Card key={offer.id} className="border-emerald-200 bg-emerald-50/30 shadow-xs">
+                  <Card key={offer.id} className="border-border/80 bg-card shadow-xs">
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-emerald-950 font-bold">
-                          <Award className="size-5 text-emerald-600" />
-                          Surat Penawaran Kerja (Offer Letter)
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                          <Award className="size-5 text-amber-600" />
+                          Surat penawaran kerja
                         </CardTitle>
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                           offer.status === "accepted"

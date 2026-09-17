@@ -6,18 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import {
     AlertTriangle,
+    BarChart3,
     Bot,
     CheckCircle2,
     Compass,
     Copy,
     Download,
     FileText,
-    Layers,
+    FolderOpen,
     Lightbulb,
-    ShieldAlert,
+    Mic,
+    Search,
     SlidersHorizontal,
     Sparkles,
+    Star,
     Target,
+    Trophy,
+    Users,
+    Wrench,
     Zap,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -25,6 +31,7 @@ import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { checkSkillsQuality } from "@/lib/ai/skills-check";
+import { cn } from "@/lib/utils";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_consultation" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -192,24 +199,24 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
 
   const skillCheck = useMemo(() => checkSkillsQuality(skills, activeTargetRole), [skills, activeTargetRole]);
 
-  const quickPromptsByFocus: Record<string, { text: string; icon: string }[]> = {
+  const quickPromptsByFocus: Record<string, { text: string; icon: typeof FileText }[]> = {
     cv_review: [
-      { text: "Perjelas bukti hasil kerja nyata (angka % & efisiensi waktu)", icon: "📊" },
-      { text: "Optimalkan kata kunci agar mudah dipindai HRD", icon: "🔍" },
-      { text: "Tandai kalimat bertele-tele pada deskripsi pengalaman", icon: "✂️" },
-      { text: "Perkuat ringkasan profesional (About Me)", icon: "💡" },
+      { text: "Perjelas bukti hasil kerja nyata (angka % dan efisiensi waktu)", icon: BarChart3 },
+      { text: "Optimalkan kata kunci agar mudah dipindai HRD", icon: Search },
+      { text: "Tandai kalimat bertele-tele pada deskripsi pengalaman", icon: FileText },
+      { text: "Perkuat ringkasan profesional (About Me)", icon: Lightbulb },
     ],
     gap_analysis: [
-      { text: "Analisis keselarasan skill untuk target posisi ini", icon: "🎯" },
-      { text: "Keahlian apa yang wajib saya tambahkan di profil?", icon: "➕" },
-      { text: "Bagaimana menonjolkan transferable skills yang saya miliki?", icon: "⭐" },
-      { text: "Cek relevansi tools dan teknologi industri terkini", icon: "🛠️" },
+      { text: "Analisis keselarasan skill untuk target posisi ini", icon: Target },
+      { text: "Keahlian apa yang wajib saya tambahkan di profil?", icon: Zap },
+      { text: "Bagaimana menonjolkan transferable skills yang saya miliki?", icon: Star },
+      { text: "Cek relevansi tools dan teknologi industri terkini", icon: Wrench },
     ],
     career_consultation: [
-      { text: "Bagaimana cara meyakinkan HRD jika saya transisi karir?", icon: "🤝" },
-      { text: "Studi kasus portofolio apa yang paling cepat dilirik perekrut?", icon: "📁" },
-      { text: "Bagaimana cara pitching pencapaian saat wawancara kerja?", icon: "🎤" },
-      { text: "Kriteria utama apa yang dicari HRD untuk level berikutnya?", icon: "🏆" },
+      { text: "Bagaimana cara meyakinkan HRD jika saya transisi karir?", icon: Users },
+      { text: "Studi kasus portofolio apa yang paling cepat dilirik perekrut?", icon: FolderOpen },
+      { text: "Bagaimana cara pitching pencapaian saat wawancara kerja?", icon: Mic },
+      { text: "Kriteria utama apa yang dicari HRD untuk level berikutnya?", icon: Trophy },
     ],
   };
 
@@ -297,7 +304,8 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
 
   function handleCopyAdvice() {
     if (!result) return;
-    const textToCopy = `ProofyLink Career Advisor - Evaluasi ${selectedFocus.toUpperCase()}\nTarget Peran: ${activeTargetRole}\n\nRingkasan:\n${result.summary}\n\nSaran Utama:\n- Hal Baik: ${adviceData.whatGood.join("; ")}\n- Perlu Penguatan: ${adviceData.whatNotGood.join("; ")}\n\nLangkah Selanjutnya:\n${result.nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+    const focusLabel = focusPresets.find((p) => p.id === selectedFocus)?.label || selectedFocus.replaceAll("_", " ");
+    const textToCopy = `ProofyLink Career Advisor - ${focusLabel}\nTarget peran: ${activeTargetRole}\n\nRingkasan:\n${result.summary}\n\nSaran utama:\n- Hal baik: ${adviceData.whatGood.join("; ")}\n- Perlu penguatan: ${adviceData.whatNotGood.join("; ")}\n\nLangkah selanjutnya:\n${result.nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
     navigator.clipboard.writeText(textToCopy);
     toast.success("Rangkuman rekomendasi AI berhasil disalin ke clipboard!");
   }
@@ -305,8 +313,8 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   // Fallback data for CV Review
   const cvReviewData: CvReviewDetails = result?.cvReviewDetails || {
     readinessLevel: skillCheck.isPlausible
-      ? (skills.length >= 6 ? "Sangat Siap & Mudah Dipindai" : "Cukup Siap (Perlu Pengayaan)")
-      : "Perlu Penyesuaian Keahlian",
+      ? (skills.length >= 6 ? "Sangat siap dan mudah dipindai" : "Cukup siap (perlu pengayaan)")
+      : "Perlu penyesuaian keahlian",
     overallScore: skillCheck.isPlausible
       ? Math.min(95, 72 + skills.length * 4)
       : 48,
@@ -315,7 +323,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
       : `Analisis menyeluruh CV untuk target posisi ${activeTargetRole}: Susunan dasar CV sudah rapi, namun keahlian yang tercantum saat ini (${skills.join(", ") || "belum lengkap"}) belum sesuai dengan kebutuhan posisi ${activeTargetRole}. Prioritaskan perbaikan kompetensi agar sesuai dengan standar industri.`,
     sectionAudits: [
       {
-        section: "1. Headline & Identitas Profesional",
+        section: "1. Headline dan identitas profesional",
         status: "good",
         notes: [
           `Menyebutkan istilah peran target (${activeTargetRole}) secara jelas dan profesional.`,
@@ -324,7 +332,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
         recommendation: "Tambahkan bidang industri yang kamu minati (misal: teknologi, keuangan, atau retail) agar profilmu semakin mudah ditemukan perekrut.",
       },
       {
-        section: "2. Ringkasan Profil (Tentang Saya / About)",
+        section: "2. Ringkasan profil (tentang saya)",
         status: "needs_improvement",
         notes: [
           "Belum merangkum total tahun pengalaman kerja secara ringkas.",
@@ -333,7 +341,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
         recommendation: "Gunakan pola 3-bagian: Peran utama, Keahlian andalan, dan Bukti hasil kerja nyata yang pernah dicapai.",
       },
       {
-        section: "3. Riwayat Pengalaman Kerja (Experience)",
+        section: "3. Riwayat pengalaman kerja",
         status: "needs_improvement",
         notes: [
           "Sebagian poin deskripsi masih berupa uraian tugas harian biasa.",
@@ -342,7 +350,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
         recommendation: "Gunakan kata kerja aktif yang jelas di awal setiap poin (misal: Mengembangkan, Memimpin, Merancang) dan sertakan contoh hasil nyata.",
       },
       {
-        section: "4. Daftar Keahlian & Alat Kerja (Skills & Tools)",
+        section: "4. Daftar keahlian dan alat kerja",
         status: skillCheck.isPlausible ? "good" : "needs_improvement",
         notes: skillCheck.isPlausible
           ? [
@@ -358,7 +366,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           : `Perbaiki kompetensi agar sesuai dengan peran ${activeTargetRole}, misalnya dengan mempelajari: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}.`,
       },
       {
-        section: "5. Pendidikan & Bukti Portofolio",
+        section: "5. Pendidikan dan bukti portofolio",
         status: "good",
         notes: [
           "Riwayat pendidikan tertera jelas dan tautan proyek dapat diakses dengan baik."
@@ -389,7 +397,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   const gapData: GapAnalysisDetails = result?.gapAnalysisDetails || {
     targetRole: activeTargetRole,
     matchScore: skillCheck.isPlausible ? 84 : 40,
-    matchLevel: skillCheck.isPlausible ? "Tinggi (Selaras Baik)" : "Perlu Penyesuaian Kompetensi",
+    matchLevel: skillCheck.isPlausible ? "Tinggi (selaras baik)" : "Perlu penyesuaian kompetensi",
     coreCompetencies: [
       {
         competency: "Riset Kebutuhan Pengguna & Validasi Solusi",
@@ -451,8 +459,8 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   // Fallback data for Career Consultation
   const consultationData: CareerConsultationDetails = result?.careerConsultationDetails || result?.careerRoadmapDetails || {
     targetRole: activeTargetRole,
-    targetTimeline: "3 — 6 Bulan Kesiapan",
-    targetLevel: skillCheck.isPlausible ? `Kesiapan Kompetitif untuk ${activeTargetRole}` : `Kandidat Siap Kerja untuk ${activeTargetRole}`,
+    targetTimeline: "3–6 bulan kesiapan",
+    targetLevel: skillCheck.isPlausible ? `Kesiapan kompetitif untuk ${activeTargetRole}` : `Kandidat siap kerja untuk ${activeTargetRole}`,
     phases: [
       {
         phaseNumber: 1,
@@ -519,7 +527,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   };
 
   const adviceData: StructuredAdvice = result?.structuredAdvice || {
-    opening: `Berdasarkan evaluasi pilar '${selectedFocus.replace("_", " ").toUpperCase()}' untuk posisi ${activeTargetRole}, berikut beberapa poin penting:`,
+    opening: `Berdasarkan evaluasi '${selectedFocus.replaceAll("_", " ")}' untuk posisi ${activeTargetRole}, berikut beberapa poin penting:`,
     whatGood: [
       "Format susunan CV rapi, bersih, dan mudah dibaca oleh tim perekrut.",
       skillCheck.isPlausible
@@ -566,12 +574,11 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
         }
       `}</style>
 
-      {/* ─── 3 Main Pillars Selection ─── */}
       <div className="no-print space-y-3">
         <div>
-          <h2 className="text-lg font-bold text-foreground">Pilih 3 Pilar Evaluasi Profil</h2>
-          <p className="text-xs text-muted-foreground">
-            Pilih aspek yang ingin kamu evaluasi hari ini untuk mendapatkan analisis mendalam dan rekomendasi instan:
+          <h2 className="text-base font-semibold text-foreground">Pilih fokus evaluasi</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pilih satu aspek untuk dianalisis dan dapatkan rekomendasi yang bisa langsung diterapkan.
           </p>
         </div>
 
@@ -584,28 +591,33 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 key={preset.id}
                 type="button"
                 onClick={() => handleFocusChange(preset.id)}
-                className={`flex flex-col justify-between rounded-2xl border p-4.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-xs cursor-pointer ${
+                aria-pressed={isSelected}
+                className={cn(
+                  "flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all cursor-pointer",
                   isSelected
-                    ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-xs"
-                    : "border-border bg-card hover:border-primary/40 hover:bg-muted/20"
-                }`}
+                    ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20 shadow-xs"
+                    : "border-border/80 bg-card hover:bg-muted/40 hover:border-border"
+                )}
               >
                 <div>
                   <div className="flex items-center justify-between">
                     <div
-                      className={`flex size-9 items-center justify-center rounded-xl ${
+                      className={cn(
+                        "flex size-9 items-center justify-center rounded-lg transition-colors",
                         isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                      }`}
+                      )}
                     >
-                      <Icon className="size-4.5" />
+                      <Icon className="size-4" />
                     </div>
                     {isSelected ? (
-                      <Badge className="bg-primary text-primary-foreground text-[11px] font-semibold">Aktif</Badge>
+                      <Badge variant="outline" className="border-primary/30 bg-primary/10 text-xs font-semibold text-primary">
+                        Aktif
+                      </Badge>
                     ) : (
-                      <span className="text-[11px] font-semibold text-muted-foreground">{preset.badge}</span>
+                      <span className="text-xs font-medium text-muted-foreground">{preset.badge}</span>
                     )}
                   </div>
-                  <h3 className="mt-3.5 font-bold text-sm text-foreground">{preset.label}</h3>
+                  <h3 className="mt-3 text-sm font-semibold text-foreground">{preset.label}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{preset.desc}</p>
                 </div>
               </button>
@@ -613,62 +625,59 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           })}
         </div>
 
-        {/* ─── Command Controls & Custom Instructions Panel ─── */}
-        <div className="rounded-2xl border border-border/80 bg-card p-5 space-y-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="size-4 text-primary" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Kontrol Perintah AI &amp; Target Peran (Opsional)
-              </h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              Sesuaikan target peran dan instruksi sesuai kebutuhanmu
+        <div className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <SlidersHorizontal className="size-4 text-muted-foreground" />
+              Target peran dan instruksi
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              Opsional — sesuaikan sebelum menjalankan analisis
             </span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Target Posisi / Peran yang Ingin Diuji:
+              <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                Target posisi atau peran yang ingin diuji
               </label>
               <Input
                 value={customRoleInput !== null ? customRoleInput : defaultTargetRole}
                 onChange={(e) => setCustomRoleInput(e.target.value)}
                 placeholder="misal: Senior Product Designer, Lead UX..."
-                className="bg-card text-xs border-border focus-visible:ring-primary"
+                className="h-9 rounded-lg border-border/80 bg-background text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Catatan / Instruksi Khusus ke AI:
+              <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                Catatan atau instruksi khusus ke AI
               </label>
               <Input
                 value={customInstruction}
                 onChange={(e) => setCustomInstruction(e.target.value)}
                 placeholder="misal: Fokus industri Fintech SaaS, tekankan kepemimpinan..."
-                className="bg-card text-xs border-border focus-visible:ring-primary"
+                className="h-9 rounded-lg border-border/80 bg-background text-sm"
               />
             </div>
           </div>
 
           {/* Dynamic Quick Prompts — chip toggle per pilar, auto-reset saat ganti pilar */}
-          <div className="space-y-2.5 pt-2.5 border-t border-border/80">
+          <div className="space-y-2.5 pt-3 border-t border-border/60">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-                <Zap className="size-3.5 text-primary" /> Fokus Analisis Cepat:
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Zap className="size-3.5 text-muted-foreground" /> Fokus analisis cepat
               </span>
               <div className="flex items-center gap-2">
                 {selectedQuickPrompts.size > 0 && (
                   <button
                     type="button"
                     onClick={() => setSelectedQuickPrompts(new Set())}
-                    className="text-[10px] text-muted-foreground hover:text-destructive font-medium transition-colors underline cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-destructive font-medium transition-colors underline cursor-pointer"
                   >
                     Hapus pilihan ({selectedQuickPrompts.size})
                   </button>
                 )}
-                <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted border border-border">
+                <span className="rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                   {focusPresets.find((p) => p.id === selectedFocus)?.label}
                 </span>
               </div>
@@ -676,52 +685,54 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
             <div className="flex flex-wrap gap-2">
               {currentQuickPrompts.map((qp, i) => {
                 const isActive = selectedQuickPrompts.has(qp.text);
+                const PromptIcon = qp.icon;
                 return (
                   <button
                     key={i}
                     type="button"
                     onClick={() => toggleQuickPrompt(qp.text)}
-                    className={`inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-xl border transition-all font-medium cursor-pointer ${
+                    aria-pressed={isActive}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer",
                       isActive
-                        ? "bg-primary border-primary text-primary-foreground shadow-2xs"
-                        : "bg-card border-border text-foreground hover:bg-muted/50 hover:border-primary/40"
-                    }`}
+                        ? "border-primary/40 bg-primary/10 text-primary font-semibold ring-1 ring-primary/25"
+                        : "border-border/80 bg-background text-foreground/80 hover:bg-muted hover:text-foreground"
+                    )}
                   >
-                    <span className="text-base leading-none">{qp.icon}</span>
+                    <PromptIcon className="size-3.5 shrink-0" />
                     <span>{qp.text}</span>
-                    {isActive && <span className="ml-0.5 opacity-80">✓</span>}
                   </button>
                 );
               })}
             </div>
             {selectedQuickPrompts.size > 0 && (
-              <p className="text-[10px] text-primary font-medium flex items-center gap-1">
-                <Sparkles className="size-3" />
-                {selectedQuickPrompts.size} fokus dipilih — AI akan memprioritaskan aspek ini dalam analisis
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Sparkles className="size-3 text-primary" />
+                <span>{selectedQuickPrompts.size} fokus dipilih — AI akan memprioritaskan aspek ini dalam analisis</span>
               </p>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60">
-            <p className="text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Evaluasi akan dijalankan untuk pilar:{" "}
-              <strong className="text-primary font-semibold">
+              <strong className="font-semibold text-foreground">
                 {focusPresets.find((p) => p.id === selectedFocus)?.label}
               </strong>
             </p>
             <Button
               onClick={() => void runAdvisor()}
               disabled={loading}
-              size="lg"
-              className="gap-2 font-semibold shadow-xs rounded-xl px-6"
+              size="default"
+              className="gap-2 font-semibold px-5 shadow-xs"
             >
               {loading ? (
                 <>
-                  <Bot className="size-4.5 animate-spin" /> Menganalisis Profil...
+                  <Bot className="size-4 animate-spin" /> Menganalisis profil...
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-4.5" /> Analisis &amp; Hasilkan Rekomendasi
+                  <Sparkles className="size-4" /> Analisis dan hasilkan rekomendasi
                 </>
               )}
             </Button>
@@ -733,20 +744,19 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
       {result && (
         <div id="printable-report" className="space-y-8 animate-fade-up">
           <div className="hidden print:block border-b pb-4 mb-6">
-            <h1 className="text-2xl font-bold text-foreground">ProofyLink — Laporan Evaluasi Karier &amp; Profil AI</h1>
+            <h1 className="text-2xl font-bold text-foreground">ProofyLink — Laporan evaluasi karier dan profil AI</h1>
             <p className="text-sm text-muted-foreground">
-              Kandidat: {cvProfile?.fullName || "Profil kamu"} | Peran Dituju: {activeTargetRole} | Tanggal: {new Date().toLocaleDateString("id-ID")}
+              Kandidat: {cvProfile?.fullName || "Profil kamu"} | Peran dituju: {activeTargetRole} | Tanggal: {new Date().toLocaleDateString("id-ID")}
             </p>
           </div>
 
           <div className="no-print flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary gap-1 px-3 py-1 font-semibold text-xs">
-                <Sparkles className="size-3.5" /> Hasil Analisis Siap
-              </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Draf AI</Badge>
+              <span className="text-xs text-muted-foreground">Hasil analisis siap ditinjau sebelum disimpan.</span>
               {isStreaming && (
-                <span className="flex items-center gap-1.5 text-xs text-primary font-mono animate-pulse">
-                  <span className="inline-block size-2 rounded-full bg-primary" /> Memproses... ({streamProgress}%)
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  Memproses... ({streamProgress}%)
                 </span>
               )}
             </div>
@@ -756,17 +766,17 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 onClick={handleCopyAdvice}
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-border text-foreground hover:bg-muted/40 rounded-xl text-xs"
+                className="gap-1.5 text-xs"
               >
-                <Copy className="size-3.5 text-primary" /> Salin Rekomendasi
+                <Copy className="size-3.5" /> Salin rekomendasi
               </Button>
               <Button
                 onClick={handleDownloadPdf}
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-border text-foreground hover:bg-muted/40 rounded-xl text-xs"
+                className="gap-1.5 text-xs"
               >
-                <Download className="size-3.5 text-primary" /> Unduh PDF
+                <Download className="size-3.5" /> Unduh PDF
               </Button>
             </div>
           </div>
@@ -777,86 +787,84 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           {(result.focus === "cv_review" || result.focus === "ats") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b pb-4">
+                <CardHeader className="border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <FileText className="size-5 text-primary" />
-                      <CardTitle className="text-lg text-foreground">Review CV Keseluruhan &amp; Kesiapan Melamar Kerja</CardTitle>
+                      <FileText className="size-5 text-muted-foreground" />
+                      <CardTitle className="text-lg text-foreground">Review CV keseluruhan dan kesiapan melamar kerja</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium">Status Kesiapan:</span>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-300">
-                        <span className="size-2 rounded-full bg-current" />
+                      <span className="text-xs text-muted-foreground">Status kesiapan:</span>
+                      <Badge variant="secondary" className="text-xs font-medium">
                         {cvReviewData.readinessLevel}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                   {/* Executive Summary */}
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                      <Sparkles className="size-4 text-primary" /> Ringkasan Eksekutif Evaluasi CV:
-                    </span>
-                    <p className="text-sm leading-relaxed text-foreground">
+                  <div className="rounded-lg border bg-card p-4 space-y-2">
+                    <h4 className="text-sm font-medium text-foreground">
+                      Ringkasan evaluasi CV
+                    </h4>
+                    <p className="text-sm leading-7 text-foreground">
                       {cvReviewData.executiveSummary}
                     </p>
                   </div>
 
                   {/* Priority Action Items */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Zap className="size-4 text-amber-500" /> Rekomendasi Perbaikan Prioritas:
+                    <h4 className="text-sm font-medium text-foreground">
+                      Rekomendasi perbaikan prioritas
                     </h4>
-                    <div className="space-y-2">
+                    <ul className="divide-y divide-border rounded-lg border bg-card">
                       {cvReviewData.priorityActionItems.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3 shadow-2xs text-xs text-foreground">
-                          <CheckCircle2 className="size-4 text-primary shrink-0 mt-0.5" />
-                          <span className="leading-relaxed font-medium">{item}</span>
-                        </div>
+                        <li key={idx} className="px-4 py-3 text-sm leading-6 text-foreground">
+                          {item}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
 
                   {/* Section Audits */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Audit per Bagian CV:</h4>
-                    <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-foreground">Audit per bagian CV</h4>
+                    <ul className="divide-y divide-border rounded-lg border bg-card">
                       {cvReviewData.sectionAudits.map((sec, i) => (
-                        <div key={i} className="rounded-xl border p-4 bg-card space-y-2.5 shadow-2xs">
-                          <div className="flex items-center justify-between">
-                            <strong className="text-sm font-semibold text-foreground">{sec.section}</strong>
-                            <Badge variant="outline" className={sec.status === "good" ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px]" : "bg-amber-50 text-amber-800 border-amber-200 text-[11px]"}>
-                              {sec.status === "good" ? "✓ Sudah Baik" : "⚠️ Perlu Penguatan"}
+                        <li key={i} className="p-4 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <strong className="text-sm font-medium text-foreground">{sec.section}</strong>
+                            <Badge variant={sec.status === "good" ? "secondary" : "outline"} className="text-xs font-medium">
+                              {sec.status === "good" ? "Sudah baik" : "Perlu penguatan"}
                             </Badge>
                           </div>
-                          <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
+                          <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-muted-foreground">
                             {sec.notes.map((n, ni) => (
                               <li key={ni}>{n}</li>
                             ))}
                           </ul>
-                          <p className="text-xs bg-muted/40 p-2.5 rounded-lg border text-foreground">
-                            <strong>Saran Perbaikan:</strong> {sec.recommendation}
+                          <p className="text-sm leading-6 bg-muted/40 p-2.5 rounded-lg border text-foreground">
+                            <strong>Saran perbaikan:</strong> {sec.recommendation}
                           </p>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
 
                   {/* Format & Readability Checks */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pemeriksaan Kerapian Format &amp; Keterbacaan Rekruter:</h4>
+                    <h4 className="text-sm font-medium text-foreground">Pemeriksaan kerapian format dan keterbacaan rekruter</h4>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {cvReviewData.formatChecks.map((check, i) => (
-                        <div key={i} className="rounded-xl border p-3 bg-card flex items-start gap-2.5 shadow-2xs">
+                        <div key={i} className="rounded-lg border bg-card p-3 flex items-start gap-2.5">
                           {check.passed ? (
                             <CheckCircle2 className="size-4 text-emerald-600 shrink-0 mt-0.5" />
                           ) : (
                             <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
                           )}
-                          <div className="text-xs">
-                            <strong className="block text-foreground">{check.check}</strong>
-                            <span className="text-muted-foreground mt-0.5 block leading-relaxed">{check.tip}</span>
+                          <div className="text-sm">
+                            <strong className="block text-foreground font-medium">{check.check}</strong>
+                            <span className="text-muted-foreground mt-0.5 block leading-6">{check.tip}</span>
                           </div>
                         </div>
                       ))}
@@ -873,21 +881,21 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           {(result.focus === "gap_analysis" || result.focus === "headline") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b pb-4">
+                <CardHeader className="border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <Target className="size-5 text-primary" />
+                      <Target className="size-5 text-muted-foreground" />
                       <div>
-                        <CardTitle className="text-lg text-foreground">Gap Analysis &amp; Evaluasi Karir Hari Ini</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Target Peran: <span className="font-semibold text-foreground">{gapData.targetRole}</span>
+                        <CardTitle className="text-lg text-foreground">Evaluasi kesenjangan karier hari ini</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Target peran: <span className="font-medium text-foreground">{gapData.targetRole}</span>
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium">Kecocokan Profil:</span>
-                      <Badge className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1">
-                        {gapData.matchScore}% Match ({gapData.matchLevel})
+                      <span className="text-xs text-muted-foreground">Kecocokan profil:</span>
+                      <Badge variant="secondary" className="text-xs font-medium tabular-nums">
+                        {gapData.matchScore}% · {gapData.matchLevel}
                       </Badge>
                     </div>
                   </div>
@@ -895,78 +903,67 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 <CardContent className="p-6 space-y-6">
                   {/* Core Competencies Matrix */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Layers className="size-4 text-primary" /> Matriks Evaluasi Kompetensi Inti:
-                    </h4>
-                    <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-foreground">
+                      Evaluasi kompetensi inti
+                    </h3>
+                    <ul className="divide-y divide-border rounded-lg border bg-card">
                       {gapData.coreCompetencies.map((comp, i) => (
-                        <div key={i} className="rounded-xl border p-4 bg-card space-y-2 shadow-2xs">
+                        <li key={i} className="p-4 space-y-2">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <strong className="text-sm font-semibold text-foreground">{comp.competency}</strong>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-muted-foreground">
-                                Levelmu: <strong className="text-foreground font-semibold">{comp.candidateLevel}</strong> / Target: <strong className="text-foreground font-semibold">{comp.requiredLevel}</strong>
+                            <strong className="text-sm font-medium text-foreground">{comp.competency}</strong>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                Level saat ini: <strong className="text-foreground font-medium">{comp.candidateLevel}</strong> · Target: <strong className="text-foreground font-medium">{comp.requiredLevel}</strong>
                               </span>
                               <Badge
-                                className={
-                                  comp.status === "match"
-                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold"
-                                    : comp.status === "exceeds"
-                                    ? "bg-blue-100 text-blue-800 border border-blue-200 text-xs font-semibold"
-                                    : "bg-amber-100 text-amber-900 border border-amber-200 text-xs font-semibold"
-                                }
+                                variant={comp.status === "gap" ? "outline" : "secondary"}
+                                className="text-xs font-medium"
                               >
-                                {comp.status === "match" ? "✓ Match" : comp.status === "exceeds" ? "★ Exceeds" : "⚡ Gap Ditemukan"}
+                                {comp.status === "match" ? "Sesuai" : comp.status === "exceeds" ? "Melebihi" : "Ada kesenjangan"}
                               </Badge>
                             </div>
                           </div>
                           {comp.recommendation && (
-                            <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg border">
-                              <strong className="text-foreground">Rekomendasi Peningkatan:</strong> {comp.recommendation}
+                            <p className="text-sm leading-6 text-muted-foreground bg-muted/40 p-2.5 rounded-lg border">
+                              <strong className="text-foreground font-medium">Rekomendasi peningkatan:</strong> {comp.recommendation}
                             </p>
                           )}
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
 
                   {/* 2-Column: Critical Gaps vs Transferable Strengths */}
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2.5">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                        <AlertTriangle className="size-4 text-amber-600" /> Kesenjangan Kritis yang Perlu Ditutup:
-                      </span>
-                      <ul className="space-y-2 text-xs text-amber-950">
+                    <div className="rounded-lg border bg-muted/40 p-4 space-y-2.5">
+                      <h4 className="text-sm font-medium text-foreground">
+                        Kesenjangan kritis yang perlu ditutup
+                      </h4>
+                      <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-foreground">
                         {gapData.criticalGaps.map((gap, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-amber-600 mt-1.5 shrink-0" />
-                            <span className="leading-relaxed">{gap}</span>
-                          </li>
+                          <li key={i}>{gap}</li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2.5">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                        <CheckCircle2 className="size-4 text-emerald-600" /> Keunggulan Unik &amp; Kekuatan Transferable:
-                      </span>
-                      <ul className="space-y-2 text-xs text-emerald-950">
+                    <div className="rounded-lg border bg-muted/40 p-4 space-y-2.5">
+                      <h4 className="text-sm font-medium text-foreground">
+                        Keunggulan dan kekuatan transferable
+                      </h4>
+                      <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-foreground">
                         {gapData.transferableStrengths.map((str, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-emerald-600 mt-1.5 shrink-0" />
-                            <span className="leading-relaxed">{str}</span>
-                          </li>
+                          <li key={i}>{str}</li>
                         ))}
                       </ul>
                     </div>
                   </div>
 
                   {/* Strategic Upskilling Action Items */}
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2.5">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                      <Lightbulb className="size-4 text-amber-500" /> Rekomendasi Aksi Peningkatan Hari Ini:
-                    </span>
-                    <ul className="text-xs space-y-1.5 text-foreground list-disc pl-4">
+                  <div className="rounded-lg border bg-card p-4 space-y-2.5">
+                    <h4 className="text-sm font-medium text-foreground">
+                      Rekomendasi aksi peningkatan hari ini
+                    </h4>
+                    <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-foreground">
                       {gapData.strategicRecommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>
                       ))}
@@ -983,22 +980,22 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           {(result.focus === "career_consultation" || result.focus === "career_roadmap" || result.focus === "star") && (
             <div className="space-y-6">
               <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b pb-4">
+                <CardHeader className="border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <Compass className="size-5 text-primary" />
+                      <Compass className="size-5 text-muted-foreground" />
                       <div>
-                        <CardTitle className="text-lg text-foreground">Career Consultation &amp; Panduan Menghadapi HRD</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Target Peran: <span className="font-semibold text-foreground">{consultationData.targetRole}</span>
+                        <CardTitle className="text-lg text-foreground">Konsultasi karier dan panduan menghadapi HRD</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Target peran: <span className="font-medium text-foreground">{consultationData.targetRole}</span>
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="border-border bg-muted/50 text-foreground text-xs font-semibold px-3 py-1">
+                      <Badge variant="outline" className="text-xs font-medium tabular-nums">
                         Timeline: {consultationData.targetTimeline}
                       </Badge>
-                      <Badge className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1">
+                      <Badge variant="secondary" className="text-xs font-medium">
                         {consultationData.targetLevel}
                       </Badge>
                     </div>
@@ -1007,88 +1004,79 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 <CardContent className="p-6 space-y-6">
                   {/* 3 Strategic Phases */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Sparkles className="size-3.5 text-primary" /> 3 Tahapan Strategis Menuju Target Peran:
-                    </h4>
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <h3 className="text-sm font-medium text-foreground">
+                      Tahapan strategis menuju target peran
+                    </h3>
+                    <ol className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4">
                       {consultationData.phases.map((phase) => (
-                        <div key={phase.phaseNumber} className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 shadow-2xs space-y-3 hover:border-primary/40 transition-colors">
+                        <li key={phase.phaseNumber} className="flex flex-col justify-between rounded-lg border bg-card p-4 space-y-3">
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                                {phase.phaseNumber}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                                Tahap {phase.phaseNumber}
                               </span>
-                              <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
+                              <span className="text-xs tabular-nums text-muted-foreground">
                                 {phase.timeframe}
-                              </Badge>
+                              </span>
                             </div>
-                            <h5 className="font-semibold text-sm text-foreground">{phase.phaseName}</h5>
-                            <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/60">
-                              <strong className="text-foreground">Hasil:</strong> {phase.outcome}
+                            <h4 className="font-medium text-sm text-foreground">{phase.phaseName}</h4>
+                            <p className="text-sm leading-6 text-muted-foreground">
+                              <strong className="text-foreground font-medium">Hasil:</strong> {phase.outcome}
                             </p>
                             <div className="space-y-1.5 pt-1">
-                              <span className="text-[11px] font-semibold text-foreground block">Aksi Utama:</span>
-                              <ul className="space-y-1 text-xs text-muted-foreground">
+                              <span className="text-sm font-medium text-foreground block">Aksi utama</span>
+                              <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-muted-foreground">
                                 {phase.keyActions.map((action, ai) => (
-                                  <li key={ai} className="flex items-start gap-1.5">
-                                    <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                    <span className="leading-relaxed">{action}</span>
-                                  </li>
+                                  <li key={ai}>{action}</li>
                                 ))}
                               </ul>
                             </div>
                           </div>
-                          <div className="pt-2 border-t border-border/60">
-                            <span className="text-[11px] font-semibold text-primary flex items-center gap-1">
-                              🎯 Milestone: {phase.milestone}
-                            </span>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs leading-6 text-muted-foreground">
+                              <span className="font-medium text-foreground">Milestone:</span> {phase.milestone}
+                            </p>
                           </div>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                   </div>
 
                   {/* 2-Column: Interview Pitch Tips vs Strategic Recruiter Advice */}
                   <div className="grid gap-4 md:grid-cols-2">
                     {/* Interview Pitch Tips */}
-                    <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                        <Zap className="size-4 text-primary" /> Tips Pitching &amp; Wawancara Kerja (HRD Perspective):
-                      </span>
-                      <ul className="space-y-2 text-xs text-muted-foreground">
+                    <div className="rounded-lg border bg-card p-4 space-y-2.5">
+                      <h4 className="text-sm font-medium text-foreground">
+                        Tips pitching dan wawancara kerja
+                      </h4>
+                      <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-muted-foreground">
                         {(consultationData.interviewPitchTips || []).map((tip, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                            <span className="leading-relaxed font-medium">{tip}</span>
-                          </li>
+                          <li key={i}>{tip}</li>
                         ))}
                       </ul>
                     </div>
 
                     {/* Strategic Advice */}
-                    <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                        <Lightbulb className="size-4 text-primary" /> Saran Strategis dari Sudut Pandang Perekrut:
-                      </span>
-                      <ul className="space-y-2 text-xs text-muted-foreground">
+                    <div className="rounded-lg border bg-card p-4 space-y-2.5">
+                      <h4 className="text-sm font-medium text-foreground">
+                        Saran strategis dari sudut pandang perekrut
+                      </h4>
+                      <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-muted-foreground">
                         {consultationData.strategicAdvice.map((adv, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="size-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                            <span className="leading-relaxed font-medium">{adv}</span>
-                          </li>
+                          <li key={i}>{adv}</li>
                         ))}
                       </ul>
                     </div>
                   </div>
 
                   {/* Recommended Certifications & Topics */}
-                  <div className="rounded-xl border border-border/80 bg-card p-4 space-y-2.5 shadow-2xs">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Layers className="size-4 text-primary" /> Topik Pelatihan &amp; Sertifikasi Umum yang Relevan:
-                    </span>
+                  <div className="rounded-lg border bg-card p-4 space-y-2.5">
+                    <h4 className="text-sm font-medium text-foreground">
+                      Topik pelatihan dan sertifikasi yang relevan
+                    </h4>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {consultationData.recommendedCertifications.map((cert, i) => (
-                        <Badge key={i} variant="outline" className="px-3 py-1 bg-muted/40 border-border text-foreground text-xs font-medium">
+                        <Badge key={i} variant="secondary" className="text-xs font-medium">
                           {cert}
                         </Badge>
                       ))}
@@ -1100,39 +1088,39 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           )}
 
           {/* ─── Executive Summary & Action Steps ─── */}
-          <Card className="no-print border-border/80 bg-card shadow-xs">
-            <CardHeader className="pb-3 border-b bg-muted/20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                <Zap className="size-4.5 text-primary" /> Rangkuman Saran &amp; Langkah Selanjutnya
+          <Card className="no-print border-border bg-card shadow-xs">
+            <CardHeader className="pb-3 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base font-medium text-foreground flex items-center gap-2">
+                <Zap className="size-4 text-muted-foreground" /> Rangkuman saran dan langkah selanjutnya
               </CardTitle>
               <Button
                 size="sm"
                 variant={appliedToCv ? "outline" : "default"}
                 onClick={handleApplyToCv}
-                className="shrink-0 gap-1.5 text-xs font-semibold"
+                className="shrink-0 gap-1.5 text-xs font-medium"
               >
                 <Sparkles className="size-3.5" />
-                {appliedToCv ? "Tersinkron ke CV ✓" : "Terapkan Saran ke CV"}
+                {appliedToCv ? "Tersinkron ke CV" : "Terapkan saran ke CV"}
               </Button>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2 text-xs">
-                  <span className="font-bold text-emerald-800 flex items-center gap-1.5">
-                    <CheckCircle2 className="size-4 text-emerald-600" /> Hal yang Sudah Baik:
-                  </span>
-                  <ul className="space-y-1.5 text-emerald-950 list-disc pl-4">
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <h4 className="text-sm font-medium text-foreground">
+                    Hal yang sudah baik
+                  </h4>
+                  <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-foreground">
                     {adviceData.whatGood.map((good, idx) => (
                       <li key={idx}>{good}</li>
                     ))}
                   </ul>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2 text-xs">
-                  <span className="font-bold text-amber-800 flex items-center gap-1.5">
-                    <AlertTriangle className="size-4 text-amber-600" /> Area yang Perlu Penguatan:
-                  </span>
-                  <ul className="space-y-1.5 text-amber-950 list-disc pl-4">
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <h4 className="text-sm font-medium text-foreground">
+                    Area yang perlu penguatan
+                  </h4>
+                  <ul className="list-disc pl-5 space-y-1.5 text-sm leading-6 text-foreground">
                     {adviceData.whatNotGood.map((bad, idx) => (
                       <li key={idx}>{bad}</li>
                     ))}
@@ -1140,13 +1128,13 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border/60">
-                <p className="text-xs text-muted-foreground">
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t">
+                <p className="text-sm text-muted-foreground">
                   Gunakan rekomendasi evaluasi di atas untuk memperbarui profil dan portofoliomu.
                 </p>
                 <Link href="/candidate/cv">
-                  <Button className="gap-2 font-semibold rounded-xl shadow-xs">
-                    <FileText className="size-4" /> Buka CV Workspace &amp; Edit
+                  <Button className="gap-2 font-medium rounded-lg shadow-xs">
+                    <FileText className="size-4" /> Buka workspace CV dan edit
                   </Button>
                 </Link>
               </div>
@@ -1154,22 +1142,21 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           </Card>
 
           {/* AI Disclosure Footer */}
-          <div className="rounded-xl border bg-muted/40 p-4 text-xs text-muted-foreground space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-              <span className="font-mono uppercase tracking-wider text-primary font-semibold flex items-center gap-1.5 text-[11px]">
-                <Bot className="size-3.5" /> Dihasilkan oleh Antarmuka AI ProofyLink
-              </span>
-              <div className="flex items-center gap-2 text-[11px]">
-                <span>Sumber: <strong className="uppercase">{result.source}</strong></span>
-                <span>•</span>
-                <span>Model: <strong>{result.modelVersion}</strong></span>
-              </div>
+          <div className="border-t pt-4 text-xs text-muted-foreground space-y-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Badge variant="secondary">Draf AI</Badge>
+              <span>Sumber: <strong className="font-medium text-foreground">{result.source}</strong></span>
+              <span aria-hidden="true">·</span>
+              <span>Model: <strong className="font-medium text-foreground tabular-nums">{result.modelVersion}</strong></span>
             </div>
+            <p className="leading-6">
+              Cakupan data: headline, {skills.length} keahlian ({skills.slice(0, 3).join(", ") || "belum ada"}), target peran {activeTargetRole}.
+            </p>
             <div className="space-y-1">
-              <span className="font-semibold text-foreground flex items-center gap-1 text-[11px]">
-                <ShieldAlert className="size-3.5 text-amber-600" /> Catatan Penting:
-              </span>
-              <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+              <p className="font-medium text-foreground">
+                Keterbatasan
+              </p>
+              <ul className="list-disc pl-5 space-y-1.5 leading-6">
                 {result.limitations.map((lim, idx) => (
                   <li key={idx}>{lim}</li>
                 ))}
