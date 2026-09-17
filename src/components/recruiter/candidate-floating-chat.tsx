@@ -222,10 +222,6 @@ export function CandidateFloatingChat({
         >
           <div className="relative">
             <MessageSquare className="size-5" />
-            <span className="absolute -top-1 -right-1 flex size-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 border border-white" />
-            </span>
           </div>
           <span className="text-xs font-semibold tracking-wide sm:inline">
             Chat {candidate.name.split(" ")[0]}
@@ -255,7 +251,6 @@ export function CandidateFloatingChat({
                 className="size-full text-xs"
               />
             </div>
-            <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400 border border-white" />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-xs font-bold leading-tight">

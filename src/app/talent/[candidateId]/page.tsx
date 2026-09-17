@@ -410,10 +410,6 @@ function ScreeningResults({
                   </p>
                 </div>
               </div>
-              <div className="shrink-0 rounded-xl border border-slate-200/90 bg-white/90 p-3 text-xs text-muted-foreground sm:text-right shadow-2xs dark:bg-slate-900/80 dark:border-slate-800">
-                <span className="font-semibold text-foreground block">Algoritma MD-CEA</span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">✓ Zero-PII (Bebas Data Privat)</span>
-              </div>
             </CardContent>
           </Card>
 
