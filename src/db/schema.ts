@@ -184,6 +184,8 @@ export const organizations = pgTable("organizations", {
   // Legalitas
   nib: text("nib").unique(),
   npwp: text("npwp").unique(),
+  nibDocumentUrl: text("nib_document_url"),
+  npwpDocumentUrl: text("npwp_document_url"),
   // Informasi Bisnis
   industry: industrySector("industry"),
   companyScale: companyScale("company_scale"),
