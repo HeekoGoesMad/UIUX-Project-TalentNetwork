@@ -88,3 +88,5 @@ next-env.d.ts
 .mcp.json
 .opencode
 .vscode
+
+mock-talentNetwork.code-workspace
