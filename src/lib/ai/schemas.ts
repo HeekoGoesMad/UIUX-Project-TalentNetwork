@@ -97,8 +97,32 @@ export const careerRoadmapPillarSchema = z.object({
   limitations: z.array(z.string()),
 });
 
+export const careerConsultationPillarSchema = z.object({
+  targetRole: z.string(),
+  targetTimeline: z.string(),
+  targetLevel: z.string(),
+  phases: z.array(
+    z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })
+  ),
+  recommendedCertifications: z.array(z.string()),
+  strategicAdvice: z.array(z.string()),
+  interviewPitchTips: z.array(z.string()).default([]),
+  summary: z.string(),
+  structuredAdvice: structuredAdviceSchema,
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
 export const advisorSchema = z.object({
-  focus: z.enum(["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
+  focus: z.enum(["cv_review", "gap_analysis", "career_consultation", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
   summary: z.string(),
   headlineSuggestions: z.array(z.string()).default([]),
   starBullets: z.array(z.object({
@@ -196,6 +220,22 @@ export const advisorSchema = z.object({
     criticalGaps: z.array(z.string()),
     transferableStrengths: z.array(z.string()),
     strategicRecommendations: z.array(z.string()),
+  }).optional(),
+  careerConsultationDetails: z.object({
+    targetRole: z.string(),
+    targetTimeline: z.string(),
+    targetLevel: z.string(),
+    phases: z.array(z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })),
+    recommendedCertifications: z.array(z.string()),
+    strategicAdvice: z.array(z.string()),
+    interviewPitchTips: z.array(z.string()).default([]),
   }).optional(),
   careerRoadmapDetails: z.object({
     targetRole: z.string(),

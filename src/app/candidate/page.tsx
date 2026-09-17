@@ -61,7 +61,7 @@ export default function CandidateHome() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
               <Badge variant="outline" className="border-purple-200 bg-purple-50/80 text-purple-700 font-mono text-[11px] font-semibold tracking-wider uppercase">
-                Candidate Workspace
+                Ruang Kerja Kandidat
               </Badge>
               <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-xs flex items-center gap-1 font-medium">
                 <UserCheck className="size-3" /> Siap Wawancara
@@ -116,7 +116,7 @@ export default function CandidateHome() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-emerald-950">Tawaran Pekerjaan Siap Ditinjau!</span>
-                        <Badge className="bg-emerald-600 text-white text-[10px]">Action Required</Badge>
+                        <Badge className="bg-emerald-600 text-white text-[10px]">Tindakan Diperlukan</Badge>
                       </div>
                       <p className="mt-0.5 text-sm text-emerald-800">
                         Kamu menerima penawaran kerja resmi untuk posisi{" "}
@@ -144,7 +144,7 @@ export default function CandidateHome() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-purple-950">Jadwal Wawancara Aktif ({interviewApplications.length})</span>
-                        <Badge className="bg-purple-600 text-white text-[10px]">Upcoming</Badge>
+                        <Badge className="bg-purple-600 text-white text-[10px]">Segera</Badge>
                       </div>
                       <p className="mt-0.5 text-sm text-purple-800">
                         Recruiter telah menjadwalkan sesi interview. Cek link Google Meet / Zoom dan agenda persiapanmu.
@@ -271,7 +271,7 @@ export default function CandidateHome() {
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {/* Pillar 1: Lamaran & Pipeline */}
             <Link href="/candidate/applications" className="group block">
               <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-purple-400 group-hover:shadow-md">
@@ -282,7 +282,7 @@ export default function CandidateHome() {
                         <Briefcase className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-purple-200 text-purple-700 bg-purple-50/50 text-[11px]">
-                        Hiring Flow
+                        Alur Rekrutmen
                       </Badge>
                     </div>
                     <div>
@@ -311,7 +311,7 @@ export default function CandidateHome() {
                         <FileText className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50 text-[11px]">
-                        Digital Resume
+                        Resume Digital
                       </Badge>
                     </div>
                     <div>
@@ -330,7 +330,7 @@ export default function CandidateHome() {
               </Card>
             </Link>
 
-            {/* Pillar 3: AI Career Advisor */}
+            {/* Pillar 3: AI Career Advisor & Consultation */}
             <Link href="/candidate/career-advisor" className="group block">
               <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-amber-400 group-hover:shadow-md">
                 <CardContent className="p-6 flex flex-col justify-between h-full gap-5">
@@ -340,49 +340,20 @@ export default function CandidateHome() {
                         <Sparkles className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50/50 text-[11px]">
-                        AI Intelligence
+                        Kecerdasan AI
                       </Badge>
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                        AI Career Advisor & ATS Optimization
+                        AI Career Advisor &amp; Consultation
                       </h3>
                       <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                        Evaluasi kecocokan kata kunci profil terhadap ATS recruiter, formulasi headline memikat, dan identifikasi celah kompetensi.
+                        Evaluasi menyeluruh keterbacaan CV oleh HRD, analisis kesenjangan skill, dan konsultasi strategi memikat perekrut.
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center text-xs font-semibold text-amber-600 pt-3 border-t border-slate-100">
-                    Konsultasi Penasihat AI <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Pillar 4: Career Growth & Development Tracker */}
-            <Link href="/candidate/career-roadmap" className="group block">
-              <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-indigo-400 group-hover:shadow-md">
-                <CardContent className="p-6 flex flex-col justify-between h-full gap-5">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex size-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <TrendingUp className="size-5" />
-                      </div>
-                      <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50 text-[11px]">
-                        Target &amp; Progres Mandiri
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                        Career Growth &amp; Development Tracker
-                      </h3>
-                      <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                        Pantau target peran impian, catat milestone aktivitas belajar mandiri, dan dokumentasikan bukti pencapaian secara terstruktur.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center text-xs font-semibold text-indigo-600 pt-3 border-t border-slate-100">
-                    Buka Career Tracker <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
+                    Buka Konsultasi Penasihat AI <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
                   </div>
                 </CardContent>
               </Card>
