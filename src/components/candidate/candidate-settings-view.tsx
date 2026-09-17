@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
 import { DeleteAccountModal } from "@/components/candidate/delete-account-modal";
+import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 import { useApp } from "@/providers/app-provider";
 
 export type SettingsTab = "overview" | "notifications" | "security" | "accessibility" | "danger";
@@ -271,11 +272,15 @@ export function CandidateSettingsView({
     profileData?.candidateProfile?.location ||
     "Indonesia";
   const isPublished = profileData?.candidateProfile?.isPublished ?? false;
-  const completeness = profileData?.candidateProfile?.completeness ?? 60;
+  const readiness = calculateCandidateReadiness(cvProfile);
+  const completeness =
+    profileData?.candidateProfile?.completeness && profileData.candidateProfile.completeness > 0
+      ? profileData.candidateProfile.completeness
+      : readiness.percent;
   const candidateId = profileData?.candidateProfile?.id;
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-10 space-y-8">
+    <div className="space-y-8 pb-12">
       {/* 1. Page Header */}
       <div>
         <span className="text-xs font-bold uppercase tracking-wider text-primary">

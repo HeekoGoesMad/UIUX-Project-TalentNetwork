@@ -41,13 +41,469 @@ export function RecruiterAssessmentEditor({ templateId }: { templateId?: string 
 
 export function RecruiterAssessmentDetail({ templateId }: { templateId: string }) { const { dbMode } = useApp(); const [template, setTemplate] = useState<DemoTemplate | null>(null); useEffect(() => { if (!dbMode) setTemplate(getDemoTemplate(templateId)); else void fetch(`/api/assessment-templates/${templateId}`).then((response) => response.json()).then((data) => setTemplate(data.template)); }, [dbMode, templateId]); if (!template) return <Shell eyebrow="Template detail" title="Template tidak ditemukan"><p className="mt-6 text-muted-foreground">Periksa kembali tautan assessment.</p></Shell>; const invite = async () => { if (!dbMode) { createDemoInvitation(template); toast.success("Invitation demo dibuat untuk Nadia"); return; } toast.info("Action invite persisted tersedia dari detail aplikasi recruiter."); }; return <Shell eyebrow="Recruiter / template" title={template.name} description={template.description} back="/recruiter/assessments"><div className="mt-8 grid gap-5 md:grid-cols-[1fr_280px]"><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>Pertanyaan</CardTitle><span className="text-sm text-muted-foreground">{template.questions.length} total</span></div></CardHeader><CardContent className="space-y-3">{template.questions.map((question, index) => <div key={question.id} className="rounded-lg border p-4"><div className="flex gap-3"><span className="text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><div><p className="font-medium">{question.prompt}</p><p className="mt-2 text-xs text-muted-foreground">{labels[question.type]} · {question.required ? "Wajib" : "Opsional"}</p></div></div></div>)}</CardContent></Card><div className="space-y-4"><Card><CardContent className="space-y-4 p-5"><p className="text-sm text-muted-foreground">{template.invitationCount} invitation dibuat</p><Button className="w-full" onClick={invite}><Send className="size-4" /> Buat invitation demo</Button>{template.invitationCount > 0 && <p className="text-xs text-amber-700">Template dikunci setelah invitation dibuat.</p>}</CardContent></Card><Button className="w-full" variant="outline" asChild><Link href={`/recruiter/assessments/${template.id}/edit`}>Edit pertanyaan</Link></Button></div></div></Shell>; }
 
-export function CandidateAssessmentList() { const { dbMode } = useApp(); const [invitations, setInvitations] = useState<ReturnType<typeof listDemoInvitations>>([]); useEffect(() => { if (!dbMode) setInvitations(listDemoInvitations()); else void fetch("/api/assessment-invitations").then((response) => response.json()).then((data) => setInvitations(data.invitations ?? [])); }, [dbMode]); return <Shell eyebrow="Candidate / assessments" title="Assessment Anda" description="Jawab dengan konteks Anda sendiri."><div className="mt-8 overflow-hidden rounded-lg border bg-card">{invitations.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">Belum ada invitation.</p> : <div className="divide-y">{invitations.map((invite) => <div key={invite.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="font-semibold">{invite.templateName}</h2><span className="text-xs text-muted-foreground">{invite.status === "submitted" ? "Terkirim" : invite.status === "started" ? "Berlangsung" : "Menunggu"}</span></div><p className="mt-1 text-sm text-muted-foreground">Dari lamaran untuk {invite.candidateName}</p></div><Button variant="outline" size="sm" asChild><Link href={`/candidate/assessments/${invite.id}`}>{invite.status === "started" ? "Lanjutkan" : invite.status === "submitted" ? "Lihat status" : "Mulai"}</Link></Button></div>)}</div>}</div></Shell>; }
+export function CandidateAssessmentList() {
+  const { dbMode } = useApp();
+  const [invitations, setInvitations] = useState<ReturnType<typeof listDemoInvitations>>([]);
+  const [loading, setLoading] = useState(true);
 
-export function CandidateAssessmentDetail({ invitationId }: { invitationId: string }) { const { dbMode } = useApp(); const [invitation, setInvitation] = useState<ReturnType<typeof getDemoInvitation>>(null); const [template, setTemplate] = useState<DemoTemplate | null>(null); const [answers, setAnswers] = useState<Record<string, unknown>>({}); const [attemptId, setAttemptId] = useState<string | null>(null); const [submitted, setSubmitted] = useState(false); const [saving, setSaving] = useState(false);
-  useEffect(() => { if (!dbMode) { const invite = getDemoInvitation(invitationId); setInvitation(invite); if (invite) { setTemplate(getDemoTemplate(invite.templateId)); setAnswers(invite.answers ?? {}); setAttemptId(invite.attemptId ?? null); setSubmitted(invite.status === "submitted"); } return; } void fetch("/api/assessment-invitations").then((response) => response.json()).then((data) => { const invite = data.invitations?.find((item: { id: string }) => item.id === invitationId); setInvitation(invite ?? null); if (invite?.attempt?.id) { setAttemptId(invite.attempt.id); return fetch(`/api/assessment-attempts/${invite.attempt.id}`); } return null; }).then((response) => response?.json()).then((data) => { if (data?.template) setTemplate(data.template); if (data?.answers) setAnswers(Object.fromEntries(data.answers.map((answer: { questionId: string; response: unknown }) => [answer.questionId, answer.response]))); if (data?.attempt?.status === "submitted") setSubmitted(true); }); }, [dbMode, invitationId]);
-  const start = async () => { if (!invitation) return; if (!dbMode) { const next = startDemoAttempt(invitation.id); if (next) { setInvitation(next); setAttemptId(next.attemptId ?? null); setTemplate(getDemoTemplate(next.templateId)); } return; } const response = await fetch("/api/assessment-attempts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invitationId }) }); const data = await response.json(); if (!response.ok) { toast.error(data.error); return; } setAttemptId(data.attempt.id); const detail = await fetch(`/api/assessment-attempts/${data.attempt.id}`).then((result) => result.json()); setTemplate(detail.template); setAnswers(Object.fromEntries(detail.answers.map((answer: { questionId: string; response: unknown }) => [answer.questionId, answer.response]))); };
-  const saveAnswer = async (questionId: string, response: unknown) => { setAnswers((current) => ({ ...current, [questionId]: response })); if (!attemptId) return; if (!dbMode) { saveDemoAnswer(invitationId, questionId, response); return; } await fetch(`/api/assessment-attempts/${attemptId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId, response }) }); };
-  const submit = async () => { if (!template || template.questions.some((question) => question.required && !String(answers[question.id] ?? "").trim())) { toast.error("Jawab semua pertanyaan wajib."); return; } setSaving(true); if (!dbMode) { submitDemoAttempt(invitationId); setSubmitted(true); } else if (attemptId) { const response = await fetch(`/api/assessment-attempts/${attemptId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submit: true }) }); const data = await response.json(); if (!response.ok) toast.error(data.error); else setSubmitted(true); } setSaving(false); };
-  if (!invitation) return <Shell eyebrow="Candidate / assessment" title="Invitation tidak ditemukan"><p className="mt-6 text-muted-foreground">Invitation ini tidak tersedia untuk akun Anda.</p></Shell>;
-  return <Shell eyebrow="Candidate / assessment" title={template?.name ?? invitation.templateName} description="Jawaban Anda menunggu review." back="/candidate/assessments"><p className="mt-6 text-sm text-muted-foreground">Jawaban hanya dilihat reviewer berwenang.</p>{submitted ? <Card className="mt-6"><CardContent className="flex items-start gap-3 p-5"><Check className="size-4 text-emerald-600" /><div><h2 className="font-semibold">Jawaban terkirim</h2><p className="mt-1 text-sm text-muted-foreground">Menunggu review.</p></div></CardContent></Card> : !attemptId ? <Card className="mt-6"><CardContent className="p-6"><div className="flex items-center gap-3"><Clock3 className="size-4 text-muted-foreground" /><div><h2 className="font-semibold">Siap untuk mulai?</h2><p className="text-sm text-muted-foreground">{template?.timeLimitMinutes ? `Waktu sekitar ${template.timeLimitMinutes} menit.` : "Tidak ada batas waktu."}</p></div></div><Button className="mt-6" onClick={start}>Mulai assessment</Button></CardContent></Card> : <div className="mt-6 space-y-4">{template?.questions.map((question, index) => <div key={question.id} className="rounded-lg border bg-card p-5"><label className="block"><span className="flex gap-3 font-semibold"><span className="text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>{question.prompt}{question.required && <span className="text-destructive">*</span>}</span>{question.type === "multiple_choice" ? <select aria-label={question.prompt} className="mt-4 h-10 w-full rounded-md border bg-background px-3 text-sm" value={String(answers[question.id] ?? "")} onChange={(event) => void saveAnswer(question.id, event.target.value)}><option value="">Pilih jawaban</option>{question.options.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <textarea aria-label={question.prompt} className="mt-4 min-h-28 w-full rounded-md border bg-transparent p-3 text-sm" value={String(answers[question.id] ?? "")} onChange={(event) => void saveAnswer(question.id, event.target.value)} placeholder="Tulis jawaban Anda..." />}</label></div>)}<Button className="w-full sm:w-auto" onClick={submit} disabled={saving}><Send className="size-4" />{saving ? "Mengirim..." : "Kirim jawaban"}</Button></div>}</Shell>;
+  useEffect(() => {
+    if (!dbMode) {
+      setInvitations(listDemoInvitations());
+      setLoading(false);
+      return;
+    }
+    void fetch("/api/assessment-invitations")
+      .then((response) => response.json())
+      .then((data) => setInvitations(data.invitations ?? []))
+      .finally(() => setLoading(false));
+  }, [dbMode]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+          Asesmen Kompetensi
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground max-w-2xl">
+          Kerjakan evaluasi teknis dan situasional yang dikirimkan oleh rekruter untuk memvalidasi kesiapan peranmu.
+        </p>
+      </div>
+
+      {loading ? (
+        <Card className="border-border bg-card">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            Memuat daftar asesmen...
+          </CardContent>
+        </Card>
+      ) : invitations.length === 0 ? (
+        <Card className="border-dashed border-border bg-card/50">
+          <CardContent className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <FileQuestion className="size-6" />
+            </div>
+            <h2 className="mt-4 text-base font-semibold text-foreground">Belum Ada Undangan Asesmen</h2>
+            <p className="mt-1 text-xs text-muted-foreground max-w-md leading-relaxed">
+              Ketika rekruter mengundangmu untuk mengerjakan tes kualifikasi pada lamaran yang aktif, tautan tes akan muncul di sini.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {invitations.map((invite) => {
+            const isSubmitted = invite.status === "submitted";
+            const isStarted = invite.status === "started";
+
+            return (
+              <Card key={invite.id} className="border-border/80 bg-card shadow-xs transition-all hover:border-primary/40">
+                <CardHeader className="pb-3 border-b">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base font-bold text-foreground">
+                        {invite.templateName}
+                      </CardTitle>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Kandidat: <span className="font-medium text-foreground">{invite.candidateName}</span>
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                        isSubmitted
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : isStarted
+                          ? "bg-primary/10 text-primary border border-primary/20"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
+                    >
+                      {isSubmitted ? "Terkirim ✓" : isStarted ? "Sedang Berlangsung" : "Menunggu Dikerjakan"}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock3 className="size-3.5" />
+                    <span>Evaluasi Human-Reviewed</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isSubmitted ? "outline" : "default"}
+                    asChild
+                    className="text-xs font-semibold"
+                  >
+                    <Link href={`/candidate/assessments/${invite.id}`}>
+                      {isStarted ? "Lanjutkan Tes" : isSubmitted ? "Tinjau Status" : "Mulai Asesmen"}
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
+
+export function CandidateAssessmentDetail({ invitationId }: { invitationId: string }) {
+  const { dbMode } = useApp();
+  const [invitation, setInvitation] = useState<ReturnType<typeof getDemoInvitation>>(null);
+  const [template, setTemplate] = useState<DemoTemplate | null>(null);
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dbMode) {
+      const invite = getDemoInvitation(invitationId);
+      setInvitation(invite);
+      if (invite) {
+        const tmpl = getDemoTemplate(invite.templateId);
+        setTemplate(tmpl);
+        setAnswers(invite.answers ?? {});
+        setAttemptId(invite.attemptId ?? null);
+        setSubmitted(invite.status === "submitted");
+        if (tmpl?.timeLimitMinutes && invite.status !== "submitted") {
+          setTimeLeft(tmpl.timeLimitMinutes * 60);
+        }
+      }
+      return;
+    }
+
+    void fetch("/api/assessment-invitations")
+      .then((response) => response.json())
+      .then((data) => {
+        const invite = data.invitations?.find((item: { id: string }) => item.id === invitationId);
+        setInvitation(invite ?? null);
+        if (invite?.attempt?.id) {
+          setAttemptId(invite.attempt.id);
+          return fetch(`/api/assessment-attempts/${invite.attempt.id}`);
+        }
+        return null;
+      })
+      .then((response) => response?.json())
+      .then((data) => {
+        if (data?.template) {
+          setTemplate(data.template);
+          if (data.template.timeLimitMinutes && data?.attempt?.status !== "submitted") {
+            setTimeLeft(data.template.timeLimitMinutes * 60);
+          }
+        }
+        if (data?.answers) {
+          setAnswers(
+            Object.fromEntries(
+              data.answers.map((answer: { questionId: string; response: unknown }) => [
+                answer.questionId,
+                answer.response,
+              ])
+            )
+          );
+        }
+        if (data?.attempt?.status === "submitted") setSubmitted(true);
+      });
+  }, [dbMode, invitationId]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || submitted || !attemptId) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeLeft, submitted, attemptId]);
+
+  const start = async () => {
+    if (!invitation) return;
+    if (!dbMode) {
+      const next = startDemoAttempt(invitation.id);
+      if (next) {
+        setInvitation(next);
+        setAttemptId(next.attemptId ?? null);
+        const tmpl = getDemoTemplate(next.templateId);
+        setTemplate(tmpl);
+        if (tmpl?.timeLimitMinutes) setTimeLeft(tmpl.timeLimitMinutes * 60);
+      }
+      return;
+    }
+    const response = await fetch("/api/assessment-attempts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invitationId }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error(data.error);
+      return;
+    }
+    setAttemptId(data.attempt.id);
+    const detail = await fetch(`/api/assessment-attempts/${data.attempt.id}`).then((result) => result.json());
+    setTemplate(detail.template);
+    setAnswers(
+      Object.fromEntries(
+        detail.answers.map((answer: { questionId: string; response: unknown }) => [
+          answer.questionId,
+          answer.response,
+        ])
+      )
+    );
+    if (detail.template?.timeLimitMinutes) {
+      setTimeLeft(detail.template.timeLimitMinutes * 60);
+    }
+  };
+
+  const saveAnswer = async (questionId: string, response: unknown) => {
+    setAnswers((current) => ({ ...current, [questionId]: response }));
+    setLastSaved("Menyimpan...");
+    if (!attemptId) return;
+
+    try {
+      if (!dbMode) {
+        saveDemoAnswer(invitationId, questionId, response);
+      } else {
+        await fetch(`/api/assessment-attempts/${attemptId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ questionId, response }),
+        });
+      }
+      setLastSaved("Tersimpan otomatis");
+    } catch {
+      setLastSaved("Gagal menyimpan draf");
+    }
+  };
+
+  const submit = async () => {
+    if (!template || template.questions.some((question) => question.required && !String(answers[question.id] ?? "").trim())) {
+      toast.error("Harap jawab semua pertanyaan yang bertanda wajib (*)");
+      return;
+    }
+    setSaving(true);
+    if (!dbMode) {
+      submitDemoAttempt(invitationId);
+      setSubmitted(true);
+      toast.success("Jawaban asesmen berhasil dikirim!");
+    } else if (attemptId) {
+      const response = await fetch(`/api/assessment-attempts/${attemptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submit: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) toast.error(data.error);
+      else {
+        setSubmitted(true);
+        toast.success("Jawaban asesmen berhasil dikirim!");
+      }
+    }
+    setSaving(false);
+  };
+
+  if (!invitation) {
+    return (
+      <div className="space-y-4">
+        <Link href="/candidate/assessments" className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" /> Kembali ke Daftar Asesmen
+        </Link>
+        <Card className="border-border bg-card">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            Undangan asesmen tidak ditemukan atau tidak dapat diakses.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const totalQuestions = template?.questions?.length || 0;
+  const answeredCount = template?.questions?.filter((q) => Boolean(String(answers[q.id] ?? "").trim())).length || 0;
+  const progressPct = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-4">
+        <Link
+          href="/candidate/assessments"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+        >
+          <ArrowLeft className="size-4" /> Kembali ke Asesmen
+        </Link>
+
+        {attemptId && !submitted && (
+          <div className="flex items-center gap-4">
+            {lastSaved && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Check className="size-3 text-emerald-600" /> {lastSaved}
+              </span>
+            )}
+            {timeLeft !== null && (
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                  timeLeft < 300
+                    ? "bg-red-50 text-red-700 border border-red-200 animate-pulse"
+                    : "bg-muted text-foreground"
+                }`}
+              >
+                <Clock3 className="size-3.5" />
+                Sisa Waktu: {formatTime(timeLeft)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+          {template?.name ?? invitation.templateName}
+        </h1>
+        <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+          {template?.description || "Jawablah dengan jujur sesuai pengalaman dan kemampuan Anda."}
+        </p>
+      </div>
+
+      {submitted ? (
+        <Card className="border-emerald-200/80 bg-emerald-50/20 shadow-xs">
+          <CardContent className="flex flex-col items-center py-12 text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-xs">
+              <Check className="size-8" />
+            </span>
+            <h2 className="mt-4 text-lg font-bold text-foreground">Jawaban Asesmen Berhasil Dikirim</h2>
+            <p className="mt-1 text-xs text-muted-foreground max-w-md leading-relaxed">
+              Terima kasih! Jawaban Anda telah tersimpan dengan aman dan saat ini sedang dalam antrean peninjauan oleh tim rekruter.
+            </p>
+            <Button size="sm" asChild className="mt-6 text-xs font-semibold">
+              <Link href="/candidate/applications">Lihat Status Lamaran</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : !attemptId ? (
+        <Card className="border-border bg-card shadow-xs">
+          <CardContent className="p-6 sm:p-8 space-y-6">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Clock3 className="size-6" />
+              </span>
+              <div>
+                <h2 className="text-base font-bold text-foreground">Petunjuk &amp; Ketentuan Asesmen</h2>
+                <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground list-disc pl-4">
+                  <li>Jumlah pertanyaan: <span className="font-semibold text-foreground">{totalQuestions} butir</span>.</li>
+                  <li>
+                    Batas waktu: <span className="font-semibold text-foreground">
+                      {template?.timeLimitMinutes ? `${template.timeLimitMinutes} menit` : "Tidak ada batas waktu"}
+                    </span>.
+                  </li>
+                  <li>Jawaban Anda akan tersimpan otomatis saat Anda mengetik.</li>
+                  <li>Pastikan koneksi internet stabil sebelum menekan tombol mulai.</li>
+                </ul>
+              </div>
+            </div>
+            <Button size="lg" className="w-full sm:w-auto text-sm font-semibold" onClick={start}>
+              Mulai Mengerjakan Asesmen Sekarang
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Progress bar */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Progres Pengerjaan</span>
+              <span className="font-semibold font-mono text-foreground">
+                {answeredCount} dari {totalQuestions} terjawab ({progressPct}%)
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Question List */}
+          <div className="space-y-4">
+            {template?.questions.map((question, index) => {
+              const currentVal = String(answers[question.id] ?? "");
+              const isFilled = Boolean(currentVal.trim());
+
+              return (
+                <Card
+                  key={question.id}
+                  className={`border transition-all ${
+                    isFilled ? "border-border/80 bg-card" : "border-amber-200/80 bg-card shadow-2xs"
+                  }`}
+                >
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-mono font-bold text-muted-foreground">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground leading-relaxed">
+                          {question.prompt}
+                          {question.required && <span className="text-destructive ml-1">*</span>}
+                        </p>
+                      </div>
+                    </div>
+
+                    {question.type === "multiple_choice" ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 pt-2">
+                        {question.options.map((option) => {
+                          const selected = currentVal === option;
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => void saveAnswer(question.id, option)}
+                              className={`flex items-center justify-between p-3 rounded-lg border text-xs font-medium text-left transition-all ${
+                                selected
+                                  ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20 font-semibold"
+                                  : "border-border bg-card text-foreground hover:bg-muted/50"
+                              }`}
+                            >
+                              <span>{option}</span>
+                              {selected && <Check className="size-3.5 shrink-0 text-primary" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <textarea
+                        aria-label={question.prompt}
+                        className="min-h-28 w-full rounded-md border border-border bg-background p-3 text-xs sm:text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                        value={currentVal}
+                        onChange={(event) => void saveAnswer(question.id, event.target.value)}
+                        placeholder="Tuliskan jawaban lengkap Anda di sini..."
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t pt-5">
+            <p className="text-xs text-muted-foreground">
+              Periksa kembali seluruh jawaban sebelum mengirimkan hasil akhir.
+            </p>
+            <Button
+              size="lg"
+              className="w-full sm:w-auto text-xs font-semibold gap-2"
+              onClick={submit}
+              disabled={saving}
+            >
+              <Send className="size-4" />
+              {saving ? "Mengirimkan..." : "Kirim Semua Jawaban Asesmen"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

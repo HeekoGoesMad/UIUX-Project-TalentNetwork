@@ -6,14 +6,14 @@ import {
   Award,
   Bell,
   Briefcase,
+  Building2,
   Calendar,
-  Compass,
-  Eye,
+  CheckCircle2,
   FileText,
-  MapPin,
+  Lock,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
@@ -21,15 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { useApplications } from "@/components/applications/application-ui";
-
-type Icon = typeof Award;
-
-const NAVS: { href: string; icon: Icon; title: string; desc: string }[] = [
-  { href: "/candidate/applications", icon: Briefcase, title: "Lamaran & status", desc: "Pantau timeline seleksi lamaranmu." },
-  { href: "/candidate/cv", icon: FileText, title: "CV & profil", desc: "Kelola pengalaman dan keahlian." },
-  { href: "/candidate/career-advisor", icon: Sparkles, title: "AI Career Advisor", desc: "Optimasi profil agar lolos ATS." },
-  { href: "/candidate/career-roadmap", icon: ShieldCheck, title: "Roadmap karier", desc: "Rencana skill dan bukti portofolio." },
-];
+import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 
 function ActionRow({
   icon: Icon,
@@ -39,7 +31,7 @@ function ActionRow({
   cta,
   emerald = false,
 }: {
-  icon: Icon;
+  icon: LucideIcon;
   title: string;
   desc: string;
   href: string;
@@ -47,19 +39,19 @@ function ActionRow({
   emerald?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 p-5">
+    <div className="flex items-center gap-3.5 p-4 sm:p-5">
       <span
-        className={`flex size-8 shrink-0 items-center justify-center rounded-md ${
-          emerald ? "bg-emerald-50 text-emerald-600" : "bg-muted text-muted-foreground"
+        className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
+          emerald ? "bg-emerald-50 text-emerald-600" : "bg-primary/10 text-primary"
         }`}
       >
-        <Icon className="size-4" />
+        <Icon className="size-4.5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="truncate text-sm text-muted-foreground">{desc}</p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="truncate text-xs text-muted-foreground">{desc}</p>
       </div>
-      <Button size="sm" variant={emerald ? "default" : "outline"} asChild className="shrink-0">
+      <Button size="sm" variant={emerald ? "default" : "outline"} asChild className="shrink-0 text-xs font-semibold">
         <Link href={href}>{cta}</Link>
       </Button>
     </div>
@@ -73,66 +65,39 @@ function StatCell({
   value,
   unit,
   hint,
+  colorClass = "text-foreground",
+  iconBgClass = "bg-muted text-muted-foreground",
 }: {
   href: string;
-  icon: Icon;
+  icon: LucideIcon;
   label: string;
   value: number | string;
   unit: string;
   hint: string;
+  colorClass?: string;
+  iconBgClass?: string;
 }) {
   return (
-    <Link href={href} className="bg-card p-5 transition-colors hover:bg-muted/50">
-      <div className="flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+    <Link href={href} className="group bg-card p-5 transition-colors hover:bg-muted/40">
+      <div className="flex items-center gap-2.5">
+        <span className={`flex size-8 items-center justify-center rounded-lg transition-transform group-hover:scale-105 ${iconBgClass}`}>
           <Icon className="size-4" />
         </span>
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight">
-        {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+      <p className={`mt-2.5 text-2xl font-bold tracking-tight font-mono ${colorClass}`}>
+        {value} <span className="text-xs font-normal text-muted-foreground font-sans">{unit}</span>
       </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-    </Link>
-  );
-}
-
-function NavItem({
-  href,
-  icon: Icon,
-  title,
-  desc,
-}: {
-  href: string;
-  icon: Icon;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <Link href={href} className="group block">
-      <Card className="h-full transition-all hover:border-primary/40 hover:shadow-sm">
-        <CardContent className="flex items-center gap-3 p-5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Icon className="size-4" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">{title}</span>
-            <span className="block truncate text-sm text-muted-foreground">{desc}</span>
-          </span>
-          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-        </CardContent>
-      </Card>
+      <p className="mt-1 text-xs text-muted-foreground truncate">{hint}</p>
     </Link>
   );
 }
 
 export default function CandidateHome() {
-  const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
+  const { cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
   const { applications } = useApplications();
 
-  const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
-  const candidateRole = cvProfile?.targetRole || cvProfile?.headline || "Talent Network Member";
-  const candidateLocation = cvProfile?.location || "Indonesia";
+  const readiness = calculateCandidateReadiness(cvProfile);
 
   const pendingConsentsCount = dbMode
     ? consentRequests.filter(
@@ -151,69 +116,95 @@ export default function CandidateHome() {
   );
   const pendingOffer = applications.find((app) => app.status === "offer");
 
-  const sections = [
-    Boolean(cvProfile?.fullName?.trim() && cvProfile?.email?.trim()),
-    Boolean(cvProfile?.headline?.trim() && cvProfile?.about?.trim()),
-    Boolean(cvProfile?.location?.trim() && cvProfile?.targetRole?.trim()),
-    Boolean(cvProfile?.skills?.length && cvProfile?.tools?.length),
-    Boolean(cvProfile?.experience?.length),
-    Boolean(cvProfile?.education?.length),
-  ];
-  const completionPercent = Math.round((sections.filter(Boolean).length / sections.length) * 100);
-
   const hasAlerts = Boolean(pendingOffer || interviewApplications.length > 0 || pendingConsentsCount > 0);
 
   const stats = [
-    { href: "/candidate/applications", icon: Briefcase, label: "Lamaran aktif", value: activeApplications.length, unit: "posisi", hint: "Pantau timeline seleksi" },
-    { href: "/candidate/applications", icon: Calendar, label: "Wawancara", value: interviewApplications.length, unit: "sesi", hint: interviewApplications.length > 0 ? "Jadwal interview aktif" : "Belum ada jadwal" },
-    { href: "/candidate/applications", icon: Award, label: "Penawaran", value: offerApplications.length, unit: "penawaran", hint: pendingOffer ? "Menunggu konfirmasi" : "Hasil offering" },
-    { href: "/candidate/cv", icon: TrendingUp, label: "Profil ATS", value: `${completionPercent}%`, unit: "lengkap", hint: completionPercent === 100 ? "Profil prima" : "Tingkatkan skor profil" },
+    {
+      href: "/candidate/applications",
+      icon: Briefcase,
+      label: "Lamaran Aktif",
+      value: activeApplications.length,
+      unit: "posisi",
+      hint: "Pantau alur seleksi Anda",
+      colorClass: "text-foreground",
+      iconBgClass: "bg-primary/10 text-primary",
+    },
+    {
+      href: "/candidate/applications",
+      icon: Calendar,
+      label: "Wawancara",
+      value: interviewApplications.length,
+      unit: "sesi",
+      hint: interviewApplications.length > 0 ? "Jadwal wawancara terjadwal" : "Belum ada jadwal",
+      colorClass: interviewApplications.length > 0 ? "text-emerald-600" : "text-foreground",
+      iconBgClass: interviewApplications.length > 0 ? "bg-emerald-50 text-emerald-600" : "bg-muted text-muted-foreground",
+    },
+    {
+      href: "/candidate/applications",
+      icon: Award,
+      label: "Penawaran Kerja",
+      value: offerApplications.length,
+      unit: "penawaran",
+      hint: pendingOffer ? "Menunggu konfirmasi Anda" : "Hasil offering rekruter",
+      colorClass: offerApplications.length > 0 ? "text-amber-600" : "text-foreground",
+      iconBgClass: offerApplications.length > 0 ? "bg-amber-50 text-amber-600" : "bg-muted text-muted-foreground",
+    },
+    {
+      href: "/candidate/contact-requests",
+      icon: ShieldCheck,
+      label: "Izin Skrining",
+      value: pendingConsentsCount > 0 ? pendingConsentsCount : "Aman",
+      unit: pendingConsentsCount > 0 ? "menunggu" : "terlindungi",
+      hint: pendingConsentsCount > 0 ? "Permintaan akses dari rekruter" : "Izin profil terkendali penuh",
+      colorClass: pendingConsentsCount > 0 ? "text-amber-600" : "text-emerald-600",
+      iconBgClass: pendingConsentsCount > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600",
+    },
   ];
 
   return (
     <ProtectedRoute role="candidate">
-      <main className="container mx-auto px-4 py-8 space-y-6">
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Halo, {candidateName}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{candidateRole}</span>
-                <span aria-hidden="true">•</span>
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-4" /> {candidateLocation}
-                </span>
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/candidate/profile">
-                  <Eye className="size-4" />
-                  Tinjau Profil Publik
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href="/jobs">
-                  <Compass className="size-4" />
-                  Cari Lowongan
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        {/* Context Header */}
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              Ringkasan Aktivitas Karir
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
+              Pantau perkembangan seleksi lamaran, izin akses rekruter, dan kesiapan kompetensi Anda.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild className="text-xs font-medium">
+              <Link href="/jobs">
+                <Briefcase className="size-3.5 mr-1.5" />
+                Cari Lowongan
+              </Link>
+            </Button>
+            <Button size="sm" asChild className="text-xs font-semibold">
+              <Link href="/candidate/career-advisor">
+                <Sparkles className="size-3.5 mr-1.5" />
+                AI Career Hub
+              </Link>
+            </Button>
+          </div>
+        </div>
 
+        {/* Action Alerts */}
         {hasAlerts && (
-          <section aria-label="Perlu perhatian">
-            <h2 className="mb-2 text-sm font-semibold">Perlu perhatian</h2>
-            <Card>
-              <div className="divide-y">
+          <section aria-label="Perlu perhatian" className="space-y-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Perlu Perhatian Segera
+            </h2>
+            <Card className="border-amber-200/80 bg-card shadow-xs overflow-hidden">
+              <div className="divide-y divide-border/60">
                 {pendingOffer && (
                   <ActionRow
                     icon={Award}
                     title="Tawaran pekerjaan siap ditinjau"
                     desc={`${pendingOffer.job?.title ?? "Posisi baru"} • ${pendingOffer.job?.organizationName ?? "Perusahaan"}`}
                     href={`/candidate/applications/${pendingOffer.id}`}
-                    cta="Tinjau tawaran"
+                    cta="Tinjau Tawaran"
                     emerald
                   />
                 )}
@@ -221,18 +212,19 @@ export default function CandidateHome() {
                   <ActionRow
                     icon={Calendar}
                     title={`Jadwal wawancara aktif (${interviewApplications.length})`}
-                    desc="Cek tautan meeting dan agenda persiapan."
+                    desc="Cek tautan meeting dan panduan agenda wawancara."
                     href={`/candidate/applications/${interviewApplications[0].id}`}
-                    cta="Buka wawancara"
+                    cta="Buka Wawancara"
+                    emerald
                   />
                 )}
                 {pendingConsentsCount > 0 && (
                   <ActionRow
                     icon={Bell}
-                    title={`${pendingConsentsCount} permintaan kontak baru`}
-                    desc="Berikan izin dari halaman notifikasi."
-                    href="/notifications?tab=contact-requests"
-                    cta="Tinjau"
+                    title={`${pendingConsentsCount} Permintaan Izin Kontak Baru`}
+                    desc="Rekruter meminta izin untuk membuka kontak dan hasil skrining kesiapan karier."
+                    href="/candidate/contact-requests"
+                    cta="Tinjau Izin"
                   />
                 )}
               </div>
@@ -240,25 +232,181 @@ export default function CandidateHome() {
           </section>
         )}
 
-        <Card className="overflow-hidden p-0">
-          <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4 lg:gap-0 lg:divide-x">
+        {/* 4-Cell High-Impact Metric Grid */}
+        <Card className="overflow-hidden p-0 border-border/80 shadow-xs">
+          <div className="grid grid-cols-2 gap-px bg-border/80 lg:grid-cols-4 lg:gap-0 lg:divide-x">
             {stats.map((s) => (
               <StatCell key={s.label} {...s} />
             ))}
           </div>
         </Card>
 
-        <section aria-label="Navigasi karier">
-          <h2 className="mb-2 text-base font-semibold">Jelajahi workspace</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {NAVS.map((n) => (
-              <NavItem key={n.href + n.title} {...n} />
-            ))}
+        {/* Active Application Pipeline */}
+        <section aria-label="Lamaran aktif" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-foreground">Proses Lamaran Berjalan</h2>
+              <p className="text-xs text-muted-foreground">
+                Perkembangan tahapan seleksi dari posisi yang telah Anda lamar.
+              </p>
+            </div>
+            {applications.length > 0 && (
+              <Button variant="ghost" size="sm" asChild className="text-xs font-medium text-primary hover:text-primary">
+                <Link href="/candidate/applications">
+                  Lihat Semua ({applications.length})
+                  <ArrowRight className="size-3.5 ml-1" />
+                </Link>
+              </Button>
+            )}
           </div>
+
+          {activeApplications.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {activeApplications.slice(0, 3).map((app) => (
+                <Card key={app.id} className="border-border/80 bg-card hover:border-primary/40 transition-colors shadow-2xs">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-foreground truncate">
+                          {app.job?.title || "Posisi Lamaran"}
+                        </h3>
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground truncate mt-0.5">
+                          <Building2 className="size-3 shrink-0" />
+                          {app.job?.organizationName || "Perusahaan Mitra"}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                        app.status === "interview"
+                          ? "bg-primary/10 text-primary"
+                          : app.status === "offer"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-muted text-muted-foreground"
+                      }`}>
+                        {app.status.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                      <span className="text-muted-foreground">
+                        {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Terkirim"}
+                      </span>
+                      <Button variant="outline" size="sm" asChild className="h-7 px-2.5 text-xs">
+                        <Link href={`/candidate/applications/${app.id}`}>
+                          Detail Alur
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="border-dashed border-border bg-card/50 p-6 text-center">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-3">
+                <Briefcase className="size-6" />
+              </div>
+              <h3 className="text-sm font-bold text-foreground">Belum Ada Lamaran Aktif</h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                Profil Anda telah siap dilamar. Temukan peluang karier yang cocok dari lowongan terverifikasi ProofyLink.
+              </p>
+              <Button size="sm" asChild className="mt-4 text-xs font-semibold">
+                <Link href="/jobs">
+                  Eksplorasi Lowongan Kerja
+                  <ArrowRight className="size-3.5 ml-1.5" />
+                </Link>
+              </Button>
+            </Card>
+          )}
         </section>
 
-        <ProfileCompletionCard />
-      </main>
+        {/* 2-Column Action Accelerators */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Card 1: AI Career Optimization */}
+          <Card className="border-border/80 bg-card shadow-2xs">
+            <CardContent className="p-5 flex flex-col justify-between h-full gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Sparkles className="size-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground">AI Career Advisor</h3>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Evaluasi kecocokan CV dengan posisi target, temukan kesenjangan kompetensi (skill gaps), dan dapatkan rekomendasi langkah karier terukur.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                  Sinkronisasi 1-Klik ke CV
+                </span>
+                <Button variant="outline" size="sm" asChild className="text-xs font-semibold">
+                  <Link href="/candidate/career-advisor">
+                    Buka AI Advisor
+                    <ArrowRight className="size-3.5 ml-1" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Privacy & Verification Trust */}
+          <Card className="border-border/80 bg-card shadow-2xs">
+            <CardContent className="p-5 flex flex-col justify-between h-full gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <ShieldCheck className="size-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground">Privasi &amp; Verifikasi Kredensial</h3>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Data profil Anda terlindungi dengan kerangka <em>Consent-First</em>. Rekruter tidak dapat melihat data kontak sebelum mendapatkan persetujuan langsung dari Anda.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Lock className="size-3.5 text-emerald-600" />
+                  Kontrol Izin Penuh
+                </span>
+                <Button variant="outline" size="sm" asChild className="text-xs font-semibold">
+                  <Link href="/candidate/contact-requests">
+                    Kelola Izin Privasi
+                    <ArrowRight className="size-3.5 ml-1" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Profile Completion / Readiness State */}
+        {!readiness.complete ? (
+          <ProfileCompletionCard />
+        ) : (
+          <Card className="border-emerald-200 bg-emerald-50/40 shadow-2xs">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4.5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <ShieldCheck className="size-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Profil Kategori Prima &amp; Terverifikasi</p>
+                  <p className="text-xs text-muted-foreground">
+                    Semua seksi utama profil telah lengkap dan siap dipadankan dengan rekruter institusi mitra.
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" asChild className="shrink-0 text-xs border-emerald-300 hover:bg-emerald-100 text-emerald-800">
+                <Link href="/candidate/cv">
+                  <FileText className="size-3.5 mr-1.5" />
+                  Kelola di CV Studio
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </ProtectedRoute>
   );
 }

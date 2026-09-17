@@ -1,16 +1,21 @@
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { CareerAdvisorWorkspace } from "@/components/candidate/career-advisor-workspace";
 
-export default function Page() {
+export default function CareerAdvisorPage() {
   return (
     <ProtectedRoute role="candidate">
-      <main className="container mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-3xl font-bold text-foreground">Penasihat Profil Karier</h1>
-        <p className="mt-2 mb-8 text-sm leading-relaxed text-muted-foreground max-w-3xl">
-          Evaluasi 3 pilar untuk memperkuat profil dan CV agar siap seleksi recruiter dan ATS.
-        </p>
-        <CareerAdvisorWorkspace />
-      </main>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            AI Career Advisor &amp; Evaluasi Profil
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground max-w-3xl">
+            Optimalkan profil dan CV kamu dengan analisis 3 pilar: Review CV ATS, Analisis Kesenjangan Skill (Gap Analysis), dan Roadmap Karier Berkelanjutan.
+          </p>
+        </div>
+        <CareerAdvisorWorkspace initialFocus="cv_review" />
+      </div>
     </ProtectedRoute>
   );
 }
+

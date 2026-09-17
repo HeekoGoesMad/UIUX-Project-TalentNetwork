@@ -43,7 +43,7 @@ const CAREER_STATUS_DESCRIPTIONS: Record<CareerStatus, string> = {
 
 // Demo fallback data agar halaman tidak kosong jika belum pernah scan CV
 const DEMO = {
-  fullName: "Nadia Putri",
+  fullName: "Nadia Putri Rahayu",
   headline: "Senior Product Designer | UX Research | Design Systems",
   targetRole: "Lead Product Designer",
   location: "Jakarta",
@@ -98,28 +98,7 @@ const DEMO = {
   portfolio: [] as string[],
 };
 
-// Completeness calculator
-function calcCompleteness(p: {
-  about?: string;
-  headline?: string;
-  experience?: unknown[];
-  education?: unknown[];
-  skills?: string[];
-  tools?: string[];
-  portfolio?: string[];
-}): { pct: number; missing: string[] } {
-  const missing: string[] = [];
-  if (!p.about) missing.push("Tentang Saya");
-  if (!p.headline) missing.push("Headline");
-  if (!p.experience?.length) missing.push("Pengalaman Kerja");
-  if (!p.education?.length) missing.push("Pendidikan");
-  if (!p.skills?.length) missing.push("Skill");
-  if (!p.tools?.length) missing.push("Tools");
-  if (!p.portfolio?.length) missing.push("Portofolio");
-  const total = 7;
-  const filled = total - missing.length;
-  return { pct: Math.round((filled / total) * 100), missing };
-}
+import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 
 export default function ProfilePage() {
   const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile } = useApp();
@@ -292,7 +271,7 @@ export default function ProfilePage() {
     });
   };
 
-  const { pct, missing } = calcCompleteness(p);
+  const readiness = calculateCandidateReadiness(p);
 
   const initials = (p.fullName || user?.name || user?.email || "P")
     .trim()
@@ -305,13 +284,12 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute role="candidate">
-      <div className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="space-y-6 pb-12">
         {/* Page header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#7C3AED]">Profil Kandidat</p>
-            <h1 className="mt-2 text-3xl font-bold text-[#111827]">Profil kamu</h1>
-            <p className="mt-2 text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Profil Publik Kamu</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Buat recruiter memahami cerita di balik pengalamanmu secara komprehensif.</p>
           </div>
           <Button variant="outline" asChild>
             <Link href="/candidate/cv">
@@ -326,8 +304,8 @@ export default function ProfilePage() {
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="relative rounded-2xl border bg-white shadow-xs">
-              <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r from-[#1e1b4b] via-[#4c1d95] to-[#7c3aed]">
+            <section className="relative rounded-2xl border bg-card shadow-xs">
+              <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r from-dark-navy via-slate-900 to-primary/80">
                 {/* Banner Photo Overlay */}
                 {p.bannerUrl ? (
                   <img
@@ -369,7 +347,7 @@ export default function ProfilePage() {
               <div className="px-6 pb-6">
                 {/* Avatar with Camera & Remove badges */}
                 <div className="-mt-16 sm:-mt-20 relative inline-block">
-                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-full border-4 border-white bg-slate-100 shadow-md overflow-hidden ring-1 ring-slate-900/5">
+                  <div className="relative flex size-28 sm:size-32 items-center justify-center rounded-full border-4 border-card bg-muted shadow-md overflow-hidden ring-1 ring-border">
                     {p.avatarUrl ? (
                       <img
                         src={p.avatarUrl}
@@ -382,7 +360,7 @@ export default function ProfilePage() {
                         }}
                       />
                     ) : null}
-                    <span className="absolute text-3xl font-bold text-[#7C3AED] select-none">{initials}</span>
+                    <span className="absolute text-3xl font-bold text-primary select-none">{initials}</span>
                   </div>
 
                   {/* Camera & Animated Peek Trash buttons for avatar */}
@@ -394,14 +372,14 @@ export default function ProfilePage() {
                           onClick={() => handleRemoveMedia("avatar")}
                           title="Hapus Foto Profil"
                           aria-label="Hapus Foto Profil"
-                          className="absolute z-10 flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-sm border-2 border-white transition-all duration-300 ease-out -translate-y-3.5 group-hover:-translate-y-9 group-focus-within:-translate-y-9 hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto will-change-transform"
+                          className="absolute z-10 flex size-8 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-sm border-2 border-card transition-all duration-300 ease-out -translate-y-3.5 group-hover:-translate-y-9 group-focus-within:-translate-y-9 hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto will-change-transform"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
                       ) : null}
                       <label
                         title="Ubah Foto Profil"
-                        className="relative z-20 cursor-pointer flex size-9 items-center justify-center rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-md border-2 border-white transition-transform duration-200 hover:scale-105"
+                        className="relative z-20 cursor-pointer flex size-9 items-center justify-center rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md border-2 border-card transition-transform duration-200 hover:scale-105"
                       >
                         <Camera className="size-4" />
                         <input
@@ -418,16 +396,16 @@ export default function ProfilePage() {
                 {/* Name + headline + location + status */}
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                       {p.fullName || user?.name || "Profil Saya"}
-                    </h1>
+                    </h2>
                     <VerifiedBadge />
                     {p.personality && (
                       <span
                         title={`Tipe Kepribadian: ${p.personality.type} (${p.personality.label})`}
-                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-[#7C3AED]"
+                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-semibold text-primary"
                       >
-                        <Brain className="size-3.5 text-[#7C3AED]" />
+                        <Brain className="size-3.5 text-primary" />
                         {p.personality.type} · {p.personality.label}
                       </span>
                     )}
@@ -435,23 +413,23 @@ export default function ProfilePage() {
 
                   {/* Headline */}
                   {p.headline && (
-                    <p className="mt-1 text-base font-semibold text-[#7C3AED]">{p.headline}</p>
+                    <p className="mt-1 text-base font-medium text-primary">{p.headline}</p>
                   )}
 
                   {/* Location, Target Role & Salary */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
-                      <MapPin className="size-4 text-slate-400" />
+                      <MapPin className="size-4 text-muted-foreground" />
                       {p.location}
                     </span>
                     {p.targetRole && (
-                      <span className="flex items-center gap-1.5 text-blue-700 font-medium">
+                      <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400 font-medium">
                         <BriefcaseBusiness className="size-4 text-blue-600" />
                         Target: {p.targetRole}
                       </span>
                     )}
                     {p.salary && (
-                      <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                      <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
                         <Banknote className="size-4 text-emerald-600" />
                         Ekspektasi: {p.salary}
                       </span>
@@ -463,7 +441,7 @@ export default function ProfilePage() {
                     <button
                       id="career-status-btn"
                       onClick={() => setStatusOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:ring-offset-1"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
                       aria-haspopup="listbox"
                       aria-expanded={statusOpen}
                     >
@@ -506,7 +484,7 @@ export default function ProfilePage() {
                                   {CAREER_STATUS_DESCRIPTIONS[key]}
                                 </p>
                               </div>
-                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-[#7C3AED]" />}
+                              {isActive && <Check className="mt-0.5 size-4 shrink-0 text-primary" />}
                             </button>
                           );
                         })}
@@ -537,15 +515,15 @@ export default function ProfilePage() {
             {/* Pengalaman Kerja */}
             {p.experience.length > 0 && (
               <ProfileSection title="Pengalaman Kerja">
-                <div className="space-y-6 border-l-2 border-slate-200 pl-5">
+                <div className="space-y-6 border-l-2 border-border pl-5">
                   {p.experience.map((exp, i) => (
                     <div key={i} className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-[#111827]">
+                        <p className="font-semibold text-foreground">
                           {exp.role} · {exp.company}
                         </p>
                         {exp.employmentType && (
-                          <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                          <span className="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-md">
                             {exp.employmentType}
                           </span>
                         )}
@@ -553,24 +531,24 @@ export default function ProfilePage() {
                       <p className="font-mono text-xs text-muted-foreground">{exp.dates}</p>
 
                       {exp.description && (
-                        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line pt-0.5">
+                        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line pt-0.5">
                           {exp.description}
                         </p>
                       )}
 
                       {Array.isArray(exp.achievements) && exp.achievements.length > 0 ? (
                         <div className="space-y-1 pt-1">
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pencapaian:</p>
                           {exp.achievements.map((a, j) => (
-                            <p key={j} className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                            <p key={j} className="text-xs leading-relaxed text-foreground/80 pl-2 border-l-2 border-primary/30">
                               • {a}
                             </p>
                           ))}
                         </div>
                       ) : typeof exp.achievements === "string" && exp.achievements ? (
                         <div className="pt-1">
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pencapaian:</p>
-                          <p className="text-xs leading-relaxed text-slate-600 pl-2 border-l-2 border-purple-300">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pencapaian:</p>
+                          <p key="str-ach" className="text-xs leading-relaxed text-foreground/80 pl-2 border-l-2 border-primary/30">
                             • {exp.achievements}
                           </p>
                         </div>
@@ -587,19 +565,19 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {p.education.map((edu, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-[#7C3AED]" />
+                      <GraduationCap className="mt-0.5 size-5 shrink-0 text-primary" />
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-[#111827]">{edu.school}</p>
+                          <p className="font-semibold text-foreground">{edu.school}</p>
                           {edu.level && (
-                            <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                            <span className="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-md">
                               {edu.level}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-slate-700 font-medium">
+                        <p className="text-sm text-foreground/90 font-medium">
                           {edu.program}
-                          {edu.gpa && <span className="text-[#7C3AED] font-semibold"> · IPK: {edu.gpa}</span>}
+                          {edu.gpa && <span className="text-primary font-semibold"> · IPK: {edu.gpa}</span>}
                         </p>
                         {edu.dates && (
                           <p className="text-xs text-muted-foreground">{edu.dates}</p>
@@ -615,19 +593,24 @@ export default function ProfilePage() {
           {/* ── Sidebar ── */}
           <aside className="space-y-5">
             {/* Profile completeness */}
-            <Card>
+            <Card className="border-border/80 bg-card shadow-xs">
               <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">Kelengkapan Profil</p>
-                <p className="mt-2 text-3xl font-bold text-[#111827]">{pct}%</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kesiapan Profil ATS</p>
+                  <span className={`font-mono text-xs font-bold ${readiness.tierColor}`}>{readiness.tier}</span>
+                </div>
+                <p className={`mt-2 font-mono text-3xl font-bold ${readiness.tierColor}`}>{readiness.percent}%</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-[#7C3AED] transition-all"
-                    style={{ width: `${pct}%` }}
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      readiness.complete ? "bg-emerald-500" : "bg-primary"
+                    }`}
+                    style={{ width: `${readiness.percent}%` }}
                   />
                 </div>
-                {missing.length > 0 && (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    Tambahkan <span className="font-medium text-[#7C3AED]">{missing[0]}</span> untuk melengkapi profil.
+                {readiness.missingSections.length > 0 && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Lengkapi <Link href={readiness.missingSections[0].anchor} className="font-semibold text-primary hover:underline">{readiness.missingSections[0].label}</Link> di CV Workspace.
                   </p>
                 )}
               </CardContent>
@@ -639,12 +622,12 @@ export default function ProfilePage() {
                 {/* 1. Hard Competencies */}
                 {p.skills.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Hard Competencies</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hard Competencies</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.skills.map((skill) => (
                         <span
                           key={skill}
-                          className="rounded-full bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-[#7C3AED]"
+                          className="rounded-full bg-primary/5 border border-primary/20 px-2.5 py-1 text-xs font-medium text-primary"
                         >
                           {skill}
                         </span>
@@ -656,12 +639,12 @@ export default function ProfilePage() {
                 {/* 2. Tools */}
                 {p.tools.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Tools &amp; Software</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tools &amp; Software</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.tools.map((tool) => (
                         <span
                           key={tool}
-                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                          className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
                         >
                           <Wrench className="size-3" />
                           {tool}
@@ -674,12 +657,12 @@ export default function ProfilePage() {
                 {/* 3. Soft Skills */}
                 {p.softSkills.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Soft Skills</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Soft Skills</p>
                     <div className="flex flex-wrap gap-1.5">
                       {p.softSkills.map((softSkill) => (
                         <span
                           key={softSkill}
-                          className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                          className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40"
                         >
                           {softSkill}
                         </span>
@@ -700,7 +683,7 @@ export default function ProfilePage() {
                       href={item.startsWith("http") ? item : `https://${item}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-[#7C3AED] transition-colors hover:bg-slate-50"
+                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-primary transition-colors hover:bg-muted/40"
                     >
                       <BriefcaseBusiness className="size-4 shrink-0" />
                       <span className="min-w-0 truncate">{item}</span>

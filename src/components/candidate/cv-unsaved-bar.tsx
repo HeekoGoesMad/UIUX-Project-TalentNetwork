@@ -80,10 +80,10 @@ export function CvUnsavedBar({
             onClick={() => void onSave()}
             disabled={saving}
             className={cn(
-              "h-8 rounded-full px-4 text-xs font-semibold shadow-xs text-white transition-transform active:scale-95",
+              "h-8 rounded-full px-4 text-xs font-semibold shadow-xs text-primary-foreground transition-transform active:scale-95",
               shaking
                 ? "bg-destructive hover:bg-destructive/90"
-                : "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                : "bg-primary hover:bg-primary/90"
             )}
           >
             {saving ? (

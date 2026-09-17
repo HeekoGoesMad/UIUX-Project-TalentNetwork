@@ -58,7 +58,7 @@ export function CvDocumentsPanel() {
             <CardTitle className="text-sm sm:text-base font-semibold text-foreground">
               Dokumen CV Terunggah
             </CardTitle>
-            <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-[#7C3AED] border border-purple-200">
+            <span className="rounded-full bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20">
               {documents.length} berkas
             </span>
           </div>

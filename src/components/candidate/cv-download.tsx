@@ -211,11 +211,11 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
       <div className="flex flex-col gap-3 border-b border-slate-200/80 bg-white p-3.5 sm:p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#7C3AED]/10 text-[#7C3AED]">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <activeTpl.icon className="size-4" />
             </span>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-slate-900 truncate">
+              <h3 className="text-sm font-bold text-foreground truncate">
                 Pratinjau Live &amp; Unduh CV
               </h3>
               <p className="text-[11px] text-muted-foreground truncate">
@@ -231,7 +231,7 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
               variant="outline"
               size="icon"
               onClick={() => setPreviewOpen(true)}
-              className="size-8 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
+              className="size-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted hover:text-foreground transition-colors"
               aria-label="Tampilan Layar Penuh"
               title="Buka Pratinjau Layar Penuh"
             >
@@ -243,7 +243,7 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
               variant="outline"
               size="icon"
               onClick={handlePrint}
-              className="size-8 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
+              className="size-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted hover:text-foreground transition-colors"
               aria-label="Cetak CV"
               title="Cetak / Simpan via Browser"
             >
@@ -255,7 +255,7 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
                 size="sm"
                 onClick={() => void handleDownload()}
                 disabled={downloading}
-                className="h-8 rounded-lg bg-[#7C3AED] px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-[#6D28D9] transition-transform active:scale-95"
+                className="h-8 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-transform active:scale-95"
               >
                 {downloading ? (
                   <>
@@ -273,7 +273,7 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
           </div>
 
           {/* Template Switcher Tabs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-xl bg-slate-100/90 p-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-xl bg-muted/60 p-1">
             {TEMPLATES.map((tpl) => {
               const isCurrent = selected === tpl.id;
               const Icon = tpl.icon;
@@ -285,16 +285,16 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
                   className={cn(
                     "flex flex-col items-start gap-0.5 rounded-lg px-2.5 py-1.5 text-left transition-all",
                     isCurrent
-                      ? "bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                      ? "bg-card text-foreground shadow-xs ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground hover:bg-card/50"
                   )}
                 >
                   <div className="flex w-full items-center justify-between">
-                    <span className="flex items-center gap-1 text-xs font-bold truncate">
-                      <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-[#7C3AED]" : "text-slate-400")} />
+                    <span className="flex items-center gap-1 text-xs font-semibold truncate">
+                      <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} />
                       {tpl.name}
                     </span>
-                    {isCurrent && <CheckCircle2 className="size-3 text-[#7C3AED]" />}
+                    {isCurrent && <CheckCircle2 className="size-3 text-primary" />}
                   </div>
                   <span className="text-[10px] text-muted-foreground truncate">
                     {tpl.tag}
@@ -428,7 +428,7 @@ export const CvDownload = memo(function CvDownload({ profile }: { profile: CvPro
                   size="sm"
                   onClick={() => void handleDownload()}
                   disabled={downloading}
-                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-1.5 text-xs font-semibold shadow-xs"
+                  className="gap-1.5 text-xs font-semibold shadow-xs"
                 >
                   {downloading ? (
                     <Loader2 className="size-3.5 animate-spin" />

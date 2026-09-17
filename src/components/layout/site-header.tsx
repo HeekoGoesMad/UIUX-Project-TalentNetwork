@@ -145,7 +145,8 @@ export function SiteHeader() {
   const isCandidateSection = pathname?.startsWith("/candidate");
 
   const isLinkActive = (href: string) => {
-    if (href === "/candidate") return pathname === href;
+    if (href === "/candidate") return pathname === href || pathname?.startsWith("/candidate");
+    if (href === "/jobs") return pathname === href || pathname?.startsWith("/jobs");
     if (href === "/messages")
       return pathname === href || pathname?.startsWith(`${href}/`) || pathname?.endsWith("/messages");
     return pathname === href || pathname?.startsWith(`${href}/`);
@@ -163,9 +164,7 @@ export function SiteHeader() {
       : isCandidateSection || visibleUser?.role === "candidate"
       ? [
           { href: "/candidate", label: "Workspace" },
-          { href: "/candidate/applications", label: "Lamaran Saya" },
-          { href: "/candidate/cv", label: "CV & Profil" },
-          { href: "/candidate/career-advisor", label: "Career Advisor" },
+          { href: "/jobs", label: "Lowongan Kerja" },
           { href: "/messages", label: "Pesan" },
         ]
       : isPublicHeader

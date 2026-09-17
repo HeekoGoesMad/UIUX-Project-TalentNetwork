@@ -75,7 +75,7 @@ export function PersonalityModal({
       <DialogContent className="sm:max-w-md p-5 sm:p-6 rounded-2xl gap-4">
         <DialogHeader className="gap-1 border-b border-border pb-3 pr-8">
           <div className="flex items-center gap-2">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Brain className="size-4" />
             </div>
             <DialogTitle className="text-base font-bold text-foreground">
@@ -89,13 +89,13 @@ export function PersonalityModal({
 
         <div className="space-y-4 py-1">
           {/* Belum tahu tes? info box */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-purple-200/70 bg-purple-50/50 p-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-purple-950 flex items-center gap-1.5">
-                <HelpCircle className="size-3.5 text-[#7C3AED]" />
+              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <HelpCircle className="size-3.5 text-primary" />
                 Belum tahu tipe kamu?
               </p>
-              <p className="text-[11px] text-purple-900/70">
+              <p className="text-[11px] text-muted-foreground">
                 Ikuti tes gratis 10–12 menit di situs resmi 16Personalities.
               </p>
             </div>
@@ -103,7 +103,7 @@ export function PersonalityModal({
               asChild
               variant="outline"
               size="sm"
-              className="h-7 text-[11px] font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-100/60 rounded-lg shrink-0 gap-1 px-2.5"
+              className="h-7 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/10 rounded-lg shrink-0 gap-1 px-2.5"
             >
               <a
                 href={OFFICIAL_16PERSONALITIES_URL}
@@ -123,7 +123,7 @@ export function PersonalityModal({
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED]"
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">-- Pilih Tipe Kepribadian --</option>
               <optgroup label="Kelompok Analis">
@@ -159,9 +159,9 @@ export function PersonalityModal({
 
           {/* Selected Preview Box */}
           {selectedConfig && (
-            <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#7C3AED]">
-                <Sparkles className="size-3.5 text-[#7C3AED]" />
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                <Sparkles className="size-3.5 text-primary" />
                 <span>{selectedConfig.type} · {selectedConfig.name}</span>
                 <span className="text-[10px] font-normal text-muted-foreground">({selectedConfig.categoryLabel})</span>
               </div>
@@ -181,7 +181,7 @@ export function PersonalityModal({
               value={testUrl}
               onChange={(e) => setTestUrl(e.target.value)}
               placeholder="https://www.16personalities.com/profiles/..."
-              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED]"
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <p className="text-[10px] text-muted-foreground">
               Tautan publik profil hasil tesmu agar rekruter dapat memverifikasi keasliannya.
@@ -219,7 +219,7 @@ export function PersonalityModal({
               size="sm"
               onClick={handleApply}
               disabled={!selectedType && !personality?.type}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white h-8 text-xs font-semibold rounded-xl gap-1"
+              className="h-8 text-xs font-semibold rounded-xl gap-1"
             >
               <Check className="size-3" />
               Terapkan
