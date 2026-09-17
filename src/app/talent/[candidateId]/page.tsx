@@ -31,6 +31,7 @@ import {
     Briefcase,
     Calendar,
     Check,
+    CheckCircle2,
     CircleHelp,
     Copy,
     ExternalLink,
@@ -169,6 +170,44 @@ function List({ items }: { items: string[] }) {
   );
 }
 
+function getScreeningStatusMeta(label?: string, score?: number) {
+  const norm = (label || "").toLowerCase();
+  if (norm.includes("sangat") || (score !== undefined && score >= 80)) {
+    return {
+      status: "Sangat Sesuai",
+      badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+      iconBoxClass: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/40 dark:border-emerald-800 dark:text-emerald-300",
+      icon: CheckCircle2,
+      description: "Kompetensi teknis, tools, dan rekam jejak kerja kandidat sangat selaras dengan kualifikasi target posisi.",
+    };
+  }
+  if (norm.includes("sesuai") || norm.includes("direkomendasikan") || norm.includes("baik") || (score !== undefined && score >= 60)) {
+    return {
+      status: "Sesuai",
+      badgeClass: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300",
+      iconBoxClass: "bg-purple-50 border-purple-200 text-[#7C3AED] dark:bg-purple-900/40 dark:border-purple-800 dark:text-purple-300",
+      icon: ShieldCheck,
+      description: "Memenuhi mayoritas kualifikasi keahlian inti dengan pengalaman kerja nyata yang relevan.",
+    };
+  }
+  if (norm.includes("cukup") || norm.includes("pertimbangan") || (score !== undefined && score >= 40)) {
+    return {
+      status: "Cukup",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+      iconBoxClass: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/40 dark:border-amber-800 dark:text-amber-300",
+      icon: AlertCircle,
+      description: "Memiliki keahlian dasar yang relevan, namun memerlukan penyesuaian khusus pada beberapa kompetensi spesifik.",
+    };
+  }
+  return {
+    status: "Kurang Sesuai",
+    badgeClass: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300",
+    iconBoxClass: "bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-700 dark:text-slate-400",
+    icon: CircleHelp,
+    description: "Kualifikasi dan latar belakang saat ini belum selaras langsung dengan standar peran yang ditargetkan.",
+  };
+}
+
 function ScreeningResults({
   candidateId,
   candidate,
@@ -267,6 +306,9 @@ function ScreeningResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId, candidate, completed, result]);
 
+  const statusMeta = result ? getScreeningStatusMeta(result.insight.label, result.insight.score) : null;
+  const StatusIcon = statusMeta?.icon;
+
   return (
     <section className="mt-10 border-t pt-10" aria-labelledby="screening-results-title">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -301,7 +343,7 @@ function ScreeningResults({
       ) : !completed && (screeningStatus === "processing" || screeningStatus === "in_progress") ? (
         <Card className="mt-5 border-purple-100 bg-purple-50/50">
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground" role="status">
-            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan skor dan AI Summary...
+            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan status dan AI Summary...
           </CardContent>
         </Card>
       ) : !completed && (
@@ -348,36 +390,29 @@ function ScreeningResults({
         </Card>
       )}
 
-      {completed && result && (
+      {completed && result && statusMeta && StatusIcon && (
         <div className="mt-5 space-y-4">
-          <Card className="overflow-hidden border-slate-200">
-            <CardContent className="grid gap-6 bg-slate-50/50 p-6 sm:grid-cols-[auto_1fr] sm:items-center">
-              <div className="flex size-28 flex-col items-center justify-center rounded-full border-8 border-slate-200 bg-white">
-                <span className="font-mono text-4xl font-bold text-[#7C3AED]">{result.insight.score}</span>
-                <span className="text-xs text-muted-foreground">dari 100</span>
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-[#7C3AED] text-white">{result.insight.label}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Rekomendasi berbasis data, bukan keputusan otomatis
-                  </span>
+          <Card className="overflow-hidden border-slate-200 shadow-2xs">
+            <CardContent className="flex flex-col gap-5 bg-gradient-to-br from-slate-50/80 via-white to-purple-50/30 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-4">
+                <div className={cn("flex size-14 shrink-0 items-center justify-center rounded-2xl border shadow-xs", statusMeta.iconBoxClass)}>
+                  <StatusIcon className="size-7" />
                 </div>
-                <div className="mt-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Cakupan data</span>
-                    <span className="font-mono text-[#7C3AED]">{result.insight.coverage}%</span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status Screening</span>
+                    <Badge className={cn("text-xs font-semibold px-2.5 py-0.5 shadow-xs border", statusMeta.badgeClass)}>
+                      {statusMeta.status}
+                    </Badge>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-[#7C3AED]/20">
-                    <div
-                      className="h-2 rounded-full bg-[#7C3AED]"
-                      style={{ width: `${result.insight.coverage}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Seberapa banyak konteks profil yang tersedia untuk insight ini.
+                  <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200 leading-snug">
+                    {statusMeta.description}
                   </p>
                 </div>
+              </div>
+              <div className="shrink-0 rounded-xl border border-slate-200/90 bg-white/90 p-3 text-xs text-muted-foreground sm:text-right shadow-2xs dark:bg-slate-900/80 dark:border-slate-800">
+                <span className="font-semibold text-foreground block">Algoritma MD-CEA</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">✓ Zero-PII (Bebas Data Privat)</span>
               </div>
             </CardContent>
           </Card>
