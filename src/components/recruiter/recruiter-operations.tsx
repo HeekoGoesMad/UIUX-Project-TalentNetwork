@@ -81,14 +81,22 @@ const initialCandidates: Candidate[] = [
 ];
 
 const initialInterviews: Interview[] = [
-  { id: "interview-1", candidateId: "candidate-1", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Portfolio Review", panel: ["Raka Pratama"], status: "Terjadwal", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
-  { id: "interview-2", candidateId: "candidate-4", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "System Design & Culture", panel: ["Dimas Nugroho"], status: "Terjadwal", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
+  { id: "interview-1", candidateId: "candidate-1", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Portfolio Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
+  { id: "interview-2", candidateId: "candidate-4", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "System Design & Culture", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
 ];
 
 function readInitialState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey) ?? "null") as { candidates?: Candidate[]; interviews?: Interview[] } | null;
-    return { candidates: parsed?.candidates ?? initialCandidates, interviews: parsed?.interviews ?? initialInterviews };
+    const rawInterviews = parsed?.interviews ?? initialInterviews;
+    const loadedInterviews = rawInterviews.map((iv) => {
+      const isPast = !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < Date.now();
+      return {
+        ...iv,
+        status: iv.status === "Dibatalkan" ? ("Dibatalkan" as const) : isPast ? ("Selesai" as const) : iv.status,
+      };
+    });
+    return { candidates: parsed?.candidates ?? initialCandidates, interviews: loadedInterviews };
   } catch {
     return { candidates: initialCandidates, interviews: initialInterviews };
   }
@@ -216,28 +224,44 @@ export function RecruiterOperationsPage() {
         // Merge and load interviews
         let mappedInterviews: Interview[] = initialInterviews;
         if (intRes.ok) {
-          type IntRow = {
-            id: string;
-            title: string;
-            scheduledAt: string;
-            timezone: string;
-            candidateProfileId?: string;
+          type NestedInt = {
+            id?: string;
+            title?: string;
+            scheduledAt?: string;
+            timezone?: string;
             meetingUrl?: string;
             status?: string;
           };
+          type IntRow = NestedInt & {
+            interview?: NestedInt;
+            candidateProfileId?: string;
+          };
           const intData = (await intRes.json()) as { interviews?: IntRow[] };
           if (intData.interviews && intData.interviews.length > 0) {
-            mappedInterviews = intData.interviews.map((iv) => ({
-              id: iv.id,
-              candidateId: iv.candidateProfileId || "",
-              date: iv.scheduledAt,
-              timezone: iv.timezone || "Asia/Jakarta (WIB)",
-              type: iv.title,
-              panel: [recruiterName],
-              status: iv.status === "completed" ? "Selesai" : iv.status === "cancelled" ? "Dibatalkan" : "Terjadwal",
-              reminder: true,
-              meetingUrl: iv.meetingUrl,
-            }));
+            mappedInterviews = intData.interviews.map((iv) => {
+              const core = iv.interview || iv;
+              const scheduledDate = core.scheduledAt || iv.scheduledAt || new Date().toISOString();
+              const isPast = !isNaN(new Date(scheduledDate).getTime()) && new Date(scheduledDate).getTime() < Date.now();
+              const rawStatus = core.status || iv.status;
+              const status =
+                rawStatus === "completed" || isPast
+                  ? "Selesai"
+                  : rawStatus === "cancelled"
+                  ? "Dibatalkan"
+                  : "Terjadwal";
+
+              return {
+                id: core.id || iv.id || `iv-${Date.now()}`,
+                candidateId: iv.candidateProfileId || "",
+                date: scheduledDate,
+                timezone: core.timezone || iv.timezone || "Asia/Jakarta (WIB)",
+                type: core.title || iv.title || "Wawancara",
+                panel: [recruiterName],
+                status: status as "Terjadwal" | "Selesai" | "Dibatalkan",
+                reminder: true,
+                meetingUrl: core.meetingUrl || iv.meetingUrl,
+              };
+            });
           }
         }
 

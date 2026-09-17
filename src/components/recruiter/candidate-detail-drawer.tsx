@@ -74,6 +74,20 @@ const STAGE_OPTIONS: Array<{ id: Stage; label: string; color: string }> = [
   { id: "rejected", label: "Rejected", color: "bg-red-50 text-red-700 border-red-200" },
 ];
 
+function formatInterviewDateTime(dateStr?: string): string {
+  if (!dateStr) return "Waktu belum ditentukan";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "Waktu belum ditentukan";
+  return `${d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}, ${d.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })} WIB`;
+}
+
 export function CandidateDetailDrawer({
   candidate,
   open,
@@ -370,27 +384,35 @@ export function CandidateDetailDrawer({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {candidateInterviews.map((iv) => (
-                      <Card key={iv.id} className="border-slate-200 shadow-2xs">
-                        <CardContent className="p-4 space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-xs font-bold text-slate-900">{iv.type}</p>
-                              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                                <Clock className="size-3.5 text-purple-600" />
-                                {new Date(iv.date).toLocaleString("id-ID", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })} (WIB)
-                              </p>
+                    {candidateInterviews.map((iv) => {
+                      const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < Date.now());
+                      const effectiveStatus = iv.status === "Dibatalkan" ? "Dibatalkan" : isPastDate || iv.status === "Selesai" ? "Selesai" : "Terjadwal";
+
+                      return (
+                        <Card key={iv.id} className="border-slate-200 shadow-2xs">
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">{iv.type}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                  <Clock className="size-3.5 text-purple-600" />
+                                  {formatInterviewDateTime(iv.date)}
+                                </p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] font-semibold",
+                                  effectiveStatus === "Selesai"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : effectiveStatus === "Dibatalkan"
+                                    ? "bg-slate-100 text-slate-600 border-slate-200"
+                                    : "bg-purple-50 text-[#7C3AED] border-purple-200"
+                                )}
+                              >
+                                {effectiveStatus}
+                              </Badge>
                             </div>
-                            <Badge variant={iv.status === "Terjadwal" ? "default" : "outline"} className="text-[10px]">
-                              {iv.status}
-                            </Badge>
-                          </div>
 
                           {iv.meetingUrl && (
                             <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
@@ -417,7 +439,8 @@ export function CandidateDetailDrawer({
                           )}
                         </CardContent>
                       </Card>
-                    ))}
+                    );
+                  })}
                   </div>
                 )}
 
