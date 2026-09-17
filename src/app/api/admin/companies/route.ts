@@ -84,6 +84,8 @@ export async function GET(request: Request) {
           slug: row.organization.slug,
           nib: row.organization.nib,
           npwp: row.organization.npwp,
+          nibDocumentUrl: row.organization.nibDocumentUrl,
+          npwpDocumentUrl: row.organization.npwpDocumentUrl,
           industry: row.organization.industry,
           companyScale: row.organization.companyScale,
           province: row.organization.province,

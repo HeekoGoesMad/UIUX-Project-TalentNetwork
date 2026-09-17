@@ -12,6 +12,7 @@ import {
   FileUp,
   Globe,
   Info,
+  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -162,6 +163,7 @@ export function RecruiterOnboarding() {
   const [agreementChecked, setAgreementChecked] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState<"nib" | "npwp" | null>(null);
   const editsRef = useRef(0);
 
   // Save draft
@@ -189,14 +191,41 @@ export function RecruiterOnboarding() {
     }
   };
 
-  const handleFileUpload = (field: "nibFileName" | "npwpFileName", file: File | null) => {
+  const handleFileUpload = async (field: "nibFileName" | "npwpFileName", file: File | null) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Ukuran berkas maksimal 10MB");
       return;
     }
-    update(field, file.name);
-    toast.success(`Berkas ${file.name} berhasil diunggah!`);
+    const docType = field === "nibFileName" ? "nib" : "npwp";
+    setUploadingDoc(docType);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", docType);
+
+      const res = await fetch("/api/recruiter/legal-docs", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengunggah berkas");
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        [field]: file.name,
+        [field === "nibFileName" ? "nibDocumentUrl" : "npwpDocumentUrl"]: data.storagePath,
+      }));
+      editsRef.current += 1;
+      toast.success(`Berkas ${file.name} berhasil diunggah!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah berkas.");
+    } finally {
+      setUploadingDoc(null);
+    }
   };
 
   const validateStep = (s: number) => {
@@ -594,13 +623,22 @@ export function RecruiterOnboarding() {
                           onChange={(e) => update("nibNumber", e.target.value)}
                           placeholder="Nomor 13 digit NIB (opsional)"
                         />
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.nibFileName || "Pilih Berkas NIB (PDF / JPG) - Opsional"}</span>
+                        <label className={`cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors ${uploadingDoc === "nib" ? "pointer-events-none opacity-60" : ""}`}>
+                          {uploadingDoc === "nib" ? (
+                            <Loader2 className="size-4 text-[#0b2342] animate-spin" />
+                          ) : (
+                            <FileUp className="size-4 text-[#0b2342]" />
+                          )}
+                          <span className="truncate">
+                            {uploadingDoc === "nib"
+                              ? "Mengunggah berkas NIB..."
+                              : form.nibFileName || "Pilih Berkas NIB (PDF / JPG) - Opsional"}
+                          </span>
                           <input
                             type="file"
                             accept=".pdf,image/*"
                             className="sr-only"
+                            disabled={uploadingDoc === "nib"}
                             onChange={(e) => handleFileUpload("nibFileName", e.target.files?.[0] || null)}
                           />
                         </label>
@@ -624,13 +662,22 @@ export function RecruiterOnboarding() {
                           onChange={(e) => update("npwpNumber", e.target.value)}
                           placeholder="Nomor 16 digit NPWP Badan (opsional)"
                         />
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.npwpFileName || "Pilih Berkas NPWP (PDF / JPG) - Opsional"}</span>
+                        <label className={`cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors ${uploadingDoc === "npwp" ? "pointer-events-none opacity-60" : ""}`}>
+                          {uploadingDoc === "npwp" ? (
+                            <Loader2 className="size-4 text-[#0b2342] animate-spin" />
+                          ) : (
+                            <FileUp className="size-4 text-[#0b2342]" />
+                          )}
+                          <span className="truncate">
+                            {uploadingDoc === "npwp"
+                              ? "Mengunggah berkas NPWP..."
+                              : form.npwpFileName || "Pilih Berkas NPWP (PDF / JPG) - Opsional"}
+                          </span>
                           <input
                             type="file"
                             accept=".pdf,image/*"
                             className="sr-only"
+                            disabled={uploadingDoc === "npwp"}
                             onChange={(e) => handleFileUpload("npwpFileName", e.target.files?.[0] || null)}
                           />
                         </label>
