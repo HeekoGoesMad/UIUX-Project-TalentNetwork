@@ -371,9 +371,8 @@ export function RecruiterOperationsPage() {
       return;
     }
 
-    // Trigger 3: Move to Offer
+    // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
     if (newStage === "offer") {
-      void executeStageChange(id, newStage);
       setOfferModalCandidate(target);
       return;
     }
@@ -1055,21 +1054,23 @@ export function RecruiterOperationsPage() {
           <CreateOfferModal
             open={Boolean(offerModalCandidate)}
             onOpenChange={(open) => {
-              if (!open) setOfferModalCandidate(null);
+              if (!open) {
+                if (offerModalCandidate && offerModalCandidate.stage !== "offer") {
+                  toast.info("Pembuatan penawaran dibatalkan, status kandidat tetap.");
+                }
+                setOfferModalCandidate(null);
+              }
             }}
             candidate={offerCandidateModalProps}
             applicationId={offerModalCandidate?.applicationId}
-            onOfferSent={() => {
+            onOfferSent={async () => {
               if (offerModalCandidate) {
-                setData((current) => ({
-                  ...current,
-                  candidates: current.candidates.map((c) =>
-                    c.id === offerModalCandidate.id ? { ...c, offerStatus: "sent", stage: "offer" } : c
-                  ),
-                }));
+                await executeStageChange(offerModalCandidate.id, "offer", {
+                  offerStatus: "sent",
+                });
                 toast.success(`Surat penawaran berhasil diterbitkan ke ${offerModalCandidate.name}!`);
+                setOfferModalCandidate(null);
               }
-              setOfferModalCandidate(null);
             }}
           />
         )}
