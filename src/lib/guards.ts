@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
 
@@ -57,9 +58,22 @@ async function resolveAccess(): Promise<Resolution> {
 
 export type GuardResult = { ok: true } | { ok: false };
 
+async function getLoginRedirectUrl(): Promise<string> {
+  try {
+    const h = await headers();
+    const pathname = h.get("x-pathname");
+    if (pathname && pathname !== "/" && pathname !== "/login") {
+      return `/login?next=${encodeURIComponent(pathname)}`;
+    }
+  } catch {
+    // Fallback when called outside request context
+  }
+  return "/login";
+}
+
 export async function requireAppUser(): Promise<GuardResult> {
   const res = await resolveAccess();
-  if (res.kind === "unauthenticated") redirect("/login");
+  if (res.kind === "unauthenticated") redirect(await getLoginRedirectUrl());
   if (res.kind === "unavailable") return { ok: false };
   return { ok: true };
 }
@@ -67,7 +81,7 @@ export async function requireAppUser(): Promise<GuardResult> {
 export async function requireRole(roles: Role[]): Promise<GuardResult> {
   const res = await resolveAccess();
   if (res.kind === "demo") return { ok: true };
-  if (res.kind === "unauthenticated") redirect("/login");
+  if (res.kind === "unauthenticated") redirect(await getLoginRedirectUrl());
   if (res.kind === "unavailable") return { ok: false };
   if (res.kind === "provisioning") {
     redirect(res.role === "partner" ? "/partner/pending" : "/recruiter/pending");
