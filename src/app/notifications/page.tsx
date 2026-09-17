@@ -10,11 +10,8 @@ import {
   Clock3,
   FileCheck2,
   Mail,
-  Save,
   Settings2,
   ShieldCheck,
-  SlidersHorizontal,
-  Smartphone,
   UserRound,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,23 +21,24 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
 import type { ConsentState } from "@/types";
 
-type QuietHours = { start?: string; end?: string; timezone?: string };
-type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean; quietHours: QuietHours };
-const preferencesKey = "proofylink-demo-notification-preferences-v1";
-const defaultPreferences: NotificationPreferences = { inAppEnabled: true, emailEnabled: true, quietHours: {} };
-
 type NotificationCategory = "all" | "requests" | "recruitment" | "system";
+
+const TAB_PARAMS: Record<NotificationCategory, string> = {
+  all: "all",
+  requests: "contact-requests",
+  recruitment: "recruitment",
+  system: "system",
+};
+
+function parseTab(value: string | null): NotificationCategory {
+  if (value === "contact-requests") return "requests";
+  if (value === "recruitment") return "recruitment";
+  if (value === "system") return "system";
+  return "all";
+}
 
 export default function NotificationsPage() {
   const {
@@ -59,52 +57,27 @@ export default function NotificationsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialTab = searchParams.get("tab") === "contact-requests" ? "requests" : "all";
+  const initialTab = parseTab(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<NotificationCategory>(initialTab);
-  const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
-  const [preferencesLoading, setPreferencesLoading] = useState(true);
-  const [preferencesSaving, setPreferencesSaving] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
+  const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
+
+  const changeTab = (tab: NotificationCategory) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTab(parseTab(new URLSearchParams(window.location.search).get("tab")));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     if (hydrated && !user) router.replace(`/login?next=${encodeURIComponent("/notifications")}`);
   }, [hydrated, user, router]);
-
-  useEffect(() => {
-    if (!hydrated || !user) return;
-    let active = true;
-    if (!dbMode) {
-      void Promise.resolve().then(() => {
-        if (!active) return;
-        try {
-          const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? "null") as Partial<NotificationPreferences> | null;
-          setPreferences({ ...defaultPreferences, ...saved, quietHours: { ...defaultPreferences.quietHours, ...saved?.quietHours } });
-        } catch {
-          setPreferences(defaultPreferences);
-        }
-        setPreferencesLoading(false);
-      });
-      return () => {
-        active = false;
-      };
-    }
-    void fetch("/api/notification-preferences", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = (await response.json()) as { preferences?: NotificationPreferences; error?: string };
-        if (!response.ok || !payload.preferences) throw new Error(payload.error ?? "Preferensi belum dapat dimuat.");
-        if (active) setPreferences(payload.preferences);
-      })
-      .catch(() => {
-        // Fallback gracefully
-      })
-      .finally(() => {
-        if (active) setPreferencesLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [dbMode, hydrated, user]);
 
   // Normalized contact requests for candidate
   const formattedRequests = useMemo(() => {
@@ -147,6 +120,9 @@ export default function NotificationsPage() {
       const ok = await respondToConsent(candidateId, state, itemId);
       if (ok) {
         toast.success(state === "consented" ? "Izin kontak telah diberikan" : "Permintaan kontak telah ditolak");
+      } else {
+        // 409 already-responded (or other failure): inline state, no undo. Provider already toasted.
+        setStaleIds((prev) => new Set(prev).add(itemId));
       }
     } catch {
       toast.error("Gagal memperbarui izin kontak");
@@ -155,34 +131,19 @@ export default function NotificationsPage() {
     }
   };
 
-  const savePreferences = async () => {
-    setPreferencesSaving(true);
-    try {
-      if (!dbMode) {
-        localStorage.setItem(preferencesKey, JSON.stringify(preferences));
-      } else {
-        const response = await fetch("/api/notification-preferences", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preferences),
-        });
-        const payload = (await response.json()) as { preferences?: NotificationPreferences; error?: string };
-        if (!response.ok || !payload.preferences) throw new Error(payload.error ?? "Preferensi belum dapat disimpan.");
-        setPreferences(payload.preferences);
-      }
-      toast.success("Preferensi notifikasi disimpan");
-      setSettingsOpen(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan preferensi");
-    } finally {
-      setPreferencesSaving(false);
-    }
+  const handleMarkRead = async (id: string) => {
+    const ok = await markNotificationRead(id);
+    if (!ok) toast.error("Gagal menandai notifikasi sebagai dibaca");
   };
 
-  // Filtered notifications
+  const handleMarkAllRead = async () => {
+    const ok = await markAllNotificationsRead();
+    if (!ok) toast.error("Gagal menandai semua notifikasi sebagai dibaca");
+  };
+
+  // Filtered notifications — tabs filter, never blank the feed
   const filteredNotifications = notifications.filter((n) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "requests") return false; // Handled in separate request section
+    if (activeTab === "all" || activeTab === "requests") return true;
     if (activeTab === "recruitment") {
       return n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received";
     }
@@ -206,98 +167,16 @@ export default function NotificationsPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           {unreadNotificationsCount > 0 && (
-            <Button variant="outline" size="sm" onClick={() => void markAllNotificationsRead()} className="text-xs">
+            <Button variant="outline" size="sm" onClick={() => void handleMarkAllRead()} className="text-xs">
               <CheckCheck className="mr-1.5 size-3.5" /> Tandai semua dibaca
             </Button>
           )}
 
-          {/* Preferences Settings Modal */}
-          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
-                <Settings2 className="mr-1.5 size-3.5" /> Pengaturan
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <SlidersHorizontal className="size-4 text-primary" /> Preferensi Notifikasi
-                </DialogTitle>
-                <DialogDescription>
-                  Pilih kanal pemberitahuan yang boleh digunakan untuk pembaruan akun dan rekrutmen.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-3">
-                {preferencesLoading ? (
-                  <p className="text-xs text-muted-foreground">Memuat preferensi...</p>
-                ) : (
-                  <>
-                    <div className="space-y-2.5">
-                      <PreferenceToggle
-                        icon={<Smartphone className="size-4 text-primary" />}
-                        label="Notifikasi dalam aplikasi"
-                        checked={preferences.inAppEnabled}
-                        onChange={(checked) => setPreferences((curr) => ({ ...curr, inAppEnabled: checked }))}
-                      />
-                      <PreferenceToggle
-                        icon={<Mail className="size-4 text-primary" />}
-                        label="Pemberitahuan email"
-                        checked={preferences.emailEnabled}
-                        onChange={(checked) => setPreferences((curr) => ({ ...curr, emailEnabled: checked }))}
-                      />
-                    </div>
-
-                    <div className="rounded-xl border bg-slate-50/70 p-3.5 dark:bg-slate-900/50">
-                      <p className="text-xs font-semibold text-foreground">Jam Tenang (Opsional)</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Pemberitahuan email ditunda pada rentang jam ini.
-                      </p>
-                      <div className="mt-2.5 grid grid-cols-2 gap-2">
-                        <label className="text-[11px] text-muted-foreground">
-                          Mulai
-                          <input
-                            type="time"
-                            value={preferences.quietHours.start ?? ""}
-                            onChange={(e) =>
-                              setPreferences((curr) => ({
-                                ...curr,
-                                quietHours: { ...curr.quietHours, start: e.target.value || undefined },
-                              }))
-                            }
-                            className="mt-1 block h-8 w-full rounded-md border bg-background px-2 text-xs"
-                          />
-                        </label>
-                        <label className="text-[11px] text-muted-foreground">
-                          Selesai
-                          <input
-                            type="time"
-                            value={preferences.quietHours.end ?? ""}
-                            onChange={(e) =>
-                              setPreferences((curr) => ({
-                                ...curr,
-                                quietHours: { ...curr.quietHours, end: e.target.value || undefined },
-                              }))
-                            }
-                            className="mt-1 block h-8 w-full rounded-md border bg-background px-2 text-xs"
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    <Button
-                      className="w-full text-xs"
-                      disabled={preferencesSaving}
-                      onClick={() => void savePreferences()}
-                    >
-                      <Save className="mr-1.5 size-3.5" />
-                      {preferencesSaving ? "Menyimpan..." : "Simpan Preferensi"}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button variant="ghost" size="sm" asChild className="text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/candidate/settings?tab=notif">
+              <Settings2 className="mr-1.5 size-3.5" /> Kelola di Pengaturan
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -306,14 +185,14 @@ export default function NotificationsPage() {
         <TabButton
           label="Semua"
           active={activeTab === "all"}
-          onClick={() => setActiveTab("all")}
+          onClick={() => changeTab("all")}
           count={unreadNotificationsCount + pendingRequestsCount}
         />
         {user?.role === "candidate" && (
           <TabButton
             label="Permintaan Kontak"
             active={activeTab === "requests"}
-            onClick={() => setActiveTab("requests")}
+            onClick={() => changeTab("requests")}
             count={pendingRequestsCount}
             highlightCount={pendingRequestsCount > 0}
           />
@@ -321,12 +200,12 @@ export default function NotificationsPage() {
         <TabButton
           label="Rekrutmen & Wawancara"
           active={activeTab === "recruitment"}
-          onClick={() => setActiveTab("recruitment")}
+          onClick={() => changeTab("recruitment")}
         />
         <TabButton
           label="Sistem"
           active={activeTab === "system"}
-          onClick={() => setActiveTab("system")}
+          onClick={() => changeTab("system")}
         />
       </div>
 
@@ -409,6 +288,11 @@ export default function NotificationsPage() {
 
                     {/* 1-Click Action Buttons */}
                     {isPending ? (
+                      staleIds.has(req.itemId) ? (
+                        <p className="shrink-0 pt-2 text-xs text-muted-foreground sm:pt-0">
+                          Sudah ditanggapi — segarkan halaman.
+                        </p>
+                      ) : (
                       <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
                         <Button
                           size="sm"
@@ -428,6 +312,7 @@ export default function NotificationsPage() {
                           Tolak
                         </Button>
                       </div>
+                      )
                     ) : isConsented ? (
                       <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
                         <Link href="/messages">
@@ -443,9 +328,8 @@ export default function NotificationsPage() {
         </section>
       )}
 
-      {/* ── GENERAL NOTIFICATIONS FEED ── */}
-      {activeTab !== "requests" && (
-        <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
+      {/* ── GENERAL NOTIFICATIONS FEED (always visible; tabs filter, never blank) ── */}
+      <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
           {filteredNotifications.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-10 text-center">
               <Bell className="mx-auto size-8 text-muted-foreground/50" />
@@ -502,7 +386,7 @@ export default function NotificationsPage() {
                             <Link
                               href={href}
                               onClick={() => {
-                                if (unread) void markNotificationRead(notif.id);
+                                if (unread) void handleMarkRead(notif.id);
                               }}
                               className="hover:text-primary transition-colors flex items-center gap-1.5"
                             >
@@ -528,7 +412,7 @@ export default function NotificationsPage() {
 
                       {unread && (
                         <button
-                          onClick={() => void markNotificationRead(notif.id)}
+                          onClick={() => void handleMarkRead(notif.id)}
                           className="mt-2 text-[11px] font-semibold text-primary hover:underline"
                         >
                           Tandai dibaca
@@ -541,7 +425,6 @@ export default function NotificationsPage() {
             })
           )}
         </section>
-      )}
     </main>
   );
 }
@@ -583,33 +466,6 @@ function TabButton({
         </span>
       )}
     </button>
-  );
-}
-
-function PreferenceToggle({
-  icon,
-  label,
-  checked,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border bg-background p-3 transition-colors hover:bg-accent">
-      <span className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
-        {icon}
-        {label}
-      </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="size-4 accent-primary"
-      />
-    </label>
   );
 }
 

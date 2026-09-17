@@ -3,20 +3,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
+import { getFirstIncompleteStep, getProfileCompletionSections } from "@/lib/candidate/onboarding-step";
 import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 export function ProfileCompletionCard() {
   const { cvProfile } = useApp();
-  const sections = [
-    { label: "Data dasar", done: Boolean(cvProfile?.fullName.trim() && cvProfile?.email.trim()) },
-    { label: "Headline & ringkasan", done: Boolean(cvProfile?.headline.trim() && cvProfile?.about.trim()) },
-    { label: "Lokasi & peran tujuan", done: Boolean(cvProfile?.location.trim() && cvProfile?.targetRole.trim()) },
-    { label: "Skill & tools", done: Boolean(cvProfile?.skills.length && cvProfile?.tools.length) },
-    { label: "Pengalaman", done: Boolean(cvProfile?.experience.length) },
-    { label: "Pendidikan", done: Boolean(cvProfile?.education.length) },
-  ];
+  const sections = getProfileCompletionSections(cvProfile);
   const doneCount = sections.filter((section) => section.done).length;
   const percent = Math.round((doneCount / sections.length) * 100);
   const complete = percent === 100;

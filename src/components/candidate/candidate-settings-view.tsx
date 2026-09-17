@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
@@ -32,6 +33,22 @@ import { DeleteAccountModal } from "@/components/candidate/delete-account-modal"
 import { useApp } from "@/providers/app-provider";
 
 export type SettingsTab = "overview" | "notifications" | "security" | "accessibility" | "danger";
+
+const SETTINGS_TAB_PARAMS: Record<SettingsTab, string> = {
+  overview: "overview",
+  notifications: "notif",
+  security: "security",
+  accessibility: "a11y",
+  danger: "danger",
+};
+
+function parseSettingsTab(value: string | null): SettingsTab {
+  if (value === "notif" || value === "notifications") return "notifications";
+  if (value === "security") return "security";
+  if (value === "a11y" || value === "accessibility") return "accessibility";
+  if (value === "danger") return "danger";
+  return "overview";
+}
 
 export type CandidateProfileData = {
   user: {
@@ -109,10 +126,24 @@ export function CandidateSettingsView({
   initialPreferences,
 }: CandidateSettingsViewProps) {
   const { user, cvProfile, profile } = useApp();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("overview");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => parseSettingsTab(searchParams.get("tab")));
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTab(parseSettingsTab(new URLSearchParams(window.location.search).get("tab")));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   const [profileData, setProfileData] = useState<CandidateProfileData | null>(
     initialProfile ?? null
   );
+
+  const changeTab = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `?tab=${SETTINGS_TAB_PARAMS[tab]}`);
+  };
 
 
   // Notification Preferences State
@@ -124,6 +155,7 @@ export function CandidateSettingsView({
     }
   );
   const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
 
   // Delete Account Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -174,6 +206,7 @@ export function CandidateSettingsView({
   const handleSaveNotifPrefs = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPrefs(true);
+    setPrefsError(null);
     try {
       const payload: Record<string, unknown> = {
         inAppEnabled: notifPrefs.inAppEnabled,
@@ -202,11 +235,12 @@ export function CandidateSettingsView({
 
       toast.success("Preferensi notifikasi berhasil diperbarui.");
     } catch (err) {
-      toast.error(
+      const message =
         err instanceof Error
           ? err.message
-          : "Terjadi kesalahan saat menyimpan preferensi notifikasi."
-      );
+          : "Terjadi kesalahan saat menyimpan preferensi notifikasi.";
+      setPrefsError(message);
+      toast.error(message);
     } finally {
       setSavingPrefs(false);
     }
@@ -375,7 +409,7 @@ export function CandidateSettingsView({
             <button
               key={item.id}
               type="button"
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => changeTab(item.id)}
               className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-all ${mobileStyle}`}
             >
               <Icon className="size-3.5" />
@@ -404,7 +438,7 @@ export function CandidateSettingsView({
                     <div className="border-t border-border/70 my-1" />
                     <button
                       type="button"
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => changeTab(item.id)}
                       className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
                         active
                           ? "bg-red-600 text-white shadow-xs"
@@ -444,7 +478,7 @@ export function CandidateSettingsView({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => changeTab(item.id)}
                   className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left transition-all ${
                     active
                       ? "bg-primary text-white shadow-xs"
@@ -710,7 +744,12 @@ export function CandidateSettingsView({
                   </CardContent>
                 </Card>
 
-                <div className="flex items-center justify-end pt-2">
+                <div className="flex flex-col items-end justify-end gap-1.5 pt-2">
+                  {prefsError && (
+                    <p role="alert" className="text-xs text-muted-foreground">
+                      {prefsError}
+                    </p>
+                  )}
                   <Button type="submit" disabled={savingPrefs} className="gap-2">
                     <Save className="size-4" />
                     {savingPrefs ? "Menyimpan..." : "Simpan Preferensi Notifikasi"}

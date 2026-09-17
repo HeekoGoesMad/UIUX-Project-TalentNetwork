@@ -1,1 +1,5 @@
-export { default } from "../../cv/page";
+import { redirect } from "next/navigation";
+
+export default function CandidateProfileEditPage() {
+  redirect("/candidate/cv");
+}

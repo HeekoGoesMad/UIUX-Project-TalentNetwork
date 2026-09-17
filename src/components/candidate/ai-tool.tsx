@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Sparkles } from "lucide-react";
+import { Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
@@ -28,9 +28,7 @@ export function AiTool({ title, description, endpoint }: { title: string; descri
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#7C3AED]">
-        <Sparkles className="size-4" /> AI Workspace
-      </p>
+      <p className="text-sm font-semibold text-muted-foreground">AI Workspace</p>
       <h1 className="mt-2 text-3xl font-bold">{title}</h1>
       <p className="mt-2 text-muted-foreground">{description}</p>
       <Card className="mt-8">

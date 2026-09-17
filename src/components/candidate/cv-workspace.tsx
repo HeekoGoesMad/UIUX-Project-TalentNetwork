@@ -64,7 +64,6 @@ function blank(email = "", fullName = ""): CvProfile {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
-// ─── Helpers ────────────────────────────────────────────────────
 function Field({
   label,
   hint,
@@ -262,7 +261,6 @@ export function CvWorkspace() {
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [shaking, setShaking] = useState(false);
   const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [personalityModalOpen, setPersonalityModalOpen] = useState(false);
@@ -282,30 +280,6 @@ export function CvWorkspace() {
     return serializeCvData(profile) !== savedSnapshot;
   }, [profile, savedSnapshot]);
 
-  const triggerShake = () => {
-    setShaking(true);
-    setTimeout(() => setShaking(false), 600);
-  };
-
-  const profileRef = useRef(profile);
-  const isShakingRef = useRef(false);
-  const hasGuardedHistoryRef = useRef(false);
-
-  useEffect(() => {
-    profileRef.current = profile;
-  }, [profile]);
-
-  useEffect(() => {
-    isShakingRef.current = shaking;
-  }, [shaking]);
-
-  // Clean up any stale unsavedGuard state from a previous session on mount
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.history.state?.unsavedGuard) {
-      window.history.replaceState({ ...window.history.state, unsavedGuard: undefined }, "", window.location.href);
-    }
-  }, []);
-
   // Browser-level tab close / refresh protection
   useEffect(() => {
     if (!isDirty) return;
@@ -315,83 +289,6 @@ export function CvWorkspace() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
-
-  // Client-side link navigation guard (vibrates floating bar if user clicks a link while unsaved)
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleLinkClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest("a");
-      if (!target) return;
-      const href = target.getAttribute("href");
-      if (!href || href.startsWith("#") || href.startsWith("blob:") || href.startsWith("data:")) return;
-
-      if (isShakingRef.current) {
-        const leave = window.confirm(
-          "Ada perubahan profil yang belum disimpan. Tinggalkan halaman ini dan buang perubahan?"
-        );
-        if (leave) {
-          hasGuardedHistoryRef.current = false;
-          setSavedSnapshot(serializeCvData(profileRef.current));
-          return;
-        }
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-      window.dispatchEvent(new Event("navigation-abort"));
-      triggerShake();
-    };
-
-    document.addEventListener("click", handleLinkClick, { capture: true });
-    return () => document.removeEventListener("click", handleLinkClick, { capture: true });
-  }, [isDirty]);
-
-  // Browser history (Back / Forward button) guard for unsaved changes
-  useEffect(() => {
-    if (!isDirty) {
-      if (hasGuardedHistoryRef.current) {
-        hasGuardedHistoryRef.current = false;
-        if (window.history.state?.unsavedGuard) {
-          window.history.back();
-        }
-      }
-      return;
-    }
-
-    // Push a dummy guard entry to browser history stack when dirty
-    if (!hasGuardedHistoryRef.current) {
-      window.history.pushState({ unsavedGuard: true }, "", window.location.href);
-      hasGuardedHistoryRef.current = true;
-    }
-
-    const handlePopState = () => {
-      // If user repeatedly presses back while already vibrating, offer option to confirm exit
-      if (isShakingRef.current) {
-        const leave = window.confirm(
-          "Ada perubahan profil yang belum disimpan. Tinggalkan halaman ini dan buang perubahan?"
-        );
-        if (leave) {
-          hasGuardedHistoryRef.current = false;
-          setSavedSnapshot(serializeCvData(profileRef.current));
-          window.history.back();
-          return;
-        }
-      }
-
-      // Intercept and prevent navigating away
-      window.dispatchEvent(new Event("navigation-abort"));
-      triggerShake();
-
-      // Re-push guard entry so URL stays on /candidate/cv and form inputs are preserved
-      window.history.pushState({ unsavedGuard: true }, "", window.location.href);
-      hasGuardedHistoryRef.current = true;
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
   }, [isDirty]);
 
   const handleReset = () => {
@@ -1545,7 +1442,7 @@ export function CvWorkspace() {
     <CvUnsavedBar
       show={isDirty || saving}
       saving={saving}
-      shaking={shaking}
+      shaking={false}
       onSave={handleSave}
       onReset={handleReset}
     />

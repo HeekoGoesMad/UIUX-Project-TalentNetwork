@@ -9,6 +9,27 @@ export interface CandidateStepData {
   experience?: Array<{ company?: string; role?: string }> | null;
   education?: Array<{ school?: string; program?: string }> | null;
   skills?: string[] | null;
+  tools?: string[] | null;
+}
+
+export interface ProfileCompletionSection {
+  label: string;
+  done: boolean;
+}
+
+/**
+ * Single source for the profile-completion card checklist (labels + done rules).
+ * Rendered UI stays identical — the card imports this instead of recomputing.
+ */
+export function getProfileCompletionSections(data?: CandidateStepData | null): ProfileCompletionSection[] {
+  return [
+    { label: "Data dasar", done: Boolean(data?.fullName?.trim() && data?.email?.trim()) },
+    { label: "Headline & ringkasan", done: Boolean(data?.headline?.trim() && data?.about?.trim()) },
+    { label: "Lokasi & peran tujuan", done: Boolean(data?.location?.trim() && data?.targetRole?.trim()) },
+    { label: "Skill & tools", done: Boolean(data?.skills?.length && data?.tools?.length) },
+    { label: "Pengalaman", done: Boolean(data?.experience?.length) },
+    { label: "Pendidikan", done: Boolean(data?.education?.length) },
+  ];
 }
 
 /**
