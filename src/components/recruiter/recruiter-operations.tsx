@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/app-provider";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
@@ -70,7 +69,6 @@ const STAGES: Array<{ id: Stage; label: string; bg: string; border: string; text
   { id: "rejected", label: "Tidak Lolos", bg: "bg-slate-50/70", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-400" },
 ];
 
-const defaultPeople = ["Raka Pratama", "Sari Wijaya", "Dimas Nugroho"];
 
 const initialCandidates: Candidate[] = [
   { id: "candidate-1", name: "Nadia Putri Rahayu", role: "Senior Product Designer", location: "Jakarta Selatan", stage: "interview", owner: "Raka Pratama", dueDate: "2026-08-20", appliedAt: "2026-07-28", score: 4.6, feedback: "Portfolio kuat di design system.", offerStatus: "draft", compensation: "Rp 28–32 juta / bulan", reason: "" },

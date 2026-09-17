@@ -104,6 +104,7 @@ export function CandidateDetailDrawer({
   const [feedbackText, setFeedbackText] = useState("");
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [sendingInterviewId, setSendingInterviewId] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   // New interview form state
   const [newInterviewDate, setNewInterviewDate] = useState(() => {
@@ -385,7 +386,7 @@ export function CandidateDetailDrawer({
                 ) : (
                   <div className="space-y-3">
                     {candidateInterviews.map((iv) => {
-                      const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < Date.now());
+                      const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
                       const effectiveStatus = iv.status === "Dibatalkan" ? "Dibatalkan" : isPastDate || iv.status === "Selesai" ? "Selesai" : "Terjadwal";
 
                       return (
