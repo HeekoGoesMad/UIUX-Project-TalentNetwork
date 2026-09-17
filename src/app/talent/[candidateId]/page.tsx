@@ -25,6 +25,7 @@ import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, Scre
 import {
     AlertCircle,
     ArrowLeft,
+    ArrowRight,
     Banknote,
     Bookmark,
     Brain,
@@ -840,18 +841,18 @@ export default function TalentProfile() {
             <div className="flex items-center gap-2 shrink-0">
               {unlocked && (
                 <Button
-                  size="sm"
-                  className="bg-purple-600 text-white hover:bg-purple-700 font-semibold text-xs h-9 shadow-xs"
+                  size="default"
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 font-bold text-xs sm:text-sm h-10 px-4 shadow-md hover:shadow-lg transition-all"
                   onClick={() => setAssignModalOpen(true)}
                 >
-                  <Briefcase className="mr-1.5 size-3.5" />
+                  <Briefcase className="mr-2 size-4" />
                   Masukkan ke Lowongan
                 </Button>
               )}
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 border-slate-200"
+                className="h-10 w-10 border-slate-200"
                 onClick={() => toggleShortlist(candidate.id)}
                 aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
                 aria-pressed={isShortlisted}
@@ -1315,11 +1316,11 @@ export default function TalentProfile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── FLOATING DOVER ACTION WIDGET (ONLY APPEARS AFTER TOKEN SCAN) ── */}
+      {/* ── STREAMLINED SHORTCUT WIDGET ── */}
       {unlocked && (
         <aside
           aria-label="Aksi Cepat Rekruter"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3.5 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
         >
           <div className="flex items-center justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-950/60 xl:flex-col xl:items-start xl:gap-2">
             <div className="flex items-center gap-2">
@@ -1331,7 +1332,7 @@ export default function TalentProfile() {
                   {candidate.name}
                 </p>
                 <p className="text-[10px] text-muted-foreground font-mono">
-                  Pipeline Rekrutmen
+                  Aksi Rekrutmen
                 </p>
               </div>
             </div>
@@ -1341,94 +1342,42 @@ export default function TalentProfile() {
               </Badge>
             ) : (
               <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
-                Pipeline Aktif
+                Profil Terbuka
               </Badge>
             )}
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
             <Button
-              size="sm"
-              className="h-8 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-2.5 xl:h-9 xl:justify-start"
-              disabled={openingConversation}
-              onClick={handleContactCandidate}
-            >
-              {openingConversation ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <MessageSquare className="mr-1.5 size-3.5" />}
-              Hubungi Kandidat
-            </Button>
-            <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              className="h-8.5 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-3 dark:border-purple-800 xl:justify-start"
               onClick={() => setQuestionModalOpen(true)}
             >
-              <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              <Brain className="mr-2 size-3.5 text-[#7C3AED]" />
               Pertanyaan AI
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
+              className="h-8.5 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-3 dark:border-purple-800 xl:justify-start"
               onClick={() => setPromptModalOpen(true)}
             >
-              <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
+              <MessageSquareQuote className="mr-2 size-3.5 text-[#7C3AED]" />
               Prompt Pesan
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
-              onClick={() => setScheduleModalOpen(true)}
-            >
-              <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
-              Jadwal Wawancara
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300 xl:h-9 xl:justify-start"
-              onClick={() => setOfferModalOpen(true)}
-            >
-              <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
-              Buat Offer Letter
-            </Button>
-            <Button
-              size="sm"
-              disabled={markingHired || hiringOutcome === "hired"}
-              className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 xl:h-9 xl:w-full"
-              onClick={async () => {
-                if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
-                setMarkingHired(true);
-                try {
-                  if (dbMode) {
-                    const res = await fetch("/api/applications", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        candidateProfileId: candidate.id,
-                        status: "hired",
-                        reason: "Kandidat diterima secara resmi melalui Talent Network.",
-                      }),
-                    });
-                    if (!res.ok) {
-                      const errData = (await res.json()) as { error?: string };
-                      throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
-                    }
-                  }
-                  setHiringOutcome("hired");
-                  toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
-                } catch (err) {
-                  toast.error("Gagal menandai status Hired", {
-                    description: err instanceof Error ? err.message : "Terjadi kesalahan.",
-                  });
-                } finally {
-                  setMarkingHired(false);
-                }
-              }}
-            >
-              {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
-              {hiringOutcome === "hired" ? "Sudah Diterima ✓" : "Tandai Diterima (Hired)"}
-            </Button>
+            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/50 mt-1 w-full">
+              <Button
+                size="sm"
+                className="h-9 text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 w-full justify-between dark:bg-purple-900/40 dark:hover:bg-purple-900/60 shadow-xs font-medium"
+                asChild
+              >
+                <Link href="/recruiter/operations">
+                  <span>Lanjutkan di Operations</span>
+                  <ArrowRight className="size-3.5 ml-1.5" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </aside>
       )}
