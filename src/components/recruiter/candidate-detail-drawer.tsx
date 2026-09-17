@@ -10,7 +10,6 @@ import {
   MapPin,
   MessageSquare,
   Send,
-  Star,
   Video,
   X,
 } from "lucide-react";
@@ -297,10 +296,9 @@ export function CandidateDetailDrawer({
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500">Skor Kesesuaian Role</p>
-                        <p className="font-bold text-purple-700 flex items-center gap-1 mt-0.5">
-                          <Star className="size-3.5 fill-purple-600 text-purple-600" />
-                          {candidate.score}/5.0 (Tinggi)
+                        <p className="text-slate-500">Tahap Saat Ini</p>
+                        <p className="font-semibold text-[#7C3AED] capitalize mt-0.5">
+                          {candidate.stage}
                         </p>
                       </div>
                       <div>

@@ -438,14 +438,13 @@ export function RecruiterOperationsPage() {
 
   const exportCsv = () => {
     const rows = [
-      ["Kandidat", "Posisi", "Tahap", "Penanggung Jawab", "Batas Waktu", "Skor Fit", "Status Offer", "Kompensasi"],
+      ["Kandidat", "Posisi", "Tahap", "Penanggung Jawab", "Batas Waktu", "Status Offer", "Kompensasi"],
       ...filteredCandidates.map((c) => [
         c.name,
         c.role,
         c.stage,
         c.owner,
         c.dueDate,
-        String(c.score),
         c.offerStatus,
         c.compensation,
       ]),
@@ -714,10 +713,6 @@ export function RecruiterOperationsPage() {
                                     <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{candidate.role}</p>
                                   </div>
                                 </div>
-
-                                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md shrink-0">
-                                  ★ {candidate.score}
-                                </span>
                               </div>
 
                               {/* Candidate Status Pills */}
@@ -790,7 +785,6 @@ export function RecruiterOperationsPage() {
                       <th className="px-5 py-3.5">Kandidat</th>
                       <th className="px-4 py-3.5">Posisi &amp; Lokasi</th>
                       <th className="px-4 py-3.5">Tahap Seleksi</th>
-                      <th className="px-4 py-3.5">Skor Fit</th>
                       <th className="px-4 py-3.5">Status Offer</th>
                       <th className="px-4 py-3.5">Penanggung Jawab</th>
                       <th className="px-5 py-3.5 text-right">Aksi</th>
@@ -799,7 +793,7 @@ export function RecruiterOperationsPage() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredCandidates.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                           Tidak ada kandidat yang cocok dengan kriteria filter.
                         </td>
                       </tr>
@@ -842,7 +836,6 @@ export function RecruiterOperationsPage() {
                               {STAGES.find((s) => s.id === candidate.stage)?.label}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 font-bold text-purple-700">★ {candidate.score}</td>
                           <td className="px-4 py-3.5">
                             <span
                               className={cn(
