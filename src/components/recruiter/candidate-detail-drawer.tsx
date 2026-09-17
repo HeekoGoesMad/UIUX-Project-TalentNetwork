@@ -426,16 +426,22 @@ export function CandidateDetailDrawer({
                                 <Video className="size-3.5 shrink-0" />
                                 {iv.meetingUrl}
                               </a>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[11px] font-semibold text-purple-700 border-purple-200 hover:bg-purple-50 shrink-0 gap-1"
-                                onClick={() => handleSendInvite(iv)}
-                                disabled={sendingInterviewId === iv.id}
-                              >
-                                <Send className="size-3" />
-                                {iv.sentAt ? "Kirim Ulang" : "Kirim Undangan"}
-                              </Button>
+                              {effectiveStatus !== "Selesai" && effectiveStatus !== "Dibatalkan" ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-[11px] font-semibold text-purple-700 border-purple-200 hover:bg-purple-50 shrink-0 gap-1"
+                                  onClick={() => handleSendInvite(iv)}
+                                  disabled={sendingInterviewId === iv.id}
+                                >
+                                  <Send className="size-3" />
+                                  {iv.sentAt ? "Kirim Ulang" : "Kirim Undangan"}
+                                </Button>
+                              ) : (
+                                <span className="text-[10px] font-medium text-slate-400 italic">
+                                  Sesi telah selesai
+                                </span>
+                              )}
                             </div>
                           )}
                         </CardContent>
