@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Check,
   Copy,
   Loader2,
   Plus,
@@ -49,7 +48,6 @@ export function InterviewQuestionModal({
   open,
   onOpenChange,
   candidate,
-  onSaveQuestions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;

@@ -30,7 +30,6 @@ import {
     Bookmark,
     Brain,
     Briefcase,
-    Calendar,
     Check,
     CheckCircle2,
     CircleHelp,
@@ -43,7 +42,6 @@ import {
     Loader2,
     Lock,
     Mail,
-    MessageSquare,
     MessageSquareQuote,
     Phone,
     Printer,
@@ -516,7 +514,6 @@ export default function TalentProfile() {
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [screeningError, setScreeningError] = useState<string | null>(null);
-  const [openingConversation, setOpeningConversation] = useState(false);
 
   // Recruiter Hiring Flow modals
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
@@ -524,8 +521,6 @@ export default function TalentProfile() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [hiringOutcome, setHiringOutcome] = useState<string | null>(null);
-  const [markingHired, setMarkingHired] = useState(false);
 
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
@@ -684,32 +679,7 @@ export default function TalentProfile() {
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
   const isShortlisted = shortlisted.includes(candidate.id);
 
-  const handleContactCandidate = async () => {
-    if (!candidate) return;
-    setOpeningConversation(true);
-    try {
-      if (dbMode) {
-        const response = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidateProfileId: candidate.id }),
-        });
-        const payload = (await response.json()) as { conversationId?: string; error?: string };
-        if (!response.ok || !payload.conversationId) {
-          throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-        }
-        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
-      } else {
-        router.push(`/recruiter/messages?contact=${encodeURIComponent(candidate.name)}`);
-      }
-    } catch (error) {
-      toast.error("Percakapan belum dapat dibuat", {
-        description: error instanceof Error ? error.message : "Silakan coba lagi.",
-      });
-    } finally {
-      setOpeningConversation(false);
-    }
-  };
+
 
   const copyProfileLink = async () => {
     const url = window.location.href;
@@ -1336,15 +1306,9 @@ export default function TalentProfile() {
                 </p>
               </div>
             </div>
-            {hiringOutcome === "hired" ? (
-              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5">
-                <UserCheck className="mr-1 size-3" /> Hired ✓
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
-                Profil Terbuka
-              </Badge>
-            )}
+            <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
+              Profil Terbuka
+            </Badge>
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
@@ -1387,10 +1351,6 @@ export default function TalentProfile() {
         open={questionModalOpen}
         onOpenChange={setQuestionModalOpen}
         candidate={candidate}
-        onSaveQuestions={() => {
-          setQuestionModalOpen(false);
-          setScheduleModalOpen(true);
-        }}
       />
 
       <PromptedOutreachComposer

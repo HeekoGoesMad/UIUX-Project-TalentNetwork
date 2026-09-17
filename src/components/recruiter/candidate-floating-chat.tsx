@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
-  CornerDownLeft,
   Loader2,
   MessageSquare,
   Send,
@@ -145,6 +144,7 @@ export function CandidateFloatingChat({
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, unlocked, candidate.id, candidate.name, candidate.role, candidate.targetRole, dbMode, currentUserEmail]);
 
   useEffect(() => {
