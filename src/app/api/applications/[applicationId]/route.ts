@@ -50,6 +50,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
     const participant = await findParticipant(current, applicationId);
     if ("error" in participant) return NextResponse.json({ error: participant.error }, { status: participant.status });
     const currentStatus = participant.application.status;
+    if (currentStatus === parsed.data.status) {
+      return NextResponse.json({ application: participant.application });
+    }
     if (current.user.role === "candidate") {
       if (parsed.data.status !== "withdrawn" || !["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer"].includes(currentStatus)) return NextResponse.json({ error: "Lamaran tidak dapat ditarik pada tahap ini." }, { status: 409 });
     } else {
