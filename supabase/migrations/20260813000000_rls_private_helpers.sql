@@ -1,3 +1,52 @@
+-- Idempotency guard for preview branches that already have prod's equivalent policies
+do $$ begin
+  drop policy if exists "users_owner_select" on public."users";
+  drop policy if exists "users_owner_update" on public."users";
+  drop policy if exists "profiles_owner_all" on public."profiles";
+  drop policy if exists "organizations_member_select" on public."organizations";
+  drop policy if exists "organizations_owner_insert" on public."organizations";
+  drop policy if exists "organizations_manager_update" on public."organizations";
+  drop policy if exists "organizations_owner_delete" on public."organizations";
+  drop policy if exists "organization_members_member_select" on public."organization_members";
+  drop policy if exists "organization_members_manager_update" on public."organization_members";
+  drop policy if exists "organization_members_manager_delete" on public."organization_members";
+  drop policy if exists "candidate_profiles_owner_all" on public."candidate_profiles";
+  drop policy if exists "candidate_profiles_published_select" on public."candidate_profiles";
+  drop policy if exists "candidate_profile_sections_owner_all" on public."candidate_profile_sections";
+  drop policy if exists "candidate_profile_sections_published_select" on public."candidate_profile_sections";
+  drop policy if exists "shortlists_member_select" on public."shortlists";
+  drop policy if exists "shortlists_member_insert" on public."shortlists";
+  drop policy if exists "shortlists_manager_update" on public."shortlists";
+  drop policy if exists "shortlists_manager_delete" on public."shortlists";
+  drop policy if exists "shortlist_items_member_select" on public."shortlist_items";
+  drop policy if exists "shortlist_items_member_insert" on public."shortlist_items";
+  drop policy if exists "shortlist_items_member_update" on public."shortlist_items";
+  drop policy if exists "shortlist_items_member_delete" on public."shortlist_items";
+  drop policy if exists "consent_batches_member_select" on public."consent_request_batches";
+  drop policy if exists "consent_batches_member_insert" on public."consent_request_batches";
+  drop policy if exists "consent_batches_requester_update" on public."consent_request_batches";
+  drop policy if exists "consent_batches_requester_delete" on public."consent_request_batches";
+  drop policy if exists "consent_items_participant_select" on public."consent_request_items";
+  drop policy if exists "consent_items_candidate_update" on public."consent_request_items";
+  drop policy if exists "consent_events_participant_select" on public."consent_events";
+  drop policy if exists "screening_runs_org_select" on public."screening_runs";
+  drop policy if exists "screening_scores_org_select" on public."screening_scores";
+  drop policy if exists "notifications_owner_select" on public."notifications";
+  drop policy if exists "notifications_owner_update" on public."notifications";
+  drop policy if exists "conversations_participant_select" on public."conversations";
+  drop policy if exists "conversations_member_insert" on public."conversations";
+  drop policy if exists "conversations_participant_update" on public."conversations";
+  drop policy if exists "conversations_creator_delete" on public."conversations";
+  drop policy if exists "conversation_participants_participant_select" on public."conversation_participants";
+  drop policy if exists "messages_participant_select" on public."messages";
+  drop policy if exists "messages_participant_insert" on public."messages";
+  drop policy if exists "messages_sender_update" on public."messages";
+  drop policy if exists "messages_sender_delete" on public."messages";
+  drop policy if exists "token_accounts_member_select" on public."token_accounts";
+  drop policy if exists "token_ledger_entries_member_select" on public."token_ledger_entries";
+exception when others then null;
+end $$;
+
 -- Reviewed RLS baseline for the current Drizzle schema.
 --
 -- The application currently uses server-only Drizzle (DATABASE_URL). Route handlers

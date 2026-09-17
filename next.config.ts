@@ -26,6 +26,15 @@ if (isDeploymentProduction) {
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  async redirects() {
+    return [
+      {
+        source: "/partner/dashboard",
+        destination: "/partner",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

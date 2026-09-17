@@ -1,7 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { IndonesianPhoneInput } from "@/components/ui/phone-input";
+import { cn } from "@/lib/utils";
+import { useApp } from "@/providers/app-provider";
+import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import {
   Brain,
   BriefcaseBusiness,
@@ -22,19 +29,12 @@ import {
   User,
   X,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useApp } from "@/providers/app-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IndonesianPhoneInput } from "@/components/ui/phone-input";
-import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
-import { cn } from "@/lib/utils";
 import { CvDownload } from "./cv-download";
 import { CvUnsavedBar } from "./cv-unsaved-bar";
-import { ProfessionalSummaryModal } from "./professional-summary-modal";
 import { PersonalityModal } from "./personality-modal";
-import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { ProfessionalSummaryModal } from "./professional-summary-modal";
 
 function blank(email = "", fullName = ""): CvProfile {
  return {
@@ -924,7 +924,7 @@ export function CvWorkspace() {
               </Field>
               <Field
                 label="Ekspektasi Gaji"
-                hint="Ditunjukkan ke rekruter setelah profil dibuka (unlocked)."
+                hint="Ditunjukkan ke rekruter setelah profil dibuka."
               >
                 <input
                   className={inputCls}
@@ -948,9 +948,19 @@ export function CvWorkspace() {
                 </select>
               </Field>
               <Field
-                label="Headline Profesional"
-                hint='Contoh: "Human Capital Specialist | Recruitment | Employee Relations"'
-                span2
+                label="Target Role (Posisi yang Dicari)"
+                hint="Posisi yang kamu tuju. Digunakan rekruter & sistem untuk mencocokkan lowongan."
+              >
+                <input
+                  className={inputCls}
+                  value={profile.targetRole ?? ""}
+                  onChange={(e) => update("targetRole", e.target.value)}
+                  placeholder="Contoh: Accounting Executive, Financial Analyst"
+                />
+              </Field>
+              <Field
+                label="Headline Profesional (Tampil di CV)"
+                hint='Jabatan/identitas saat ini di bawah nama CV. Contoh: "Senior Accounting Executive | Tax"'
               >
                 <input
                   className={inputCls}

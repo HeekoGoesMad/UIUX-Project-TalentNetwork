@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Building2,
   Coins,
+  GraduationCap,
   LayoutDashboard,
   ScrollText,
   Settings,
@@ -27,6 +28,7 @@ interface NavLinkItem {
 const adminNavLinks: NavLinkItem[] = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Companies", href: "/admin/companies", icon: Building2 },
+  { label: "Partnerships", href: "/admin/partnerships", icon: GraduationCap },
   { label: "Tokens", href: "/admin/tokens", icon: Coins },
   { label: "Audit Logs", href: "/admin/audit-log", icon: ScrollText },
   { label: "Settings", href: "#", icon: Settings, badge: "Soon", disabled: true },

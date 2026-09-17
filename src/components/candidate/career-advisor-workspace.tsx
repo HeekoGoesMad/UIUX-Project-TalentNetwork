@@ -13,21 +13,25 @@ import {
     Check,
     CheckCircle2,
     Compass,
+    Copy,
     Download,
     FileText,
     GraduationCap,
     Layers,
     Lightbulb,
     ShieldAlert,
+    SlidersHorizontal,
     Sparkles,
     Target,
     TrendingUp,
     User,
     Zap,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
+import { checkSkillsQuality } from "@/lib/ai/skills-check";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -115,7 +119,7 @@ const focusPresets: { id: FocusType; label: string; icon: typeof FileText; desc:
     id: "cv_review",
     label: "Review CV Keseluruhan",
     icon: FileText,
-    desc: "Evaluasi menyeluruh struktur CV, ringkasan profil, relevansi pengalaman, dan kesiapan sistem ATS.",
+    desc: "Evaluasi menyeluruh susunan CV, ringkasan profil, relevansi pengalaman, dan kemudahan dibaca perekrut.",
     badge: "Pilar 1",
   },
   {
@@ -145,9 +149,32 @@ export function CareerAdvisorWorkspace() {
   const [streamProgress, setStreamProgress] = useState<number>(0);
 
   const headline = cvProfile?.headline || "Senior Product Designer";
-  const about = cvProfile?.about || "Product designer yang fokus pada user research dan scalable design system.";
-  const targetRole = cvProfile?.targetRole || "Product Designer";
-  const skills = cvProfile?.skills || ["Product Design", "UX Research", "Design Systems", "Figma", "User Journey Mapping"];
+  const about = cvProfile?.about || "Product designer yang fokus pada user research dan perancangan antarmuka digital.";
+  const defaultTargetRole = cvProfile?.targetRole || "Product Designer";
+  const skills = useMemo(() => cvProfile?.skills || ["Product Design", "UX Research", "Design Systems", "Figma", "User Journey Mapping"], [cvProfile?.skills]);
+
+  const [customRoleInput, setCustomRoleInput] = useState<string | null>(null);
+  const [customInstruction, setCustomInstruction] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const activeTargetRole = (customRoleInput !== null ? customRoleInput.trim() : "") || defaultTargetRole;
+
+  const skillCheck = useMemo(() => checkSkillsQuality(skills, activeTargetRole), [skills, activeTargetRole]);
+
+  const quickPrompts = [
+    "Perjelas bukti hasil kerja nyata (angka % & efisiensi waktu)",
+    "Optimalkan kata kunci agar mudah lolos seleksi perekrut",
+    "Fokus transisi ke jenjang karir yang lebih tinggi",
+    "Perkuat relevansi portofolio & studi kasus proyek",
+  ];
+
+  function applyQuickPrompt(promptText: string) {
+    setCustomInstruction((prev) => {
+      if (!prev.trim()) return promptText;
+      if (prev.includes(promptText)) return prev;
+      return `${prev}, ${promptText}`;
+    });
+  }
 
   useEffect(() => {
     if (isStreaming && result) {
@@ -178,19 +205,20 @@ export function CareerAdvisorWorkspace() {
           focus: selectedFocus,
           headline,
           about,
-          targetRole,
+          targetRole: activeTargetRole,
           skills,
           location: cvProfile?.location || "Jakarta",
+          customInstruction: customInstruction.trim(),
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Gagal mengambil rekomendasi karier.");
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Gagal mengambil rekomendasi karier.");
       }
 
-      const data: AdvisorResult = await response.json();
       setStreamProgress(0);
-      setResult(data);
+      setResult(data as AdvisorResult);
       setIsStreaming(true);
       toast.success("Analisis rekomendasi karier berhasil dihasilkan!");
     } catch (error) {
@@ -204,173 +232,244 @@ export function CareerAdvisorWorkspace() {
     window.print();
   }
 
+  function handleCopyAdvice() {
+    if (!result) return;
+    const textToCopy = `ProofyLink Career Advisor - Evaluasi ${selectedFocus.toUpperCase()}\nTarget Peran: ${activeTargetRole}\n\nRingkasan:\n${result.summary}\n\nSaran Utama:\n- Hal Baik: ${adviceData.whatGood.join("; ")}\n- Perlu Penguatan: ${adviceData.whatNotGood.join("; ")}\n\nLangkah Selanjutnya:\n${result.nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+    navigator.clipboard.writeText(textToCopy);
+    toast.success("Rangkuman rekomendasi AI berhasil disalin ke clipboard!");
+  }
+
   // Fallback data for CV Review
   const cvReviewData: CvReviewDetails = result?.cvReviewDetails || {
-    readinessLevel: skills.length >= 6 ? "Sangat Siap Kerja & ATS-Friendly" : "Cukup Siap (Perlu Pengayaan)",
-    overallScore: Math.min(95, 72 + skills.length * 4),
-    executiveSummary: `Analisis menyeluruh CV untuk target peran ${targetRole}: Struktur informasi dan pengalaman kerja relevan sudah solid. Keterbacaan sistem ATS optimal, dengan saran penguatan pada metrik hasil kuantitatif dan spesialisasi domain industri.`,
+    readinessLevel: skillCheck.isPlausible
+      ? (skills.length >= 6 ? "Sangat Siap & Mudah Dipindai" : "Cukup Siap (Perlu Pengayaan)")
+      : "Perlu Penyesuaian Keahlian",
+    overallScore: skillCheck.isPlausible
+      ? Math.min(95, 72 + skills.length * 4)
+      : 48,
+    executiveSummary: skillCheck.isPlausible
+      ? `Analisis menyeluruh CV untuk target posisi ${activeTargetRole}: Struktur informasi dan riwayat pengalaman kerja sudah rapi serta mudah dibaca oleh perekrut. Rekomendasi utama adalah melengkapi bukti hasil kerja nyata dan memperjelas keahlian unggulanmu.`
+      : `Analisis menyeluruh CV untuk target posisi ${activeTargetRole}: Susunan dasar CV sudah rapi, namun keahlian yang tercantum saat ini (${skills.join(", ") || "belum lengkap"}) belum sesuai dengan kebutuhan posisi ${activeTargetRole}. Prioritaskan perbaikan kompetensi agar sesuai dengan standar industri.`,
     sectionAudits: [
       {
         section: "1. Headline & Identitas Profesional",
         status: "good",
-        notes: [`Menyebutkan istilah peran target (${targetRole}) secara eksplisit.`, "Format teks bersih tanpa karakter simbol yang membingungkan parser ATS."],
-        recommendation: "Tambahkan domain industri (misal: Fintech/B2B SaaS) agar relevansi pencarian rekruter meningkat pesat.",
+        notes: [
+          `Menyebutkan istilah peran target (${activeTargetRole}) secara jelas dan profesional.`,
+          "Format teks bersih, rapi, dan mudah dibaca oleh sistem seleksi maupun tim perekrut."
+        ],
+        recommendation: "Tambahkan bidang industri yang kamu minati (misal: teknologi, keuangan, atau retail) agar profilmu semakin mudah ditemukan perekrut.",
       },
       {
         section: "2. Ringkasan Profil (Tentang Saya / About)",
         status: "needs_improvement",
-        notes: ["Belum merangkum total tahun pengalaman kerja secara terstruktur.", "Kata kunci inti masih bisa diperkaya di paragraf pembuka."],
-        recommendation: "Gunakan pola 3-fokus: Peran & Nilai Utama, Keahlian Kunci, dan Bukti Dampak Kerja Nyata.",
+        notes: [
+          "Belum merangkum total tahun pengalaman kerja secara ringkas.",
+          "Kalimat pembuka masih bisa diperkuat dengan nilai tambah atau pencapaian terbaikmu."
+        ],
+        recommendation: "Gunakan pola 3-bagian: Peran utama, Keahlian andalan, dan Bukti hasil kerja nyata yang pernah dicapai.",
       },
       {
         section: "3. Riwayat Pengalaman Kerja (Experience)",
         status: "needs_improvement",
-        notes: ["Beberapa poin deskripsi masih berupa uraian tugas pasif.", "Pencantuman angka metrik hasil belum konsisten di semua proyek."],
-        recommendation: "Gunakan Strong Action Verbs di awal setiap bullet point dan sertakan minimal 1 angka metrik (%, user, efisiensi waktu).",
+        notes: [
+          "Sebagian poin deskripsi masih berupa uraian tugas harian biasa.",
+          "Belum konsisten menyertakan bukti hasil kerja nyata (misal: persentase keberhasilan, jumlah proyek, efisiensi waktu)."
+        ],
+        recommendation: "Gunakan kata kerja aktif yang jelas di awal setiap poin (misal: Mengembangkan, Memimpin, Merancang) dan sertakan contoh hasil nyata.",
       },
       {
         section: "4. Daftar Keahlian & Alat Kerja (Skills & Tools)",
-        status: "good",
-        notes: [`Terdaftar ${skills.length} keahlian relevan dengan standar industri ${targetRole}.`, "Kombinasi hard skill dan metodologi kerja sudah terlihat."],
-        recommendation: "Kelompokkan skill ke dalam Hard Skills, Tools, dan Core Methodologies agar mudah dipindai rekruter dalam 6 detik.",
+        status: skillCheck.isPlausible ? "good" : "needs_improvement",
+        notes: skillCheck.isPlausible
+          ? [
+              `Terdaftar ${skills.length} keahlian yang relevan dengan kebutuhan peran ${activeTargetRole}.`,
+              "Kombinasi keahlian teknis dan cara kerja tim sudah terlihat."
+            ]
+          : [
+              `Keahlian yang tercantum (${skills.join(", ") || "belum lengkap"}) belum sesuai dengan standar kompetensi peran ${activeTargetRole}.`,
+              "Perekrut membutuhkan keahlian nyata yang sesuai dengan posisi yang dilamar."
+            ],
+        recommendation: skillCheck.isPlausible
+          ? "Kelompokkan keahlian ke dalam Keahlian Teknis, Alat Kerja (Tools), dan Metode Kerja agar mudah dipindai rekruter dalam hitungan detik."
+          : `Perbaiki kompetensi agar sesuai dengan peran ${activeTargetRole}, misalnya dengan mempelajari: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}.`,
       },
       {
         section: "5. Pendidikan & Bukti Portofolio",
         status: "good",
-        notes: ["Riwayat pendidikan tertera jelas dan tautan portofolio aktif."],
-        recommendation: "Pastikan setiap proyek di portofolio mencantumkan peran spesifikmu dan metrik keberhasilan bisnis yang dicapai.",
+        notes: [
+          "Riwayat pendidikan tertera jelas dan tautan proyek dapat diakses dengan baik."
+        ],
+        recommendation: "Pastikan setiap proyek di portofolio mencantumkan peran spesifikmu dan hasil nyata yang dicapai.",
       },
     ],
     formatChecks: [
-      { check: "Standar Tipografi & Format Heading Baku", passed: true, tip: "Gunakan nama heading standar: Experience, Education, Skills, Portfolio." },
-      { check: "Kepadatan Kata Kunci Inti (Keyword Density)", passed: true, tip: "Kata kunci target role tersebar alami di Headline, About, dan Experience." },
-      { check: "Keterbacaan Bullet Points & Tata Letak", passed: true, tip: "Bullet point rapi tanpa simbol grafis rumit yang berisiko merusak parser ATS." },
-      { check: "Kelengkapan Tautan Kontak & Keamanan Data", passed: true, tip: "Tautan LinkedIn, portofolio online, dan email kontak telah aktif dan valid." },
+      { check: "Kerapian Format & Judul Bagian CV Baku", passed: true, tip: "Gunakan nama bagian standar: Pengalaman Kerja, Pendidikan, Keahlian, Portofolio." },
+      { check: "Kesesuaian Kata Kunci & Keahlian Inti", passed: skillCheck.isPlausible, tip: "Gunakan istilah dan kata kunci yang umum dicari rekruter untuk posisi ini." },
+      { check: "Keterbacaan Poin Uraian & Tata Letak", passed: true, tip: "Gunakan poin-poin ringkas dan rapi yang nyaman dipindai oleh tim rekruter." },
+      { check: "Kelengkapan Tautan Kontak & Portofolio", passed: true, tip: "Tautan profil profesional, portofolio online, dan email kontak telah aktif dan valid." },
     ],
-    priorityActionItems: [
-      "Tambahkan metrik kuantitatif terukur (%, user base, efisiensi waktu) pada 2 pengalaman kerja teratas.",
-      "Perkaya ringkasan 'About' dengan menyertakan domain spesialisasi industri (misal: SaaS, Fintech, E-Commerce).",
-      "Kelompokkan skill teknis dan metodologi kerja agar mudah dipindai oleh hiring manager dalam 6 detik pertama.",
-    ],
+    priorityActionItems: skillCheck.isPlausible
+      ? [
+          "Tambahkan bukti hasil kerja nyata (angka %, jumlah proyek, efisiensi waktu) pada 2 pengalaman kerja teratas.",
+          "Perkaya ringkasan 'Tentang Saya' dengan menyertakan bidang industri yang kamu kuasai (misal: teknologi, keuangan, ritel).",
+          "Kelompokkan keahlian teknis dan alat kerja agar mudah dipindai oleh tim perekrut dalam hitungan detik.",
+        ]
+      : [
+          `Perbarui daftar keahlian di CV agar sesuai dengan kompetensi peran ${activeTargetRole} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+          "Tambahkan bukti hasil kerja nyata pada uraian pengalaman kerja agar rekruter lebih yakin.",
+          "Tulis ringkasan singkat di bagian 'Tentang Saya' yang menjelaskan keunggulan dan minat karirmu.",
+        ],
   };
 
   // Fallback data for Gap Analysis
   const gapData: GapAnalysisDetails = result?.gapAnalysisDetails || {
-    targetRole,
-    matchScore: 84,
-    matchLevel: "Tinggi (Strong Alignment)",
+    targetRole: activeTargetRole,
+    matchScore: skillCheck.isPlausible ? 84 : 40,
+    matchLevel: skillCheck.isPlausible ? "Tinggi (Selaras Baik)" : "Perlu Penyesuaian Kompetensi",
     coreCompetencies: [
       {
-        competency: "User Research & Usability Validation",
-        candidateLevel: "Advanced",
-        requiredLevel: "Advanced",
+        competency: "Riset Kebutuhan Pengguna & Validasi Solusi",
+        candidateLevel: skillCheck.isPlausible ? "Menengah" : "Dasar",
+        requiredLevel: "Mahir",
+        status: skillCheck.isPlausible ? "match" : "gap",
+        recommendation: "Pelajari metode riset sederhana dan sertakan contoh proses kerja di portofolio.",
+      },
+      {
+        competency: "Perancangan Komponen & Standar Desain Konsisten",
+        candidateLevel: skillCheck.isPlausible ? "Menengah" : "Dasar",
+        requiredLevel: "Mahir",
+        status: "gap",
+        recommendation: "Pelajari cara menyusun komponen desain yang terstruktur dan mudah digunakan tim.",
+      },
+      {
+        competency: "Komunikasi & Kolaborasi Antar-Tim",
+        candidateLevel: "Menengah",
+        requiredLevel: "Menengah",
         status: "match",
-        recommendation: "Pertahankan dan jadikan selling point utama saat sesi technical interview.",
+        recommendation: "Keunggulan kerja sama tim yang baik untuk posisi ini.",
       },
       {
-        competency: "Scalable Design Systems & Tokenization",
-        candidateLevel: "Intermediate",
-        requiredLevel: "Advanced",
+        competency: "Analisis Data Pengguna & Uji Coba Peningkatan Solusi",
+        candidateLevel: "Dasar",
+        requiredLevel: "Menengah",
         status: "gap",
-        recommendation: "Pelajari arsitektur design token multi-platform dan dokumentasikan studi kasusnya di portofolio.",
-      },
-      {
-        competency: "Cross-functional Leadership & Stakeholder Management",
-        candidateLevel: "Advanced",
-        requiredLevel: "Intermediate",
-        status: "exceeds",
-        recommendation: "Keunggulan kompetitif yang kuat untuk posisi jenjang senior / lead.",
-      },
-      {
-        competency: "Product Analytics & Growth Experimentation (A/B Testing)",
-        candidateLevel: "Intermediate",
-        requiredLevel: "Advanced",
-        status: "gap",
-        recommendation: "Sertakan metrik konversi dan pemahaman tools analytics (Mixpanel/Amplitude) di CV.",
+        recommendation: "Sertakan contoh metrik hasil atau efisiensi kerja di portofolio.",
       },
     ],
-    criticalGaps: [
-      "Pengalaman mengukur dampak desain pasca-rilis (A/B testing, funnel conversion) perlu lebih dipertegas di CV.",
-      "Portofolio studi kasus perlu menyertakan arsitektur Design System berskala multi-platform.",
-      "Perjelas peran kepemimpinan desain (mentoring junior designer atau ownership feature end-to-end).",
-    ],
+    criticalGaps: skillCheck.isPlausible
+      ? [
+          "Pengalaman mengukur dampak nyata setelah proyek selesai perlu lebih dipertegas di CV.",
+          "Portofolio studi kasus perlu menyertakan proses perancangan yang terstruktur dari awal hingga akhir.",
+          "Perjelas peran kepemimpinan atau inisiatif mandiri saat bekerja bersama tim.",
+        ]
+      : [
+          skillCheck.competencyFeedback,
+          "Belum ada bukti proyek portofolio atau studi kasus yang relevan dengan peran target ini.",
+          "Perlu membangun pemahaman tentang alat kerja dan metode kerja yang umum digunakan.",
+        ],
     transferableStrengths: [
-      "Keahlian komunikasi lintas fungsi dan fasilitasi workshop desain dengan tim engineering & bisnis.",
-      "Kemampuan sintesis data kualitatif dari riset pengguna menjadi solusi antarmuka yang bernilai bisnis.",
+      "Keahlian komunikasi yang baik dan kemudahan berkolaborasi dengan rekan tim.",
+      "Kemampuan mengolah data dan masukan menjadi solusi nyata yang bermanfaat.",
     ],
-    strategicRecommendations: [
-      "Tutup gap Design System dengan membuat 1 studi kasus mendalam tentang struktur token komponen di portofolio.",
-      "Cantumkan tools analisis produk (misal: Amplitude, Hotjar, Google Analytics) di seksi keahlian.",
-      "Tuliskan hasil kolaborasi dengan Product Manager dan Engineering Lead pada deskripsi pencapaian karir.",
-    ],
+    strategicRecommendations: skillCheck.isPlausible
+      ? [
+          "Tutup kesenjangan dengan membuat 1 studi kasus mendalam tentang proses kerja di portofolio.",
+          "Cantumkan alat kerja (tools) yang kamu kuasai secara jelas di bagian keahlian.",
+          "Tuliskan kontribusimu bersama tim pada deskripsi pencapaian karir.",
+        ]
+      : [
+          `Perbarui profil dengan mempelajari keahlian dasar untuk posisi ${activeTargetRole} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+          "Buat minimal satu proyek sederhana atau studi kasus untuk membuktikan kemampuanmu.",
+          "Ikuti kursus atau pelatihan daring untuk membangun fondasi keahlian yang dibutuhkan.",
+        ],
   };
 
   // Fallback data for Career Roadmap
   const roadmapData: CareerRoadmapDetails = result?.careerRoadmapDetails || {
-    targetRole,
+    targetRole: activeTargetRole,
     targetTimeline: "6 — 12 Bulan",
-    targetLevel: "Senior to Lead Level",
+    targetLevel: skillCheck.isPlausible ? "Senior to Lead Level" : `Kandidat Siap Kerja untuk ${activeTargetRole}`,
     phases: [
       {
         phaseNumber: 1,
-        phaseName: "Fondasi & Penutupan Gap Kompetensi",
+        phaseName: skillCheck.isPlausible ? "Fondasi & Penutupan Gap Kompetensi" : "Penyelarasan & Pembangunan Keahlian Inti",
         timeframe: "Bulan 1 — 3",
-        outcome: "Portofolio siap standar industri dan gap skill utama tertutup sempurna.",
-        keyActions: [
-          "Audit dan poles poin pengalaman kerja di CV dengan metrik kuantitatif nyata",
-          "Dokumentasikan 1 studi kasus mendalam tentang scalable design system & analytics di portofolio",
-          "Pelajari materi lanjutan terkait product strategy & business metrics",
-        ],
-        milestone: "CV & Portofolio mencapai standar review ATS 90%+",
+        outcome: skillCheck.isPlausible
+          ? "Portofolio siap standar industri dan gap skill utama tertutup."
+          : `Keahlian inti untuk posisi ${activeTargetRole} mulai dikuasai dan portofolio awal terbentuk.`,
+        keyActions: skillCheck.isPlausible
+          ? [
+              "Audit dan poles poin pengalaman kerja di CV dengan bukti hasil kerja nyata",
+              "Dokumentasikan 1 studi kasus mendalam tentang proyek relevan di portofolio",
+              "Pelajari materi lanjutan terkait strategi kerja dan pemecahan masalah bisnis",
+            ]
+          : [
+              `Fokus pelajari 2-3 keahlian utama untuk posisi ${activeTargetRole} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")})`,
+              "Perbarui daftar keahlian di CV setelah menguasai materi baru",
+              "Buat 1 proyek latihan terstruktur sebagai bukti portofolio awal",
+            ],
+        milestone: skillCheck.isPlausible
+          ? "CV & Portofolio siap lolos seleksi awal perekrut dengan tingkat keterbacaan tinggi"
+          : `Keahlian di profil selaras dengan kebutuhan peran ${activeTargetRole}`,
       },
       {
         phaseNumber: 2,
-        phaseName: "Pembuktian Dampak & Personal Branding",
+        phaseName: "Pembuktian Hasil Kerja & Personal Branding",
         timeframe: "Bulan 3 — 6",
-        outcome: "Diakui sebagai talent spesialis dan mulai menerima tawaran karir relevan.",
+        outcome: "Diakui sebagai talent yang kompeten dan mulai menerima kesempatan wawancara relevan.",
         keyActions: [
-          "Publikasikan tulisan insight desain atau studi kasus di LinkedIn / Medium",
+          "Publikasikan tulisan wawasan atau studi kasus proyek di LinkedIn atau komunitas profesional",
           "Aktif di ProofyLink Talent Network untuk mendapatkan verified badge",
-          "Mulai mengambil inisiatif kepemimpinan proyek atau mentoring anggota tim",
+          "Mulai mengambil inisiatif kolaborasi atau memimpin tugas proyek mandiri",
         ],
-        milestone: "Mendapatkan 3-5 undangan wawancara atau penawaran kerja privat",
+        milestone: "Mendapatkan undangan wawancara atau tawaran kerja yang relevan",
       },
       {
         phaseNumber: 3,
         phaseName: "Akselerasi Karir & Kesiapan Promosi",
         timeframe: "Bulan 6 — 12",
-        outcome: "Mencapai peran target impian dengan kompensasi dan posisi optimal.",
+        outcome: "Mencapai peran target impian dengan posisi dan kompensasi optimal.",
         keyActions: [
-          "Lakukan simulasi mock interview teknis & behavioral leadership",
-          "Negosiasi penawaran kerja / evaluasi kenaikan jenjang ke posisi Senior/Lead",
-          "Susun rencana kerja strategis (90-day plan) untuk peran baru",
+          "Lakukan simulasi wawancara kerja teknis dan situasional",
+          "Evaluasi tawaran kerja atau peluang jenjang karir yang lebih tinggi",
+          "Susun rencana kerja awal (rencana 90 hari) untuk posisi baru",
         ],
         milestone: "Penempatan resmi di posisi target idaman dengan kompensasi kompetitif",
       },
     ],
     recommendedCertifications: [
-      "Enterprise Design Thinking & Scalable Systems Practitioner",
-      "Data-Driven Product Design & Growth Strategy Certification",
-      "Leadership & Agile Project Management for Tech Professionals",
+      `Sertifikasi Profesional Bidang ${activeTargetRole}`,
+      "Pelatihan Praktis Analisis & Strategi Kerja",
+      "Pelatihan Manajemen Proyek & Kolaborasi Tim",
     ],
     strategicAdvice: [
-      "Fokuslah pada pencapaian hasil bisnis terukur, bukan sekadar daftar tugas harian.",
+      "Fokuslah pada pencapaian hasil kerja nyata yang bermanfaat, bukan sekadar daftar tugas harian.",
       "Bangun reputasi profesional dengan aktif membagikan pembelajaran dan hasil kerja nyata.",
-      "Perbarui profil ProofyLink secara berkala setiap kali menyelesaikan proyek berdampak tinggi.",
+      "Perbarui profil ProofyLink secara berkala setiap kali menyelesaikan proyek berdampak positif.",
     ],
   };
 
   const adviceData: StructuredAdvice = result?.structuredAdvice || {
-    opening: `Berdasarkan evaluasi pilar '${selectedFocus.replace("_", " ").toUpperCase()}' untuk peran ${targetRole}, berikut ringkasan evaluasi:`,
+    opening: `Berdasarkan evaluasi pilar '${selectedFocus.replace("_", " ").toUpperCase()}' untuk posisi ${activeTargetRole}, berikut beberapa poin penting:`,
     whatGood: [
-      `Fokus spesialisasi pada ${skills.slice(0, 2).join(" & ") || "keahlian utama"} sudah konsisten.`,
-      `Pengalaman kerja relevan dan mendukung klaim keahlian profesional.`,
+      "Format susunan CV rapi, bersih, dan mudah dibaca oleh tim perekrut.",
+      skillCheck.isPlausible
+        ? `Keahlian yang dicantumkan (${skillCheck.validSkills.slice(0, 3).join(", ")}) sudah relevan dengan target posisi.`
+        : "Informasi profil dan kontak utama sudah terisi dengan jelas.",
     ],
-    whatNotGood: [
-      `Poin pengalaman kerja perlu diperkaya dengan angka metrik konkret (Metode STAR).`,
-      `Kesesuaian kata kunci domain industri perlu diselaraskan dengan kebutuhan terkini.`,
-    ],
-    conclusion: `Terapkan rekomendasi di bawah untuk memaksimalkan daya tawar profilmu dan mempercepat pencapaian target karir.`,
+    whatNotGood: skillCheck.isPlausible
+      ? [
+          "Uraian pengalaman kerja masih bisa diperjelas dengan bukti hasil nyata (angka %, jumlah proyek, efisiensi waktu).",
+          "Ringkasan profil belum menonjolkan bidang industri utama yang kamu kuasai.",
+        ]
+      : [
+          skillCheck.competencyFeedback,
+          "Uraian pengalaman kerja masih kurang bukti hasil nyata yang meyakinkan perekrut.",
+        ],
+    conclusion: skillCheck.isPlausible
+      ? "Terapkan rekomendasi di atas untuk membuat CV kamu semakin menarik dan meningkatkan peluang dipanggil wawancara."
+      : `Perbaiki daftar keahlian agar sesuai dengan standar posisi ${activeTargetRole} untuk membuka peluang lebih besar saat melamar pekerjaan.`,
   };
 
   return (
@@ -429,7 +528,7 @@ export function CareerAdvisorWorkspace() {
                 </div>
                 <p className="mt-1 text-sm font-medium text-slate-700">{headline}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Peran Dituju: <span className="font-semibold text-foreground">{targetRole}</span> • {skills.length} Skill Terdaftar
+                  Peran Dituju: <span className="font-semibold text-foreground">{activeTargetRole}</span> • {skills.length} Skill Terdaftar
                 </p>
               </div>
             </div>
@@ -490,23 +589,93 @@ export function CareerAdvisorWorkspace() {
           })}
         </div>
 
-        <div className="flex justify-end pt-2">
-          <Button
-            onClick={() => void runAdvisor()}
-            disabled={loading}
-            size="lg"
-            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] font-bold text-white shadow-sm rounded-xl px-6"
-          >
-            {loading ? (
-              <>
-                <Bot className="size-5 animate-spin" /> Menganalisis Profil...
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-5 text-white" /> Analisis &amp; Hasilkan Rekomendasi
-              </>
-            )}
-          </Button>
+        {/* ─── Command Controls & Custom Instructions Panel ─── */}
+        <div className="rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/50 via-white to-purple-50/20 p-5 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4 text-[#7C3AED]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Kontrol Perintah AI &amp; Target Peran (Opsional)
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs font-semibold text-[#7C3AED] hover:underline"
+            >
+              {showAdvanced ? "Sembunyikan Pintasan" : "Pintasan Perintah Cepat"}
+            </button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Target Posisi / Peran yang Ingin Diuji:
+              </label>
+              <Input
+                value={customRoleInput !== null ? customRoleInput : defaultTargetRole}
+                onChange={(e) => setCustomRoleInput(e.target.value)}
+                placeholder="misal: Senior Product Designer, Lead UX..."
+                className="bg-white text-xs border-purple-200 focus-visible:ring-[#7C3AED]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Catatan / Instruksi Khusus ke AI:
+              </label>
+              <Input
+                value={customInstruction}
+                onChange={(e) => setCustomInstruction(e.target.value)}
+                placeholder="misal: Fokus industri Fintech SaaS, tekankan kepemimpinan..."
+                className="bg-white text-xs border-purple-200 focus-visible:ring-[#7C3AED]"
+              />
+            </div>
+          </div>
+
+          {showAdvanced && (
+            <div className="space-y-2 pt-2 border-t border-purple-100">
+              <span className="text-[11px] font-semibold text-slate-600 block">
+                Pintasan Perintah Cepat (Klik untuk menyisipkan ke instruksi):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {quickPrompts.map((qp, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => applyQuickPrompt(qp)}
+                    className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white border border-purple-200 text-purple-800 hover:bg-purple-50 transition-colors font-medium shadow-2xs"
+                  >
+                    <Sparkles className="size-3 text-[#7C3AED]" /> {qp}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-purple-100/60">
+            <p className="text-xs text-muted-foreground">
+              Evaluasi akan dijalankan untuk pilar:{" "}
+              <strong className="text-[#7C3AED]">
+                {focusPresets.find((p) => p.id === selectedFocus)?.label}
+              </strong>
+            </p>
+            <Button
+              onClick={() => void runAdvisor()}
+              disabled={loading}
+              size="lg"
+              className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] font-bold text-white shadow-sm rounded-xl px-6"
+            >
+              {loading ? (
+                <>
+                  <Bot className="size-4.5 animate-spin" /> Menganalisis Profil...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4.5 text-white" /> Analisis &amp; Hasilkan Rekomendasi
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -516,11 +685,11 @@ export function CareerAdvisorWorkspace() {
           <div className="hidden print:block border-b pb-4 mb-6">
             <h1 className="text-2xl font-bold text-foreground">ProofyLink — Laporan Evaluasi Karier &amp; Profil AI</h1>
             <p className="text-sm text-muted-foreground">
-              Kandidat: {cvProfile?.fullName || "Profil kamu"} | Peran Dituju: {targetRole} | Tanggal: {new Date().toLocaleDateString("id-ID")}
+              Kandidat: {cvProfile?.fullName || "Profil kamu"} | Peran Dituju: {activeTargetRole} | Tanggal: {new Date().toLocaleDateString("id-ID")}
             </p>
           </div>
 
-          <div className="no-print flex items-center justify-between border-b pb-4">
+          <div className="no-print flex flex-wrap items-center justify-between gap-3 border-b pb-4">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-purple-300 bg-purple-50 text-[#7C3AED] gap-1 px-3 py-1 font-semibold text-xs">
                 <Sparkles className="size-3.5" /> Hasil Analisis Siap
@@ -532,14 +701,24 @@ export function CareerAdvisorWorkspace() {
               )}
             </div>
 
-            <Button
-              onClick={handleDownloadPdf}
-              variant="outline"
-              size="sm"
-              className="gap-2 border-border text-slate-700 hover:bg-slate-50 rounded-xl"
-            >
-              <Download className="size-4 text-[#7C3AED]" /> Unduh Laporan PDF
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleCopyAdvice}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-border text-slate-700 hover:bg-slate-50 rounded-xl text-xs"
+              >
+                <Copy className="size-3.5 text-[#7C3AED]" /> Salin Rekomendasi
+              </Button>
+              <Button
+                onClick={handleDownloadPdf}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-border text-slate-700 hover:bg-slate-50 rounded-xl text-xs"
+              >
+                <Download className="size-3.5 text-[#7C3AED]" /> Unduh PDF
+              </Button>
+            </div>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
@@ -552,7 +731,7 @@ export function CareerAdvisorWorkspace() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <FileText className="size-5 text-[#7C3AED]" />
-                      <CardTitle className="text-lg text-foreground">Review CV Keseluruhan &amp; Kesiapan ATS</CardTitle>
+                      <CardTitle className="text-lg text-foreground">Review CV Keseluruhan &amp; Kesiapan Melamar Kerja</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground font-medium">Status Kesiapan:</span>
@@ -616,7 +795,7 @@ export function CareerAdvisorWorkspace() {
 
                   {/* Format & Readability Checks */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Pemeriksaan Format &amp; Keterbacaan ATS:</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Pemeriksaan Kerapian Format &amp; Keterbacaan Rekruter:</h4>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {cvReviewData.formatChecks.map((check, i) => (
                         <div key={i} className="rounded-xl border p-3 bg-white flex items-start gap-2.5 shadow-2xs">
@@ -761,7 +940,7 @@ export function CareerAdvisorWorkspace() {
                       <div>
                         <CardTitle className="text-lg text-foreground">Career Roadmap &amp; Rencana Aksi Terstruktur</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Jalur Pertumbuhan: <span className="font-semibold text-foreground">{targetRole}</span> → <span className="font-semibold text-purple-700">{roadmapData.targetLevel}</span>
+                          Jalur Pertumbuhan: <span className="font-semibold text-foreground">{activeTargetRole}</span> → <span className="font-semibold text-purple-700">{roadmapData.targetLevel}</span>
                         </p>
                       </div>
                     </div>

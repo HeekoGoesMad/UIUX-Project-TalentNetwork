@@ -11,6 +11,7 @@ import {
   FileText,
   GitCompareArrows,
   History,
+  Loader2,
   MoreHorizontal,
   RefreshCw,
   Search,
@@ -26,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { downloadIcsFile } from "@/lib/calendar";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
+import { cn } from "@/lib/utils";
 
 type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
 type Candidate = {
@@ -55,6 +57,8 @@ type Interview = {
   panel: string[];
   status: "Terjadwal" | "Selesai" | "Dibatalkan";
   reminder: boolean;
+  meetingUrl?: string;
+  sentAt?: string | null;
 };
 
 const storageKey = "proofylink-demo-recruiter-operations";
@@ -121,7 +125,14 @@ export function RecruiterOperationsPage() {
   const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState("");
-  const [eventForm, setEventForm] = useState({ date: "2026-08-25T10:00", timezone: "Asia/Jakarta (WIB)", type: "Panel interview", panel: user?.name || "Tim Rekruter" });
+  const [eventForm, setEventForm] = useState({
+    date: "2026-09-16T10:00",
+    timezone: "Asia/Jakarta (WIB)",
+    type: "Interview Online",
+    panel: user?.name || "Tim Rekruter",
+    meetingUrl: "https://meet.google.com/new",
+  });
+  const [sendingInterviewId, setSendingInterviewId] = useState<string | null>(null);
   const [historyStage, setHistoryStage] = useState<Stage | "all">("all");
   const [historySearch, setHistorySearch] = useState("");
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -252,6 +263,7 @@ export function RecruiterOperationsPage() {
       toast.error("Pilih kandidat terlebih dahulu");
       return;
     }
+    const meetingUrl = eventForm.meetingUrl?.trim() || "https://meet.google.com/new";
     const interview: Interview = {
       id: `interview-${Date.now()}`,
       candidateId: selectedCandidate,
@@ -261,11 +273,13 @@ export function RecruiterOperationsPage() {
       panel: [eventForm.panel],
       status: "Terjadwal",
       reminder: true,
+      meetingUrl,
+      sentAt: null,
     };
     setData((current) => ({ ...current, interviews: [interview, ...current.interviews] }));
     if (dbMode) {
       try {
-        await fetch("/api/interviews", {
+        const res = await fetch("/api/interviews", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -273,14 +287,52 @@ export function RecruiterOperationsPage() {
             scheduledAt: new Date(eventForm.date).toISOString(),
             timezone: eventForm.timezone,
             candidateProfileId: selectedCandidate.startsWith("candidate-") ? undefined : selectedCandidate,
-            meetingUrl: "https://meet.google.com/new",
+            meetingUrl,
           }),
         });
+        const payload = (await res.json()) as { interview?: { id: string } };
+        if (payload.interview?.id) {
+          setData((current) => ({
+            ...current,
+            interviews: current.interviews.map((item) =>
+              item.id === interview.id ? { ...item, id: payload.interview!.id } : item
+            ),
+          }));
+        }
       } catch {
         // Handled
       }
     }
-    toast.success("Interview dijadwalkan", { description: "Reminder kandidat aktif." });
+    toast.success("Jadwal interview berhasil disimpan", {
+      description: "Klik ikon pesawat kertas (send) pada kartu event untuk mengirim notifikasi dan link meeting ke kandidat.",
+    });
+  };
+
+  const handleSendInterviewInvitation = async (interview: Interview, cand?: Candidate) => {
+    setSendingInterviewId(interview.id);
+    try {
+      if (dbMode && !interview.id.startsWith("interview-")) {
+        const response = await fetch(`/api/interviews/${interview.id}/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Gagal mengirim undangan interview.");
+      }
+      setData((current) => ({
+        ...current,
+        interviews: current.interviews.map((item) =>
+          item.id === interview.id ? { ...item, sentAt: new Date().toISOString() } : item
+        ),
+      }));
+      toast.success(`Undangan & link meeting berhasil dikirim ke ${cand?.name ?? "kandidat"}!`, {
+        description: "Notifikasi telah masuk dan tautan meeting telah dikirim ke pesan kandidat.",
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim undangan interview.");
+    } finally {
+      setSendingInterviewId(null);
+    }
   };
 
   const exportCsv = () => {
@@ -460,7 +512,8 @@ export function RecruiterOperationsPage() {
             title?: string;
             status?: string;
             candidateProfileId?: string;
-            interview?: { id: string; scheduledAt: string; timezone?: string; title?: string; status?: string };
+            meetingUrl?: string;
+            interview?: { id: string; scheduledAt: string; timezone?: string; title?: string; status?: string; meetingUrl?: string };
           };
           const intData = (await intRes.json()) as { interviews?: IntRow[] };
           if (intData.interviews && intData.interviews.length > 0) {
@@ -484,6 +537,8 @@ export function RecruiterOperationsPage() {
                     ? "Selesai"
                     : "Dibatalkan") as Interview["status"],
                   reminder: true,
+                  meetingUrl: intObj.meetingUrl || item.meetingUrl || "https://meet.google.com/new",
+                  sentAt: null,
                 };
               });
           }
@@ -805,6 +860,9 @@ export function RecruiterOperationsPage() {
               addInterview={addInterview}
               setData={setData}
               people={people}
+              onSendInvitation={handleSendInterviewInvitation}
+              sendingInterviewId={sendingInterviewId}
+              dbMode={dbMode}
             />
           )}
 
@@ -1255,14 +1313,20 @@ function InterviewsView({
   addInterview,
   setData,
   people,
+  onSendInvitation,
+  sendingInterviewId,
+  dbMode,
 }: {
   data: { candidates: Candidate[]; interviews: Interview[] };
   selectedCandidateData?: Candidate;
-  eventForm: { date: string; timezone: string; type: string; panel: string };
-  setEventForm: (value: { date: string; timezone: string; type: string; panel: string }) => void;
+  eventForm: { date: string; timezone: string; type: string; panel: string; meetingUrl: string };
+  setEventForm: React.Dispatch<React.SetStateAction<{ date: string; timezone: string; type: string; panel: string; meetingUrl: string }>>;
   addInterview: () => void;
   setData: React.Dispatch<React.SetStateAction<{ candidates: Candidate[]; interviews: Interview[] }>>;
   people: string[];
+  onSendInvitation?: (interview: Interview, cand?: Candidate) => void;
+  sendingInterviewId?: string | null;
+  dbMode?: boolean;
 }) {
   const [feedback, setFeedback] = useState(selectedCandidateData?.feedback ?? "");
   const selectedInterviews = data.interviews.filter((interview) => interview.candidateId === selectedCandidateData?.id);
@@ -1271,6 +1335,23 @@ function InterviewsView({
       ...current,
       interviews: current.interviews.map((item) => (item.id === id ? { ...item, ...update } : item)),
     }));
+
+  const deleteInterview = async (id: string) => {
+    setData((current) => ({
+      ...current,
+      interviews: current.interviews.filter((item) => item.id !== id),
+    }));
+    if (dbMode && !id.startsWith("interview-")) {
+      try {
+        await fetch(`/api/interviews/${id}`, {
+          method: "DELETE",
+        });
+      } catch {
+        // Optimistic UI preserved
+      }
+    }
+    toast.success("Jadwal interview berhasil dihapus");
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[.85fr_1.15fr]">
@@ -1336,6 +1417,16 @@ function InterviewsView({
             />
           </label>
           <label className="block text-sm font-semibold">
+            Link meeting (Google Meet, Zoom, dll.)
+            <input
+              type="url"
+              placeholder="https://meet.google.com/xxx-xxxx-xxx"
+              value={eventForm.meetingUrl ?? ""}
+              onChange={(event) => setEventForm({ ...eventForm, meetingUrl: event.target.value })}
+              className="field mt-2"
+            />
+          </label>
+          <label className="block text-sm font-semibold">
             Panel interviewer
             <select
               value={eventForm.panel}
@@ -1384,6 +1475,27 @@ function InterviewsView({
                         <Button
                           size="icon"
                           variant="ghost"
+                          className={cn(
+                            interview.sentAt ? "text-emerald-600 hover:text-emerald-700" : "text-primary hover:bg-purple-50"
+                          )}
+                          title={
+                            interview.sentAt
+                              ? `Undangan & link telah dikirim (${new Date(interview.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}) - Klik untuk kirim ulang`
+                              : "Kirim notifikasi & link meeting ke pesan kandidat"
+                          }
+                          aria-label="Kirim notifikasi dan link meeting"
+                          disabled={sendingInterviewId === interview.id}
+                          onClick={() => onSendInvitation?.(interview, cand)}
+                        >
+                          {sendingInterviewId === interview.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Send className="size-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           aria-label="Kirim ulang reminder"
                           onClick={() => {
                             updateInterview(interview.id, { reminder: true });
@@ -1403,11 +1515,10 @@ function InterviewsView({
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Batalkan interview"
-                          onClick={() => {
-                            updateInterview(interview.id, { status: "Dibatalkan" });
-                            toast.success("Interview dibatalkan");
-                          }}
+                          className="hover:bg-red-50 hover:text-red-600"
+                          aria-label="Hapus jadwal interview"
+                          title="Hapus jadwal interview"
+                          onClick={() => deleteInterview(interview.id)}
                         >
                           <X className="size-4" />
                         </Button>

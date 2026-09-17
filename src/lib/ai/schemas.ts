@@ -6,6 +6,7 @@ export const profileContextSchema = z.object({
   skills: z.array(z.string()).max(40).default([]),
   targetRole: z.string().max(120).default(""),
   location: z.string().max(120).default(""),
+  customInstruction: z.string().max(1000).optional().default(""),
 });
 
 export const summarySchema = z.object({
@@ -15,6 +16,87 @@ export const screeningSchema = z.object({
   score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
+
+export const structuredAdviceSchema = z.object({
+  opening: z.string(),
+  whatGood: z.array(z.string()),
+  whatNotGood: z.array(z.string()),
+  conclusion: z.string(),
+});
+
+export const cvReviewPillarSchema = z.object({
+  readinessLevel: z.string(),
+  overallScore: z.number().min(0).max(100),
+  executiveSummary: z.string(),
+  sectionAudits: z.array(
+    z.object({
+      section: z.string(),
+      status: z.enum(["good", "needs_improvement"]),
+      notes: z.array(z.string()),
+      recommendation: z.string(),
+    })
+  ),
+  formatChecks: z.array(
+    z.object({
+      check: z.string(),
+      passed: z.boolean(),
+      tip: z.string(),
+    })
+  ),
+  priorityActionItems: z.array(z.string()),
+  summary: z.string(),
+  structuredAdvice: structuredAdviceSchema,
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
+export const gapAnalysisPillarSchema = z.object({
+  targetRole: z.string(),
+  matchScore: z.number().min(0).max(100),
+  matchLevel: z.string(),
+  coreCompetencies: z.array(
+    z.object({
+      competency: z.string(),
+      candidateLevel: z.string(),
+      requiredLevel: z.string(),
+      status: z.enum(["match", "gap", "exceeds"]),
+      recommendation: z.string(),
+    })
+  ),
+  criticalGaps: z.array(z.string()),
+  transferableStrengths: z.array(z.string()),
+  strategicRecommendations: z.array(z.string()),
+  summary: z.string(),
+  structuredAdvice: structuredAdviceSchema,
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
+export const careerRoadmapPillarSchema = z.object({
+  targetRole: z.string(),
+  targetTimeline: z.string(),
+  targetLevel: z.string(),
+  phases: z.array(
+    z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })
+  ),
+  recommendedCertifications: z.array(z.string()),
+  strategicAdvice: z.array(z.string()),
+  summary: z.string(),
+  structuredAdvice: structuredAdviceSchema,
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
 export const advisorSchema = z.object({
   focus: z.enum(["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
   summary: z.string(),
@@ -23,7 +105,7 @@ export const advisorSchema = z.object({
     before: z.string(),
     after: z.string(),
     impactReason: z.string(),
-    metricsHighlight: z.string().optional(),
+    metricsHighlight: z.string().default(""),
   })).default([]),
   pillars: z.array(z.object({
     name: z.string(),
@@ -32,12 +114,7 @@ export const advisorSchema = z.object({
     recommendation: z.string(),
     actionables: z.array(z.string()),
   })).default([]),
-  structuredAdvice: z.object({
-    opening: z.string(),
-    whatGood: z.array(z.string()),
-    whatNotGood: z.array(z.string()),
-    conclusion: z.string(),
-  }).optional(),
+  structuredAdvice: structuredAdviceSchema.optional(),
   atsDetails: z.object({
     readinessLevel: z.enum(["Sangat Siap ATS", "Cukup Siap", "Perlu Penguatan"]).default("Cukup Siap"),
     detectedKeywords: z.array(z.string()),
@@ -114,7 +191,7 @@ export const advisorSchema = z.object({
       candidateLevel: z.string(),
       requiredLevel: z.string(),
       status: z.enum(["match", "gap", "exceeds"]),
-      recommendation: z.string().optional(),
+      recommendation: z.string().default(""),
     })),
     criticalGaps: z.array(z.string()),
     transferableStrengths: z.array(z.string()),

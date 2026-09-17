@@ -14,10 +14,21 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
+    // Admin has superuser preview access to inspect any workspace
+    if (user.role === "admin") {
+      return;
+    }
     if (user.role === "recruiter" && user.provisioningStatus !== "active") {
       // Allow recruiter to access onboarding to fill company data, or stay at pending page
       if (pathname !== "/recruiter/pending" && pathname !== "/recruiter/onboarding") {
         router.replace("/recruiter/pending");
+      }
+      return;
+    }
+    if (user.role === "partner" && user.provisioningStatus !== "active") {
+      // Allow partner to access onboarding or pending verification page
+      if (pathname !== "/partner/pending" && pathname !== "/partner/onboarding") {
+        router.replace(user.provisioningStatus === "revision_required" ? "/partner/onboarding" : "/partner/pending");
       }
       return;
     }
@@ -36,12 +47,25 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
     }
   }, [hydrated, bootstrapped, dbMode, user, cvProfile, role, router, pathname]);
 
+  if (!hydrated) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
+        <div className="mx-auto size-8 animate-pulse rounded-full bg-[#d7f5e8]" />
+        <p className="mt-4 text-sm text-muted-foreground">Menyiapkan workspace...</p>
+      </div>
+    );
+  }
+
+  if (user?.role === "admin") {
+    return <>{children}</>;
+  }
+
   if (
-    !hydrated ||
     (dbMode && !bootstrapped) ||
     !user ||
     user.role !== role ||
     (role === "recruiter" && user.provisioningStatus !== "active" && pathname !== "/recruiter/onboarding") ||
+    (role === "partner" && user.provisioningStatus !== "active" && pathname !== "/partner/onboarding") ||
     (role === "candidate" && (!cvProfile || !cvProfile.fullName?.trim()) && pathname !== "/candidate/onboarding")
   ) {
     return (

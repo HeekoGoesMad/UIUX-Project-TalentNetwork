@@ -28,18 +28,32 @@ export default function RecruiterPendingPage() {
   const [checking, setChecking] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [localStatus, setLocalStatus] = useState<ProvisioningStatus>(() => user?.provisioningStatus || "pending");
+  const [localCompanyName, setLocalCompanyName] = useState<string | null>(() => user?.companyName || null);
 
   const status = localStatus || user?.provisioningStatus || "pending";
   const isApproved = status === "active";
   const isRevisionRequired = status === "revision_required";
   const isRejected = status === "rejected";
 
+  const companyDisplayName =
+    user?.companyName ||
+    localCompanyName ||
+    (user?.name && user.name !== "Recruiter" && user.name !== "Budi Santoso" ? user.name : "Perusahaan");
+
   const checkStatus = async (showToasts = true) => {
     setChecking(true);
     try {
       const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
       if (res.ok) {
-        const data = (await res.json()) as { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } };
+        const data = (await res.json()) as {
+          identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string };
+          organization?: { name?: string };
+        };
+        if (data.organization?.name) {
+          setLocalCompanyName(data.organization.name);
+        } else if (data.identity?.companyName) {
+          setLocalCompanyName(data.identity.companyName);
+        }
         if (data.identity?.provisioningStatus) {
           const next = data.identity.provisioningStatus;
           setLocalStatus(next);
@@ -84,8 +98,13 @@ export default function RecruiterPendingPage() {
 
       fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string } } | null) => {
+        .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string }; organization?: { name?: string } } | null) => {
           if (!active) return;
+          if (data?.organization?.name) {
+            setLocalCompanyName(data.organization.name);
+          } else if (data?.identity?.companyName) {
+            setLocalCompanyName(data.identity.companyName);
+          }
           if (data?.identity?.provisioningStatus) {
             const next = data.identity.provisioningStatus;
             if (next === "active") {
@@ -206,7 +225,7 @@ export default function RecruiterPendingPage() {
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Selamat, <strong>{user?.name || "Recruiter"}</strong>! Seluruh berkas pendaftaran dan legalitas perusahaan Anda telah diverifikasi oleh tim compliance. Silakan masuk ke workspace untuk mulai mencari talent.
+                    Selamat, <strong>{companyDisplayName}</strong>! Seluruh berkas pendaftaran dan legalitas perusahaan Anda telah diverifikasi oleh tim compliance. Silakan masuk ke workspace untuk mulai mencari talent.
                   </p>
                   <div className="pt-2">
                     <Button
@@ -258,9 +277,8 @@ export default function RecruiterPendingPage() {
                   </div>
 
                   <p className="text-xs text-slate-700 leading-relaxed">
-                    Halo <strong>{user?.name || "Recruiter"}</strong>, tim compliance telah meninjau pengajuan pendaftaran Anda. Terdapat berkas yang belum sesuai dan perlu diperbaiki.
+                    Halo <strong>{companyDisplayName}</strong>, tim compliance telah meninjau pengajuan pendaftaran Anda. Terdapat berkas yang belum sesuai dan perlu diperbaiki.
                   </p>
-
                   {/* Revision Notes Box */}
                   <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 text-xs text-orange-950 space-y-1">
                     <p className="font-bold flex items-center gap-1.5">
@@ -356,7 +374,7 @@ export default function RecruiterPendingPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Terima kasih, <strong>{user?.name || "Budi Santoso"}</strong>. Berkas pendaftaran dan dokumen legalitas perusahaan Anda telah berhasil dikirim dan saat ini masuk ke antrean verifikasi tim compliance ProofyLink.
+                    Terima kasih, <strong>{companyDisplayName}</strong>. Berkas pendaftaran dan dokumen legalitas perusahaan Anda telah berhasil dikirim dan saat ini masuk ke antrean verifikasi tim compliance ProofyLink.
                   </p>
                   <div className="pt-1 flex items-center gap-2 text-xs font-semibold text-amber-900">
                     <span>Estimasi Waktu Verifikasi:</span>

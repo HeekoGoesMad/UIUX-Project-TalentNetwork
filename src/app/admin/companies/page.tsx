@@ -7,11 +7,13 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  FileCheck,
   Loader2,
   RefreshCw,
   Search,
   ShieldAlert,
   Trash2,
+  User,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -105,24 +107,24 @@ const STATUS_CONFIG: Record<
 };
 
 const INDUSTRY_OPTIONS = [
-  "Technology",
-  "Financial Services",
-  "Hospitality",
-  "Retail",
-  "Manufacturing",
-  "Education",
-  "Healthcare",
-  "Logistics",
-  "Professional Services",
-  "Other",
+  { value: "Technology", label: "Teknologi & Perangkat Lunak (SaaS / IT)" },
+  { value: "Financial Services", label: "Fintech & Layanan Keuangan" },
+  { value: "Retail", label: "E-Commerce & Retail Modern" },
+  { value: "Manufacturing", label: "FMCG & Manufaktur" },
+  { value: "Healthcare", label: "Kesehatan, Farmasi & Medtech" },
+  { value: "Logistics", label: "Logistik, Transportasi & Supply Chain" },
+  { value: "Professional Services", label: "Konsultan & Layanan Bisnis Profesional" },
+  { value: "Education", label: "Pendidikan & Edutech" },
+  { value: "Hospitality", label: "Hospitality & Pariwisata" },
+  { value: "Other", label: "Lainnya" },
 ];
 
 const SCALE_OPTIONS = [
-  "1-10 Karyawan",
-  "11-50 Karyawan",
-  "51-200 Karyawan",
-  "201-500 Karyawan",
-  "500+ Karyawan",
+  { id: "1-10 Karyawan", label: "1 — 10 Karyawan (Startup / Usaha Rintisan)" },
+  { id: "11-50 Karyawan", label: "11 — 50 Karyawan (Pertumbuhan Awal)" },
+  { id: "51-200 Karyawan", label: "51 — 200 Karyawan (Menengah / Mid-Sized)" },
+  { id: "201-500 Karyawan", label: "201 — 500 Karyawan (Perusahaan Besar)" },
+  { id: "500+ Karyawan", label: "500+ Karyawan (Korporasi / Enterprise)" },
 ];
 
 const TIER_OPTIONS = ["trial", "starter", "professional", "enterprise"];
@@ -146,7 +148,7 @@ function AdminCompaniesContent() {
   const [activeTab, setActiveTab] = useState<"legal" | "verification" | "subscription">("legal");
   const [updating, setUpdating] = useState(false);
 
-  // Edit form state in modal
+  // Edit form state in modal - matches recruiter profile form 1:1
   const [formStatus, setFormStatus] = useState<CompanyItem["verificationStatus"]>("pending");
   const [formNotes, setFormNotes] = useState("");
   const [formNib, setFormNib] = useState("");
@@ -161,24 +163,59 @@ function AdminCompaniesContent() {
   const [formTier, setFormTier] = useState<CompanyItem["subscriptionTier"]>("trial");
   const [formSubStatus, setFormSubStatus] = useState<CompanyItem["subscriptionStatus"]>("active");
 
-  const openReviewModal = useCallback((c: CompanyItem) => {
+  // Recruiter Profile 1:1 fields
+  const [formCompanyName, setFormCompanyName] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formOfficeAddress, setFormOfficeAddress] = useState("");
+  const [formPicName, setFormPicName] = useState("");
+  const [formPicTitle, setFormPicTitle] = useState("");
+  const [formPicEmail, setFormPicEmail] = useState("");
+  const [formPicPhone, setFormPicPhone] = useState("");
+
+  const populateForm = useCallback((c: CompanyItem) => {
     setSelectedCompany(c);
+    setFormCompanyName(c.name || "");
+    setFormPicName(c.owner?.name || "");
+    setFormPicTitle("");
+    setFormPicEmail(c.owner?.email || c.companyEmail || "");
+    setFormPicPhone(c.owner?.phone || "");
     setFormStatus(c.verificationStatus);
     setFormNotes(c.verificationNotes || "");
     setFormNib(c.nib || "");
     setFormNpwp(c.npwp || "");
-    setFormIndustry(c.industry || "Technology");
+    setFormIndustry(c.industry || "Other");
     setFormScale(c.companyScale || "1-10 Karyawan");
     setFormProvince(c.province || "");
     setFormCity(c.city || "");
-    setFormEmail(c.companyEmail || c.owner.email || "");
+    setFormDescription(c.description || "");
+    setFormOfficeAddress(c.officeAddress || "");
+    setFormEmail(c.companyEmail || c.owner?.email || "");
     setFormWebsite(c.website || "");
     setFormLinkedin(c.linkedinUrl || "");
     setFormTier(c.subscriptionTier || "trial");
     setFormSubStatus(c.subscriptionStatus || "active");
+  }, []);
+
+  const openReviewModal = useCallback((c: CompanyItem) => {
+    populateForm(c);
     setActiveTab("legal");
     setModalOpen(true);
-  }, []);
+
+    // Live sync: fetch fresh copy from server to ensure 100% latest live data
+    void fetch(new URL(`/api/admin/companies?t=${Date.now()}`, window.location.origin), {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.companies) {
+          const fresh = (data.companies as CompanyItem[]).find((item) => item.id === c.id);
+          if (fresh) {
+            populateForm(fresh);
+          }
+        }
+      })
+      .catch(() => null);
+  }, [populateForm]);
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -237,14 +274,19 @@ function AdminCompaniesContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: formCompanyName || selectedCompany.name,
+          picName: formPicName || null,
+          picPhone: formPicPhone || null,
           verificationStatus: formStatus,
-          verificationNotes: formNotes,
+          verificationNotes: formNotes || null,
           nib: formNib || null,
           npwp: formNpwp || null,
           industry: formIndustry || null,
           companyScale: formScale || null,
           province: formProvince || null,
           city: formCity || null,
+          description: formDescription || null,
+          officeAddress: formOfficeAddress || null,
           companyEmail: formEmail || null,
           website: formWebsite || null,
           linkedinUrl: formLinkedin || null,
@@ -258,9 +300,18 @@ function AdminCompaniesContent() {
         throw new Error(errorData.error || "Gagal memperbarui data.");
       }
 
-      toast.success("Data dan status verifikasi perusahaan berhasil diperbarui!");
+      const resData = await res.json();
+      const updated = resData.company;
+
+      toast.success(`Data perusahaan ${formCompanyName || selectedCompany.name} berhasil diperbarui & disinkronkan!`);
       setModalOpen(false);
-      fetchCompanies();
+
+      if (updated) {
+        setCompanies((prev) =>
+          prev.map((item) => (item.id === selectedCompany.id ? { ...item, ...updated } : item))
+        );
+      }
+      void fetchCompanies();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal menyimpan perubahan.";
       toast.error(msg);
@@ -531,41 +582,86 @@ function AdminCompaniesContent() {
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {activeTab === "legal" && (
                 <div className="space-y-4 text-xs">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-                    <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                      Informasi Legalitas
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Bagian 1: Identitas PIC / Penanggung Jawab */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
+                        <User className="size-4" />
+                      </div>
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">
-                          Nomor Induk Berusaha (NIB) <span className="text-red-500">* (13 digit)</span>
-                        </label>
+                        <p className="font-bold text-slate-900 text-xs">Identitas PIC / Penanggung Jawab</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Informasi perwakilan resmi dari tim Talent Acquisition atau HR.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Nama Lengkap PIC</label>
                         <Input
-                          value={formNib}
-                          onChange={(e) => setFormNib(e.target.value)}
-                          placeholder="13 digit angka NIB..."
+                          value={formPicName}
+                          onChange={(e) => setFormPicName(e.target.value)}
+                          placeholder="Contoh: Budi Santoso"
                           className="h-8 text-xs bg-white"
                         />
                       </div>
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">
-                          NPWP Perusahaan <span className="text-red-500">*</span>
-                        </label>
+                        <label className="font-semibold text-slate-700 block mb-1">Jabatan / Role PIC</label>
                         <Input
-                          value={formNpwp}
-                          onChange={(e) => setFormNpwp(e.target.value)}
-                          placeholder="Format NPWP perusahaan..."
+                          value={formPicTitle}
+                          onChange={(e) => setFormPicTitle(e.target.value)}
+                          placeholder="Contoh: Talent Acquisition Lead"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Email Akun PIC</label>
+                        <Input
+                          value={formPicEmail}
+                          disabled
+                          className="h-8 text-xs bg-slate-50 text-muted-foreground cursor-not-allowed"
+                        />
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">
+                          Email login terikat dengan akun dan tidak dapat diubah langsung.
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Nomor Telepon / WhatsApp</label>
+                        <Input
+                          value={formPicPhone}
+                          onChange={(e) => setFormPicPhone(e.target.value)}
+                          placeholder="0812-xxxx-xxxx"
                           className="h-8 text-xs bg-white"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-                    <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                      Informasi Bisnis &amp; Profil
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Bagian 2: Profil Entitas Bisnis & Operasional */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                        <Building2 className="size-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">Profil Entitas Bisnis &amp; Operasional</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Informasi entitas perusahaan yang ditampilkan pada kandidat saat permintaan screening.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">
+                          Nama Resmi Perusahaan (PT/CV) *
+                        </label>
+                        <Input
+                          value={formCompanyName}
+                          onChange={(e) => setFormCompanyName(e.target.value)}
+                          placeholder="Nama badan hukum perusahaan"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Sektor Industri *</label>
                         <select
@@ -574,70 +670,116 @@ function AdminCompaniesContent() {
                           className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2"
                         >
                           {INDUSTRY_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Skala Perusahaan *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Skala / Ukuran Perusahaan *</label>
                         <select
                           value={formScale}
                           onChange={(e) => setFormScale(e.target.value)}
                           className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2"
                         >
                           {SCALE_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Provinsi *</label>
-                        <Input
-                          value={formProvince}
-                          onChange={(e) => setFormProvince(e.target.value)}
-                          placeholder="Contoh: DKI Jakarta"
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Kota / Kabupaten *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Kota Kantor</label>
                         <Input
                           value={formCity}
                           onChange={(e) => setFormCity(e.target.value)}
-                          placeholder="Contoh: Jakarta Selatan"
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Email Resmi Perusahaan *</label>
-                        <Input
-                          value={formEmail}
-                          onChange={(e) => setFormEmail(e.target.value)}
-                          placeholder="official@company.com"
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Website Resmi (Opsional)</label>
-                        <Input
-                          value={formWebsite}
-                          onChange={(e) => setFormWebsite(e.target.value)}
-                          placeholder="https://company.com"
+                          placeholder="Contoh: Surabaya, Jawa Timur"
                           className="h-8 text-xs bg-white"
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="font-semibold text-slate-700 block mb-1">LinkedIn Perusahaan (Opsional)</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Deskripsi Perusahaan</label>
+                        <textarea
+                          value={formDescription}
+                          onChange={(e) => setFormDescription(e.target.value)}
+                          rows={3}
+                          placeholder="Ceritakan tentang model bisnis, produk, atau nilai perusahaan..."
+                          className="w-full text-xs rounded-md border border-slate-300 bg-white p-2.5 outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Website Resmi</label>
+                        <Input
+                          value={formWebsite}
+                          onChange={(e) => setFormWebsite(e.target.value)}
+                          placeholder="https://perusahaan.com"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Profil LinkedIn Perusahaan</label>
                         <Input
                           value={formLinkedin}
                           onChange={(e) => setFormLinkedin(e.target.value)}
                           placeholder="https://linkedin.com/company/..."
                           className="h-8 text-xs bg-white"
                         />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="font-semibold text-slate-700 block mb-1">Alamat Kantor Lengkap</label>
+                        <Input
+                          value={formOfficeAddress}
+                          onChange={(e) => setFormOfficeAddress(e.target.value)}
+                          placeholder="Gedung, lantai, nomor, dan nama jalan"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bagian 3: Dokumen Legalitas & Perpajakan */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                        <FileCheck className="size-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Nomor identifikasi izin berusaha dan NPWP yang terdaftar di sistem ProofyLink.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">
+                          Nomor Induk Berusaha (NIB)
+                        </label>
+                        <Input
+                          value={formNib}
+                          onChange={(e) => setFormNib(e.target.value)}
+                          placeholder="Contoh: 9120001234567"
+                          className="h-8 text-xs bg-white"
+                        />
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">
+                          NIB terdaftar di Online Single Submission (OSS).
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">
+                          Nomor Pokok Wajib Pajak (NPWP)
+                        </label>
+                        <Input
+                          value={formNpwp}
+                          onChange={(e) => setFormNpwp(e.target.value)}
+                          placeholder="01.234.567.8–012.000"
+                          className="h-8 text-xs bg-white"
+                        />
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">
+                          NPWP Badan Usaha yang valid.
+                        </span>
                       </div>
                     </div>
                   </div>

@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Gagal memproses rekomendasi karier AI:", error);
-    return NextResponse.json({ error: "Fitur AI belum dapat diproses. Coba lagi nanti." }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Fitur AI belum dapat diproses. Coba lagi nanti.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

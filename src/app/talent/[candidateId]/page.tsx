@@ -19,6 +19,7 @@ import {
 import { findCandidate } from "@/data/candidates";
 import { maskName } from "@/lib/candidate-display";
 import { UUID_RE, cn } from "@/lib/utils";
+import { saveDemoApplication } from "@/components/applications/application-ui";
 import { useApp } from "@/providers/app-provider";
 import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
 import {
@@ -40,6 +41,7 @@ import {
     Loader2,
     Lock,
     Mail,
+    MessageSquare,
     MessageSquareQuote,
     Phone,
     Printer,
@@ -468,8 +470,6 @@ export default function TalentProfile() {
     bootstrapped,
     databaseError,
     partnerVerifications,
-    screeningConsents,
-    reloadBootstrap,
   } = useApp();
 
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
@@ -480,7 +480,6 @@ export default function TalentProfile() {
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
-  const [requestingContactConsent, setRequestingContactConsent] = useState(false);
 
   // Recruiter Hiring Flow modals
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
@@ -522,6 +521,17 @@ export default function TalentProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
+  useEffect(() => {
+    const isUnlocked = scans.some((item) => item.candidateId === candidate?.id);
+    if (isUnlocked && dbMode && candidate?.id && UUID_RE.test(candidate.id)) {
+      fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateProfileId: candidate.id }),
+      }).catch((err) => console.error("Auto sync application check failed", err));
+    }
+  }, [scans, dbMode, candidate?.id]);
+
   if (!hydrated || !user || user.role !== "recruiter")
     return (
       <ProtectedRoute role="recruiter">
@@ -550,7 +560,6 @@ export default function TalentProfile() {
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
   const screeningStatus = screeningRunStatuses[candidate.id];
   const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
-  const contactConsent = screeningConsents[candidate.id];
 
   // startScreening only reports success/failure, so attribute dbMode failures via
   // the single-balance endpoint: token shortage is claimed only when the balance
@@ -587,6 +596,40 @@ export default function TalentProfile() {
         return;
       }
       setConfirmOpen(false);
+
+      if (dbMode) {
+        try {
+          await fetch("/api/applications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ candidateProfileId: candidate.id }),
+          });
+        } catch (appError) {
+          console.error("Failed to link application on unlock", appError);
+        }
+      } else {
+        const orgName = user?.companyName || "Perusahaan Mitra";
+        saveDemoApplication({
+          id: `demo-app-${candidate.id}`,
+          jobId: `job-demo-${candidate.id}`,
+          status: "review",
+          coverNote: "Profil dibuka dan sedang ditinjau langsung oleh tim rekruter melalui Talent Network.",
+          submittedAt: new Date().toISOString(),
+          withdrawnAt: null,
+          updatedAt: new Date().toISOString(),
+          job: {
+            id: `job-demo-${candidate.id}`,
+            title: `Talent Sourcing · ${candidate.role || "Talent Network"}`,
+            organizationName: orgName,
+          },
+          candidate: {
+            name: candidate.name,
+            headline: candidate.role,
+            location: candidate.location,
+          },
+        });
+      }
+
       const started = await startScreening(candidate.id);
       if (dbMode && started) setRemoteScreeningCompleted(true);
       if (!started) setScreeningError(await describeScreeningFailure());
@@ -603,6 +646,33 @@ export default function TalentProfile() {
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
   const isShortlisted = shortlisted.includes(candidate.id);
+
+  const handleContactCandidate = async () => {
+    if (!candidate) return;
+    setOpeningConversation(true);
+    try {
+      if (dbMode) {
+        const response = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateProfileId: candidate.id }),
+        });
+        const payload = (await response.json()) as { conversationId?: string; error?: string };
+        if (!response.ok || !payload.conversationId) {
+          throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
+        }
+        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
+      } else {
+        router.push(`/recruiter/messages?contact=${encodeURIComponent(candidate.name)}`);
+      }
+    } catch (error) {
+      toast.error("Percakapan belum dapat dibuat", {
+        description: error instanceof Error ? error.message : "Silakan coba lagi.",
+      });
+    } finally {
+      setOpeningConversation(false);
+    }
+  };
 
   const copyProfileLink = async () => {
     const url = window.location.href;
@@ -717,6 +787,11 @@ export default function TalentProfile() {
 
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Pengalaman {candidate.experience} tahun · {candidate.availability}
+                {candidate.targetRole && (
+                  <span className="text-blue-700 dark:text-blue-400 font-medium">
+                    {" "}· Target Peran: {candidate.targetRole}
+                  </span>
+                )}
                 {unlocked && (
                   <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                     · Ekspektasi Gaji: {candidate.salary}
@@ -1000,6 +1075,15 @@ export default function TalentProfile() {
               {/* Portfolio & CV buttons */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
                 <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs font-semibold"
+                    disabled={openingConversation}
+                    onClick={handleContactCandidate}
+                  >
+                    {openingConversation ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <MessageSquare className="mr-1.5 size-3.5" />}
+                    {openingConversation ? "Menghubungkan..." : "Hubungi Kandidat"}
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
                     <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
@@ -1117,82 +1201,40 @@ export default function TalentProfile() {
         )}
       </Card>
 
+      {unlocked && (
+        <Card className="mt-6 border-purple-200/90 bg-gradient-to-r from-purple-50/70 via-white to-indigo-50/40 shadow-xs">
+          <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground flex items-center gap-2">
+                <MessageSquare className="size-4.5 text-[#7C3AED]" /> Obrolan Langsung dengan {displayName}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Profil telah dibuka. Anda dapat langsung mengirim pesan in-app untuk memulai diskusi peluang karir, jadwal wawancara, atau tawaran kerja.
+              </p>
+            </div>
+            <Button
+              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shrink-0 font-medium shadow-xs"
+              disabled={openingConversation}
+              onClick={handleContactCandidate}
+            >
+              {openingConversation ? <Loader2 className="mr-2 size-4 animate-spin" /> : <MessageSquare className="mr-2 size-4" />}
+              {openingConversation ? "Menghubungkan..." : "Hubungi Kandidat"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {(unlocked || (dbMode && completed)) && (
-        <>
-          {dbMode && completed && (
-            <Card className="mt-6 border-[#b9e6d0] bg-[#f7fffb]">
-              <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-                <div>
-                  <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pemotongan token dan skor sudah tercatat. Kandidat tetap perlu menyetujui permintaan kontak sebelum percakapan dimulai.
-                  </p>
-                </div>
-                {contactConsent === "consented" ? (
-                  <Button
-                    disabled={openingConversation}
-                    onClick={async () => {
-                      setOpeningConversation(true);
-                      try {
-                        const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
-                        const payload = await response.json() as { conversationId?: string; error?: string };
-                        if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-                        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
-                      } catch (error) {
-                        toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
-                      } finally {
-                        setOpeningConversation(false);
-                      }
-                    }}
-                  >
-                    {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                    {openingConversation ? "Membuka..." : "Mulai percakapan"}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    disabled={requestingContactConsent || contactConsent === "pending-candidate-consent"}
-                    onClick={async () => {
-                      setRequestingContactConsent(true);
-                      try {
-                        const response = await fetch("/api/consent-requests", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            candidateProfileIds: [candidate.id],
-                            purpose: "Diskusi peluang setelah screening",
-                            message: "Recruiter ingin mendiskusikan hasil screening dan peluang yang relevan.",
-                          }),
-                        });
-                        const payload = await response.json() as { error?: string };
-                        if (!response.ok) throw new Error(payload.error ?? "Permintaan kontak belum dapat dikirim.");
-                        await reloadBootstrap();
-                        toast.success("Permintaan kontak dikirim", { description: "Tunggu persetujuan kandidat sebelum memulai percakapan." });
-                      } catch (error) {
-                        toast.error("Permintaan kontak gagal", { description: error instanceof Error ? error.message : "Coba lagi." });
-                      } finally {
-                        setRequestingContactConsent(false);
-                      }
-                    }}
-                  >
-                    {requestingContactConsent ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                    {requestingContactConsent ? "Mengirim..." : contactConsent === "pending-candidate-consent" ? "Menunggu persetujuan kandidat" : "Minta izin menghubungi"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          <ScreeningResults
-            candidateId={candidate.id}
-            candidate={candidate}
-            completed={completed}
-            screeningStatus={screeningStatus}
-            screeningError={screeningError}
-            onRetry={() => void retryScreening()}
-            result={screeningResults[candidate.id]}
-            saveResult={saveScreeningResult}
-          />
-        </>
+        <ScreeningResults
+          candidateId={candidate.id}
+          candidate={candidate}
+          completed={completed}
+          screeningStatus={screeningStatus}
+          screeningError={screeningError}
+          onRetry={() => void retryScreening()}
+          result={screeningResults[candidate.id]}
+          saveResult={saveScreeningResult}
+        />
       )}
 
       {/* Confirmation Dialog */}
@@ -1201,7 +1243,7 @@ export default function TalentProfile() {
           <DialogHeader>
             <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
-               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit akan otomatis dijalankan.
+               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit otomatis dijalankan dan kandidat akan menerima notifikasi bahwa profilnya sedang ditinjau oleh perusahaan Anda.
                {devBypass ? " Mode development: token scan tidak digunakan." : ` Sisa token Anda: ${tokens} token.`}
             </DialogDescription>
           </DialogHeader>
@@ -1336,6 +1378,15 @@ export default function TalentProfile() {
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-2.5 xl:h-9 xl:justify-start"
+              disabled={openingConversation}
+              onClick={handleContactCandidate}
+            >
+              {openingConversation ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <MessageSquare className="mr-1.5 size-3.5" />}
+              Hubungi Kandidat
+            </Button>
             <Button
               variant="outline"
               size="sm"

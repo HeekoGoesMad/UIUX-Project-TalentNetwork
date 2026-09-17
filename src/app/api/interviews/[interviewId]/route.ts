@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
-import { getInterviewById, updateInterview } from "@/lib/services/recruiter-hiring";
+import { deleteInterview, getInterviewById, updateInterview } from "@/lib/services/recruiter-hiring";
 
 const updateSchema = z.object({
   status: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).optional(),
@@ -72,3 +72,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ in
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ interviewId: string }> }) {
+  try {
+    const { interviewId } = await params;
+    const current = await getCurrentAppUser();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    const scope = await getRecruiterScope(current.db, current.user);
+    if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+    await deleteInterview(current.db, {
+      interviewId,
+      organizationId: scope.membership.organizationId,
+      actorUserId: current.user.id,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete interview error:", error);
+    const message = error instanceof Error ? error.message : "Gagal menghapus wawancara.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+

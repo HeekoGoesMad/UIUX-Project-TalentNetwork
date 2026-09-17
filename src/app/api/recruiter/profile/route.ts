@@ -55,8 +55,10 @@ const updateProfileSchema = z
     city: z.string().trim().max(120).optional(),
     nibNumber: z.string().trim().max(32).optional(),
     npwpNumber: z.string().trim().max(32).optional(),
+    picEmail: z.string().optional().nullable(),
+    verificationStatus: z.string().optional().nullable(),
   })
-  .strict()
+  .strip()
   .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: "Tidak ada perubahan yang dikirim.",
   });
