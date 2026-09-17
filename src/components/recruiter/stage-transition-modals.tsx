@@ -282,3 +282,80 @@ export function ConfirmHireModal({
     </Dialog>
   );
 }
+
+/* ── 4. Demote Interview Warning Modal (Interview -> Lower Stages: Screening / Rejected) ── */
+interface DemoteInterviewWarningModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  candidate: Candidate | null;
+  targetStage: Stage | null;
+  onConfirm: () => void;
+}
+
+export function DemoteInterviewWarningModal({
+  open,
+  onOpenChange,
+  candidate,
+  targetStage,
+  onConfirm,
+}: DemoteInterviewWarningModalProps) {
+  if (!candidate || !targetStage) return null;
+
+  const stageLabels: Record<Stage, string> = {
+    screening: "Screening",
+    interview: "Wawancara",
+    offer: "Penawaran",
+    hired: "Diterima",
+    rejected: "Tidak Lolos",
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md p-6">
+        <DialogHeader>
+          <div className="size-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
+            <AlertTriangle className="size-5" />
+          </div>
+          <DialogTitle className="text-base font-bold text-slate-900">
+            {targetStage === "screening"
+              ? "Kembalikan ke Tahap Screening?"
+              : `Pindahkan dari Wawancara ke ${stageLabels[targetStage]}?`}
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-500">
+            Kandidat <span className="font-semibold text-slate-800">{candidate.name}</span> saat ini berada pada tahap <span className="font-semibold text-fuchsia-700">Wawancara (Interview)</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 my-2 text-xs text-amber-900 space-y-1">
+          <p className="font-bold flex items-center gap-1.5 text-amber-800">
+            <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+            Konsekuensi Perubahan Tahap Wawancara:
+          </p>
+          <p className="text-[11px] text-amber-800/90 leading-relaxed">
+            Memindahkan kandidat kembali ke tahap <span className="font-semibold">{stageLabels[targetStage]}</span> akan menghentikan proses wawancara aktif dan mencatat perubahan status kandidat di sistem.
+          </p>
+        </div>
+
+        <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="text-xs font-semibold"
+          >
+            Pertahankan Wawancara
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onConfirm}
+            className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            Ya, Pindahkan Status
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

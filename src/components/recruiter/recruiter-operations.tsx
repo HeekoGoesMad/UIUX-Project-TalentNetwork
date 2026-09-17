@@ -28,6 +28,7 @@ import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
   ConfirmHireModal,
+  DemoteInterviewWarningModal,
 } from "@/components/recruiter/stage-transition-modals";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,8 @@ export function RecruiterOperationsPage() {
   const [scheduleModalCandidate, setScheduleModalCandidate] = useState<Candidate | null>(null);
   const [cancelOfferCandidate, setCancelOfferCandidate] = useState<Candidate | null>(null);
   const [cancelOfferTargetStage, setCancelOfferTargetStage] = useState<Stage | null>(null);
+  const [demoteInterviewCandidate, setDemoteInterviewCandidate] = useState<Candidate | null>(null);
+  const [demoteInterviewTargetStage, setDemoteInterviewTargetStage] = useState<Stage | null>(null);
   const [hireConfirmCandidate, setHireConfirmCandidate] = useState<Candidate | null>(null);
 
   // Drag and Drop state
@@ -362,6 +365,13 @@ export function RecruiterOperationsPage() {
     if (target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
       setCancelOfferCandidate(target);
       setCancelOfferTargetStage(newStage);
+      return;
+    }
+
+    // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
+    if (target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
+      setDemoteInterviewCandidate(target);
+      setDemoteInterviewTargetStage(newStage);
       return;
     }
 
@@ -1025,6 +1035,29 @@ export function RecruiterOperationsPage() {
               );
               setCancelOfferCandidate(null);
               setCancelOfferTargetStage(null);
+            }
+          }}
+        />
+
+        {/* Demote Interview Warning Modal (Interview -> Screening / Rejected) */}
+        <DemoteInterviewWarningModal
+          open={Boolean(demoteInterviewCandidate && demoteInterviewTargetStage)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDemoteInterviewCandidate(null);
+              setDemoteInterviewTargetStage(null);
+            }
+          }}
+          candidate={demoteInterviewCandidate}
+          targetStage={demoteInterviewTargetStage}
+          onConfirm={async () => {
+            if (demoteInterviewCandidate && demoteInterviewTargetStage) {
+              await executeStageChange(demoteInterviewCandidate.id, demoteInterviewTargetStage);
+              toast.info(
+                `Kandidat ${demoteInterviewCandidate.name} dikembalikan ke tahap ${STAGES.find((s) => s.id === demoteInterviewTargetStage)?.label || demoteInterviewTargetStage}.`
+              );
+              setDemoteInterviewCandidate(null);
+              setDemoteInterviewTargetStage(null);
             }
           }}
         />
