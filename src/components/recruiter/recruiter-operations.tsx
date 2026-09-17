@@ -7,7 +7,9 @@ import {
   Clock,
   DollarSign,
   Download,
+  GripVertical,
   Kanban,
+  MapPin,
   MessageSquare,
   Search,
   Table as TableIcon,
@@ -564,23 +566,23 @@ export function RecruiterOperationsPage() {
 
             {/* KPI Metric Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                 <span className="text-[11px] font-medium text-slate-500">Total Pelamar</span>
                 <span className="text-sm font-bold text-slate-900">{metrics.total}</span>
               </div>
-              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl px-3 py-2 flex items-center justify-between">
+              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                 <span className="text-[11px] font-medium text-blue-700">Screening</span>
                 <span className="text-sm font-bold text-blue-900">{metrics.screening}</span>
               </div>
-              <div className="bg-fuchsia-50/70 border border-fuchsia-200/80 rounded-xl px-3 py-2 flex items-center justify-between">
+              <div className="bg-fuchsia-50/70 border border-fuchsia-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                 <span className="text-[11px] font-medium text-fuchsia-700">Wawancara</span>
                 <span className="text-sm font-bold text-fuchsia-900">{metrics.interview}</span>
               </div>
-              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-2 flex items-center justify-between">
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                 <span className="text-[11px] font-medium text-amber-700">Penawaran (Offer)</span>
                 <span className="text-sm font-bold text-amber-900">{metrics.offer}</span>
               </div>
-              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between col-span-2 sm:col-span-1">
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between col-span-2 sm:col-span-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                 <span className="text-[11px] font-medium text-emerald-700">Diterima (Hired)</span>
                 <span className="text-sm font-bold text-emerald-900">{metrics.hired}</span>
               </div>
@@ -681,16 +683,16 @@ export function RecruiterOperationsPage() {
                     className={cn(
                       "flex flex-col rounded-2xl border transition-all duration-200 min-h-[560px] bg-slate-50/60 p-3",
                       stage.border,
-                      isOver ? "bg-purple-50/70 border-dashed border-[#7C3AED] ring-2 ring-purple-200" : ""
+                      isOver ? "bg-purple-50/80 border-dashed border-[#7C3AED] ring-2 ring-purple-300 scale-[1.01] shadow-inner" : "hover:border-slate-300"
                     )}
                   >
                     {/* Column Header */}
                     <div className="flex items-center justify-between pb-3 px-1 border-b border-slate-200/80">
                       <div className="flex items-center gap-2">
-                        <span className={cn("size-2.5 rounded-full", stage.dot)} />
+                        <span className={cn("size-2.5 rounded-full transition-transform group-hover:scale-110", stage.dot)} />
                         <h2 className="text-xs font-bold text-slate-900">{stage.label}</h2>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-2xs">
+                      <span className="text-[11px] font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-2xs transition-transform hover:scale-105">
                         {stageCandidates.length}
                       </span>
                     </div>
@@ -698,11 +700,11 @@ export function RecruiterOperationsPage() {
                     {/* Candidate Cards List */}
                     <div className="flex-1 space-y-2.5 pt-3 overflow-y-auto max-h-[700px]">
                       {stageCandidates.length === 0 ? (
-                        <div className="h-32 rounded-xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center p-4 text-center">
+                        <div className="h-32 rounded-xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center p-4 text-center transition-colors">
                           <p className="text-[11px] text-slate-400 font-medium">Tarik kandidat ke sini</p>
                         </div>
                       ) : (
-                        stageCandidates.map((candidate) => {
+                        stageCandidates.map((candidate, idx) => {
                           const candidateInterviews = data.interviews.filter((i) => i.candidateId === candidate.id);
                           const isDragging = draggingCandidateId === candidate.id;
 
@@ -716,15 +718,16 @@ export function RecruiterOperationsPage() {
                                 setSelectedCandidate(candidate);
                                 setDrawerOpen(true);
                               }}
+                              style={{ animationDelay: `${idx * 50}ms` }}
                               className={cn(
-                                "group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all cursor-grab active:cursor-grabbing",
-                                isDragging ? "opacity-40 scale-95 border-[#7C3AED]" : ""
+                                "group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing animate-in fade-in-50 slide-in-from-bottom-2",
+                                isDragging ? "opacity-30 scale-95 border-[#7C3AED] ring-2 ring-purple-300 shadow-2xl" : ""
                               )}
                             >
                               {/* Top Bar: Name & Actions */}
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                  <div className="size-7 rounded-lg bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-bold text-xs">
+                                  <div className="size-7 rounded-lg bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-bold text-xs group-hover:scale-105 transition-transform">
                                     {candidate.name
                                       .split(" ")
                                       .map((n) => n[0])
@@ -772,11 +775,14 @@ export function RecruiterOperationsPage() {
                                 )}
                               </div>
 
-                              {/* Hover Quick Actions */}
-                              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                                <span className="text-[10px] truncate max-w-[100px]">{candidate.location}</span>
+                              {/* Card Footer: Clean Location & Actions (No Dropdown) */}
+                              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                                <span className="text-[10px] flex items-center gap-1 truncate max-w-[130px] text-slate-500">
+                                  <MapPin className="size-3 text-slate-400 shrink-0" />
+                                  {candidate.location}
+                                </span>
 
-                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <Link
                                     href="/messages"
                                     className="p-1 rounded-md text-slate-400 hover:text-[#7C3AED] hover:bg-purple-50 transition-colors"
@@ -785,19 +791,12 @@ export function RecruiterOperationsPage() {
                                     <MessageSquare className="size-3.5" />
                                   </Link>
 
-                                  {/* Fast stage dropdown */}
-                                  <select
-                                    value={candidate.stage}
-                                    onChange={(e) => void changeStage(candidate.id, e.target.value as Stage)}
-                                    className="text-[10px] font-medium bg-transparent text-slate-400 hover:text-slate-800 focus:outline-hidden cursor-pointer"
-                                    title="Pindahkan tahap"
+                                  <div
+                                    className="p-1 text-slate-300 group-hover:text-purple-400 transition-colors cursor-grab"
+                                    title="Tarik kartu untuk memindahkan tahap"
                                   >
-                                    {STAGES.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        &rarr; {s.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    <GripVertical className="size-3.5" />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -811,7 +810,7 @@ export function RecruiterOperationsPage() {
             </div>
           ) : (
             /* CLEAN TABLE VIEW */
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden animate-in fade-in-50 duration-300">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
