@@ -1,6 +1,5 @@
 import { chromium } from "playwright";
 import { config } from "dotenv";
-import fs from "fs";
 import path from "path";
 
 config({ path: ".env.local" });

@@ -1,14 +1,5 @@
-import { AiTool } from "@/components/candidate/ai-tool";
-import { ProtectedRoute } from "@/components/auth/protected-route";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return (
-    <ProtectedRoute role="candidate">
-      <AiTool
-        title="Career Roadmap"
-        description="Bangun fase belajar dan bukti kerja yang dapat kamu sesuaikan."
-        endpoint="/api/ai/roadmap"
-      />
-    </ProtectedRoute>
-  );
+export default function CandidateCareerRoadmapPage() {
+  redirect("/candidate/career-advisor");
 }

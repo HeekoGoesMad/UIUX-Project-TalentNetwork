@@ -11,7 +11,7 @@ export default function Page() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-foreground">Penasihat Profil Karier AI</h1>
         <p className="mt-2 mb-8 text-sm leading-relaxed text-muted-foreground max-w-3xl">
-          Panduan interaktif &amp; evaluasi cerdas 3 pilar untuk memperkuat profil dan CV kamu agar siap lolos seleksi recruiter serta sistem ATS.
+          Evaluasi cerdas untuk mengaudit susunan CV, kesiapan format ATS, dan menganalisis kecocokan kompetensi profil kamu terhadap peran impian.
         </p>
         <CareerAdvisorWorkspace />
       </main>

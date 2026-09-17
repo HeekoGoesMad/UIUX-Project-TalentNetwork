@@ -775,11 +775,14 @@ export default function TalentProfile() {
           )}
         </div>
 
-        {/* Profile Info Row with Overlapping Avatar */}
-        <div className="relative bg-white px-6 pb-6 pt-3 dark:bg-slate-900 sm:px-10">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-            <div className="-mt-14 sm:-mt-18 relative shrink-0 z-20">
-              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-1 ring-slate-900/10">
+        {/* Profile Info Row — avatar overlaps banner, actions top-right */}
+        <div className="relative bg-white px-6 pb-6 dark:bg-slate-900 sm:px-10">
+
+          {/* Row 1: Avatar (overlapping) + Action buttons (top-right) */}
+          <div className="flex items-start justify-between gap-4">
+            {/* Avatar — overlaps banner via negative top margin */}
+            <div className="-mt-14 sm:-mt-16 relative shrink-0 z-20">
+              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-2 ring-slate-900/8">
                 <CandidateAvatar
                   initials={candidate.initials}
                   avatarUrl={candidate.avatarUrl}
@@ -790,58 +793,8 @@ export default function TalentProfile() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <CandidateCategoryBadge category={candidate.talentCategory} />
-                {candidate.careerStatus && (
-                  <CandidateStatusBadge status={candidate.careerStatus} />
-                )}
-                {candidate.personality && (
-                  <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
-                    <Brain className="mr-1 size-3.5 text-purple-600" />
-                    {candidate.personality.type} · {candidate.personality.label}
-                  </Badge>
-                )}
-                {verif?.status === "verified" && (
-                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
-                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
-                    Campus Verified · {verif.institution}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                  {displayName}
-                </h1>
-                {unlocked && (
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
-                    <UserCheck className="mr-1 size-3" /> Terbuka
-                  </Badge>
-                )}
-              </div>
-
-              <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
-                {candidate.role} · {candidate.location}
-              </p>
-
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Pengalaman {candidate.experience} tahun · {candidate.availability}
-                {candidate.targetRole && (
-                  <span className="text-blue-700 dark:text-blue-400 font-medium">
-                    {" "}· Target Peran: {candidate.targetRole}
-                  </span>
-                )}
-                {unlocked && (
-                  <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    · Ekspektasi Gaji: {candidate.salary}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            {/* Quick Action buttons */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Action buttons — always top-right, never wraps under info */}
+            <div className="flex items-center gap-2 shrink-0 pt-3">
               {unlocked && (
                 <Button
                   size="default"
@@ -873,9 +826,64 @@ export default function TalentProfile() {
               </Button>
             </div>
           </div>
+
+          {/* Row 2: Candidate Identity Block */}
+          <div className="mt-3">
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CandidateCategoryBadge category={candidate.talentCategory} />
+              {candidate.careerStatus && (
+                <CandidateStatusBadge status={candidate.careerStatus} />
+              )}
+              {candidate.personality && (
+                <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
+                  <Brain className="mr-1 size-3.5 text-purple-600" />
+                  {candidate.personality.type} · {candidate.personality.label}
+                </Badge>
+              )}
+              {verif?.status === "verified" && (
+                <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
+                  <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
+                  Campus Verified · {verif.institution}
+                </Badge>
+              )}
+            </div>
+
+            {/* Name + unlock badge */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                {displayName}
+              </h1>
+              {unlocked && (
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
+                  <UserCheck className="mr-1 size-3" /> Terbuka
+                </Badge>
+              )}
+            </div>
+
+            {/* Role & location */}
+            <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
+              {candidate.role} · {candidate.location}
+            </p>
+
+            {/* Meta chips row — experience, availability, target role, salary */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                <Briefcase className="size-3 text-slate-400" />
+                {candidate.experience} tahun pengalaman
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {candidate.availability}
+              </span>
+              {candidate.targetRole && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
+                  Target: {candidate.targetRole}
+                </span>
+              )}
+
+            </div>
+          </div>
         </div>
-
-
 
         {/* ── CARD CONTENT ── */}
         {!unlocked ? (
@@ -1088,11 +1096,13 @@ export default function TalentProfile() {
                       </Link>
                     </Button>
                   ) : screeningError ? (
-                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge>
+                    <Button size="sm" variant="outline" className="border-amber-200 bg-amber-50 text-amber-800" disabled>
+                      Retry Screening
+                    </Button>
                   ) : (
-                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]">
-                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening otomatis
-                    </Badge>
+                    <Button size="sm" variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]" disabled>
+                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening...
+                    </Button>
                   )}
                 </div>
 

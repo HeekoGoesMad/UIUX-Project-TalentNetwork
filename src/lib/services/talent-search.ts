@@ -176,7 +176,14 @@ export class TalentSearchService {
     }
 
     if (params?.locations && params.locations.length > 0) {
-      conditions.push(inArray(schema.candidateProfiles.location, params.locations));
+      const locConditions = params.locations.map((loc) => {
+        const cleanLoc = loc.replace(/[\\%_]/g, "\\$&");
+        return or(
+          ilike(schema.candidateProfiles.location, `%${cleanLoc}%`),
+          eq(schema.candidateProfiles.location, loc)
+        )!;
+      });
+      conditions.push(or(...locConditions)!);
     }
 
     const whereClause = and(...conditions);

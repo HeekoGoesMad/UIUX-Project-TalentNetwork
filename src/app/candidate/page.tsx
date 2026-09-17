@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Award,
-  Bell,
   Briefcase,
   Calendar,
   Compass,
@@ -12,7 +11,6 @@ import {
   Eye,
   FileText,
   MapPin,
-  ShieldCheck,
   Sparkles,
   TrendingUp,
   UserCheck,
@@ -26,22 +24,13 @@ import { useApp } from "@/providers/app-provider";
 import { useApplications } from "@/components/applications/application-ui";
 
 export default function CandidateHome() {
-  const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
+  const { user, cvProfile } = useApp();
   const { applications } = useApplications();
 
   // Candidate Name & Headline
   const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
-  const candidateRole = cvProfile?.targetRole || cvProfile?.headline || "Talent Network Member";
+  const candidateRole = cvProfile?.headline?.trim() || "Talent Network Member";
   const candidateLocation = cvProfile?.location || "Indonesia";
-
-  // Pending Contact Consents
-  const pendingConsentsCount = dbMode
-    ? consentRequests.filter(
-        (r) =>
-          r.consentState === "pending-candidate-consent" ||
-          screeningConsents[String(r.candidateProfileId)] === "pending-candidate-consent"
-      ).length
-    : Object.values(screeningConsents).filter((state) => state === "pending-candidate-consent").length;
 
   // Pipeline Insights
   const activeApplications = applications.filter(
@@ -72,7 +61,7 @@ export default function CandidateHome() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
               <Badge variant="outline" className="border-purple-200 bg-purple-50/80 text-purple-700 font-mono text-[11px] font-semibold tracking-wider uppercase">
-                Candidate Workspace
+                Ruang Kerja Kandidat
               </Badge>
               <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-xs flex items-center gap-1 font-medium">
                 <UserCheck className="size-3" /> Siap Wawancara
@@ -107,7 +96,7 @@ export default function CandidateHome() {
         </div>
 
         {/* Smart Hiring Action Center Alerts */}
-        {(pendingOffer || interviewApplications.length > 0 || pendingConsentsCount > 0) && (
+        {(pendingOffer || interviewApplications.length > 0) && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="flex size-2 rounded-full bg-purple-600 animate-ping" />
@@ -127,7 +116,7 @@ export default function CandidateHome() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-emerald-950">Tawaran Pekerjaan Siap Ditinjau!</span>
-                        <Badge className="bg-emerald-600 text-white text-[10px]">Action Required</Badge>
+                        <Badge className="bg-emerald-600 text-white text-[10px]">Tindakan Diperlukan</Badge>
                       </div>
                       <p className="mt-0.5 text-sm text-emerald-800">
                         Kamu menerima penawaran kerja resmi untuk posisi{" "}
@@ -155,7 +144,7 @@ export default function CandidateHome() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-purple-950">Jadwal Wawancara Aktif ({interviewApplications.length})</span>
-                        <Badge className="bg-purple-600 text-white text-[10px]">Upcoming</Badge>
+                        <Badge className="bg-purple-600 text-white text-[10px]">Segera</Badge>
                       </div>
                       <p className="mt-0.5 text-sm text-purple-800">
                         Recruiter telah menjadwalkan sesi interview. Cek link Google Meet / Zoom dan agenda persiapanmu.
@@ -166,36 +155,6 @@ export default function CandidateHome() {
                     <Link href={`/candidate/applications/${interviewApplications[0].id}`}>
                       Buka Ruang Wawancara
                       <ExternalLink className="size-3.5 ml-1.5" />
-                    </Link>
-                  </Button>
-                </div>
-              )}
-
-              {/* Contact Request Pending Alert */}
-              {pendingConsentsCount > 0 && (
-                <div className="flex flex-col gap-4 rounded-xl border border-blue-200 bg-linear-to-r from-blue-500/10 via-blue-500/5 to-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3.5">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-2xs">
-                      <Bell className="size-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-blue-950">
-                          {pendingConsentsCount} Permintaan Kontak Baru
-                        </span>
-                        <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700 text-[10px]">
-                          1-Click Action
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 text-sm text-blue-800">
-                        Recruiter atau mitra ingin menghubungi kamu untuk proses rekrutmen. Berikan izin dengan cepat di notifikasi.
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="shrink-0 border-blue-300 text-blue-700 hover:bg-blue-50" asChild>
-                    <Link href="/notifications?tab=contact-requests">
-                      Tinjau di Notifikasi
-                      <ArrowRight className="size-3.5 ml-1.5" />
                     </Link>
                   </Button>
                 </div>
@@ -312,7 +271,7 @@ export default function CandidateHome() {
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {/* Pillar 1: Lamaran & Pipeline */}
             <Link href="/candidate/applications" className="group block">
               <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-purple-400 group-hover:shadow-md">
@@ -323,7 +282,7 @@ export default function CandidateHome() {
                         <Briefcase className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-purple-200 text-purple-700 bg-purple-50/50 text-[11px]">
-                        Hiring Flow
+                        Alur Rekrutmen
                       </Badge>
                     </div>
                     <div>
@@ -352,7 +311,7 @@ export default function CandidateHome() {
                         <FileText className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50 text-[11px]">
-                        Digital Resume
+                        Resume Digital
                       </Badge>
                     </div>
                     <div>
@@ -371,7 +330,7 @@ export default function CandidateHome() {
               </Card>
             </Link>
 
-            {/* Pillar 3: AI Career Advisor */}
+            {/* Pillar 3: AI Career Advisor & Consultation */}
             <Link href="/candidate/career-advisor" className="group block">
               <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-amber-400 group-hover:shadow-md">
                 <CardContent className="p-6 flex flex-col justify-between h-full gap-5">
@@ -381,49 +340,20 @@ export default function CandidateHome() {
                         <Sparkles className="size-5" />
                       </div>
                       <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50/50 text-[11px]">
-                        AI Intelligence
+                        Kecerdasan AI
                       </Badge>
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                        AI Career Advisor & ATS Optimization
+                        AI Career Advisor &amp; Consultation
                       </h3>
                       <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                        Evaluasi kecocokan kata kunci profil terhadap ATS recruiter, formulasi headline memikat, dan identifikasi celah kompetensi.
+                        Evaluasi menyeluruh keterbacaan CV oleh HRD, analisis kesenjangan skill, dan konsultasi strategi memikat perekrut.
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center text-xs font-semibold text-amber-600 pt-3 border-t border-slate-100">
-                    Konsultasi Penasihat AI <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Pillar 4: Verifikasi Kampus & Kredensial */}
-            <Link href="/candidate/career-roadmap" className="group block">
-              <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-emerald-400 group-hover:shadow-md">
-                <CardContent className="p-6 flex flex-col justify-between h-full gap-5">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                        <ShieldCheck className="size-5" />
-                      </div>
-                      <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50/50 text-[11px]">
-                        Peta Karier & Bukti
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">
-                        Roadmap Karier & Bukti Portofolio
-                      </h3>
-                      <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                        Rencanakan target kenaikan tingkat keahlian, buat bukti pengerjaan proyek nyata, dan dapatkan pengakuan kredensial.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center text-xs font-semibold text-emerald-600 pt-3 border-t border-slate-100">
-                    Buka Roadmap Karier <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
+                    Buka Konsultasi Penasihat AI <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
                   </div>
                 </CardContent>
               </Card>

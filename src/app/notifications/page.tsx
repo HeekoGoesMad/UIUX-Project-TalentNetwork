@@ -1,21 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   Calendar,
-  Check,
   CheckCheck,
   ChevronRight,
-  Clock3,
   FileCheck2,
   Mail,
   Save,
   Settings2,
-  ShieldCheck,
   SlidersHorizontal,
   Smartphone,
-  UserRound,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -23,7 +19,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -33,14 +28,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
-import type { ConsentState } from "@/types";
 
 type QuietHours = { start?: string; end?: string; timezone?: string };
 type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean; quietHours: QuietHours };
 const preferencesKey = "proofylink-demo-notification-preferences-v1";
 const defaultPreferences: NotificationPreferences = { inAppEnabled: true, emailEnabled: true, quietHours: {} };
 
-type NotificationCategory = "all" | "requests" | "recruitment" | "system";
+type NotificationCategory = "all" | "recruitment" | "system";
 
 export default function NotificationsPage() {
   const {
@@ -51,21 +45,18 @@ export default function NotificationsPage() {
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
-    consentRequests,
-    screeningConsents,
-    contactRequests,
-    respondToConsent,
   } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialTab = searchParams.get("tab") === "contact-requests" ? "requests" : "all";
+  const tabParam = searchParams.get("tab");
+  const initialTab: NotificationCategory =
+    tabParam === "recruitment" || tabParam === "system" ? tabParam : "all";
   const [activeTab, setActiveTab] = useState<NotificationCategory>(initialTab);
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [preferencesLoading, setPreferencesLoading] = useState(true);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [actingRequestId, setActingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (hydrated && !user) router.replace(`/login?next=${encodeURIComponent("/notifications")}`);
@@ -106,54 +97,10 @@ export default function NotificationsPage() {
     };
   }, [dbMode, hydrated, user]);
 
-  // Normalized contact requests for candidate
-  const formattedRequests = useMemo(() => {
-    if (user?.role !== "candidate") return [];
-    if (dbMode) {
-      return consentRequests
-        .map((req) => ({
-          itemId: typeof req.itemId === "string" ? req.itemId : String(req.candidateProfileId),
-          candidateId: typeof req.candidateProfileId === "string" ? req.candidateProfileId : "",
-          state: (req.consentState as ConsentState) || "pending-candidate-consent",
-          recruiterName: typeof req.recruiterName === "string" ? req.recruiterName : "Tim Rekruter",
-          company: typeof req.organizationName === "string" ? req.organizationName : "Organisasi Mitra",
-          email: typeof req.recruiterEmail === "string" ? req.recruiterEmail : null,
-          requestedAt: typeof req.createdAt === "string" ? req.createdAt : new Date().toISOString(),
-        }))
-        .filter((r) => r.candidateId);
-    }
-    return Object.entries(screeningConsents)
-      .filter(([, state]) => state !== "not-requested")
-      .map(([candidateId, state]) => ({
-        itemId: candidateId,
-        candidateId,
-        state,
-        recruiterName: contactRequests?.[candidateId]?.recruiterName || "Tim Rekruter",
-        company: contactRequests?.[candidateId]?.company || "Perusahaan Mitra",
-        email: contactRequests?.[candidateId]?.email || null,
-        requestedAt: contactRequests?.[candidateId]?.requestedAt || new Date().toISOString(),
-      }));
-  }, [user, dbMode, consentRequests, screeningConsents, contactRequests]);
-
-  const pendingRequestsCount = formattedRequests.filter((r) => r.state === "pending-candidate-consent").length;
   const unreadNotificationsCount = notifications.filter((n) => !n.readAt).length;
 
   if (!hydrated || !user) return <StateMessage text="Menyiapkan notifikasi..." />;
   if (dbMode && !bootstrapped) return <StateMessage text="Memuat notifikasi..." />;
-
-  const handleConsentAction = async (candidateId: string, itemId: string, state: "consented" | "declined") => {
-    setActingRequestId(itemId);
-    try {
-      const ok = await respondToConsent(candidateId, state, itemId);
-      if (ok) {
-        toast.success(state === "consented" ? "Izin kontak telah diberikan" : "Permintaan kontak telah ditolak");
-      }
-    } catch {
-      toast.error("Gagal memperbarui izin kontak");
-    } finally {
-      setActingRequestId(null);
-    }
-  };
 
   const savePreferences = async () => {
     setPreferencesSaving(true);
@@ -182,7 +129,6 @@ export default function NotificationsPage() {
   // Filtered notifications
   const filteredNotifications = notifications.filter((n) => {
     if (activeTab === "all") return true;
-    if (activeTab === "requests") return false; // Handled in separate request section
     if (activeTab === "recruitment") {
       return n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received";
     }
@@ -200,7 +146,7 @@ export default function NotificationsPage() {
           <p className="font-mono text-xs uppercase tracking-widest text-primary">Pusat Aktivitas</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Notifikasi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Kelola izin kontak, jadwal wawancara, dan pesan rekrutmen di satu tempat.
+            Kelola jadwal wawancara, pembaruan rekrutmen, dan pengumuman sistem di satu tempat.
           </p>
         </div>
 
@@ -307,17 +253,8 @@ export default function NotificationsPage() {
           label="Semua"
           active={activeTab === "all"}
           onClick={() => setActiveTab("all")}
-          count={unreadNotificationsCount + pendingRequestsCount}
+          count={unreadNotificationsCount}
         />
-        {user?.role === "candidate" && (
-          <TabButton
-            label="Permintaan Kontak"
-            active={activeTab === "requests"}
-            onClick={() => setActiveTab("requests")}
-            count={pendingRequestsCount}
-            highlightCount={pendingRequestsCount > 0}
-          />
-        )}
         <TabButton
           label="Rekrutmen & Wawancara"
           active={activeTab === "recruitment"}
@@ -330,218 +267,103 @@ export default function NotificationsPage() {
         />
       </div>
 
-      {/* ── 1-CLICK CONTACT REQUESTS FEED (CANDIDATE PRIVACY) ── */}
-      {(activeTab === "all" || activeTab === "requests") && user?.role === "candidate" && formattedRequests.length > 0 && (
-        <section className="mt-6 space-y-3" aria-label="Permintaan Kontak">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <ShieldCheck className="size-4 text-emerald-600" /> Permintaan Akses Kontak
-            </h2>
-            {pendingRequestsCount > 0 && (
-              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                {pendingRequestsCount} perlu persetujuan 1-klik
-              </span>
-            )}
+      {/* ── GENERAL NOTIFICATIONS FEED ── */}
+      <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
+        {filteredNotifications.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-10 text-center">
+            <Bell className="mx-auto size-8 text-muted-foreground/50" />
+            <p className="mt-3 font-semibold text-sm text-foreground">Tidak ada notifikasi di kategori ini</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Semua pembaruan rekrutmen dan sistem akan muncul di sini.
+            </p>
           </div>
-
-          {formattedRequests.map((req) => {
-            const isPending = req.state === "pending-candidate-consent";
-            const isConsented = req.state === "consented" || req.state === "screening-completed" || req.state === "screening-in-progress";
+        ) : (
+          filteredNotifications.map((notif) => {
+            const unread = !notif.readAt;
+            const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
+            const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
+            const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
+            const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
+            const displayBody = notif.body
+              ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
+              : "";
 
             return (
               <Card
-                key={req.itemId}
-                className={`transition-all duration-200 ${
-                  isPending
-                    ? "border-emerald-300/80 bg-emerald-50/40 shadow-xs dark:border-emerald-900/60 dark:bg-emerald-950/20"
-                    : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                key={notif.id}
+                className={`transition-all duration-150 hover:shadow-xs ${
+                  unread
+                    ? "border-l-4 border-l-[#7C3AED] bg-purple-50/30 dark:bg-purple-950/15"
+                    : "bg-white dark:bg-slate-900 border-border"
                 }`}
               >
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div className="flex items-start gap-3">
-                      <span
-                        className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                          isPending ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        <UserRound className="size-4.5" />
-                      </span>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-sm text-foreground">{req.recruiterName}</p>
-                          <span className="text-xs text-muted-foreground">dari</span>
-                          <span className="font-semibold text-xs text-foreground">{req.company}</span>
-                          {isPending ? (
-                            <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 text-[10px] px-2 py-0.2">
-                              Menunggu Respon
-                            </Badge>
-                          ) : isConsented ? (
-                            <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.2">
-                              Disetujui ✓
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] px-2 py-0.2 text-muted-foreground">
-                              Ditolak
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Rekruter meminta izin untuk membuka data kontak dan memulai screening wawancara.
-                        </p>
-                        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                          {req.email && (
-                            <span className="flex items-center gap-1">
-                              <Mail className="size-3 text-muted-foreground" /> {req.email}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Clock3 className="size-3 text-muted-foreground" />
-                            {new Date(req.requestedAt).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      </div>
+                <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
+                  <span
+                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                      isInterview
+                        ? "bg-purple-100 text-[#7C3AED]"
+                        : isOffer
+                        ? "bg-emerald-100 text-emerald-700"
+                        : unread
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isInterview ? (
+                      <Calendar className="size-4" />
+                    ) : isOffer ? (
+                      <FileCheck2 className="size-4" />
+                    ) : (
+                      <Bell className="size-4" />
+                    )}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
+                      <h3 className={`text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground/80"}`}>
+                        {href ? (
+                          <Link
+                            href={href}
+                            onClick={() => {
+                              if (unread) void markNotificationRead(notif.id);
+                            }}
+                            className="hover:text-primary transition-colors flex items-center gap-1.5"
+                          >
+                            {notif.title} <ChevronRight className="size-3 text-muted-foreground" />
+                          </Link>
+                        ) : (
+                          notif.title
+                        )}
+                      </h3>
+                      <time className="shrink-0 text-[11px] text-muted-foreground font-mono">
+                        {new Date(notif.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
                     </div>
 
-                    {/* 1-Click Action Buttons */}
-                    {isPending ? (
-                      <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
-                        <Button
-                          size="sm"
-                          disabled={actingRequestId === req.itemId}
-                          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 shadow-xs"
-                          onClick={() => void handleConsentAction(req.candidateId, req.itemId, "consented")}
-                        >
-                          <Check className="mr-1.5 size-3.5" /> Izinkan Kontak
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={actingRequestId === req.itemId}
-                          className="h-8 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 px-3"
-                          onClick={() => void handleConsentAction(req.candidateId, req.itemId, "declined")}
-                        >
-                          Tolak
-                        </Button>
-                      </div>
-                    ) : isConsented ? (
-                      <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
-                        <Link href="/messages">
-                          Buka Pesan <ChevronRight className="ml-1 size-3.5" />
-                        </Link>
-                      </Button>
-                    ) : null}
+                    {displayBody && (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
+                    )}
+
+                    {unread && (
+                      <button
+                        onClick={() => void markNotificationRead(notif.id)}
+                        className="mt-2 text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Tandai dibaca
+                      </button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             );
-          })}
-        </section>
-      )}
-
-      {/* ── GENERAL NOTIFICATIONS FEED ── */}
-      {activeTab !== "requests" && (
-        <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
-          {filteredNotifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-10 text-center">
-              <Bell className="mx-auto size-8 text-muted-foreground/50" />
-              <p className="mt-3 font-semibold text-sm text-foreground">Tidak ada notifikasi di kategori ini</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Semua pembaruan rekrutmen dan sistem akan muncul di sini.
-              </p>
-            </div>
-          ) : (
-            filteredNotifications.map((notif) => {
-              const unread = !notif.readAt;
-              const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
-              const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
-              const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
-              const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
-              const displayBody = notif.body
-                ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
-                : "";
-
-              return (
-                <Card
-                  key={notif.id}
-                  className={`transition-all duration-150 hover:shadow-xs ${
-                    unread
-                      ? "border-l-4 border-l-[#7C3AED] bg-purple-50/30 dark:bg-purple-950/15"
-                      : "bg-white dark:bg-slate-900 border-border"
-                  }`}
-                >
-                  <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
-                    <span
-                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                        isInterview
-                          ? "bg-purple-100 text-[#7C3AED]"
-                          : isOffer
-                          ? "bg-emerald-100 text-emerald-700"
-                          : unread
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {isInterview ? (
-                        <Calendar className="size-4" />
-                      ) : isOffer ? (
-                        <FileCheck2 className="size-4" />
-                      ) : (
-                        <Bell className="size-4" />
-                      )}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
-                        <h3 className={`text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground/80"}`}>
-                          {href ? (
-                            <Link
-                              href={href}
-                              onClick={() => {
-                                if (unread) void markNotificationRead(notif.id);
-                              }}
-                              className="hover:text-primary transition-colors flex items-center gap-1.5"
-                            >
-                              {notif.title} <ChevronRight className="size-3 text-muted-foreground" />
-                            </Link>
-                          ) : (
-                            notif.title
-                          )}
-                        </h3>
-                        <time className="shrink-0 text-[11px] text-muted-foreground font-mono">
-                          {new Date(notif.createdAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      </div>
-
-                      {displayBody && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
-                      )}
-
-                      {unread && (
-                        <button
-                          onClick={() => void markNotificationRead(notif.id)}
-                          className="mt-2 text-[11px] font-semibold text-primary hover:underline"
-                        >
-                          Tandai dibaca
-                        </button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </section>
-      )}
+          })
+        )}
+      </section>
     </main>
   );
 }

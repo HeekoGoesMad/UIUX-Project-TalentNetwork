@@ -220,7 +220,7 @@ export function SiteHeader() {
             <ShieldCheck className="size-5" />
           </span>
           <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-foreground")}>
-            Proofy<span className="text-primary">Link</span>
+            Talent<span className="text-primary"> Network</span>
           </span>
         </Link>
 
