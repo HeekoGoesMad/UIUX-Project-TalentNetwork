@@ -62,6 +62,7 @@ import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outrea
 import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
+import { CandidateFloatingChat } from "@/components/recruiter/candidate-floating-chat";
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -1474,6 +1475,14 @@ export default function TalentProfile() {
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
         candidate={candidate}
+      />
+
+      {/* Floating candidate-locked direct chat */}
+      <CandidateFloatingChat
+        candidate={candidate}
+        unlocked={unlocked}
+        dbMode={dbMode}
+        currentUserEmail={user?.email}
       />
     </div>
   );
