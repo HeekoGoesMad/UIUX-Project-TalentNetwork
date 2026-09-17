@@ -12,7 +12,18 @@ const statusValues = ["new", "shortlisted", "consent_requested", "consent_approv
 const updateSchema = z.object({ status: z.enum(statusValues), reason: z.string().trim().min(3).max(1000).optional() }).strict();
 const idSchema = z.string().uuid();
 const recruiterTransitions: Record<(typeof statusValues)[number], (typeof statusValues)[number][]> = {
-  new: ["shortlisted", "rejected"], shortlisted: ["consent_requested", "screening", "rejected"], consent_requested: ["consent_approved", "rejected"], consent_approved: ["screening", "rejected"], screening: ["assessment", "review", "rejected"], assessment: ["review", "interview", "rejected"], review: ["interview", "offer", "rejected"], interview: ["offer", "hired", "rejected"], offer: ["hired", "rejected"], hired: [], rejected: [], withdrawn: [],
+  new: ["shortlisted", "screening", "interview", "rejected"],
+  shortlisted: ["consent_requested", "screening", "interview", "rejected"],
+  consent_requested: ["consent_approved", "rejected"],
+  consent_approved: ["screening", "interview", "rejected"],
+  screening: ["assessment", "review", "interview", "rejected"],
+  assessment: ["review", "interview", "screening", "rejected"],
+  review: ["interview", "offer", "screening", "rejected"],
+  interview: ["offer", "hired", "screening", "rejected"],
+  offer: ["interview", "screening", "hired", "rejected"],
+  hired: ["offer", "interview", "screening", "rejected"],
+  rejected: ["screening", "interview", "offer"],
+  withdrawn: [],
 };
 
 export async function GET(_request: Request, { params }: { params: Promise<{ applicationId: string }> }) {
@@ -39,6 +50,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
     const participant = await findParticipant(current, applicationId);
     if ("error" in participant) return NextResponse.json({ error: participant.error }, { status: participant.status });
     const currentStatus = participant.application.status;
+    if (currentStatus === parsed.data.status) {
+      return NextResponse.json({ application: participant.application });
+    }
     if (current.user.role === "candidate") {
       if (parsed.data.status !== "withdrawn" || !["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer"].includes(currentStatus)) return NextResponse.json({ error: "Lamaran tidak dapat ditarik pada tahap ini." }, { status: 409 });
     } else {

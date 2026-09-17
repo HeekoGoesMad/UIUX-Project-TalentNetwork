@@ -37,9 +37,135 @@ export const CandidateCardView = memo(function CandidateCardView({
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
   const verif = partnerVerification ?? candidate.campusVerification;
 
+  /* ─── LIST VIEW ─────────────────────────────────────────────────────────── */
+  if (list) {
+    return (
+      <Card className="card-interactive">
+        <CardContent className="flex items-center gap-4 p-4">
+
+          {/* Avatar — fixed size */}
+          <div className="shrink-0">
+            <CandidateAvatar
+              initials={candidate.initials}
+              avatarUrl={candidate.avatarUrl}
+              name={displayName}
+              locked={!unlocked}
+            />
+          </div>
+
+          {/* Info block — grows to fill remaining space */}
+          <div className="min-w-0 flex-1">
+            {/* Row 1: category badge + name + preview badge */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CandidateCategoryBadge category={candidate.talentCategory} />
+              {verif?.status === "verified" && (
+                <span
+                  title={`Terverifikasi oleh ${verif.verifiedBy || verif.institution}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]"
+                >
+                  <GraduationCap className="size-3 text-[#7C3AED]" />
+                  Campus Verified · {verif.institution.replace("Universitas ", "UI ").replace("Institut Teknologi ", "IT ")}
+                </span>
+              )}
+            </div>
+
+            {/* Row 2: name + role */}
+            <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
+              <p className="font-semibold text-foreground leading-tight">{displayName}</p>
+              {!unlocked && (
+                <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  Pratinjau
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground leading-tight">{candidate.role}</p>
+
+            {/* Row 3: career status + personality */}
+            {(candidate.careerStatus || candidate.personality) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {candidate.careerStatus && (
+                  <CandidateStatusBadge status={candidate.careerStatus} />
+                )}
+                {candidate.personality && (
+                  <span
+                    title={`Tipe Kepribadian: ${candidate.personality.type} (${candidate.personality.label})`}
+                    className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-[#7C3AED]"
+                  >
+                    <Brain className="size-3 text-[#7C3AED]" />
+                    {candidate.personality.type} · {candidate.personality.label}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Row 4: meta info */}
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <MapPin className="size-3" />
+                {candidate.location}
+              </span>
+              <span className="flex items-center gap-1">
+                <BriefcaseBusiness className="size-3" />
+                {candidate.experience} tahun
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock3 className="size-3" />
+                {candidate.availability}
+              </span>
+            </div>
+          </div>
+
+          {/* Right column — skills + shortlist + CTA, fixed width */}
+          <div className="flex shrink-0 items-center gap-3">
+            {/* Skills & tools (hidden on very small screens) */}
+            <div className="hidden flex-wrap justify-end gap-1 sm:flex" style={{ maxWidth: "260px" }}>
+              {candidate.skills.slice(0, 3).map((skill) => (
+                <Badge key={skill} variant="outline" className="text-xs">
+                  {skill}
+                </Badge>
+              ))}
+              {candidate.tools?.slice(0, 2).map((tool) => (
+                <Badge key={tool} variant="secondary" className="border-slate-200 bg-slate-100 text-xs text-slate-600">
+                  <Wrench className="mr-0.5 size-2.5" /> {tool}
+                </Badge>
+              ))}
+            </div>
+
+            {/* Shortlist button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => onToggleShortlist(candidate.id)}
+              aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
+              aria-pressed={isShortlisted}
+            >
+              <Bookmark className={isShortlisted ? "fill-primary text-primary" : ""} />
+            </Button>
+
+            {/* CTA */}
+            <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className="shrink-0">
+              <Link href={`/recruiter/discover/${candidate.id}`}>
+                {unlocked ? (
+                  "Lihat Detail"
+                ) : (
+                  <>
+                    <Lock className="mr-1.5 size-3.5" /> Lihat Detail
+                  </>
+                )}
+              </Link>
+            </Button>
+          </div>
+
+        </CardContent>
+      </Card>
+    );
+  }
+
+  /* ─── GRID VIEW ─────────────────────────────────────────────────────────── */
   return (
-    <Card className={list ? "card-interactive" : "card-interactive flex flex-col"}>
-      <CardContent className={list ? "flex flex-wrap items-center gap-4 p-5" : "flex flex-1 flex-col gap-4 p-5"}>
+    <Card className="card-interactive flex flex-col">
+      <CardContent className="flex flex-1 flex-col gap-4 p-5">
         <CandidateAvatar
           initials={candidate.initials}
           avatarUrl={candidate.avatarUrl}
@@ -120,7 +246,7 @@ export const CandidateCardView = memo(function CandidateCardView({
           </div>
         </div>
 
-        <div className={list ? "ml-auto flex items-center gap-3" : "mt-auto flex flex-col gap-3 pt-2"}>
+        <div className="mt-auto flex flex-col gap-3 pt-2">
           {/* Skills & Tools */}
           <div className="flex flex-wrap gap-1">
             {candidate.skills.slice(0, 3).map((skill) => (
@@ -135,7 +261,7 @@ export const CandidateCardView = memo(function CandidateCardView({
             ))}
           </div>
 
-          <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className={list ? "" : "w-full justify-center"}>
+          <Button asChild size="sm" variant={unlocked ? "outline" : "default"} className="w-full justify-center">
             <Link href={`/recruiter/discover/${candidate.id}`}>
               {unlocked ? (
                 "Lihat Detail"
@@ -151,6 +277,7 @@ export const CandidateCardView = memo(function CandidateCardView({
     </Card>
   );
 });
+
 
 export interface CandidateCardProps {
   candidate: Candidate;

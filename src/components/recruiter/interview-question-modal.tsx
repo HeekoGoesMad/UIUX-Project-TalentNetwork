@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-  Check,
   Copy,
   Loader2,
   Plus,
+  Printer,
   RefreshCw,
   Sparkles,
   Trash2,
-  HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +48,6 @@ export function InterviewQuestionModal({
   open,
   onOpenChange,
   candidate,
-  onSaveQuestions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -175,12 +173,89 @@ export function InterviewQuestionModal({
     }
   };
 
-  const handleSaveAndAttach = () => {
-    if (onSaveQuestions) {
-      onSaveQuestions(questions.map((q) => q.text));
+  const handleExportPDF = () => {
+    if (questions.length === 0) {
+      toast.error("Belum ada pertanyaan untuk diekspor.");
+      return;
     }
-    toast.success("Pertanyaan disimpan sebagai kriteria wawancara!");
-    onOpenChange(false);
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Gagal membuka jendela cetak. Izinkan pop-up di browser Anda.");
+      return;
+    }
+
+    const technicalQuestions = questions.filter((q) => q.category === "technical");
+    const behavioralQuestions = questions.filter((q) => q.category === "behavioral");
+    const cultureQuestions = questions.filter((q) => q.category === "culture");
+
+    const renderCategoryGroup = (title: string, items: typeof questions) => {
+      if (items.length === 0) return "";
+      return `
+        <div style="margin-bottom: 24px;">
+          <h3 style="font-size: 13px; font-weight: 700; color: #4338ca; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1.5px solid #e0e7ff; padding-bottom: 4px;">
+            ${title} (${items.length})
+          </h3>
+          ${items
+            .map(
+              (q, idx) => `
+            <div style="margin-bottom: 14px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fafafa;">
+              <div style="font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 6px;">
+                #${idx + 1}. ${q.text}
+              </div>
+              <div style="height: 36px; border-bottom: 1px dashed #cbd5e1; margin-top: 10px;"></div>
+              <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Catatan Pewawancara / Evaluasi:</div>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      `;
+    };
+
+    const content = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Panduan Pertanyaan Wawancara - ${candidate.name}</title>
+          <style>
+            @page { margin: 15mm; size: A4; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 0; padding: 20px; line-height: 1.5; }
+            .header { border-bottom: 2px solid #7c3aed; padding-bottom: 14px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 20px; font-weight: 800; color: #1e1b4b; }
+            .candidate-info { font-size: 13px; color: #475569; margin-top: 4px; }
+            .meta { font-size: 11px; color: #64748b; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">Panduan Pertanyaan Wawancara</div>
+              <div class="candidate-info">
+                Kandidat: <strong>${candidate.name}</strong> · Posisi: <strong>${candidate.role}</strong>
+              </div>
+            </div>
+            <div class="meta">
+              Dicetak: ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}<br/>
+              Talent Network ATS
+            </div>
+          </div>
+          ${renderCategoryGroup("Kompetensi & Teknis", technicalQuestions)}
+          ${renderCategoryGroup("STAR & Situasional", behavioralQuestions)}
+          ${renderCategoryGroup("Budaya & Kolaborasi", cultureQuestions)}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+
+    toast.success("Dokumen PDF pertanyaan wawancara siap dicetak / disimpan!");
   };
 
   const filteredQuestions =
@@ -201,8 +276,7 @@ export function InterviewQuestionModal({
                 Persiapan Pertanyaan Wawancara
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                Kompilasi pertanyaan terstruktur berbasis AI untuk{" "}
-                <strong className="text-foreground">{candidate.name}</strong> ({candidate.role})
+                <strong className="text-foreground">{candidate.name}</strong> · {candidate.role}
               </DialogDescription>
             </div>
           </div>
@@ -358,20 +432,18 @@ export function InterviewQuestionModal({
           </div>
         </div>
 
-        <DialogFooter className="border-t pt-3 flex sm:justify-between items-center gap-2">
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <HelpCircle className="size-3.5 text-muted-foreground/80" />
-            <span>Pertanyaan ini dapat dijadikan acuan penilaian pada scorecard wawancara.</span>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              Tutup
-            </Button>
-            <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" onClick={handleSaveAndAttach}>
-              <Check className="size-4 mr-1.5" />
-              Simpan Sebagai Kriteria Wawancara
-            </Button>
-          </div>
+        <DialogFooter className="border-t pt-3 flex sm:justify-end items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Tutup
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium"
+            onClick={handleExportPDF}
+          >
+            <Printer className="size-4 mr-1.5" />
+            Simpan sebagai PDF
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

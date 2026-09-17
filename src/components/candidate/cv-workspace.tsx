@@ -9,6 +9,7 @@ import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
+import { POPULAR_LOCATION_SUGGESTIONS } from "@/lib/locations";
 import {
   Brain,
   BriefcaseBusiness,
@@ -88,7 +89,7 @@ const inputCls =
   "h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
 const textareaCls =
   "min-h-24 w-full rounded-md border bg-background p-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
-const maxPdfBytes = 5 * 1024 * 1024;
+const maxDocBytes = 10 * 1024 * 1024;
 
 // ─── Section wrapper ─────────────────────────────────────────────
 function FormSection({
@@ -519,18 +520,19 @@ export function CvWorkspace() {
 
   async function importPdf(file: File) {
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      setMessage("File harus berformat PDF.");
-      toast.error("File tidak didukung", { description: "Impor CV hanya menerima berkas PDF." });
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
+    if (!isPdf && !isImage) {
+      setMessage("File harus berformat PDF atau Gambar (PNG, JPG, WEBP).");
+      toast.error("File tidak didukung", { description: "Impor CV menerima berkas PDF atau gambar (PNG, JPG, WEBP)." });
       return;
     }
-    if (file.size > maxPdfBytes) {
-      setMessage("Ukuran file melebihi batas 5 MB.");
-      toast.error("Ukuran file terlalu besar", { description: "Ukuran PDF maksimal 5 MB. Kompres atau pilih file lain." });
+    if (file.size > maxDocBytes) {
+      setMessage("Ukuran file melebihi batas 10 MB.");
+      toast.error("Ukuran file terlalu besar", { description: "Ukuran berkas maksimal 10 MB. Kompres atau pilih file lain." });
       return;
     }
     setImporting(true);
-    setMessage("Membaca PDF sebagai draf...");
+    setMessage(isImage ? "Menganalisis gambar CV dengan Vision AI..." : "Membaca dokumen CV sebagai draf...");
     try {
       const form = new FormData();
       form.set("file", file);
@@ -538,7 +540,7 @@ export function CvWorkspace() {
       const data = await response.json();
       if (!response.ok) {
         setMessage(data.error ?? "Impor gagal. Coba lagi atau isi manual.");
-        toast.error("Impor gagal", { description: data.error ?? "Server tidak dapat memproses PDF ini." });
+        toast.error("Impor gagal", { description: data.error ?? "Server tidak dapat memproses dokumen ini." });
         return;
       }
       setProfile((c) => ({
@@ -555,7 +557,7 @@ export function CvWorkspace() {
         sourceFileName: file.name,
       }));
       setMessage("Draf berhasil dibuat. Tinjau semua field sebelum menyimpan.");
-      toast.success("PDF diimpor sebagai draf", { description: "Semua hasil ekstraksi tetap bisa kamu edit sebelum disimpan." });
+      toast.success("Dokumen diimpor sebagai draf", { description: "Semua hasil ekstraksi tetap bisa kamu edit sebelum disimpan." });
     } catch {
       setMessage("Impor gagal. Coba lagi atau isi manual.");
       toast.error("Impor gagal", { description: "Periksa koneksi kamu lalu coba lagi." });
@@ -634,10 +636,10 @@ export function CvWorkspace() {
               <div>
                 <p className="flex items-center gap-2 font-semibold text-foreground text-sm">
                   <FileUp className="size-4 text-primary" />
-                  Import Data dari CV PDF
+                  Import Data dari CV (PDF / Gambar)
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Format PDF (maks 5 MB). AI mengekstraksi data otomatis sebagai draf yang bisa kamu tinjau.
+                  Format PDF atau Gambar (PNG, JPG, WEBP maks 10 MB). AI mengekstraksi data otomatis sebagai draf yang bisa kamu tinjau.
                 </p>
               </div>
               <label
@@ -651,7 +653,7 @@ export function CvWorkspace() {
                 <input
                   className="sr-only"
                   type="file"
-                  accept="application/pdf,.pdf"
+                  accept="application/pdf,.pdf,image/png,image/jpeg,image/webp"
                   disabled={importing}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -660,7 +662,7 @@ export function CvWorkspace() {
                   }}
                 />
                 {importing ? <Loader2 className="size-3.5 animate-spin" /> : <FileUp className="size-3.5" />}
-                {importing ? "Memproses..." : "Pilih Berkas PDF"}
+                {importing ? "Memproses Dokumen..." : "Pilih Dokumen CV"}
               </label>
             </CardContent>
           </Card>
@@ -795,13 +797,19 @@ export function CvWorkspace() {
                   placeholder="Nama lengkapmu"
                 />
               </Field>
-              <Field label="Lokasi">
+              <Field label="Lokasi (Kabupaten/Kota, Provinsi)">
                 <input
                   className={inputCls}
                   value={profile.location}
                   onChange={(e) => update("location", e.target.value)}
-                  placeholder="Kota, Provinsi (contoh: Jakarta Selatan, DKI Jakarta)"
+                  placeholder="Sleman, D.I. Yogyakarta"
+                  list="cv-locations-list"
                 />
+                <datalist id="cv-locations-list">
+                  {POPULAR_LOCATION_SUGGESTIONS.map((loc) => (
+                    <option key={loc} value={loc} />
+                  ))}
+                </datalist>
               </Field>
               <Field label="Email">
                 <input

@@ -7,22 +7,37 @@ import {
   Check,
   CheckCheck,
   ChevronRight,
-  Clock3,
   FileCheck2,
   Mail,
+  Save,
   Settings2,
   ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
   UserRound,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
 import type { ConsentState } from "@/types";
+
+type QuietHours = { start?: string; end?: string; timezone?: string };
+type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean; quietHours: QuietHours };
+const preferencesKey = "proofylink-demo-notification-preferences-v1";
+const defaultPreferences: NotificationPreferences = { inAppEnabled: true, emailEnabled: true, quietHours: {} };
 
 type NotificationCategory = "all" | "requests" | "recruitment" | "system";
 
@@ -62,6 +77,12 @@ export default function NotificationsPage() {
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
 
+  // Preferences state
+  const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const changeTab = (tab: NotificationCategory) => {
     setActiveTab(tab);
     window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
@@ -78,6 +99,42 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (hydrated && !user) router.replace(`/login?next=${encodeURIComponent("/notifications")}`);
   }, [hydrated, user, router]);
+
+  // Load Preferences
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    let active = true;
+    if (!dbMode) {
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        try {
+          const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? "null") as Partial<NotificationPreferences> | null;
+          setPreferences({ ...defaultPreferences, ...saved, quietHours: { ...defaultPreferences.quietHours, ...saved?.quietHours } });
+        } catch {
+          setPreferences(defaultPreferences);
+        }
+        setPreferencesLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }
+    void fetch("/api/notification-preferences", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { preferences?: NotificationPreferences; error?: string };
+        if (!response.ok || !payload.preferences) throw new Error(payload.error ?? "Preferensi belum dapat dimuat.");
+        if (active) setPreferences(payload.preferences);
+      })
+      .catch(() => {
+        // Fallback gracefully
+      })
+      .finally(() => {
+        if (active) setPreferencesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [dbMode, hydrated, user]);
 
   // Normalized contact requests for candidate
   const formattedRequests = useMemo(() => {
@@ -121,7 +178,6 @@ export default function NotificationsPage() {
       if (ok) {
         toast.success(state === "consented" ? "Izin kontak telah diberikan" : "Permintaan kontak telah ditolak");
       } else {
-        // 409 already-responded (or other failure): inline state, no undo. Provider already toasted.
         setStaleIds((prev) => new Set(prev).add(itemId));
       }
     } catch {
@@ -139,6 +195,30 @@ export default function NotificationsPage() {
   const handleMarkAllRead = async () => {
     const ok = await markAllNotificationsRead();
     if (!ok) toast.error("Gagal menandai semua notifikasi sebagai dibaca");
+  };
+
+  const savePreferences = async () => {
+    setPreferencesSaving(true);
+    try {
+      if (!dbMode) {
+        localStorage.setItem(preferencesKey, JSON.stringify(preferences));
+      } else {
+        const response = await fetch("/api/notification-preferences", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(preferences),
+        });
+        const payload = (await response.json()) as { preferences?: NotificationPreferences; error?: string };
+        if (!response.ok || !payload.preferences) throw new Error(payload.error ?? "Preferensi belum dapat disimpan.");
+        setPreferences(payload.preferences);
+      }
+      toast.success("Preferensi notifikasi disimpan");
+      setSettingsOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan preferensi");
+    } finally {
+      setPreferencesSaving(false);
+    }
   };
 
   // Filtered notifications — tabs filter, never blank the feed
@@ -161,7 +241,7 @@ export default function NotificationsPage() {
           <p className="font-mono text-xs uppercase tracking-widest text-primary">Pusat Aktivitas</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Notifikasi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Kelola izin kontak, jadwal wawancara, dan pesan rekrutmen di satu tempat.
+            Kelola jadwal wawancara, pembaruan rekrutmen, dan pengumuman sistem di satu tempat.
           </p>
         </div>
 
@@ -171,6 +251,95 @@ export default function NotificationsPage() {
               <CheckCheck className="mr-1.5 size-3.5" /> Tandai semua dibaca
             </Button>
           )}
+
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-xs">
+                <SlidersHorizontal className="mr-1.5 size-3.5" />
+                Preferensi
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base">
+                  <Settings2 className="size-4 text-primary" />
+                  Preferensi &amp; Waktu Tenang
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Atur saluran pengiriman notifikasi serta jam bebas gangguan (Quiet Hours).
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-2">
+                {preferencesLoading ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">Memuat preferensi...</p>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <PreferenceToggle
+                        icon={<Smartphone className="size-4 text-muted-foreground" />}
+                        label="Notifikasi In-App"
+                        checked={preferences.inAppEnabled}
+                        onChange={(checked) => setPreferences((curr) => ({ ...curr, inAppEnabled: checked }))}
+                      />
+                      <PreferenceToggle
+                        icon={<Mail className="size-4 text-muted-foreground" />}
+                        label="Notifikasi Email Ringkasan"
+                        checked={preferences.emailEnabled}
+                        onChange={(checked) => setPreferences((curr) => ({ ...curr, emailEnabled: checked }))}
+                      />
+                    </div>
+
+                    <div className="rounded-xl border bg-muted/30 p-3.5 space-y-2.5">
+                      <p className="text-xs font-semibold text-foreground">Waktu Tenang (Quiet Hours)</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Notifikasi non-kritis akan dijeda selama periode jam ini.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-[11px] text-muted-foreground">
+                          Mulai:
+                          <input
+                            type="time"
+                            value={preferences.quietHours.start ?? ""}
+                            onChange={(e) =>
+                              setPreferences((curr) => ({
+                                ...curr,
+                                quietHours: { ...curr.quietHours, start: e.target.value || undefined },
+                              }))
+                            }
+                            className="mt-1 block h-8 w-full rounded-md border bg-background px-2 text-xs"
+                          />
+                        </label>
+                        <label className="text-[11px] text-muted-foreground">
+                          Selesai:
+                          <input
+                            type="time"
+                            value={preferences.quietHours.end ?? ""}
+                            onChange={(e) =>
+                              setPreferences((curr) => ({
+                                ...curr,
+                                quietHours: { ...curr.quietHours, end: e.target.value || undefined },
+                              }))
+                            }
+                            className="mt-1 block h-8 w-full rounded-md border bg-background px-2 text-xs"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <Button
+                      className="w-full text-xs"
+                      disabled={preferencesSaving}
+                      onClick={() => void savePreferences()}
+                    >
+                      <Save className="mr-1.5 size-3.5" />
+                      {preferencesSaving ? "Menyimpan..." : "Simpan Preferensi"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Button variant="ghost" size="sm" asChild className="text-xs text-muted-foreground hover:text-foreground">
             <Link href="/candidate/settings?tab=notif">
@@ -198,7 +367,7 @@ export default function NotificationsPage() {
           />
         )}
         <TabButton
-          label="Rekrutmen & Wawancara"
+          label="Rekrutmen &amp; Wawancara"
           active={activeTab === "recruitment"}
           onClick={() => changeTab("recruitment")}
         />
@@ -209,90 +378,73 @@ export default function NotificationsPage() {
         />
       </div>
 
-      {/* ── 1-CLICK CONTACT REQUESTS FEED (CANDIDATE PRIVACY) ── */}
-      {(activeTab === "all" || activeTab === "requests") && user?.role === "candidate" && formattedRequests.length > 0 && (
-        <section className="mt-6 space-y-3" aria-label="Permintaan Kontak">
+      {/* ── CANDIDATE CONTACT REQUESTS (Only on 'requests' tab or when active on 'all') ── */}
+      {user?.role === "candidate" && (activeTab === "requests" || (activeTab === "all" && pendingRequestsCount > 0)) && (
+        <section className="mt-6 space-y-3" aria-label="Permintaan Kontak Rekruter">
           <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <ShieldCheck className="size-4 text-emerald-600" /> Permintaan Akses Kontak
-            </h2>
-            {pendingRequestsCount > 0 && (
-              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                {pendingRequestsCount} perlu persetujuan 1-klik
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4.5 text-primary" />
+              <h2 className="text-sm font-bold text-foreground">Permintaan Akses Kontak &amp; Skrining</h2>
+              {pendingRequestsCount > 0 && (
+                <Badge className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2">
+                  {pendingRequestsCount} Perlu Ditanggapi
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" asChild className="text-xs text-primary">
+              <Link href="/candidate/contact-requests">
+                Semua Izin <ChevronRight className="ml-1 size-3.5" />
+              </Link>
+            </Button>
           </div>
 
           {formattedRequests.map((req) => {
             const isPending = req.state === "pending-candidate-consent";
-            const isConsented = req.state === "consented" || req.state === "screening-completed" || req.state === "screening-in-progress";
-
+            const isConsented = req.state === "consented";
             return (
               <Card
                 key={req.itemId}
-                className={`transition-all duration-200 ${
+                className={`border transition-all duration-150 ${
                   isPending
-                    ? "border-emerald-300/80 bg-emerald-50/40 shadow-xs dark:border-emerald-900/60 dark:bg-emerald-950/20"
-                    : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                    ? "border-amber-300 bg-amber-50/20 dark:border-amber-700/50 dark:bg-amber-950/20 shadow-2xs"
+                    : "border-border bg-card"
                 }`}
               >
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div className="flex items-start gap-3">
-                      <span
-                        className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                          isPending ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        <UserRound className="size-4.5" />
-                      </span>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-sm text-foreground">{req.recruiterName}</p>
-                          <span className="text-xs text-muted-foreground">dari</span>
-                          <span className="font-semibold text-xs text-foreground">{req.company}</span>
-                          {isPending ? (
-                            <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 text-[10px] px-2 py-0.2">
-                              Menunggu Respon
-                            </Badge>
-                          ) : isConsented ? (
-                            <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.2">
-                              Disetujui ✓
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] px-2 py-0.2 text-muted-foreground">
-                              Ditolak
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Rekruter meminta izin untuk membuka data kontak dan memulai screening wawancara.
-                        </p>
-                        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                          {req.email && (
-                            <span className="flex items-center gap-1">
-                              <Mail className="size-3 text-muted-foreground" /> {req.email}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Clock3 className="size-3 text-muted-foreground" />
-                            {new Date(req.requestedAt).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      </div>
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                        isPending
+                          ? "bg-amber-100 text-amber-800"
+                          : isConsented
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <UserRound className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">
+                        <span className="font-bold">{req.recruiterName}</span> ({req.company}) meminta izin untuk melihat detail kontak dan verifikasi Anda.
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Status: <strong className="capitalize">{req.state.replace(/-/g, " ")}</strong> • Diajukan:{" "}
+                        {new Date(req.requestedAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
                     </div>
+                  </div>
 
-                    {/* 1-Click Action Buttons */}
-                    {isPending ? (
-                      staleIds.has(req.itemId) ? (
-                        <p className="shrink-0 pt-2 text-xs text-muted-foreground sm:pt-0">
-                          Sudah ditanggapi — segarkan halaman.
-                        </p>
-                      ) : (
+                  {/* 1-Click Action Buttons */}
+                  {isPending ? (
+                    staleIds.has(req.itemId) ? (
+                      <p className="shrink-0 pt-2 text-xs text-muted-foreground sm:pt-0">
+                        Sudah ditanggapi — segarkan halaman.
+                      </p>
+                    ) : (
                       <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
                         <Button
                           size="sm"
@@ -312,15 +464,14 @@ export default function NotificationsPage() {
                           Tolak
                         </Button>
                       </div>
-                      )
-                    ) : isConsented ? (
-                      <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
-                        <Link href="/messages">
-                          Buka Pesan <ChevronRight className="ml-1 size-3.5" />
-                        </Link>
-                      </Button>
-                    ) : null}
-                  </div>
+                    )
+                  ) : isConsented ? (
+                    <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
+                      <Link href="/messages">
+                        Buka Pesan <ChevronRight className="ml-1 size-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
                 </CardContent>
               </Card>
             );
@@ -328,103 +479,103 @@ export default function NotificationsPage() {
         </section>
       )}
 
-      {/* ── GENERAL NOTIFICATIONS FEED (always visible; tabs filter, never blank) ── */}
+      {/* ── GENERAL NOTIFICATIONS FEED ── */}
       <section className="mt-6 space-y-2.5" aria-label="Daftar Notifikasi">
-          {filteredNotifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-10 text-center">
-              <Bell className="mx-auto size-8 text-muted-foreground/50" />
-              <p className="mt-3 font-semibold text-sm text-foreground">Tidak ada notifikasi di kategori ini</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Semua pembaruan rekrutmen dan sistem akan muncul di sini.
-              </p>
-            </div>
-          ) : (
-            filteredNotifications.map((notif) => {
-              const unread = !notif.readAt;
-              const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
-              const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
-              const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
-              const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
-              const displayBody = notif.body
-                ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
-                : "";
+        {filteredNotifications.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-10 text-center">
+            <Bell className="mx-auto size-8 text-muted-foreground/50" />
+            <p className="mt-3 font-semibold text-sm text-foreground">Tidak ada notifikasi di kategori ini</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Semua pembaruan rekrutmen dan sistem akan muncul di sini.
+            </p>
+          </div>
+        ) : (
+          filteredNotifications.map((notif) => {
+            const unread = !notif.readAt;
+            const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
+            const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
+            const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
+            const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
+            const displayBody = notif.body
+              ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
+              : "";
 
-              return (
-                <Card
-                  key={notif.id}
-                  className={`transition-all duration-150 hover:shadow-xs ${
-                    unread
-                      ? "border-l-4 border-l-[#7C3AED] bg-purple-50/30 dark:bg-purple-950/15"
-                      : "bg-white dark:bg-slate-900 border-border"
-                  }`}
-                >
-                  <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
-                    <span
-                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                        isInterview
-                          ? "bg-purple-100 text-[#7C3AED]"
-                          : isOffer
-                          ? "bg-emerald-100 text-emerald-700"
-                          : unread
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {isInterview ? (
-                        <Calendar className="size-4" />
-                      ) : isOffer ? (
-                        <FileCheck2 className="size-4" />
-                      ) : (
-                        <Bell className="size-4" />
-                      )}
-                    </span>
+            return (
+              <Card
+                key={notif.id}
+                className={`transition-all duration-150 hover:shadow-xs ${
+                  unread
+                    ? "border-l-4 border-l-primary bg-primary/5"
+                    : "bg-card border-border"
+                }`}
+              >
+                <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
+                  <span
+                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                      isInterview
+                        ? "bg-primary/10 text-primary"
+                        : isOffer
+                        ? "bg-emerald-100 text-emerald-700"
+                        : unread
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {isInterview ? (
+                      <Calendar className="size-4" />
+                    ) : isOffer ? (
+                      <FileCheck2 className="size-4" />
+                    ) : (
+                      <Bell className="size-4" />
+                    )}
+                  </span>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
-                        <h3 className={`text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground/80"}`}>
-                          {href ? (
-                            <Link
-                              href={href}
-                              onClick={() => {
-                                if (unread) void handleMarkRead(notif.id);
-                              }}
-                              className="hover:text-primary transition-colors flex items-center gap-1.5"
-                            >
-                              {notif.title} <ChevronRight className="size-3 text-muted-foreground" />
-                            </Link>
-                          ) : (
-                            notif.title
-                          )}
-                        </h3>
-                        <time className="shrink-0 text-[11px] text-muted-foreground font-mono">
-                          {new Date(notif.createdAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      </div>
-
-                      {displayBody && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
-                      )}
-
-                      {unread && (
-                        <button
-                          onClick={() => void handleMarkRead(notif.id)}
-                          className="mt-2 text-[11px] font-semibold text-primary hover:underline"
-                        >
-                          Tandai dibaca
-                        </button>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
+                      <h3 className={`text-sm ${unread ? "font-bold text-foreground" : "font-medium text-foreground/80"}`}>
+                        {href ? (
+                          <Link
+                            href={href}
+                            onClick={() => {
+                              if (unread) void markNotificationRead(notif.id);
+                            }}
+                            className="hover:text-primary transition-colors flex items-center gap-1.5"
+                          >
+                            {notif.title} <ChevronRight className="size-3 text-muted-foreground" />
+                          </Link>
+                        ) : (
+                          notif.title
+                        )}
+                      </h3>
+                      <time className="shrink-0 text-[11px] text-muted-foreground font-mono">
+                        {new Date(notif.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </section>
+
+                    {displayBody && (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
+                    )}
+
+                    {unread && (
+                      <button
+                        onClick={() => void handleMarkRead(notif.id)}
+                        className="mt-2 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        Tandai dibaca
+                      </button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </section>
     </main>
   );
 }
@@ -445,9 +596,9 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
         active
-          ? "bg-[#7C3AED] text-white shadow-xs"
+          ? "bg-primary text-primary-foreground shadow-2xs"
           : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
       }`}
     >
@@ -456,7 +607,7 @@ function TabButton({
         <span
           className={`flex size-4.5 items-center justify-center rounded-full text-[10px] font-bold ${
             active
-              ? "bg-white text-primary"
+              ? "bg-primary-foreground text-primary"
               : highlightCount
               ? "bg-emerald-600 text-white"
               : "bg-muted-foreground/20 text-foreground"
@@ -466,6 +617,33 @@ function TabButton({
         </span>
       )}
     </button>
+  );
+}
+
+function PreferenceToggle({
+  icon,
+  label,
+  checked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border bg-background p-3 transition-colors hover:bg-accent">
+      <span className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
+        {icon}
+        {label}
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 accent-primary cursor-pointer"
+      />
+    </label>
   );
 }
 

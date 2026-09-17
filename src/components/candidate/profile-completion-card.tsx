@@ -84,7 +84,6 @@ export function ProfileCompletionCard() {
             </div>
           </div>
         )}
-
         <div className="mt-5 border-t border-border/60 pt-4 flex flex-wrap items-center justify-between gap-3">
           {!readiness.complete ? (
             <>

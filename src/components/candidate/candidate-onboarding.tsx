@@ -27,6 +27,7 @@ import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { extractIndonesianLocalPhone } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
+import { POPULAR_LOCATION_SUGGESTIONS } from "@/lib/locations";
 import {
   CAREER_STATUS_CONFIG,
   TALENT_CATEGORY_CONFIG,
@@ -888,15 +889,24 @@ function LocationStep({
   return (
     <Intro title="Di mana kamu ingin bekerja?" text="Lokasi membantu recruiter menemukan kecocokan yang realistis.">
       <div className="space-y-5">
-        <Field label="Domisili saat ini *" error={errors.location}>
+        <Field
+          label="Domisili saat ini (Kabupaten/Kota, Provinsi) *"
+          error={errors.location}
+        >
           <input
             required
             aria-invalid={Boolean(errors.location)}
             className={inputClass}
             value={form.location}
             onChange={(event) => setValue("location", event.target.value)}
-            placeholder="Jakarta Selatan, DKI Jakarta"
+            placeholder="Sleman, D.I. Yogyakarta"
+            list="onboarding-locations-list"
           />
+          <datalist id="onboarding-locations-list">
+            {POPULAR_LOCATION_SUGGESTIONS.map((loc) => (
+              <option key={loc} value={loc} />
+            ))}
+          </datalist>
         </Field>
         <Field label="Peran yang dituju *" hint="Satu peran utama membantu profilmu tampil lebih fokus." error={errors.targetRole}>
           <input

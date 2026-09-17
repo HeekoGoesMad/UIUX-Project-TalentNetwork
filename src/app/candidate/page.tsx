@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Award,
-  Bell,
   Briefcase,
   Building2,
   Calendar,
@@ -94,8 +93,10 @@ function StatCell({
 }
 
 export default function CandidateHome() {
-  const { cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
+  const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
   const { applications } = useApplications();
+
+  const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
 
   const readiness = calculateCandidateReadiness(cvProfile);
 
@@ -168,7 +169,7 @@ export default function CandidateHome() {
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Ringkasan Aktivitas Karir
+              Halo, {candidateName} 👋
             </h1>
             <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
               Pantau perkembangan seleksi lamaran, izin akses rekruter, dan kesiapan kompetensi Anda.
@@ -211,18 +212,17 @@ export default function CandidateHome() {
                 {interviewApplications.length > 0 && (
                   <ActionRow
                     icon={Calendar}
-                    title={`Jadwal wawancara aktif (${interviewApplications.length})`}
-                    desc="Cek tautan meeting dan panduan agenda wawancara."
-                    href={`/candidate/applications/${interviewApplications[0].id}`}
-                    cta="Buka Wawancara"
-                    emerald
+                    title={`${interviewApplications.length} jadwal wawancara aktif`}
+                    desc="Persiapkan diri dan sinkronkan kalender wawancara Anda."
+                    href="/candidate/applications"
+                    cta="Cek Jadwal"
                   />
                 )}
                 {pendingConsentsCount > 0 && (
                   <ActionRow
-                    icon={Bell}
-                    title={`${pendingConsentsCount} Permintaan Izin Kontak Baru`}
-                    desc="Rekruter meminta izin untuk membuka kontak dan hasil skrining kesiapan karier."
+                    icon={ShieldCheck}
+                    title={`${pendingConsentsCount} permintaan izin profil dari rekruter`}
+                    desc="Tinjau dan beri persetujuan aman untuk membuka detail profil Anda."
                     href="/candidate/contact-requests"
                     cta="Tinjau Izin"
                   />
@@ -232,23 +232,23 @@ export default function CandidateHome() {
           </section>
         )}
 
-        {/* 4-Cell High-Impact Metric Grid */}
-        <Card className="overflow-hidden p-0 border-border/80 shadow-xs">
-          <div className="grid grid-cols-2 gap-px bg-border/80 lg:grid-cols-4 lg:gap-0 lg:divide-x">
-            {stats.map((s) => (
-              <StatCell key={s.label} {...s} />
-            ))}
-          </div>
-        </Card>
+        {/* Quick Stats Grid */}
+        <section aria-label="Statistik utama">
+          <Card className="overflow-hidden border-border/80 bg-border/60 shadow-xs">
+            <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
+              {stats.map((stat) => (
+                <StatCell key={stat.label} {...stat} />
+              ))}
+            </div>
+          </Card>
+        </section>
 
-        {/* Active Application Pipeline */}
-        <section aria-label="Lamaran aktif" className="space-y-3">
+        {/* Recent Applications Section */}
+        <section aria-label="Lamaran terbaru" className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-foreground">Proses Lamaran Berjalan</h2>
-              <p className="text-xs text-muted-foreground">
-                Perkembangan tahapan seleksi dari posisi yang telah Anda lamar.
-              </p>
+              <h2 className="text-sm font-bold text-foreground">Aktivitas Lamaran Terakhir</h2>
+              <p className="text-xs text-muted-foreground">Status seleksi pada posisi yang Anda lamar</p>
             </div>
             {applications.length > 0 && (
               <Button variant="ghost" size="sm" asChild className="text-xs font-medium text-primary hover:text-primary">

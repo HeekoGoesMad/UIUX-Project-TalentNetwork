@@ -97,8 +97,32 @@ export const careerRoadmapPillarSchema = z.object({
   limitations: z.array(z.string()),
 });
 
+export const careerConsultationPillarSchema = z.object({
+  targetRole: z.string(),
+  targetTimeline: z.string(),
+  targetLevel: z.string(),
+  phases: z.array(
+    z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })
+  ),
+  recommendedCertifications: z.array(z.string()),
+  strategicAdvice: z.array(z.string()),
+  interviewPitchTips: z.array(z.string()).default([]),
+  summary: z.string(),
+  structuredAdvice: structuredAdviceSchema,
+  answer: z.string(),
+  nextSteps: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
 export const advisorSchema = z.object({
-  focus: z.enum(["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
+  focus: z.enum(["cv_review", "gap_analysis", "career_consultation", "career_roadmap", "ats", "headline", "star", "role", "general"]).default("cv_review"),
   summary: z.string(),
   headlineSuggestions: z.array(z.string()).default([]),
   starBullets: z.array(z.object({
@@ -197,6 +221,22 @@ export const advisorSchema = z.object({
     transferableStrengths: z.array(z.string()),
     strategicRecommendations: z.array(z.string()),
   }).optional(),
+  careerConsultationDetails: z.object({
+    targetRole: z.string(),
+    targetTimeline: z.string(),
+    targetLevel: z.string(),
+    phases: z.array(z.object({
+      phaseNumber: z.number(),
+      phaseName: z.string(),
+      timeframe: z.string(),
+      outcome: z.string(),
+      keyActions: z.array(z.string()),
+      milestone: z.string(),
+    })),
+    recommendedCertifications: z.array(z.string()),
+    strategicAdvice: z.array(z.string()),
+    interviewPitchTips: z.array(z.string()).default([]),
+  }).optional(),
   careerRoadmapDetails: z.object({
     targetRole: z.string(),
     targetTimeline: z.string(),
@@ -226,32 +266,32 @@ export const cvImportSchema = z.object({
   headline: z.string(),
   about: z.string(),
   skills: z.array(z.string()),
-  hardCompetencies: z.array(z.string()).optional(),
-  tools: z.array(z.string()).optional(),
-  softSkills: z.array(z.string()).optional(),
+  hardCompetencies: z.array(z.string()),
+  tools: z.array(z.string()),
+  softSkills: z.array(z.string()),
   experience: z.array(
     z.object({
       company: z.string(),
       role: z.string(),
-      employmentType: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-      currentPosition: z.boolean().optional(),
-      dates: z.string().optional().default(""),
-      description: z.string().optional(),
-      achievements: z.array(z.string()).default([]),
+      employmentType: z.string().nullable(),
+      startDate: z.string().nullable(),
+      endDate: z.string().nullable(),
+      currentPosition: z.boolean().nullable(),
+      dates: z.string(),
+      description: z.string().nullable(),
+      achievements: z.array(z.string()),
     })
   ),
   education: z.array(
     z.object({
-      level: z.string().optional(),
+      level: z.string().nullable(),
       school: z.string(),
       program: z.string(),
-      gpa: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-      currentlyStudying: z.boolean().optional(),
-      dates: z.string().optional().default(""),
+      gpa: z.string().nullable(),
+      startDate: z.string().nullable(),
+      endDate: z.string().nullable(),
+      currentlyStudying: z.boolean().nullable(),
+      dates: z.string(),
     })
   ),
   suggestions: z.array(z.string()),

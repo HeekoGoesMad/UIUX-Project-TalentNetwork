@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,15 +17,14 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useApp } from "@/providers/app-provider";
 import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { DEMO_JOBS, type Job } from "@/lib/jobs";
+import { useApp } from "@/providers/app-provider";
 
 export const applicationStatuses = ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer", "hired", "rejected", "withdrawn"] as const;
 export type ApplicationStatus = (typeof applicationStatuses)[number];

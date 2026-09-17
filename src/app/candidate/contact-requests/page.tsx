@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  ArrowRight,
   Building2,
   Check,
   CheckCircle2,
@@ -12,6 +13,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Badge } from "@/components/ui/badge";
@@ -332,6 +334,18 @@ export default function ContactRequestsPage() {
             </p>
           </CardContent>
         </Card>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
+          <Button variant="outline" asChild>
+            <Link href="/candidate">Kembali ke Dashboard</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/notifications">
+              Buka Notifikasi
+              <ArrowRight className="size-4 ml-1.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </ProtectedRoute>
   );

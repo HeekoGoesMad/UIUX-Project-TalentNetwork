@@ -7,7 +7,7 @@ import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus, UserRole } from "@/types";
 import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, Sparkles, User } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConsentModal } from "./consent-modal";
@@ -17,7 +17,18 @@ import { RoleSelector } from "./role-selector";
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { user, hydrated, login, register, loginAsDemoCandidate, loginAsFreshCandidate, loginAsDemoPartner } = useApp();
-  const [role, setRole] = useState<UserRole>("recruiter");
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role");
+  const validRoleParam = roleParam === "candidate" || roleParam === "recruiter" || roleParam === "partner" ? roleParam : null;
+  const [role, setRole] = useState<UserRole>(validRoleParam ?? "recruiter");
+  const [prevRoleParam, setPrevRoleParam] = useState<UserRole | null>(validRoleParam);
+
+  if (validRoleParam !== prevRoleParam) {
+    setPrevRoleParam(validRoleParam);
+    if (validRoleParam) {
+      setRole(validRoleParam);
+    }
+  }
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -525,7 +536,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {mode === "login" ? "Belum memiliki akun? " : "Sudah memiliki akun? "}
         <Link
           className="font-bold text-[#7C3AED] hover:underline"
-          href={mode === "login" ? "/register" : "/login"}
+          href={mode === "login" ? `/register?role=${role}` : `/login?role=${role}`}
         >
           {mode === "login" ? "Daftar di sini" : "Masuk di sini"}
         </Link>

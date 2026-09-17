@@ -4,7 +4,7 @@ import { createAzure } from "@ai-sdk/azure";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { cvBuilderSchema, cvImportSchema, gapsSchema, cvReviewPillarSchema, gapAnalysisPillarSchema, careerRoadmapPillarSchema, profileContextSchema, questionsSchema, recruiterOutreachPromptSchema, recruiterPromptInputSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
+import { cvBuilderSchema, cvImportSchema, gapsSchema, cvReviewPillarSchema, gapAnalysisPillarSchema, careerConsultationPillarSchema, profileContextSchema, questionsSchema, recruiterOutreachPromptSchema, recruiterPromptInputSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
 
 const defaultVersion = "proofylink-screening-v1";
 
@@ -18,7 +18,7 @@ export function getSource(): "mock" | "local" | "azure" {
 type AiOptions = { strict?: boolean };
 
 function label(score: number) {
-  return score >= 80 ? "Sangat Direkomendasikan" : score >= 50 ? "Direkomendasikan" : score >= 21 ? "Perlu Pertimbangan" : "Perlu Review Mendalam";
+  return score >= 80 ? "Sangat Sesuai" : score >= 60 ? "Sesuai" : score >= 40 ? "Cukup" : "Kurang Sesuai";
 }
 
 let cachedLocalAi: ReturnType<typeof createOpenAI> | null = null;
@@ -33,21 +33,52 @@ function getLocalAi(baseURL: string, apiKey: string) {
   return cachedLocalAi;
 }
 
-let cachedAzure: ReturnType<typeof createAzure> | null = null;
-let cachedAzureKey = "";
-
-function getAzure(baseURL: string, apiKey: string, apiVersion?: string) {
-  const key = `${baseURL}|${apiKey}|${apiVersion ?? ""}`;
-  if (!cachedAzure || cachedAzureKey !== key) {
-    cachedAzure = createAzure({
-      baseURL,
-      apiKey,
-      apiVersion,
-      useDeploymentBasedUrls: true,
-    });
-    cachedAzureKey = key;
+function normalizeAzureBaseUrl(rawEndpoint: string): string {
+  let ep = rawEndpoint.trim();
+  if (!ep.startsWith("http://") && !ep.startsWith("https://")) {
+    ep = `https://${ep}.openai.azure.com`;
   }
-  return cachedAzure;
+  try {
+    const parsed = new URL(ep);
+    return `${parsed.origin}/openai`;
+  } catch {
+    return `${ep.replace(/\/+$/, "")}/openai`;
+  }
+}
+
+const cachedAzureMap = new Map<string, ReturnType<typeof createAzure>>();
+
+export function getAzureConfig() {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  const apiKey = (process.env.AZURE_OPENAI_API_KEY || process.env.AZURE_API_KEY)?.trim();
+  const deployment = (
+    process.env.AZURE_OPENAI_DEPLOYMENT ||
+    process.env.AZURE_OPENAI_MODEL ||
+    process.env.AZURE_MODEL ||
+    process.env.OPENAI_MODEL ||
+    process.env.MODEL ||
+    "gpt-4o-mini"
+  ).trim();
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION?.trim() || "2024-10-21";
+  const isConfigured = Boolean(endpoint && apiKey && !apiKey.startsWith("<"));
+
+  return { endpoint, apiKey, deployment, apiVersion, isConfigured };
+}
+
+function getAzure(baseURL: string, apiKey: string, apiVersion?: string, useDeploymentBasedUrls = true) {
+  const key = `${baseURL}|${apiKey}|${apiVersion ?? ""}|${useDeploymentBasedUrls}`;
+  if (!cachedAzureMap.has(key)) {
+    cachedAzureMap.set(
+      key,
+      createAzure({
+        baseURL,
+        apiKey,
+        apiVersion,
+        useDeploymentBasedUrls,
+      })
+    );
+  }
+  return cachedAzureMap.get(key)!;
 }
 
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
@@ -89,11 +120,9 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
   }
 
   // Azure mode
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT?.trim();
-  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
-  if (!endpoint || !deployment || !apiKey || apiKey.startsWith("<")) {
-    if (options.strict) throw new Error("Konfigurasi Azure AI belum lengkap.");
+  const { endpoint, deployment, apiKey, apiVersion, isConfigured } = getAzureConfig();
+  if (!isConfigured || !endpoint || !apiKey) {
+    if (options.strict) throw new Error("Konfigurasi Azure AI belum lengkap. Harap periksa AZURE_OPENAI_ENDPOINT dan AZURE_OPENAI_API_KEY.");
     return {
       ...(fallback as Record<string, unknown>),
       source: "mock",
@@ -103,18 +132,37 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
 
   try {
     const azure = getAzure(
-      `${endpoint.replace(/\/$/, "")}/openai`,
+      normalizeAzureBaseUrl(endpoint),
       apiKey,
-      process.env.AZURE_OPENAI_API_VERSION?.trim()
+      apiVersion
     );
-    const result = await generateObject({ model: azure.chat(deployment), schema, prompt });
-    return {
-      ...(result.object as Record<string, unknown>),
-      source: "azure",
-      modelVersion: deployment || defaultVersion,
-    } as z.infer<T>;
+    // Timeout 25 detik — cegah koneksi menggantung (wsarecv / connection forcibly closed)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25_000);
+    try {
+      const result = await generateObject({ model: azure.chat(deployment), schema, prompt, abortSignal: controller.signal });
+      clearTimeout(timeoutId);
+      return {
+        ...(result.object as Record<string, unknown>),
+        source: "azure",
+        modelVersion: deployment || defaultVersion,
+      } as z.infer<T>;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
-    console.error("AI provider error:", error);
+    const isNetworkError = error instanceof Error && (
+      error.message.includes("wsarecv") ||
+      error.message.includes("forcibly closed") ||
+      error.message.includes("ECONNRESET") ||
+      error.message.includes("aborted") ||
+      error.name === "AbortError"
+    );
+    if (isNetworkError) {
+      console.warn("[AI Azure] Koneksi terputus, menggunakan data fallback:", error.message);
+    } else {
+      console.error("[AI Azure] Error:", error);
+    }
     if (options.strict) throw error;
     return {
       ...(fallback as Record<string, unknown>),
@@ -153,7 +201,7 @@ export async function summary(input: unknown, options?: AiOptions) {
 export async function screening(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
   const score = Math.min(100, 48 + context.skills.length * 8 + (context.targetRole ? 12 : 0));
-  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Skill dan target role tersedia di profile.", "Penilaian berfokus pada data quality dan role fit."], limitations: ["Bukan keputusan hire/reject.", "Financial, credit, dan atribut sensitif tidak dianalisis."], followUp: "Lakukan interview berbasis bukti dan beri kandidat kesempatan klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
+  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Kompetensi teknis dan keselarasan peran dianalisis secara objektif.", "Penilaian berfokus pada relevansi keahlian dan rekam jejak kerja."], limitations: ["Bukan keputusan final hire/reject.", "Data pribadi sensitif (kontak & privasi) dikecualikan sepenuhnya dari analisis."], followUp: "Lakukan interview berbasis bukti kompetensi dan berikan kandidat ruang klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
 }
 
 export async function interviewQuestions(input: unknown) {
@@ -165,9 +213,9 @@ import { checkSkillsQuality } from "./skills-check";
 
 export async function careerAdvisor(input: unknown, options?: AiOptions) {
   const raw = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
-  const focus = (typeof raw.focus === "string" && ["cv_review", "gap_analysis", "career_roadmap", "ats", "headline", "star", "role"].includes(raw.focus)
+  const focus = (typeof raw.focus === "string" && ["cv_review", "gap_analysis", "career_consultation", "career_roadmap", "ats", "headline", "star", "role"].includes(raw.focus)
     ? raw.focus
-    : "cv_review") as "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star" | "role";
+    : "cv_review") as "cv_review" | "gap_analysis" | "career_consultation" | "career_roadmap" | "ats" | "headline" | "star" | "role";
   const context = profileContextSchema.parse(input);
 
   const role = context.targetRole || context.headline || "Senior Product Designer";
@@ -540,25 +588,25 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PILAR 3: CAREER ROADMAP RENCANA KEDEPAN (career_roadmap / star)
+  // PILAR 3: CAREER CONSULTATION & PERSIAPAN REKRUTMEN (career_consultation / career_roadmap / star)
   // ─────────────────────────────────────────────────────────────────────────────
-  const roadmapFallback = {
+  const consultationFallback = {
     targetRole: role,
-    targetTimeline: "6 — 12 Bulan",
-    targetLevel: skillCheck.isPlausible ? "Senior to Lead Level" : `Kandidat Siap Kerja untuk ${role}`,
+    targetTimeline: "3 — 6 Bulan Kesiapan",
+    targetLevel: skillCheck.isPlausible ? `Kesiapan Kompetitif untuk ${role}` : `Kandidat Siap Kerja untuk ${role}`,
     phases: [
       {
         phaseNumber: 1,
-        phaseName: skillCheck.isPlausible ? "Fondasi & Penutupan Gap Kompetensi" : "Penyelarasan & Pembangunan Keahlian Inti",
-        timeframe: "Bulan 1 — 3",
+        phaseName: skillCheck.isPlausible ? "Pembuktian Portofolio & Keunggulan Relevan" : "Penyelarasan & Pembangunan Keahlian Inti",
+        timeframe: "Bulan 1 — 2",
         outcome: skillCheck.isPlausible
-          ? "Portofolio siap standar industri dan gap skill utama tertutup sempurna."
+          ? "Portofolio proyek memiliki bukti hasil kerja nyata yang langsung memikat HRD saat peninjauan pertama."
           : `Keahlian inti untuk posisi ${role} mulai dikuasai dan portofolio awal terbentuk.`,
         keyActions: skillCheck.isPlausible
           ? [
-              "Audit dan poles poin pengalaman kerja di CV dengan bukti hasil kerja nyata",
-              "Dokumentasikan 1 studi kasus mendalam tentang proyek relevan di portofolio",
-              "Pelajari materi lanjutan terkait strategi kerja dan pemecahan masalah bisnis",
+              "Poles 1-2 studi kasus portofolio dengan menekankan peran spesifik dan metrik dampak positif",
+              "Perbarui headline dan ringkasan profil agar mencerminkan spesialisasi bidang kerjamu",
+              "Kelompokkan keahlian teknis dan alat kerja utama agar mudah dipindai HRD",
             ]
           : [
               `Fokus pelajari 2-3 keahlian utama untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")})`,
@@ -566,84 +614,89 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
               "Buat 1 proyek latihan terstruktur sebagai bukti portofolio awal",
             ],
         milestone: skillCheck.isPlausible
-          ? "CV & Portofolio siap lolos seleksi awal perekrut dengan tingkat keterbacaan tinggi"
+          ? "Profil & Portofolio memiliki daya tarik tinggi saat disaring oleh HRD"
           : `Keahlian di profil selaras dengan kebutuhan peran ${role}`,
       },
       {
         phaseNumber: 2,
-        phaseName: "Pembuktian Hasil Kerja & Personal Branding",
-        timeframe: "Bulan 3 — 6",
-        outcome: "Diakui sebagai talent yang kompeten dan mulai menerima kesempatan wawancara relevan.",
+        phaseName: "Personal Branding & Visibilitas ke Perekrut",
+        timeframe: "Bulan 2 — 4",
+        outcome: "Profil aktif terlihat di radar pencarian talent dan mulai menerima undangan peluang kerja.",
         keyActions: [
-          "Publikasikan tulisan wawasan atau hasil proyek di LinkedIn atau komunitas profesional",
-          "Aktif di ProofyLink Talent Network untuk mendapatkan verified badge",
-          "Mulai mengambil inisiatif kolaborasi atau memimpin tugas proyek mandiri",
+          "Publikasikan rangkuman pembelajaran proyek atau studi kasus di komunitas profesional atau LinkedIn",
+          "Lengkapi seluruh bagian profil ProofyLink untuk memaksimalkan peluang rekomendasi otomatis",
+          "Minta umpan balik dari rekan kerja atau mentor mengenai kejelasan portofoliomu",
         ],
-        milestone: "Mendapatkan undangan wawancara atau tawaran kerja yang relevan",
+        milestone: "Mendapatkan tanggapan positif dan undangan wawancara dari perekrut",
       },
       {
         phaseNumber: 3,
-        phaseName: "Akselerasi Karir & Kesiapan Promosi",
-        timeframe: "Bulan 6 — 12",
-        outcome: "Mencapai peran target impian dengan posisi dan kompensasi optimal.",
+        phaseName: "Strategi Pitching Wawancara & Evaluasi Tawaran",
+        timeframe: "Bulan 4 — 6",
+        outcome: "Mampu menyampaikan keunggulan diri secara percaya diri dan meraih penawaran kerja terbaik.",
         keyActions: [
-          "Lakukan simulasi wawancara kerja teknis dan situasional",
-          "Evaluasi tawaran kerja atau peluang jenjang karir yang lebih tinggi",
-          "Susun rencana kerja awal (rencana 90 hari) untuk posisi baru",
+          "Siapkan narasi STAR (Situation, Task, Action, Result) untuk setiap pencapaian utama",
+          "Latih penjelasan jujur namun positif seputar transisi karir atau celah pengalaman",
+          "Pelajari riset standar kompensasi dan nilai tambah unik yang kamu bawa untuk perusahaan",
         ],
-        milestone: "Penempatan resmi di posisi target idaman dengan kompensasi kompetitif",
+        milestone: "Menerima dan menegosiasikan penawaran kerja resmi sesuai target karir",
       },
     ],
     recommendedCertifications: [
-      `Sertifikasi Profesional Bidang ${role}`,
-      "Pelatihan Praktis Analisis & Strategi Kerja",
-      "Pelatihan Manajemen Proyek & Kolaborasi Tim",
+      `Pelatihan Praktis & Studi Kasus Bidang ${role}`,
+      "Sertifikasi Profesional atau Lisensi Alat Kerja Industri",
+      "Lokakarya Komunikasi Efektif & Kolaborasi Tim",
     ],
     strategicAdvice: [
-      "Fokuslah pada pencapaian hasil kerja nyata yang bermanfaat, bukan sekadar daftar tugas harian.",
-      "Bangun reputasi profesional dengan aktif membagikan pembelajaran dan hasil kerja nyata.",
-      "Perbarui profil ProofyLink secara berkala setiap kali menyelesaikan proyek berdampak positif.",
+      "Perekrut lebih tertarik pada bagaimana caramu memecahkan masalah nyata dibanding sekadar panjangnya daftar tugas.",
+      "Jelaskan kontribusi pribadimu secara jujur dan transparan saat menceritakan proyek kolaborasi.",
+      "Gunakan setiap wawancara kerja sebagai ruang bertukar wawasan dua arah, bukan sekadar ujian.",
     ],
-    summary: `Career Roadmap 3-Fase untuk ${role}: Panduan terstruktur 6-12 bulan dari penguatan fondasi kompetensi, pembuktian reputasi profesional, hingga kesiapan promosi/penempatan posisi impian.`,
+    interviewPitchTips: [
+      "Gunakan formula STAR: sebutkan tantangan yang dihadapi, aksimu, dan hasil positif yang dicapai.",
+      "Jika ada kesenjangan pengalaman atau transisi karir, tonjolkan kecepatan belajar dan transferable skills yang relevan.",
+      "Tunjukkan antusiasme dengan mempelajari produk atau tantangan bisnis perusahaan sebelum sesi interview.",
+    ],
+    summary: `Career Consultation untuk ${role}: Panduan strategis kesiapan diri dalam 3-6 bulan yang berfokus pada pembuktian portofolio, visibilitas di mata HRD, dan penguasaan teknik pitching wawancara kerja.`,
     structuredAdvice: {
-      opening: `Rencana akselerasi karir berorientasi hasil menuju jenjang berikutnya untuk ${role}:`,
+      opening: `Konsultasi persiapan karir dan strategi memikat HRD untuk posisi ${role}:`,
       whatGood: [
-        "Jalur pertumbuhan memiliki tahapan jelas dengan target pencapaian yang nyata.",
-        "Keseimbangan antara peningkatan keahlian kerja dan reputasi profesional.",
+        "Arah tujuan karir sudah terdefinisi jelas menuju target peran yang diinginkan.",
+        "Kombinasi keahlian dasar menjadi modal berharga untuk melangkah ke tahap seleksi.",
       ],
       whatNotGood: skillCheck.isPlausible
         ? [
-            "Dibutuhkan konsistensi mingguan dalam mengeksekusi action items Fase 1.",
-            "Hindari mengambil terlalu banyak pelatihan tanpa pembuktian proyek portofolio nyata.",
+            "Perlu melatih teknik bercerita (storytelling) agar pencapaian kerjamu tidak terdengar seperti tugas biasa.",
+            "Portofolio masih perlu menyertakan proses pengambilan keputusan di balik solusi.",
           ]
         : [
             skillCheck.competencyFeedback,
-            "Hindari mengambil terlalu banyak topik sekaligus; utamakan penguasaan mendalam pada keahlian inti.",
+            "Hindari melamar tanpa proyek pembuktian; siapkan minimal satu karya nyata sebagai modal pitching.",
           ],
-      conclusion: "Eksekusi setiap fase secara bertahap dan tinjau milestone setiap akhir bulan untuk menjaga momentum karir.",
+      conclusion: "Terapkan rekomendasi di atas untuk membangun kepercayaan diri dan daya pikat profilmu di hadapan HRD.",
     },
-    answer: `Career Roadmap: Rencana aksi terarah untuk mencapai jenjang impian dalam 6-12 bulan dengan tahapan dan milestone konkret yang dapat diukur.`,
+    answer: `Career Consultation: Panduan persiapan karir dan teknik memikat HRD untuk posisi ${role} melalui penguatan portofolio nyata, visibilitas profesional, dan kesiapan wawancara kerja.`,
     nextSteps: skillCheck.isPlausible
       ? [
-          "Terapkan action items Fase 1 dalam 30 hari ke depan.",
-          "Ikuti sertifikasi atau kursus yang direkomendasikan untuk menutup gap.",
-          "Jadwalkan review berkala setiap akhir fase untuk memantau pencapaian milestone.",
+          "Pilih 1 proyek terbaik dan tuliskan ulang uraian hasilnya menggunakan metode STAR.",
+          "Tinjau kelengkapan profil ProofyLink agar mudah ditemukan dalam pencarian talent.",
+          "Latih pitching ringkas 2 menit tentang siapa dirimu dan keunggulan utamamu.",
         ]
       : [
-          `Mulai pelajari keahlian inti peran ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
-          "Perbarui profil CV setelah menyelesaikan materi atau proyek awal.",
-          "Jadwalkan evaluasi berkala untuk memantau perkembangan kompetensimu.",
+          `Mulai pelajari 2-3 keahlian utama untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+          "Buat 1 proyek latihan sederhana untuk dijadikan portofolio awal.",
+          "Jalankan kembali konsultasi ini setelah portofolio barumu siap.",
         ],
     limitations: [
-      "Estimasi waktu dan pencapaian roadmap dapat disesuaikan dengan alokasi waktu pribadi.",
-      "Peluang promosi dan rekrutmen dipengaruhi oleh dinamika pasar dan iklim industri.",
+      "Konsultasi ini merupakan panduan umum berbasis tren pasar kerja dan simulasi sudut pandang HRD sebagai referensi mandiri.",
+      "ProofyLink bukan penasihat karir bersertifikasi; proses rekrutmen aktual bergantung pada kebutuhan spesifik masing-masing perusahaan.",
     ],
   };
 
   const prompt =
-    `Anda adalah Lead Technical Recruiter & Senior Career Advisor di ProofyLink Talent Network.\n` +
-    `Tugas Anda: Susun Career Roadmap strategis 3-fase terstruktur untuk memandu akselerasi karir kandidat menuju jenjang berikutnya secara ramah, komunikatif, dan realistis dalam Bahasa Indonesia.\n\n` +
-    `- Target Peran Saat Ini: ${role}\n` +
+    `Anda adalah Lead Technical Recruiter & Talent Advisor di ProofyLink Talent Network.\n` +
+    `Tugas Anda: Berikan Career Consultation (Konsultasi Karir & Kesiapan Rekrutmen) yang ramah, membumi, dan berorientasi pada sudut pandang HRD/perekrut dalam Bahasa Indonesia untuk membantu kandidat dilirik perusahaan.\n\n` +
+    `- Target Peran yang Dituju: ${role}\n` +
     `- Headline Profil: ${context.headline || "Belum ditentukan"}\n` +
     `- Ringkasan (About): ${context.about || "Belum diisi"}\n` +
     `- Keahlian Terdaftar (Skills): ${context.skills.join(", ") || "Belum diisi"}\n` +
@@ -654,33 +707,44 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
     `1. Periksa keahlian kandidat: [${context.skills.join(", ")}] terhadap target peran "${role}".\n` +
     `   - Jika keahlian kandidat TIDAK RELEVAN atau berupa kata-kata dummy (seperti 'plo', 'pluh', 'plar', 'test', dsb):\n` +
     `     * JANGAN memujinya di 'whatGood'!\n` +
-    `     * Fase 1 WAJIB difokuskan pada: Penyelarasan & Pembangunan Keahlian Inti, yaitu mempelajari keahlian nyata untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).\n` +
-    `     * Di 'whatNotGood', sampaikan dengan ramah bahwa kandidat perlu memperbaiki kompetensi agar sesuai dengan peran ${role}.\n\n` +
-    `PANDUAN GAYA BAHASA (GENERAL & MUDAH DIPAHAMI):\n` +
-    `2. Gunakan Bahasa Indonesia yang komunikatif, ramah, dan membumi. HINDARI jargon teknikal yang membingungkan kandidat (misal: hindari istilah 'scalable architecture tokenization', 'metrik kuantitatif mutlak', dsb). Gunakan istilah umum seperti 'bukti hasil kerja nyata', 'proyek portofolio', 'pelatihan praktis'.\n\n` +
-    `Panduan Roadmap yang Wajib Diikuti:\n` +
-    `1. targetTimeline: Berikan estimasi waktu realistis (misal: '6 — 12 Bulan').\n` +
-    `2. targetLevel: Tentukan jenjang target yang dicapai.\n` +
-    `3. phases: Rancang persis 3 fase berkesinambungan:\n` +
-    `   - Fase 1: Fondasi & Penutupan Gap Kompetensi (Bulan 1 — 3)\n` +
-    `   - Fase 2: Pembuktian Dampak & Personal Branding (Bulan 3 — 6)\n` +
-    `   - Fase 3: Akselerasi Karir & Kesiapan Promosi/Penempatan (Bulan 6 — 12)\n` +
-    `   Untuk setiap fase wajib ada: phaseNumber, phaseName, timeframe, outcome terukur, minimal 3 keyActions konkret, dan milestone utama.\n` +
-    `4. recommendedCertifications: Sebutkan 3 sertifikasi atau topik pelatihan berstandar industri.\n` +
-    `5. strategicAdvice: Berikan 3 saran strategis jangka panjang.\n` +
-    `6. structuredAdvice: Berikan opening, whatGood (minimal 2 poin), whatNotGood (minimal 2 poin), dan conclusion.\n` +
-    `7. nextSteps: Minimal 3 langkah eksekusi langsung.\n` +
-    `Gunakan bahasa Indonesia profesional yang menginspirasi, terarah, dan realistis.`;
+    `     * Fase 1 WAJIB difokuskan pada Penyelarasan & Pembangunan Keahlian Inti untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).\n` +
+    `     * Di 'whatNotGood', sampaikan dengan ramah bahwa kandidat perlu membangun kompetensi nyata terlebih dahulu sebelum siap dilirik HRD untuk peran ${role}.\n\n` +
+    `PANDUAN GAYA BAHASA & SUDUT PANDANG REKRUTER (RAMAH & MEMBUMI):\n` +
+    `2. Gunakan sudut pandang "Bagaimana HRD memandang profil ini". Berikan tips nyata agar kandidat tahu apa yang dicari HRD pada saat screening CV, peninjauan portofolio, dan sesi wawancara.\n` +
+    `3. HINDARI janji pasti atau bahasa legal absolut. Jadikan konsultasi ini sebagai panduan umum yang memberdayakan kandidat.\n\n` +
+    `Struktur Output yang Wajib Diisi:\n` +
+    `1. targetTimeline: Berikan estimasi waktu realistis (misal: '3 — 6 Bulan Kesiapan').\n` +
+    `2. targetLevel: Tentukan level target kompetensi kandidat.\n` +
+    `3. phases: Tepat 3 tahapan strategis:\n` +
+    `   - Fase 1: Penguatan Portofolio & Pembuktian Hasil Nyata\n` +
+    `   - Fase 2: Personal Branding & Visibilitas ke Perekrut\n` +
+    `   - Fase 3: Strategi Pitching Wawancara & Evaluasi Tawaran\n` +
+    `   Setiap fase memiliki phaseNumber, phaseName, timeframe, outcome, minimal 3 keyActions, dan milestone.\n` +
+    `4. recommendedCertifications: Sebutkan 3 sertifikasi atau topik pelatihan relevan.\n` +
+    `5. strategicAdvice: Berikan 3 saran strategis dari kacamata HRD.\n` +
+    `6. interviewPitchTips: Berikan 3 tips praktis cara mengkomunikasikan keunggulan diri saat wawancara (termasuk tips transisi karir / gap pengalaman).\n` +
+    `7. structuredAdvice: opening, whatGood (min 2), whatNotGood (min 2), dan conclusion.\n` +
+    `8. nextSteps: Minimal 3 aksi nyata langsung.\n` +
+    `9. limitations: Sertakan disclaimer bahwa ini panduan umum berbasis tren pasar kerja dan ProofyLink bukan penasihat karir bersertifikasi.`;
 
-  const aiOut = await aiResult(careerRoadmapPillarSchema, prompt, roadmapFallback, options);
+  const aiOut = await aiResult(careerConsultationPillarSchema, prompt, consultationFallback, options);
 
   return {
-    focus: "career_roadmap" as const,
+    focus: "career_consultation" as const,
     summary: aiOut.summary,
     headlineSuggestions: [],
     starBullets: [],
     pillars: [],
     structuredAdvice: aiOut.structuredAdvice,
+    careerConsultationDetails: {
+      targetRole: aiOut.targetRole,
+      targetTimeline: aiOut.targetTimeline,
+      targetLevel: aiOut.targetLevel,
+      phases: aiOut.phases,
+      recommendedCertifications: aiOut.recommendedCertifications,
+      strategicAdvice: aiOut.strategicAdvice,
+      interviewPitchTips: aiOut.interviewPitchTips || consultationFallback.interviewPitchTips,
+    },
     careerRoadmapDetails: {
       targetRole: aiOut.targetRole,
       targetTimeline: aiOut.targetTimeline,
@@ -709,11 +773,251 @@ export async function roadmap(input: unknown) {
 
 export async function cvBuilder(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(cvBuilderSchema, JSON.stringify(context), { headline: context.headline || context.targetRole || "Professional", about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.", bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`), limitations: ["Draft harus disetujui kandidat sebelum disimpan."], modelVersion: defaultVersion, source: getSource() });
+  return aiResult(cvBuilderSchema, JSON.stringify(context), {
+    headline: context.headline || context.targetRole || "Professional",
+    about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.",
+    bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`),
+    limitations: ["Draft harus disetujui kandidat sebelum disimpan."],
+    modelVersion: defaultVersion,
+    source: getSource(),
+  });
 }
 
 export function importCv(fileName: string) {
-  return cvImportSchema.parse({ fullName: "Nadia Putri", headline: "Senior Product Designer", about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.", skills: ["Product design", "User research", "Figma"], experience: [{ company: "Studio Nusantara", role: "Senior Product Designer", dates: "2021 - sekarang", achievements: ["Meningkatkan kejelasan workflow produk."] }], education: [{ school: "Universitas Indonesia", program: "Desain Komunikasi Visual", dates: "2015 - 2019" }], suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`], source: getSource() });
+  return cvImportSchema.parse({
+    fullName: "Nadia Putri",
+    headline: "Senior Product Designer",
+    about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.",
+    skills: ["Product design", "User research", "Figma"],
+    hardCompetencies: ["Product design", "User research"],
+    tools: ["Figma"],
+    softSkills: ["Komunikasi", "Problem solving"],
+    experience: [
+      {
+        company: "Studio Nusantara",
+        role: "Senior Product Designer",
+        employmentType: "Full Time",
+        startDate: "2021",
+        endDate: null,
+        currentPosition: true,
+        dates: "2021 - sekarang",
+        description: "Memimpin perancangan pengalaman produk digital nusantara.",
+        achievements: ["Meningkatkan kejelasan workflow produk."],
+      },
+    ],
+    education: [
+      {
+        level: "S1",
+        school: "Universitas Indonesia",
+        program: "Desain Komunikasi Visual",
+        gpa: "3.85",
+        startDate: "2015",
+        endDate: "2019",
+        currentlyStudying: false,
+        dates: "2015 - 2019",
+      },
+    ],
+    suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`],
+    source: getSource(),
+  });
+}
+
+export type ExtractCvInput = {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+};
+
+function formatAiError(err: unknown): string {
+  if (!err) return "Terjadi kesalahan yang tidak diketahui.";
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    const status = e.status || e.statusCode;
+    let bodyMsg = "";
+    if (typeof e.responseBody === "string") {
+      try {
+        const parsed = JSON.parse(e.responseBody);
+        bodyMsg = parsed?.error?.message || parsed?.message || e.responseBody;
+      } catch {
+        bodyMsg = e.responseBody;
+      }
+    } else if (e.responseBody && typeof e.responseBody === "object") {
+      const resp = e.responseBody as Record<string, unknown>;
+      const errObj = resp.error as Record<string, unknown> | undefined;
+      bodyMsg = (errObj?.message as string) || (resp.message as string) || "";
+    }
+    const mainMsg = (e.message as string) || (e.name as string) || "Koneksi ke Azure AI gagal";
+    const statusPrefix = status ? `[HTTP ${status}] ` : "";
+    if (bodyMsg && bodyMsg !== mainMsg) {
+      return `${statusPrefix}${mainMsg} (${bodyMsg})`;
+    }
+    return `${statusPrefix}${mainMsg}`;
+  }
+  return String(err);
+}
+
+export async function extractCvDocument(
+  input: ExtractCvInput,
+  options: AiOptions = {}
+): Promise<z.infer<typeof cvImportSchema>> {
+  const { endpoint, deployment, apiKey, apiVersion, isConfigured } = getAzureConfig();
+
+  // If Azure credentials are not available
+  if (!isConfigured || !endpoint || !apiKey) {
+    const missingFields = [
+      !endpoint ? "AZURE_OPENAI_ENDPOINT" : null,
+      !apiKey ? "AZURE_OPENAI_API_KEY" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const errorMsg =
+      `Konfigurasi Azure AI belum lengkap (variabel belum diisi: ${missingFields || "tidak valid"}). ` +
+      `Pastikan variabel tersebut sudah terpasang di file .env lokal Anda dan restart server development ('npm run dev').`;
+
+    if (options.strict || getSource() !== "mock") {
+      throw new Error(errorMsg);
+    }
+    console.warn(`[extractCvDocument] ${errorMsg}`);
+    return importCv(input.fileName);
+  }
+
+  try {
+    const azure = getAzure(
+      normalizeAzureBaseUrl(endpoint),
+      apiKey,
+      apiVersion
+    );
+    const model = azure.chat(deployment);
+
+    const isImage =
+      input.mimeType.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(input.fileName);
+
+    if (isImage) {
+      // Vision OCR via multimodal message
+      const result = await generateObject({
+        model,
+        schema: cvImportSchema,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  `Anda adalah asisten AI OCR dan parser CV/resume profesional. ` +
+                  `Analisis gambar dokumen CV "${input.fileName}" ini secara mendalam dan ekstrak datanya ke format JSON sesuai skema berikut:\n` +
+                  `- fullName: Nama lengkap kandidat\n` +
+                  `- headline: Judul profesional atau target peran kerja\n` +
+                  `- about: Ringkasan profesional kandidat dalam 1-3 kalimat\n` +
+                  `- skills: Array daftar keahlian utama\n` +
+                  `- hardCompetencies: Daftar keahlian teknis (array string, berikan [] jika tidak ada)\n` +
+                  `- tools: Software atau teknologi yang dikuasai (array string, berikan [] jika tidak ada)\n` +
+                  `- softSkills: Keahlian interpersonal (array string, berikan [] jika tidak ada)\n` +
+                  `- experience: Array riwayat pekerjaan dengan format objek: { company, role, employmentType, startDate, endDate, currentPosition, dates, description, achievements }. Jika field tertentu tidak ada pada CV, isi dengan null (atau [] untuk achievements).\n` +
+                  `- education: Array riwayat pendidikan dengan format objek: { level, school, program, gpa, startDate, endDate, currentlyStudying, dates }. Jika field tertentu tidak ada pada CV, isi dengan null.\n` +
+                  `- suggestions: 1-3 saran profesional untuk mengoptimalkan CV ini bagi rekruter.\n` +
+                  `- source: Selalu isi dengan "azure"\n` +
+                  `Pastikan data akurat dan tidak ada halusinasi informasi yang tidak tercantum.`,
+              },
+              {
+                type: "image",
+                image: input.buffer,
+              },
+            ],
+          },
+        ],
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    }
+
+    // PDF processing: extract text first using unpdf
+    let pdfText = "";
+    try {
+      const { extractText } = await import("unpdf");
+      const parsed = await extractText(new Uint8Array(input.buffer), { mergePages: true });
+      const rawText = parsed.text;
+      pdfText = typeof rawText === "string" ? rawText : Array.isArray(rawText) ? (rawText as string[]).join("\n") : "";
+    } catch (pdfErr) {
+      console.warn("[extractCvDocument] Gagal membaca teks PDF dengan unpdf:", pdfErr);
+    }
+
+    // If PDF has readable text
+    if (pdfText.trim().length > 0) {
+      const result = await generateObject({
+        model,
+        schema: cvImportSchema,
+        prompt:
+          `Anda adalah asisten AI parser CV/resume profesional. ` +
+          `Analisis teks dokumen CV "${input.fileName}" berikut dan ekstrak datanya ke format JSON sesuai skema:\n` +
+          `- fullName: Nama lengkap kandidat\n` +
+          `- headline: Judul profesional atau target peran kerja\n` +
+          `- about: Ringkasan profesional kandidat dalam 1-3 kalimat\n` +
+          `- skills: Array daftar keahlian utama\n` +
+          `- hardCompetencies: Daftar keahlian teknis (array string, berikan [] jika tidak ada)\n` +
+          `- tools: Software atau teknologi yang dikuasai (array string, berikan [] jika tidak ada)\n` +
+          `- softSkills: Keahlian interpersonal (array string, berikan [] jika tidak ada)\n` +
+          `- experience: Array riwayat pekerjaan dengan format objek: { company, role, employmentType, startDate, endDate, currentPosition, dates, description, achievements }. Jika field tertentu tidak ada pada CV, isi dengan null (atau [] untuk achievements).\n` +
+          `- education: Array riwayat pendidikan dengan format objek: { level, school, program, gpa, startDate, endDate, currentlyStudying, dates }. Jika field tertentu tidak ada pada CV, isi dengan null.\n` +
+          `- suggestions: 1-3 saran profesional untuk mengoptimalkan CV ini bagi rekruter.\n` +
+          `- source: Selalu isi dengan "azure"\n\n` +
+          `=== TEKS DOKUMEN CV ===\n${pdfText.slice(0, 18000)}`,
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    }
+
+    // If PDF has zero extracted text (scanned PDF without text layer)
+    // Try sending directly as a file part to Azure Responses model if available
+    try {
+      const responsesModel = typeof azure.responses === "function" ? azure.responses(deployment) : azure(deployment);
+      const result = await generateObject({
+        model: responsesModel,
+        schema: cvImportSchema,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  `Anda adalah asisten AI OCR CV profesional. Ekstrak data profil dari berkas CV "${input.fileName}" ini secara lengkap ke format JSON sesuai skema:\n` +
+                  `- fullName, headline, about, skills, experience, education, suggestions.`,
+              },
+              {
+                type: "file",
+                data: input.buffer,
+                mediaType: "application/pdf",
+                filename: input.fileName,
+              },
+            ],
+          },
+        ],
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    } catch (fileErr) {
+      console.warn("[extractCvDocument] File part parsing error:", fileErr);
+      throw new Error(
+        "Dokumen PDF tidak memiliki teks digital yang dapat dibaca (kemungkinan hasil scan gambar). " +
+        "Silakan ekspor CV Anda langsung sebagai 'PDF Standar' dari Canva/Word, atau unggah sebagai gambar PNG/JPG."
+      );
+    }
+  } catch (err: unknown) {
+    console.error("[extractCvDocument] Azure error:", err);
+    throw new Error(`Gagal memproses dokumen dengan Azure AI: ${formatAiError(err)}`);
+  }
 }
 
 export async function recruiterOutreachPrompt(input: unknown, options?: AiOptions) {

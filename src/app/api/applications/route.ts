@@ -58,12 +58,22 @@ export async function GET(request: Request) {
 
     const scope = await getRecruiterScope(current.db, current.user);
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+    // Optional filter: recruiter viewing a specific candidate's pipeline status
+    const candidateProfileIdParam = url.searchParams.get("candidateProfileId");
+    const candidateProfileIdFilter = candidateProfileIdParam ? z.string().uuid().safeParse(candidateProfileIdParam) : null;
+
+    const baseWhere = eq(schema.jobs.organizationId, scope.membership.organizationId);
+    const whereClause = candidateProfileIdFilter?.success
+      ? and(baseWhere, eq(schema.applications.candidateProfileId, candidateProfileIdFilter.data))
+      : baseWhere;
+
     const rows = await current.db.select(applicationSelect).from(schema.applications)
       .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
       .innerJoin(schema.organizations, eq(schema.organizations.id, schema.jobs.organizationId))
       .leftJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-      .where(eq(schema.jobs.organizationId, scope.membership.organizationId)).orderBy(desc(schema.applications.updatedAt)).limit(limit + 1).offset(offset);
+      .where(whereClause).orderBy(desc(schema.applications.updatedAt)).limit(limit + 1).offset(offset);
     const hasMore = rows.length > limit;
     return NextResponse.json({ applications: (hasMore ? rows.slice(0, limit) : rows).map(formatApplication), page, limit, hasMore });
   } catch (error) {

@@ -113,8 +113,8 @@ export function SiteHeader() {
   const recruiterFeatures = [
     {
       href: "/recruiter/operations",
-      label: "Pipeline & Operasi",
-      desc: "Alur Dover, jadwal wawancara & status offer",
+      label: "Pipeline Rekrutmen",
+      desc: "Jadwal wawancara & status penawaran",
       icon: GitBranch,
     },
     {
@@ -226,7 +226,7 @@ export function SiteHeader() {
             <ShieldCheck className="size-5" />
           </span>
           <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-foreground")}>
-            Proofy<span className="text-primary">Link</span>
+            Talent<span className="text-primary"> Network</span>
           </span>
         </Link>
 
@@ -462,7 +462,7 @@ export function SiteHeader() {
             {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
               <div className="mt-2 border-t border-slate-100 pt-2">
                 <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Alur Rekrutmen Dover
+                  Pipeline Rekrutmen
                 </p>
                 {recruiterFeatures.map((feat) => {
                   const Icon = feat.icon;
