@@ -363,6 +363,7 @@ export function RecruiterOperationsPage() {
 
     // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
     if (target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
+      setDrawerOpen(false);
       setCancelOfferCandidate(target);
       setCancelOfferTargetStage(newStage);
       return;
@@ -370,6 +371,7 @@ export function RecruiterOperationsPage() {
 
     // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
     if (target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
+      setDrawerOpen(false);
       setDemoteInterviewCandidate(target);
       setDemoteInterviewTargetStage(newStage);
       return;
@@ -377,18 +379,21 @@ export function RecruiterOperationsPage() {
 
     // Trigger 2: Move to Interview from Screening (prepare interview modal)
     if (newStage === "interview" && target.stage === "screening") {
+      setDrawerOpen(false);
       setScheduleModalCandidate(target);
       return;
     }
 
     // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
     if (newStage === "offer") {
+      setDrawerOpen(false);
       setOfferModalCandidate(target);
       return;
     }
 
     // Trigger 4: Move to Hired (confirmation modal)
     if (newStage === "hired") {
+      setDrawerOpen(false);
       setHireConfirmCandidate(target);
       return;
     }
