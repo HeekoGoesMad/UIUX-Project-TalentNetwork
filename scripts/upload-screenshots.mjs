@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
-import path from "path";
 import dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -29,16 +28,16 @@ async function main() {
 
   const screenshots = [
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\candidate_profile_view_1789645961679.png",
-      remoteName: `revamp-discover-profile-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\clean_screening_and_no_online_dot_1789648439015.png",
+      remoteName: `clean-screening-no-online-dot-${Date.now()}.png`,
     },
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\candidate_floating_chatbox_open_1789646349146.png",
-      remoteName: `revamp-floating-chatbox-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\interview_demote_warning_modal_1789649987611.png",
+      remoteName: `interview-demote-warning-modal-${Date.now()}.png`,
     },
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\ai_interview_questions_pdf_modal_1789646638438.png",
-      remoteName: `revamp-ai-questions-modal-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\candidate_demoted_to_screening_success_1789650026860.png",
+      remoteName: `candidate-demoted-to-screening-${Date.now()}.png`,
     },
   ];
 
@@ -54,7 +53,7 @@ async function main() {
     const storagePath = `notion-reports/${userId}/${item.remoteName}`;
 
     console.log(`Uploading ${item.remoteName} to profile-media...`);
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("profile-media")
       .upload(storagePath, fileBuffer, {
         contentType: "image/png",
