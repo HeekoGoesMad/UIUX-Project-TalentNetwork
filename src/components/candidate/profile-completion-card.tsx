@@ -71,11 +71,11 @@ export function ProfileCompletionCard() {
             href={`/candidate/onboarding?step=${targetStep}`}
             className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
           >
-            Lanjutkan onboarding <ArrowRight className="size-4" />
+            Lanjutkan Pengisian Profil <ArrowRight className="size-4" />
           </Link>
         ) : (
           <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-            <ShieldCheck className="size-4" /> Profil siap ditemukan recruiter
+            <ShieldCheck className="size-4" /> Profil siap ditemukan perekrut
           </p>
         )}
       </CardContent>

@@ -1,5 +1,6 @@
 import { AuthForm } from "@/components/auth/auth-form";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { Suspense } from "react";
 
 export default function LoginPage() {
   return (
@@ -7,7 +8,9 @@ export default function LoginPage() {
       title="Selamat Datang Kembali"
       description="Masuk untuk melanjutkan perjalananmu."
     >
-      <AuthForm mode="login" />
+      <Suspense>
+        <AuthForm mode="login" />
+      </Suspense>
     </AuthShell>
   );
 }

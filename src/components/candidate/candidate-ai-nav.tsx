@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const aiNavItems = [
   {
     href: "/candidate/career-advisor",
-    label: "Penasihat Profil Karier AI",
+    label: "AI Career Advisor & Consultation",
     icon: Sparkles,
   },
 ];

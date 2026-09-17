@@ -3,7 +3,20 @@ import { Candidate, CareerStatus, IndustryCategory, TalentCategory } from "@/typ
 
 const names = ["Nadia Putri","Rizky Pratama","Clara Wijaya","Bima Santoso","Maya Kusuma","Aditya Ramadhan","Salsabila Noor","Kevin Hartono","Dewi Lestari","Fajar Nugroho","Sarah Tan","Dimas Haryanto","Anisa Rahma","Bagas Permana","Citra Anggraini","Yoga Saputra","Larasati Dewi","Rafi Maulana","Intan Sari","Gilang Wibowo","Mei Chen","Arif Setiawan","Nina Kurnia","Rendra Wijaya","Vania Putri","Teguh Adi","Alya Prameswari","Raka Putra","Wulan Sari","Hendra Gunawan"];
 const roles = ["Senior Product Designer","Frontend Engineer","Growth Marketing Lead","Data Scientist","Product Manager","UX Researcher","Backend Engineer","Brand Strategist"];
-const cities = ["Jakarta","Bandung","Surabaya","Yogyakarta","Bali","Tangerang","Semarang","Medan"];
+const cities = [
+  "Jakarta Selatan, DKI Jakarta",
+  "Bandung, Jawa Barat",
+  "Surabaya, Jawa Timur",
+  "Sleman, D.I. Yogyakarta",
+  "Badung, Bali",
+  "Tangerang Selatan, Banten",
+  "Semarang, Jawa Tengah",
+  "Medan, Sumatera Utara",
+  "Jakarta Pusat, DKI Jakarta",
+  "Bogor, Jawa Barat",
+  "Malang, Jawa Timur",
+  "Bantul, D.I. Yogyakarta",
+];
 const skills = ["Figma","React","TypeScript","SQL","Product strategy","Research","Python","Go","Brand systems","Analytics"];
 
 const careerStatuses: CareerStatus[] = ["open-to-work","open-for-opportunities","freelance-available","internship-available","not-available"];
