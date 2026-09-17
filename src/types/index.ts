@@ -214,3 +214,28 @@ export type RecruiterOnboardingData = {
 };
 
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
+
+export type CareerActivityCategory = "project" | "certification" | "leadership" | "skill_research";
+export type CareerActivityStatus = "planned" | "in_progress" | "completed";
+
+export type CareerActivityItem = {
+  id: string;
+  title: string;
+  description?: string;
+  category: CareerActivityCategory;
+  duration: string;
+  status: CareerActivityStatus;
+  achievementNotes?: string;
+  proofUrl?: string;
+  createdAt: string;
+  completedAt?: string;
+};
+
+export type CareerTrackerData = {
+  targetRole: string;
+  targetTimeline: string;
+  currentLevel: string;
+  targetLevel: string;
+  notes?: string;
+  activities: CareerActivityItem[];
+};

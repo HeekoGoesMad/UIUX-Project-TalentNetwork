@@ -72,8 +72,8 @@ export default function ContactRequestsPage() {
                 <Link href="/candidate">Kembali ke Dashboard</Link>
               </Button>
               <Button className="bg-purple-600 text-white hover:bg-purple-700 shadow-sm" asChild>
-                <Link href="/notifications?tab=contact-requests">
-                  Buka Permintaan di Notifikasi
+                <Link href="/notifications">
+                  Buka Notifikasi
                   <ArrowRight className="size-4 ml-1.5" />
                 </Link>
               </Button>

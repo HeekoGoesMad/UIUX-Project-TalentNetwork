@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Award,
-  Bell,
   Briefcase,
   Calendar,
   Compass,
@@ -12,7 +11,6 @@ import {
   Eye,
   FileText,
   MapPin,
-  ShieldCheck,
   Sparkles,
   TrendingUp,
   UserCheck,
@@ -26,22 +24,13 @@ import { useApp } from "@/providers/app-provider";
 import { useApplications } from "@/components/applications/application-ui";
 
 export default function CandidateHome() {
-  const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
+  const { user, cvProfile } = useApp();
   const { applications } = useApplications();
 
   // Candidate Name & Headline
   const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
-  const candidateRole = cvProfile?.targetRole || cvProfile?.headline || "Talent Network Member";
+  const candidateRole = cvProfile?.headline?.trim() || "Talent Network Member";
   const candidateLocation = cvProfile?.location || "Indonesia";
-
-  // Pending Contact Consents
-  const pendingConsentsCount = dbMode
-    ? consentRequests.filter(
-        (r) =>
-          r.consentState === "pending-candidate-consent" ||
-          screeningConsents[String(r.candidateProfileId)] === "pending-candidate-consent"
-      ).length
-    : Object.values(screeningConsents).filter((state) => state === "pending-candidate-consent").length;
 
   // Pipeline Insights
   const activeApplications = applications.filter(
@@ -107,7 +96,7 @@ export default function CandidateHome() {
         </div>
 
         {/* Smart Hiring Action Center Alerts */}
-        {(pendingOffer || interviewApplications.length > 0 || pendingConsentsCount > 0) && (
+        {(pendingOffer || interviewApplications.length > 0) && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="flex size-2 rounded-full bg-purple-600 animate-ping" />
@@ -166,36 +155,6 @@ export default function CandidateHome() {
                     <Link href={`/candidate/applications/${interviewApplications[0].id}`}>
                       Buka Ruang Wawancara
                       <ExternalLink className="size-3.5 ml-1.5" />
-                    </Link>
-                  </Button>
-                </div>
-              )}
-
-              {/* Contact Request Pending Alert */}
-              {pendingConsentsCount > 0 && (
-                <div className="flex flex-col gap-4 rounded-xl border border-blue-200 bg-linear-to-r from-blue-500/10 via-blue-500/5 to-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3.5">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-2xs">
-                      <Bell className="size-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-blue-950">
-                          {pendingConsentsCount} Permintaan Kontak Baru
-                        </span>
-                        <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700 text-[10px]">
-                          1-Click Action
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 text-sm text-blue-800">
-                        Recruiter atau mitra ingin menghubungi kamu untuk proses rekrutmen. Berikan izin dengan cepat di notifikasi.
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="shrink-0 border-blue-300 text-blue-700 hover:bg-blue-50" asChild>
-                    <Link href="/notifications?tab=contact-requests">
-                      Tinjau di Notifikasi
-                      <ArrowRight className="size-3.5 ml-1.5" />
                     </Link>
                   </Button>
                 </div>
@@ -400,30 +359,30 @@ export default function CandidateHome() {
               </Card>
             </Link>
 
-            {/* Pillar 4: Verifikasi Kampus & Kredensial */}
+            {/* Pillar 4: Career Growth & Development Tracker */}
             <Link href="/candidate/career-roadmap" className="group block">
-              <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-emerald-400 group-hover:shadow-md">
+              <Card className="card-interactive h-full border-slate-200 bg-white transition-all duration-200 group-hover:border-indigo-400 group-hover:shadow-md">
                 <CardContent className="p-6 flex flex-col justify-between h-full gap-5">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                        <ShieldCheck className="size-5" />
+                      <div className="flex size-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <TrendingUp className="size-5" />
                       </div>
-                      <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50/50 text-[11px]">
-                        Peta Karier & Bukti
+                      <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50 text-[11px]">
+                        Target &amp; Progres Mandiri
                       </Badge>
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">
-                        Roadmap Karier & Bukti Portofolio
+                      <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        Career Growth &amp; Development Tracker
                       </h3>
                       <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                        Rencanakan target kenaikan tingkat keahlian, buat bukti pengerjaan proyek nyata, dan dapatkan pengakuan kredensial.
+                        Pantau target peran impian, catat milestone aktivitas belajar mandiri, dan dokumentasikan bukti pencapaian secara terstruktur.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center text-xs font-semibold text-emerald-600 pt-3 border-t border-slate-100">
-                    Buka Roadmap Karier <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
+                  <div className="flex items-center text-xs font-semibold text-indigo-600 pt-3 border-t border-slate-100">
+                    Buka Career Tracker <ArrowRight className="size-3.5 ml-1.5 transition-transform group-hover:translate-x-1" />
                   </div>
                 </CardContent>
               </Card>

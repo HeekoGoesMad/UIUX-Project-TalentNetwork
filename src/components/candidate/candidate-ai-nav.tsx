@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Sparkles, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const aiNavItems = [
   {
     href: "/candidate/career-advisor",
-    label: "Penasihat Profil Karier AI",
+    label: "AI Career Advisor",
     icon: Sparkles,
+  },
+  {
+    href: "/candidate/career-roadmap",
+    label: "Career Growth Tracker",
+    icon: TrendingUp,
   },
 ];
 

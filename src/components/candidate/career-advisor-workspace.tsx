@@ -6,24 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import {
     AlertTriangle,
-    Award,
-    BookOpen,
     Bot,
-    Calendar,
-    Check,
     CheckCircle2,
-    Compass,
     Copy,
     Download,
     FileText,
-    GraduationCap,
     Layers,
     Lightbulb,
     ShieldAlert,
     SlidersHorizontal,
     Sparkles,
     Target,
-    TrendingUp,
     User,
     Zap,
 } from "lucide-react";
@@ -33,7 +26,7 @@ import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { checkSkillsQuality } from "@/lib/ai/skills-check";
 
-export type FocusType = "cv_review" | "gap_analysis" | "career_roadmap" | "ats" | "headline" | "star";
+export type FocusType = "cv_review" | "gap_analysis" | "ats" | "headline" | "star";
 
 interface SectionAudit {
   section: string;
@@ -75,24 +68,6 @@ interface GapAnalysisDetails {
   strategicRecommendations: string[];
 }
 
-interface RoadmapPhase {
-  phaseNumber: number;
-  phaseName: string;
-  timeframe: string;
-  outcome: string;
-  keyActions: string[];
-  milestone: string;
-}
-
-interface CareerRoadmapDetails {
-  targetRole: string;
-  targetTimeline: string;
-  targetLevel: string;
-  phases: RoadmapPhase[];
-  recommendedCertifications: string[];
-  strategicAdvice: string[];
-}
-
 interface StructuredAdvice {
   opening: string;
   whatGood: string[];
@@ -106,7 +81,6 @@ interface AdvisorResult {
   structuredAdvice?: StructuredAdvice;
   cvReviewDetails?: CvReviewDetails;
   gapAnalysisDetails?: GapAnalysisDetails;
-  careerRoadmapDetails?: CareerRoadmapDetails;
   answer: string;
   nextSteps: string[];
   limitations: string[];
@@ -119,7 +93,7 @@ const focusPresets: { id: FocusType; label: string; icon: typeof FileText; desc:
     id: "cv_review",
     label: "Review CV Keseluruhan",
     icon: FileText,
-    desc: "Evaluasi menyeluruh susunan CV, ringkasan profil, relevansi pengalaman, dan kemudahan dibaca perekrut.",
+    desc: "Evaluasi menyeluruh susunan CV, ringkasan profil, relevansi pengalaman, dan keterbacaan format ATS.",
     badge: "Pilar 1",
   },
   {
@@ -128,13 +102,6 @@ const focusPresets: { id: FocusType; label: string; icon: typeof FileText; desc:
     icon: Target,
     desc: "Cek karir hari ini: Analisis kesenjangan skill & kompetensi saat ini terhadap ekspektasi peran impian.",
     badge: "Pilar 2",
-  },
-  {
-    id: "career_roadmap",
-    label: "Career Roadmap",
-    icon: TrendingUp,
-    desc: "Rencana karir kedepan: Panduan tahapan strategis dan aksi konkret jangka pendek hingga panjang.",
-    badge: "Pilar 3",
   },
 ];
 
@@ -385,71 +352,6 @@ export function CareerAdvisorWorkspace() {
         ],
   };
 
-  // Fallback data for Career Roadmap
-  const roadmapData: CareerRoadmapDetails = result?.careerRoadmapDetails || {
-    targetRole: activeTargetRole,
-    targetTimeline: "6 — 12 Bulan",
-    targetLevel: skillCheck.isPlausible ? "Senior to Lead Level" : `Kandidat Siap Kerja untuk ${activeTargetRole}`,
-    phases: [
-      {
-        phaseNumber: 1,
-        phaseName: skillCheck.isPlausible ? "Fondasi & Penutupan Gap Kompetensi" : "Penyelarasan & Pembangunan Keahlian Inti",
-        timeframe: "Bulan 1 — 3",
-        outcome: skillCheck.isPlausible
-          ? "Portofolio siap standar industri dan gap skill utama tertutup."
-          : `Keahlian inti untuk posisi ${activeTargetRole} mulai dikuasai dan portofolio awal terbentuk.`,
-        keyActions: skillCheck.isPlausible
-          ? [
-              "Audit dan poles poin pengalaman kerja di CV dengan bukti hasil kerja nyata",
-              "Dokumentasikan 1 studi kasus mendalam tentang proyek relevan di portofolio",
-              "Pelajari materi lanjutan terkait strategi kerja dan pemecahan masalah bisnis",
-            ]
-          : [
-              `Fokus pelajari 2-3 keahlian utama untuk posisi ${activeTargetRole} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")})`,
-              "Perbarui daftar keahlian di CV setelah menguasai materi baru",
-              "Buat 1 proyek latihan terstruktur sebagai bukti portofolio awal",
-            ],
-        milestone: skillCheck.isPlausible
-          ? "CV & Portofolio siap lolos seleksi awal perekrut dengan tingkat keterbacaan tinggi"
-          : `Keahlian di profil selaras dengan kebutuhan peran ${activeTargetRole}`,
-      },
-      {
-        phaseNumber: 2,
-        phaseName: "Pembuktian Hasil Kerja & Personal Branding",
-        timeframe: "Bulan 3 — 6",
-        outcome: "Diakui sebagai talent yang kompeten dan mulai menerima kesempatan wawancara relevan.",
-        keyActions: [
-          "Publikasikan tulisan wawasan atau studi kasus proyek di LinkedIn atau komunitas profesional",
-          "Aktif di ProofyLink Talent Network untuk mendapatkan verified badge",
-          "Mulai mengambil inisiatif kolaborasi atau memimpin tugas proyek mandiri",
-        ],
-        milestone: "Mendapatkan undangan wawancara atau tawaran kerja yang relevan",
-      },
-      {
-        phaseNumber: 3,
-        phaseName: "Akselerasi Karir & Kesiapan Promosi",
-        timeframe: "Bulan 6 — 12",
-        outcome: "Mencapai peran target impian dengan posisi dan kompensasi optimal.",
-        keyActions: [
-          "Lakukan simulasi wawancara kerja teknis dan situasional",
-          "Evaluasi tawaran kerja atau peluang jenjang karir yang lebih tinggi",
-          "Susun rencana kerja awal (rencana 90 hari) untuk posisi baru",
-        ],
-        milestone: "Penempatan resmi di posisi target idaman dengan kompensasi kompetitif",
-      },
-    ],
-    recommendedCertifications: [
-      `Sertifikasi Profesional Bidang ${activeTargetRole}`,
-      "Pelatihan Praktis Analisis & Strategi Kerja",
-      "Pelatihan Manajemen Proyek & Kolaborasi Tim",
-    ],
-    strategicAdvice: [
-      "Fokuslah pada pencapaian hasil kerja nyata yang bermanfaat, bukan sekadar daftar tugas harian.",
-      "Bangun reputasi profesional dengan aktif membagikan pembelajaran dan hasil kerja nyata.",
-      "Perbarui profil ProofyLink secara berkala setiap kali menyelesaikan proyek berdampak positif.",
-    ],
-  };
-
   const adviceData: StructuredAdvice = result?.structuredAdvice || {
     opening: `Berdasarkan evaluasi pilar '${selectedFocus.replace("_", " ").toUpperCase()}' untuk posisi ${activeTargetRole}, berikut beberapa poin penting:`,
     whatGood: [
@@ -542,16 +444,16 @@ export function CareerAdvisorWorkspace() {
         </CardContent>
       </Card>
 
-      {/* ─── 3 Main Pillars Selection ─── */}
+      {/* ─── 2 Main Pillars Selection ─── */}
       <div className="no-print space-y-3">
         <div>
-          <h2 className="text-lg font-bold text-foreground">Pilih 3 Pilar Evaluasi Profil</h2>
+          <h2 className="text-lg font-bold text-foreground">Pilih Pilar Evaluasi Profil</h2>
           <p className="text-xs text-muted-foreground">
             Pilih aspek yang ingin kamu evaluasi hari ini untuk mendapatkan analisis mendalam dan rekomendasi instan:
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {focusPresets.map((preset) => {
             const Icon = preset.icon;
             const isSelected = selectedFocus === preset.id;
@@ -587,6 +489,24 @@ export function CareerAdvisorWorkspace() {
               </button>
             );
           })}
+        </div>
+
+        {/* Info Banner for Career Growth Tracker */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-purple-100 bg-purple-50/40 px-4 py-3 text-xs">
+          <div className="flex items-center gap-2.5 text-slate-700">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-purple-700 font-bold shrink-0">
+              <Sparkles className="size-4" />
+            </span>
+            <span>
+              Ingin mencatat target peran &amp; rekam jejak aktivitas belajar secara mandiri?
+            </span>
+          </div>
+          <Link
+            href="/candidate/career-roadmap"
+            className="inline-flex items-center gap-1 font-bold text-purple-700 hover:text-purple-900 transition-colors text-xs shrink-0 self-end sm:self-auto"
+          >
+            Buka Career Growth Tracker &rarr;
+          </Link>
         </div>
 
         {/* ─── Command Controls & Custom Instructions Panel ─── */}
@@ -919,104 +839,6 @@ export function CareerAdvisorWorkspace() {
                     <ul className="text-xs space-y-1.5 text-slate-700 list-disc pl-4">
                       {gapData.strategicRecommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* ─── PILAR 3: CAREER ROADMAP (RENCANA KARIR KEDEPAN) ─── */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {(result.focus === "career_roadmap" || result.focus === "star") && (
-            <div className="space-y-6">
-              <Card className="border-border shadow-xs overflow-hidden">
-                <CardHeader className="bg-slate-50 border-b pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <TrendingUp className="size-5 text-[#7C3AED]" />
-                      <div>
-                        <CardTitle className="text-lg text-foreground">Career Roadmap &amp; Rencana Aksi Terstruktur</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Jalur Pertumbuhan: <span className="font-semibold text-foreground">{activeTargetRole}</span> → <span className="font-semibold text-purple-700">{roadmapData.targetLevel}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="bg-purple-100 text-[#7C3AED] border border-purple-200 text-xs font-semibold px-3 py-1">
-                      Estimasi Waktu: {roadmapData.targetTimeline}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  {/* Multi-Phase Roadmap Timeline */}
-                  <div className="space-y-4">
-                    {roadmapData.phases.map((phase) => (
-                      <div key={phase.phaseNumber} className="rounded-2xl border p-5 bg-white shadow-2xs space-y-3.5 hover:border-purple-300 transition-colors">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="flex size-7 items-center justify-center rounded-xl bg-[#7C3AED] text-white text-xs font-bold shadow-2xs">
-                              {phase.phaseNumber}
-                            </span>
-                            <div>
-                              <h4 className="font-bold text-sm text-foreground">{phase.phaseName}</h4>
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <Calendar className="size-3 text-slate-400" /> {phase.timeframe}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100">
-                            Target Outcome: {phase.outcome}
-                          </span>
-                        </div>
-
-                        {/* Actions Checklist */}
-                        <div className="space-y-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Langkah Aksi Konkret:</span>
-                          <div className="grid gap-2 sm:grid-cols-3">
-                            {phase.keyActions.map((action, ai) => (
-                              <div key={ai} className="flex items-start gap-2 rounded-xl bg-slate-50/80 p-3 border border-slate-200/70 text-xs text-slate-700">
-                                <Check className="size-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                <span className="leading-relaxed">{action}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Milestone Banner */}
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 flex items-center justify-between text-xs">
-                          <span className="font-bold text-emerald-900 flex items-center gap-1.5">
-                            <Award className="size-4 text-emerald-600" /> Key Milestone: {phase.milestone}
-                          </span>
-                          <Badge className="bg-emerald-600 text-white text-[10px] font-semibold">Tercapai Saat Selesai</Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Recommended Certifications */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <GraduationCap className="size-4 text-[#7C3AED]" /> Rekomendasi Sertifikasi &amp; Program Belajar:
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {roadmapData.recommendedCertifications.map((cert, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 bg-white border text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-2xs">
-                          <BookOpen className="size-3.5 text-[#7C3AED]" /> {cert}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Strategic Career Navigation Advice */}
-                  <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#7C3AED] flex items-center gap-1.5">
-                      <Compass className="size-4 text-purple-700" /> Tips Akselerasi Karir Masa Depan:
-                    </span>
-                    <ul className="text-xs space-y-1.5 text-slate-700 list-disc pl-4">
-                      {roadmapData.strategicAdvice.map((advice, i) => (
-                        <li key={i}>{advice}</li>
                       ))}
                     </ul>
                   </div>

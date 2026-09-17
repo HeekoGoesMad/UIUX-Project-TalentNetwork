@@ -33,21 +33,52 @@ function getLocalAi(baseURL: string, apiKey: string) {
   return cachedLocalAi;
 }
 
-let cachedAzure: ReturnType<typeof createAzure> | null = null;
-let cachedAzureKey = "";
-
-function getAzure(baseURL: string, apiKey: string, apiVersion?: string) {
-  const key = `${baseURL}|${apiKey}|${apiVersion ?? ""}`;
-  if (!cachedAzure || cachedAzureKey !== key) {
-    cachedAzure = createAzure({
-      baseURL,
-      apiKey,
-      apiVersion,
-      useDeploymentBasedUrls: true,
-    });
-    cachedAzureKey = key;
+function normalizeAzureBaseUrl(rawEndpoint: string): string {
+  let ep = rawEndpoint.trim();
+  if (!ep.startsWith("http://") && !ep.startsWith("https://")) {
+    ep = `https://${ep}.openai.azure.com`;
   }
-  return cachedAzure;
+  try {
+    const parsed = new URL(ep);
+    return `${parsed.origin}/openai`;
+  } catch {
+    return `${ep.replace(/\/+$/, "")}/openai`;
+  }
+}
+
+const cachedAzureMap = new Map<string, ReturnType<typeof createAzure>>();
+
+export function getAzureConfig() {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  const apiKey = (process.env.AZURE_OPENAI_API_KEY || process.env.AZURE_API_KEY)?.trim();
+  const deployment = (
+    process.env.AZURE_OPENAI_DEPLOYMENT ||
+    process.env.AZURE_OPENAI_MODEL ||
+    process.env.AZURE_MODEL ||
+    process.env.OPENAI_MODEL ||
+    process.env.MODEL ||
+    "gpt-4o-mini"
+  ).trim();
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION?.trim() || "2024-10-21";
+  const isConfigured = Boolean(endpoint && apiKey && !apiKey.startsWith("<"));
+
+  return { endpoint, apiKey, deployment, apiVersion, isConfigured };
+}
+
+function getAzure(baseURL: string, apiKey: string, apiVersion?: string, useDeploymentBasedUrls = true) {
+  const key = `${baseURL}|${apiKey}|${apiVersion ?? ""}|${useDeploymentBasedUrls}`;
+  if (!cachedAzureMap.has(key)) {
+    cachedAzureMap.set(
+      key,
+      createAzure({
+        baseURL,
+        apiKey,
+        apiVersion,
+        useDeploymentBasedUrls,
+      })
+    );
+  }
+  return cachedAzureMap.get(key)!;
 }
 
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
@@ -89,11 +120,9 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
   }
 
   // Azure mode
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT?.trim();
-  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
-  if (!endpoint || !deployment || !apiKey || apiKey.startsWith("<")) {
-    if (options.strict) throw new Error("Konfigurasi Azure AI belum lengkap.");
+  const { endpoint, deployment, apiKey, apiVersion, isConfigured } = getAzureConfig();
+  if (!isConfigured || !endpoint || !apiKey) {
+    if (options.strict) throw new Error("Konfigurasi Azure AI belum lengkap. Harap periksa AZURE_OPENAI_ENDPOINT dan AZURE_OPENAI_API_KEY.");
     return {
       ...(fallback as Record<string, unknown>),
       source: "mock",
@@ -103,9 +132,9 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
 
   try {
     const azure = getAzure(
-      `${endpoint.replace(/\/$/, "")}/openai`,
+      normalizeAzureBaseUrl(endpoint),
       apiKey,
-      process.env.AZURE_OPENAI_API_VERSION?.trim()
+      apiVersion
     );
     const result = await generateObject({ model: azure.chat(deployment), schema, prompt });
     return {
@@ -709,11 +738,251 @@ export async function roadmap(input: unknown) {
 
 export async function cvBuilder(input: unknown) {
   const context = profileContextSchema.parse(input);
-  return aiResult(cvBuilderSchema, JSON.stringify(context), { headline: context.headline || context.targetRole || "Professional", about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.", bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`), limitations: ["Draft harus disetujui kandidat sebelum disimpan."], modelVersion: defaultVersion, source: getSource() });
+  return aiResult(cvBuilderSchema, JSON.stringify(context), {
+    headline: context.headline || context.targetRole || "Professional",
+    about: context.about || "Professional yang berfokus pada hasil dan kolaborasi.",
+    bullets: context.skills.slice(0, 3).map((skill) => `Menggunakan ${skill} untuk menyelesaikan masalah pengguna.`),
+    limitations: ["Draft harus disetujui kandidat sebelum disimpan."],
+    modelVersion: defaultVersion,
+    source: getSource(),
+  });
 }
 
 export function importCv(fileName: string) {
-  return cvImportSchema.parse({ fullName: "Nadia Putri", headline: "Senior Product Designer", about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.", skills: ["Product design", "User research", "Figma"], experience: [{ company: "Studio Nusantara", role: "Senior Product Designer", dates: "2021 - sekarang", achievements: ["Meningkatkan kejelasan workflow produk."] }], education: [{ school: "Universitas Indonesia", program: "Desain Komunikasi Visual", dates: "2015 - 2019" }], suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`], source: getSource() });
+  return cvImportSchema.parse({
+    fullName: "Nadia Putri",
+    headline: "Senior Product Designer",
+    about: "Product designer yang mengubah masalah kompleks menjadi pengalaman digital yang jelas.",
+    skills: ["Product design", "User research", "Figma"],
+    hardCompetencies: ["Product design", "User research"],
+    tools: ["Figma"],
+    softSkills: ["Komunikasi", "Problem solving"],
+    experience: [
+      {
+        company: "Studio Nusantara",
+        role: "Senior Product Designer",
+        employmentType: "Full Time",
+        startDate: "2021",
+        endDate: null,
+        currentPosition: true,
+        dates: "2021 - sekarang",
+        description: "Memimpin perancangan pengalaman produk digital nusantara.",
+        achievements: ["Meningkatkan kejelasan workflow produk."],
+      },
+    ],
+    education: [
+      {
+        level: "S1",
+        school: "Universitas Indonesia",
+        program: "Desain Komunikasi Visual",
+        gpa: "3.85",
+        startDate: "2015",
+        endDate: "2019",
+        currentlyStudying: false,
+        dates: "2015 - 2019",
+      },
+    ],
+    suggestions: [`Review hasil extraction dari ${fileName} sebelum menyimpan.`],
+    source: getSource(),
+  });
+}
+
+export type ExtractCvInput = {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+};
+
+function formatAiError(err: unknown): string {
+  if (!err) return "Terjadi kesalahan yang tidak diketahui.";
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    const status = e.status || e.statusCode;
+    let bodyMsg = "";
+    if (typeof e.responseBody === "string") {
+      try {
+        const parsed = JSON.parse(e.responseBody);
+        bodyMsg = parsed?.error?.message || parsed?.message || e.responseBody;
+      } catch {
+        bodyMsg = e.responseBody;
+      }
+    } else if (e.responseBody && typeof e.responseBody === "object") {
+      const resp = e.responseBody as Record<string, unknown>;
+      const errObj = resp.error as Record<string, unknown> | undefined;
+      bodyMsg = (errObj?.message as string) || (resp.message as string) || "";
+    }
+    const mainMsg = (e.message as string) || (e.name as string) || "Koneksi ke Azure AI gagal";
+    const statusPrefix = status ? `[HTTP ${status}] ` : "";
+    if (bodyMsg && bodyMsg !== mainMsg) {
+      return `${statusPrefix}${mainMsg} (${bodyMsg})`;
+    }
+    return `${statusPrefix}${mainMsg}`;
+  }
+  return String(err);
+}
+
+export async function extractCvDocument(
+  input: ExtractCvInput,
+  options: AiOptions = {}
+): Promise<z.infer<typeof cvImportSchema>> {
+  const { endpoint, deployment, apiKey, apiVersion, isConfigured } = getAzureConfig();
+
+  // If Azure credentials are not available
+  if (!isConfigured || !endpoint || !apiKey) {
+    const missingFields = [
+      !endpoint ? "AZURE_OPENAI_ENDPOINT" : null,
+      !apiKey ? "AZURE_OPENAI_API_KEY" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const errorMsg =
+      `Konfigurasi Azure AI belum lengkap (variabel belum diisi: ${missingFields || "tidak valid"}). ` +
+      `Pastikan variabel tersebut sudah terpasang di file .env lokal Anda dan restart server development ('npm run dev').`;
+
+    if (options.strict || getSource() !== "mock") {
+      throw new Error(errorMsg);
+    }
+    console.warn(`[extractCvDocument] ${errorMsg}`);
+    return importCv(input.fileName);
+  }
+
+  try {
+    const azure = getAzure(
+      normalizeAzureBaseUrl(endpoint),
+      apiKey,
+      apiVersion
+    );
+    const model = azure.chat(deployment);
+
+    const isImage =
+      input.mimeType.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(input.fileName);
+
+    if (isImage) {
+      // Vision OCR via multimodal message
+      const result = await generateObject({
+        model,
+        schema: cvImportSchema,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  `Anda adalah asisten AI OCR dan parser CV/resume profesional. ` +
+                  `Analisis gambar dokumen CV "${input.fileName}" ini secara mendalam dan ekstrak datanya ke format JSON sesuai skema berikut:\n` +
+                  `- fullName: Nama lengkap kandidat\n` +
+                  `- headline: Judul profesional atau target peran kerja\n` +
+                  `- about: Ringkasan profesional kandidat dalam 1-3 kalimat\n` +
+                  `- skills: Array daftar keahlian utama\n` +
+                  `- hardCompetencies: Daftar keahlian teknis (array string, berikan [] jika tidak ada)\n` +
+                  `- tools: Software atau teknologi yang dikuasai (array string, berikan [] jika tidak ada)\n` +
+                  `- softSkills: Keahlian interpersonal (array string, berikan [] jika tidak ada)\n` +
+                  `- experience: Array riwayat pekerjaan dengan format objek: { company, role, employmentType, startDate, endDate, currentPosition, dates, description, achievements }. Jika field tertentu tidak ada pada CV, isi dengan null (atau [] untuk achievements).\n` +
+                  `- education: Array riwayat pendidikan dengan format objek: { level, school, program, gpa, startDate, endDate, currentlyStudying, dates }. Jika field tertentu tidak ada pada CV, isi dengan null.\n` +
+                  `- suggestions: 1-3 saran profesional untuk mengoptimalkan CV ini bagi rekruter.\n` +
+                  `- source: Selalu isi dengan "azure"\n` +
+                  `Pastikan data akurat dan tidak ada halusinasi informasi yang tidak tercantum.`,
+              },
+              {
+                type: "image",
+                image: input.buffer,
+              },
+            ],
+          },
+        ],
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    }
+
+    // PDF processing: extract text first using unpdf
+    let pdfText = "";
+    try {
+      const { extractText } = await import("unpdf");
+      const parsed = await extractText(new Uint8Array(input.buffer), { mergePages: true });
+      const rawText = parsed.text;
+      pdfText = typeof rawText === "string" ? rawText : Array.isArray(rawText) ? (rawText as string[]).join("\n") : "";
+    } catch (pdfErr) {
+      console.warn("[extractCvDocument] Gagal membaca teks PDF dengan unpdf:", pdfErr);
+    }
+
+    // If PDF has readable text
+    if (pdfText.trim().length > 0) {
+      const result = await generateObject({
+        model,
+        schema: cvImportSchema,
+        prompt:
+          `Anda adalah asisten AI parser CV/resume profesional. ` +
+          `Analisis teks dokumen CV "${input.fileName}" berikut dan ekstrak datanya ke format JSON sesuai skema:\n` +
+          `- fullName: Nama lengkap kandidat\n` +
+          `- headline: Judul profesional atau target peran kerja\n` +
+          `- about: Ringkasan profesional kandidat dalam 1-3 kalimat\n` +
+          `- skills: Array daftar keahlian utama\n` +
+          `- hardCompetencies: Daftar keahlian teknis (array string, berikan [] jika tidak ada)\n` +
+          `- tools: Software atau teknologi yang dikuasai (array string, berikan [] jika tidak ada)\n` +
+          `- softSkills: Keahlian interpersonal (array string, berikan [] jika tidak ada)\n` +
+          `- experience: Array riwayat pekerjaan dengan format objek: { company, role, employmentType, startDate, endDate, currentPosition, dates, description, achievements }. Jika field tertentu tidak ada pada CV, isi dengan null (atau [] untuk achievements).\n` +
+          `- education: Array riwayat pendidikan dengan format objek: { level, school, program, gpa, startDate, endDate, currentlyStudying, dates }. Jika field tertentu tidak ada pada CV, isi dengan null.\n` +
+          `- suggestions: 1-3 saran profesional untuk mengoptimalkan CV ini bagi rekruter.\n` +
+          `- source: Selalu isi dengan "azure"\n\n` +
+          `=== TEKS DOKUMEN CV ===\n${pdfText.slice(0, 18000)}`,
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    }
+
+    // If PDF has zero extracted text (scanned PDF without text layer)
+    // Try sending directly as a file part to Azure Responses model if available
+    try {
+      const responsesModel = typeof azure.responses === "function" ? azure.responses(deployment) : azure(deployment);
+      const result = await generateObject({
+        model: responsesModel,
+        schema: cvImportSchema,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  `Anda adalah asisten AI OCR CV profesional. Ekstrak data profil dari berkas CV "${input.fileName}" ini secara lengkap ke format JSON sesuai skema:\n` +
+                  `- fullName, headline, about, skills, experience, education, suggestions.`,
+              },
+              {
+                type: "file",
+                data: input.buffer,
+                mediaType: "application/pdf",
+                filename: input.fileName,
+              },
+            ],
+          },
+        ],
+      });
+
+      return {
+        ...result.object,
+        source: "azure",
+      };
+    } catch (fileErr) {
+      console.warn("[extractCvDocument] File part parsing error:", fileErr);
+      throw new Error(
+        "Dokumen PDF tidak memiliki teks digital yang dapat dibaca (kemungkinan hasil scan gambar). " +
+        "Silakan ekspor CV Anda langsung sebagai 'PDF Standar' dari Canva/Word, atau unggah sebagai gambar PNG/JPG."
+      );
+    }
+  } catch (err: unknown) {
+    console.error("[extractCvDocument] Azure error:", err);
+    throw new Error(`Gagal memproses dokumen dengan Azure AI: ${formatAiError(err)}`);
+  }
 }
 
 export async function recruiterOutreachPrompt(input: unknown, options?: AiOptions) {

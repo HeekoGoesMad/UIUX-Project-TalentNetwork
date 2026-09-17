@@ -481,6 +481,9 @@ export default function TalentProfile() {
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [openingConversation, setOpeningConversation] = useState(false);
 
+  // Real-time pipeline stage from recruiter applications
+  const [pipelineApplicationStatus, setPipelineApplicationStatus] = useState<string | null>(null);
+
   // Recruiter Hiring Flow modals
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);
@@ -513,6 +516,31 @@ export default function TalentProfile() {
         if (response.ok) setRemoteScreeningCompleted(payload.run?.status === "completed");
       })
       .catch(() => setRemoteScreeningCompleted(false));
+  }, [candidateId, dbMode, bootstrapped]);
+
+  // Fetch real pipeline application status for this candidate from the recruiter's org
+  useEffect(() => {
+    if (!bootstrapped || !candidateId) return;
+    if (dbMode && UUID_RE.test(candidateId)) {
+      void fetch(`/api/applications?candidateProfileId=${encodeURIComponent(candidateId)}&limit=1`, { cache: "no-store" })
+        .then(async (response) => {
+          const payload = await response.json() as { applications?: { status: string }[] };
+          if (response.ok && payload.applications?.[0]) {
+            setPipelineApplicationStatus(payload.applications[0].status);
+          }
+        })
+        .catch(() => { /* best-effort */ });
+    } else if (!dbMode) {
+      // In demo mode, derive from local storage demo applications
+      // Use Promise.resolve to avoid synchronous setState-in-effect lint rule
+      void Promise.resolve().then(() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem("proofylink-demo-applications") ?? "[]") as { candidateProfileId?: string; status?: string }[];
+          const match = stored.find((a) => a.candidateProfileId === candidateId);
+          if (match?.status) setPipelineApplicationStatus(match.status);
+        } catch { /* ignore */ }
+      });
+    }
   }, [candidateId, dbMode, bootstrapped]);
 
   useEffect(() => {
@@ -735,11 +763,14 @@ export default function TalentProfile() {
           )}
         </div>
 
-        {/* Profile Info Row with Overlapping Avatar */}
-        <div className="relative bg-white px-6 pb-6 pt-3 dark:bg-slate-900 sm:px-10">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-            <div className="-mt-14 sm:-mt-18 relative shrink-0 z-20">
-              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-1 ring-slate-900/10">
+        {/* Profile Info Row — avatar overlaps banner, actions top-right */}
+        <div className="relative bg-white px-6 pb-6 dark:bg-slate-900 sm:px-10">
+
+          {/* Row 1: Avatar (overlapping) + Action buttons (top-right) */}
+          <div className="flex items-start justify-between gap-4">
+            {/* Avatar — overlaps banner via negative top margin */}
+            <div className="-mt-14 sm:-mt-16 relative shrink-0 z-20">
+              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-2 ring-slate-900/8">
                 <CandidateAvatar
                   initials={candidate.initials}
                   avatarUrl={candidate.avatarUrl}
@@ -750,58 +781,8 @@ export default function TalentProfile() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <CandidateCategoryBadge category={candidate.talentCategory} />
-                {candidate.careerStatus && (
-                  <CandidateStatusBadge status={candidate.careerStatus} />
-                )}
-                {candidate.personality && (
-                  <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
-                    <Brain className="mr-1 size-3.5 text-purple-600" />
-                    {candidate.personality.type} · {candidate.personality.label}
-                  </Badge>
-                )}
-                {verif?.status === "verified" && (
-                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
-                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
-                    Campus Verified · {verif.institution}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                  {displayName}
-                </h1>
-                {unlocked && (
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
-                    <UserCheck className="mr-1 size-3" /> Terbuka
-                  </Badge>
-                )}
-              </div>
-
-              <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
-                {candidate.role} · {candidate.location}
-              </p>
-
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Pengalaman {candidate.experience} tahun · {candidate.availability}
-                {candidate.targetRole && (
-                  <span className="text-blue-700 dark:text-blue-400 font-medium">
-                    {" "}· Target Peran: {candidate.targetRole}
-                  </span>
-                )}
-                {unlocked && (
-                  <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    · Ekspektasi Gaji: {candidate.salary}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            {/* Quick Action buttons */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Action buttons — always top-right, never wraps under info */}
+            <div className="flex items-center gap-2 shrink-0 pt-3">
               {unlocked && (
                 <Button
                   size="sm"
@@ -833,44 +814,125 @@ export default function TalentProfile() {
               </Button>
             </div>
           </div>
+
+          {/* Row 2: Candidate Identity Block */}
+          <div className="mt-3">
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CandidateCategoryBadge category={candidate.talentCategory} />
+              {candidate.careerStatus && (
+                <CandidateStatusBadge status={candidate.careerStatus} />
+              )}
+              {candidate.personality && (
+                <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
+                  <Brain className="mr-1 size-3.5 text-purple-600" />
+                  {candidate.personality.type} · {candidate.personality.label}
+                </Badge>
+              )}
+              {verif?.status === "verified" && (
+                <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
+                  <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
+                  Campus Verified · {verif.institution}
+                </Badge>
+              )}
+            </div>
+
+            {/* Name + unlock badge */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                {displayName}
+              </h1>
+              {unlocked && (
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
+                  <UserCheck className="mr-1 size-3" /> Terbuka
+                </Badge>
+              )}
+            </div>
+
+            {/* Role & location */}
+            <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
+              {candidate.role} · {candidate.location}
+            </p>
+
+            {/* Meta chips row — experience, availability, target role, salary */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                <Briefcase className="size-3 text-slate-400" />
+                {candidate.experience} tahun pengalaman
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {candidate.availability}
+              </span>
+              {candidate.targetRole && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
+                  Target: {candidate.targetRole}
+                </span>
+              )}
+
+            </div>
+          </div>
         </div>
 
         {/* ── DOVER HIRING PROGRESS STEPPER ── */}
         <div className="border-b bg-slate-50/90 px-6 py-3.5 sm:px-10 dark:bg-slate-900/50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 shrink-0">
               <Sparkles className="size-3.5 text-[#7C3AED]" />
               Status Pipeline Dover
             </span>
-            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
-              <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${unlocked || completed ? "bg-purple-600 text-white" : "bg-purple-200 text-purple-950"}`}>
-                  1
-                </span>
-                <span>Screening</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  2
-                </span>
-                <span>Wawancara</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  3
-                </span>
-                <span>Offer Letter</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className={`flex items-center gap-1.5 shrink-0 ${hiringOutcome === "hired" ? "text-emerald-700 font-bold" : "text-slate-400"}`}>
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${hiringOutcome === "hired" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>
-                  ✓
-                </span>
-                <span>Hired</span>
-              </div>
+            {/* Steps */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
+              {[
+                { label: "Screening", active: unlocked || completed || ["screening", "assessment", "review", "interview", "offer", "hired"].includes(pipelineApplicationStatus ?? "") },
+                { label: "Wawancara", active: ["interview", "offer", "hired"].includes(pipelineApplicationStatus ?? "") },
+                { label: "Offer Letter", active: ["offer", "hired"].includes(pipelineApplicationStatus ?? "") },
+                { label: "Hired", active: hiringOutcome === "hired" || pipelineApplicationStatus === "hired", isCheck: true },
+              ].map((step, i) => (
+                <>
+                  <div
+                    key={step.label}
+                    className={cn(
+                      "flex items-center gap-1.5 shrink-0 text-xs font-medium",
+                      step.active
+                        ? step.isCheck ? "text-emerald-700 font-bold" : "text-purple-900 font-semibold"
+                        : "text-slate-400",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-5 items-center justify-center rounded-full text-[10px] transition-colors",
+                        step.active
+                          ? step.isCheck ? "bg-emerald-600 text-white" : "bg-purple-600 text-white"
+                          : "bg-slate-200 text-slate-500",
+                      )}
+                    >
+                      {step.isCheck ? "✓" : i + 1}
+                    </span>
+                    <span>{step.label}</span>
+                  </div>
+                  {i < 3 && (
+                    <span key={`arrow-${i}`} className="text-slate-300 font-mono text-xs shrink-0">→</span>
+                  )}
+                </>
+              ))}
             </div>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-2.5 h-1 w-full rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className="h-1 rounded-full bg-purple-600 transition-all duration-500"
+              style={{
+                width: (() => {
+                  const s = pipelineApplicationStatus ?? "";
+                  if (hiringOutcome === "hired" || s === "hired") return "100%";
+                  if (["offer"].includes(s)) return "85%";
+                  if (["interview"].includes(s)) return "65%";
+                  if (completed || ["screening", "assessment", "review"].includes(s)) return "35%";
+                  if (unlocked) return "15%";
+                  return "0%";
+                })(),
+              }}
+            />
           </div>
         </div>
 
@@ -1073,37 +1135,43 @@ export default function TalentProfile() {
               </div>
 
               {/* Portfolio & CV buttons */}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="mt-4 border-t border-slate-100 pt-3.5">
+                {/* 3 main action buttons — equal-width grid for visual symmetry */}
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     size="sm"
-                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs font-semibold"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs font-semibold w-full"
                     disabled={openingConversation}
                     onClick={handleContactCandidate}
                   >
                     {openingConversation ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <MessageSquare className="mr-1.5 size-3.5" />}
-                    {openingConversation ? "Menghubungkan..." : "Hubungi Kandidat"}
+                    <span className="truncate">{openingConversation ? "Menghubungkan..." : "Hubungi"}</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
-                    <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
+                  <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50 w-full">
+                    <FileText className="mr-1.5 size-3.5" />
+                    <span className="truncate">Pratinjau CV</span>
                   </Button>
                   {completed ? (
-                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
+                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9] w-full" asChild>
                       <Link href={`/recruiter/screenings/${candidate.id}`}>
-                        <ShieldCheck className="mr-1.5 size-3.5" /> Lihat Screening Selesai
+                        <ShieldCheck className="mr-1.5 size-3.5" />
+                        <span className="truncate">Hasil Screening</span>
                       </Link>
                     </Button>
                   ) : screeningError ? (
-                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge>
+                    <Button size="sm" variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 w-full" disabled>
+                      <span className="truncate">Retry Screening</span>
+                    </Button>
                   ) : (
-                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]">
-                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening otomatis
-                    </Badge>
+                    <Button size="sm" variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED] w-full" disabled>
+                      <Loader2 className="mr-1.5 size-3 animate-spin" />
+                      <span className="truncate">Screening...</span>
+                    </Button>
                   )}
                 </div>
 
                 {candidate.portfolio.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     {candidate.portfolio.map((url) => (
                       <Button key={url} variant="outline" size="sm" asChild className="h-8 text-xs text-muted-foreground hover:text-foreground">
                         <a href={url} target="_blank" rel="noreferrer">
