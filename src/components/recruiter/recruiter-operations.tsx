@@ -455,25 +455,34 @@ export function RecruiterOperationsPage() {
 
     if (dbMode) {
       try {
-        const res = await fetch("/api/interviews", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: interviewData.type,
-            scheduledAt: new Date(interviewData.date).toISOString(),
-            timezone: interviewData.timezone,
-            candidateProfileId: candidateId.startsWith("candidate-") ? undefined : candidateId,
-            meetingUrl: interviewData.meetingUrl,
-          }),
-        });
-        const payload = (await res.json()) as { interview?: { id: string } };
-        if (payload.interview?.id) {
-          setData((current) => ({
-            ...current,
-            interviews: current.interviews.map((item) =>
-              item.id === newInterview.id ? { ...item, id: payload.interview!.id } : item
-            ),
-          }));
+        const cand = data.candidates.find((c) => c.id === candidateId);
+        const isUuid = (val?: string) =>
+          Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+        const targetAppId = cand?.applicationId && isUuid(cand.applicationId) ? cand.applicationId : undefined;
+        const targetCandidateProfileId = !targetAppId && isUuid(candidateId) ? candidateId : undefined;
+
+        if (targetAppId || targetCandidateProfileId) {
+          const res = await fetch("/api/interviews", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              applicationId: targetAppId,
+              candidateProfileId: targetCandidateProfileId,
+              title: interviewData.type,
+              scheduledAt: new Date(interviewData.date).toISOString(),
+              timezone: interviewData.timezone,
+              meetingUrl: interviewData.meetingUrl,
+            }),
+          });
+          const payload = (await res.json()) as { interview?: { id: string } };
+          if (payload.interview?.id) {
+            setData((current) => ({
+              ...current,
+              interviews: current.interviews.map((item) =>
+                item.id === newInterview.id ? { ...item, id: payload.interview!.id } : item
+              ),
+            }));
+          }
         }
       } catch {
         // Handled

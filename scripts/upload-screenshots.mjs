@@ -28,16 +28,12 @@ async function main() {
 
   const screenshots = [
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\clean_screening_and_no_online_dot_1789648439015.png",
-      remoteName: `clean-screening-no-online-dot-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\screening_to_interview_success_1789651588073.png",
+      remoteName: `screening-to-interview-success-${Date.now()}.png`,
     },
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\interview_demote_warning_modal_1789649987611.png",
-      remoteName: `interview-demote-warning-modal-${Date.now()}.png`,
-    },
-    {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\candidate_demoted_to_screening_success_1789650026860.png",
-      remoteName: `candidate-demoted-to-screening-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\wawancara_to_penawaran_success_1789651631872.png",
+      remoteName: `wawancara-to-penawaran-success-${Date.now()}.png`,
     },
   ];
 
