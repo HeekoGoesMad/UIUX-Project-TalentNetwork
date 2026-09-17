@@ -840,7 +840,7 @@ export default function TalentProfile() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Sparkles className="size-3.5 text-[#7C3AED]" />
-              Status Pipeline Dover
+              Status Pipeline Rekrutmen
             </span>
             <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
               <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
@@ -1362,7 +1362,7 @@ export default function TalentProfile() {
                   {candidate.name}
                 </p>
                 <p className="text-[10px] text-muted-foreground font-mono">
-                  Alur Rekrutmen Dover
+                  Pipeline Rekrutmen
                 </p>
               </div>
             </div>

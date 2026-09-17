@@ -100,7 +100,6 @@ export function RecruiterOperationsPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
-  const [ownerFilter, setOwnerFilter] = useState("all");
   const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>([]);
 
   // Modals & Drawer states
@@ -114,7 +113,6 @@ export function RecruiterOperationsPage() {
   const [activeDropZone, setActiveDropZone] = useState<Stage | null>(null);
 
   const recruiterName = user?.name || "Tim Rekruter";
-  const people = useMemo(() => Array.from(new Set([recruiterName, ...defaultPeople])), [recruiterName]);
 
   // Load available job openings
   useEffect(() => {
@@ -263,10 +261,9 @@ export function RecruiterOperationsPage() {
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
       const matchJob = jobFilter === "all" || candidate.jobId === jobFilter || candidate.role === jobFilter;
-      const matchOwner = ownerFilter === "all" || candidate.owner === ownerFilter;
-      return matchSearch && matchJob && matchOwner;
+      return matchSearch && matchJob;
     });
-  }, [activeCandidates, searchQuery, jobFilter, ownerFilter]);
+  }, [activeCandidates, searchQuery, jobFilter]);
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -506,15 +503,7 @@ export function RecruiterOperationsPage() {
           <div className="container mx-auto px-4 sm:px-6 py-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
-                  <Badge variant="outline" className="text-xs font-semibold text-[#7C3AED] border-purple-200 bg-purple-50">
-                    ATS Dover Model
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Kelola kandidat dari screening hingga hiring dengan sistem drag-and-drop yang cepat dan terpusat.
-                </p>
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
               </div>
 
               {/* View Switcher & Action Buttons */}
@@ -631,30 +620,13 @@ export function RecruiterOperationsPage() {
                 </div>
               )}
 
-              {/* Owner Filter */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                <select
-                  value={ownerFilter}
-                  onChange={(e) => setOwnerFilter(e.target.value)}
-                  className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                >
-                  <option value="all">Semua Penanggung Jawab</option>
-                  {people.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {(searchQuery || jobFilter !== "all" || ownerFilter !== "all") && (
+              {(searchQuery || jobFilter !== "all") && (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
                     setSearchQuery("");
                     setJobFilter("all");
-                    setOwnerFilter("all");
                   }}
                   className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
                 >
