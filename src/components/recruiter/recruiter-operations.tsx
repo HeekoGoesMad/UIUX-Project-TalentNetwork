@@ -91,7 +91,22 @@ const initialInterviews: Interview[] = [
   { id: "interview-2", candidateId: "candidate-4", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "System Design & Culture", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
 ];
 
-function readInitialState() {
+const DB_CACHE_KEY = "proofylink-ops-db-cache-v1";
+
+function readInitialState(isDb: boolean) {
+  if (isDb) {
+    try {
+      const cached = typeof window !== "undefined" ? localStorage.getItem(DB_CACHE_KEY) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached) as { candidates?: Candidate[]; interviews?: Interview[] };
+        if (Array.isArray(parsed?.candidates)) {
+          return { candidates: parsed.candidates, interviews: parsed.interviews ?? [] };
+        }
+      }
+    } catch {}
+    return { candidates: [], interviews: [] };
+  }
+
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey) ?? "null") as { candidates?: Candidate[]; interviews?: Interview[] } | null;
     const rawInterviews = parsed?.interviews ?? initialInterviews;
@@ -110,7 +125,8 @@ function readInitialState() {
 
 export function RecruiterOperationsPage() {
   const { dbMode, scans, user } = useApp();
-  const [data, setData] = useState(readInitialState);
+  const [data, setData] = useState(() => readInitialState(dbMode));
+  const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
@@ -148,12 +164,16 @@ export function RecruiterOperationsPage() {
       .catch(() => {});
   }, []);
 
-  // Save to demo storage when not in dbMode
+  // Save to demo storage when not in dbMode, or cache DB records in dbMode
   useEffect(() => {
     if (!dbMode) {
       localStorage.setItem(storageKey, JSON.stringify(data));
+    } else if (typeof window !== "undefined" && !isDbSyncing) {
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(data));
+      } catch {}
     }
-  }, [data, dbMode]);
+  }, [data, dbMode, isDbSyncing]);
 
   // Anti-abuse: check unlocked candidates in DB mode
   const isCandidateUnlocked = useCallback(
@@ -236,7 +256,7 @@ export function RecruiterOperationsPage() {
         }
 
         // Merge and load interviews
-        let mappedInterviews: Interview[] = initialInterviews;
+        let mappedInterviews: Interview[] = dbMode ? [] : initialInterviews;
         if (intRes.ok) {
           type NestedInt = {
             id?: string;
@@ -279,12 +299,22 @@ export function RecruiterOperationsPage() {
           }
         }
 
-        setData({
-          candidates: mappedCandidates.length > 0 ? mappedCandidates : initialCandidates,
+        const nextData = {
+          candidates: mappedCandidates.length > 0 || dbMode ? mappedCandidates : initialCandidates,
           interviews: mappedInterviews,
-        });
+        };
+
+        setData(nextData);
+        setIsDbSyncing(false);
+        if (dbMode && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+          } catch {}
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setIsDbSyncing(false);
+      });
 
     return () => {
       active = false;
@@ -756,7 +786,25 @@ export function RecruiterOperationsPage() {
 
                     {/* Candidate Cards List */}
                     <div className="flex-1 space-y-2.5 pt-3 overflow-y-auto max-h-[700px]">
-                      {stageCandidates.length === 0 ? (
+                      {isDbSyncing && data.candidates.length === 0 ? (
+                        <div className="space-y-2.5">
+                          {[1, 2].map((k) => (
+                            <div
+                              key={k}
+                              className="rounded-2xl border border-slate-200/60 bg-white/70 p-3.5 animate-pulse space-y-2.5 shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="size-8 rounded-full bg-slate-200" />
+                                <div className="space-y-1 flex-1">
+                                  <div className="h-3 w-28 bg-slate-200 rounded" />
+                                  <div className="h-2.5 w-20 bg-slate-100 rounded" />
+                                </div>
+                              </div>
+                              <div className="h-4 w-24 bg-slate-100 rounded-full" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : stageCandidates.length === 0 ? (
                         <div className="h-32 rounded-xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center p-4 text-center transition-colors">
                           <p className="text-[11px] text-slate-400 font-medium">Tarik kandidat ke sini</p>
                         </div>

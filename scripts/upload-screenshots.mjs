@@ -28,12 +28,12 @@ async function main() {
 
   const screenshots = [
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\screening_to_interview_success_1789651588073.png",
-      remoteName: `screening-to-interview-success-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\recruiter_operations_board_1789651951220.png",
+      remoteName: `recruiter-operations-board-redirect-${Date.now()}.png`,
     },
     {
-      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\wawancara_to_penawaran_success_1789651631872.png",
-      remoteName: `wawancara-to-penawaran-success-${Date.now()}.png`,
+      localPath: "C:\\Users\\adrie\\.gemini\\antigravity-ide\\brain\\6b901e28-748e-4227-af49-247f92635dc5\\recruiter_operations_board_loaded_1789651962021.png",
+      remoteName: `recruiter-operations-board-loaded-${Date.now()}.png`,
     },
   ];
 
