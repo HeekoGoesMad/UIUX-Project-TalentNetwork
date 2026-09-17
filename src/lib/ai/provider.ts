@@ -18,7 +18,7 @@ export function getSource(): "mock" | "local" | "azure" {
 type AiOptions = { strict?: boolean };
 
 function label(score: number) {
-  return score >= 80 ? "Sangat Direkomendasikan" : score >= 50 ? "Direkomendasikan" : score >= 21 ? "Perlu Pertimbangan" : "Perlu Review Mendalam";
+  return score >= 80 ? "Sangat Sesuai" : score >= 60 ? "Sesuai" : score >= 40 ? "Cukup" : "Kurang Sesuai";
 }
 
 let cachedLocalAi: ReturnType<typeof createOpenAI> | null = null;
@@ -201,7 +201,7 @@ export async function summary(input: unknown, options?: AiOptions) {
 export async function screening(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
   const score = Math.min(100, 48 + context.skills.length * 8 + (context.targetRole ? 12 : 0));
-  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Skill dan target role tersedia di profile.", "Penilaian berfokus pada data quality dan role fit."], limitations: ["Bukan keputusan hire/reject.", "Financial, credit, dan atribut sensitif tidak dianalisis."], followUp: "Lakukan interview berbasis bukti dan beri kandidat kesempatan klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
+  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Kompetensi teknis dan keselarasan peran dianalisis secara objektif.", "Penilaian berfokus pada relevansi keahlian dan rekam jejak kerja."], limitations: ["Bukan keputusan final hire/reject.", "Data pribadi sensitif (kontak & privasi) dikecualikan sepenuhnya dari analisis."], followUp: "Lakukan interview berbasis bukti kompetensi dan berikan kandidat ruang klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
 }
 
 export async function interviewQuestions(input: unknown) {
