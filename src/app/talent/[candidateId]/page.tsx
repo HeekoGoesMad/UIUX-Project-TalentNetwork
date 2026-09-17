@@ -870,44 +870,7 @@ export default function TalentProfile() {
           </div>
         </div>
 
-        {/* ── DOVER HIRING PROGRESS STEPPER ── */}
-        <div className="border-b bg-slate-50/90 px-6 py-3.5 sm:px-10 dark:bg-slate-900/50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-[#7C3AED]" />
-              Status Pipeline Rekrutmen
-            </span>
-            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
-              <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${unlocked || completed ? "bg-purple-600 text-white" : "bg-purple-200 text-purple-950"}`}>
-                  1
-                </span>
-                <span>Screening</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  2
-                </span>
-                <span>Wawancara</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  3
-                </span>
-                <span>Offer Letter</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className={`flex items-center gap-1.5 shrink-0 ${hiringOutcome === "hired" ? "text-emerald-700 font-bold" : "text-slate-400"}`}>
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${hiringOutcome === "hired" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>
-                  ✓
-                </span>
-                <span>Hired</span>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* ── CARD CONTENT ── */}
         {!unlocked ? (
@@ -1110,15 +1073,6 @@ export default function TalentProfile() {
               {/* Portfolio & CV buttons */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs font-semibold"
-                    disabled={openingConversation}
-                    onClick={handleContactCandidate}
-                  >
-                    {openingConversation ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <MessageSquare className="mr-1.5 size-3.5" />}
-                    {openingConversation ? "Menghubungkan..." : "Hubungi Kandidat"}
-                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
                     <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
@@ -1236,28 +1190,7 @@ export default function TalentProfile() {
         )}
       </Card>
 
-      {unlocked && (
-        <Card className="mt-6 border-purple-200/90 bg-gradient-to-r from-purple-50/70 via-white to-indigo-50/40 shadow-xs">
-          <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-            <div className="space-y-1">
-              <p className="font-semibold text-foreground flex items-center gap-2">
-                <MessageSquare className="size-4.5 text-[#7C3AED]" /> Obrolan Langsung dengan {displayName}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Profil telah dibuka. Anda dapat langsung mengirim pesan in-app untuk memulai diskusi peluang karir, jadwal wawancara, atau tawaran kerja.
-              </p>
-            </div>
-            <Button
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shrink-0 font-medium shadow-xs"
-              disabled={openingConversation}
-              onClick={handleContactCandidate}
-            >
-              {openingConversation ? <Loader2 className="mr-2 size-4 animate-spin" /> : <MessageSquare className="mr-2 size-4" />}
-              {openingConversation ? "Menghubungkan..." : "Hubungi Kandidat"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+
 
       {(unlocked || (dbMode && completed)) && (
         <ScreeningResults
