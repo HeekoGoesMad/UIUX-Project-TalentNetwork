@@ -75,35 +75,37 @@ export function CreateOfferModal({
     setLoading(true);
     try {
       if (dbMode) {
-        const bodyPayload = applicationId
-          ? {
-              applicationId,
-              salary,
-              currency,
-              startDate,
-              expirationDate,
-              benefits,
-              notes,
-            }
-          : {
-              candidateProfileId: candidate.id,
-              salary,
-              currency,
-              startDate,
-              expirationDate,
-              benefits,
-              notes,
-            };
+        const isUuid = (val?: string) =>
+          Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
 
-        const res = await fetch("/api/offers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bodyPayload),
-        });
+        const targetAppId = isUuid(applicationId) ? applicationId : undefined;
+        const targetCandidateId = !targetAppId && isUuid(candidate.id) ? candidate.id : undefined;
 
-        const data = (await res.json()) as { offer?: { id: string }; error?: string };
-        if (!res.ok || !data.offer) {
-          throw new Error(data.error ?? "Gagal menerbitkan surat penawaran kerja.");
+        if (targetAppId || targetCandidateId) {
+          const bodyPayload = {
+            applicationId: targetAppId,
+            candidateProfileId: targetCandidateId,
+            status: "sent" as const,
+            terms: {
+              salary: String(salary),
+              currency: currency || "IDR",
+              startDate: startDate || undefined,
+              benefits: benefits || undefined,
+              notes: notes || undefined,
+            },
+            expiresAt: expirationDate ? new Date(expirationDate).toISOString() : undefined,
+          };
+
+          const res = await fetch("/api/offers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(bodyPayload),
+          });
+
+          const data = (await res.json()) as { offer?: { id: string }; error?: string };
+          if (!res.ok || !data.offer) {
+            throw new Error(data.error ?? "Gagal menerbitkan surat penawaran kerja.");
+          }
         }
       }
 
