@@ -54,7 +54,7 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
 import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
@@ -486,7 +486,6 @@ function ScreeningResults({
 
 export default function TalentProfile() {
   const { candidateId } = useParams<{ candidateId: string }>();
-  const router = useRouter();
   const {
     tokens,
     scans,
