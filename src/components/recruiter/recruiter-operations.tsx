@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3,
+  Calendar,
   Clock,
   DollarSign,
   Download,
@@ -12,6 +13,7 @@ import {
   MapPin,
   MessageSquare,
   Search,
+  Sparkles,
   Table as TableIcon,
   X,
 } from "lucide-react";
@@ -22,6 +24,11 @@ import { useApp } from "@/providers/app-provider";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import {
+  ScheduleInterviewTransitionModal,
+  CancelOfferWarningModal,
+  ConfirmHireModal,
+} from "@/components/recruiter/stage-transition-modals";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -114,6 +121,12 @@ export function RecruiterOperationsPage() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [offerModalCandidate, setOfferModalCandidate] = useState<Candidate | null>(null);
 
+  // Stage Transition Modals
+  const [scheduleModalCandidate, setScheduleModalCandidate] = useState<Candidate | null>(null);
+  const [cancelOfferCandidate, setCancelOfferCandidate] = useState<Candidate | null>(null);
+  const [cancelOfferTargetStage, setCancelOfferTargetStage] = useState<Stage | null>(null);
+  const [hireConfirmCandidate, setHireConfirmCandidate] = useState<Candidate | null>(null);
+
   // Drag and Drop state
   const [draggingCandidateId, setDraggingCandidateId] = useState<string | null>(null);
   const [activeDropZone, setActiveDropZone] = useState<Stage | null>(null);
@@ -164,7 +177,7 @@ export function RecruiterOperationsPage() {
       fetch("/api/interviews", { cache: "no-store" }),
       fetch("/api/offers", { cache: "no-store" }),
     ])
-      .then(async ([appRes, _candRes, intRes, _offRes]) => {
+      .then(async ([appRes, , intRes]) => {
         if (!active) return;
         const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
         let mappedCandidates: Candidate[] = [];
@@ -297,18 +310,20 @@ export function RecruiterOperationsPage() {
     return { total, screening, interview, offer, hired };
   }, [activeCandidates]);
 
-  // Stage change handler with API sync
-  const changeStage = async (id: string, newStage: Stage) => {
+  // Execute stage change with optimistic UI and DB sync
+  const executeStageChange = async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
     const target = data.candidates.find((c) => c.id === id);
     if (!target) return;
 
     setData((current) => ({
       ...current,
-      candidates: current.candidates.map((c) => (c.id === id ? { ...c, stage: newStage } : c)),
+      candidates: current.candidates.map((c) =>
+        c.id === id ? { ...c, stage: newStage, ...extraUpdates } : c
+      ),
     }));
 
     if (selectedCandidate && selectedCandidate.id === id) {
-      setSelectedCandidate({ ...selectedCandidate, stage: newStage });
+      setSelectedCandidate({ ...selectedCandidate, stage: newStage, ...extraUpdates });
     }
 
     if (dbMode && target.applicationId) {
@@ -336,15 +351,41 @@ export function RecruiterOperationsPage() {
 
     const stageObj = STAGES.find((s) => s.id === newStage);
     toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`);
+  };
 
-    // Smart Triggers
-    if (newStage === "offer") {
-      setOfferModalCandidate(target);
-    } else if (newStage === "hired") {
-      toast.info(`Selamat! ${target.name} telah berhasil di-hire!`, {
-        description: "Status lamaran dan riwayat penerimaan telah disinkronkan ke database.",
-      });
+  // Smart transition handler (validates transitions and opens appropriate modals)
+  const initiateStageChange = (id: string, newStage: Stage) => {
+    const target = data.candidates.find((c) => c.id === id);
+    if (!target || target.stage === newStage) return;
+
+    // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
+    if (target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
+      setCancelOfferCandidate(target);
+      setCancelOfferTargetStage(newStage);
+      return;
     }
+
+    // Trigger 2: Move to Interview from Screening (prepare interview modal)
+    if (newStage === "interview" && target.stage === "screening") {
+      setScheduleModalCandidate(target);
+      return;
+    }
+
+    // Trigger 3: Move to Offer
+    if (newStage === "offer") {
+      void executeStageChange(id, newStage);
+      setOfferModalCandidate(target);
+      return;
+    }
+
+    // Trigger 4: Move to Hired (confirmation modal)
+    if (newStage === "hired") {
+      setHireConfirmCandidate(target);
+      return;
+    }
+
+    // Default: execute stage change directly
+    void executeStageChange(id, newStage);
   };
 
   // Drag and drop handlers
@@ -381,7 +422,7 @@ export function RecruiterOperationsPage() {
 
     const candidate = data.candidates.find((c) => c.id === candidateId);
     if (candidate && candidate.stage !== targetStage) {
-      void changeStage(candidateId, targetStage);
+      initiateStageChange(candidateId, targetStage);
     }
     setDraggingCandidateId(null);
   };
@@ -739,13 +780,28 @@ export function RecruiterOperationsPage() {
 
                               {/* Candidate Status Pills */}
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                {candidateInterviews.length > 0 && (
+                                {/* Visual Differentiator: Screening vs Interview */}
+                                {candidate.stage === "screening" && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                    <Sparkles className="size-2.5 text-blue-600" />
+                                    Review Profil
+                                  </span>
+                                )}
+
+                                {candidate.stage === "interview" && candidateInterviews.length > 0 && (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
                                     <Clock className="size-2.5" />
-                                    {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
+                                    Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
                                       day: "numeric",
                                       month: "short",
                                     })}
+                                  </span>
+                                )}
+
+                                {candidate.stage === "interview" && candidateInterviews.length === 0 && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                    <Calendar className="size-2.5" />
+                                    Belum Terjadwal
                                   </span>
                                 )}
 
@@ -906,7 +962,7 @@ export function RecruiterOperationsPage() {
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           interviews={data.interviews}
-          onStageChange={changeStage}
+          onStageChange={initiateStageChange}
           onOpenOfferModal={(c) => {
             setDrawerOpen(false);
             setOfferModalCandidate(c);
@@ -915,6 +971,83 @@ export function RecruiterOperationsPage() {
           onSendInterviewInvitation={handleSendInterviewInvitation}
           onUpdateFeedback={handleUpdateFeedback}
           recruiterName={recruiterName}
+        />
+
+        {/* Schedule Interview Transition Modal (Screening -> Interview) */}
+        <ScheduleInterviewTransitionModal
+          open={Boolean(scheduleModalCandidate)}
+          onOpenChange={(open) => {
+            if (!open) setScheduleModalCandidate(null);
+          }}
+          candidate={scheduleModalCandidate}
+          onConfirm={async (interviewData) => {
+            if (scheduleModalCandidate) {
+              await handleAddInterview(scheduleModalCandidate.id, {
+                candidateId: scheduleModalCandidate.id,
+                date: interviewData.date,
+                timezone: "Asia/Jakarta (WIB)",
+                type: interviewData.type,
+                panel: [recruiterName],
+                status: "Terjadwal",
+                reminder: true,
+                meetingUrl: interviewData.meetingUrl,
+                sentAt: null,
+              });
+              await executeStageChange(scheduleModalCandidate.id, "interview");
+              setScheduleModalCandidate(null);
+            }
+          }}
+          onSkip={() => {
+            if (scheduleModalCandidate) {
+              void executeStageChange(scheduleModalCandidate.id, "interview");
+              setScheduleModalCandidate(null);
+            }
+          }}
+        />
+
+        {/* Cancel Offer Warning Modal (Offer -> Lower Stages) */}
+        <CancelOfferWarningModal
+          open={Boolean(cancelOfferCandidate && cancelOfferTargetStage)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCancelOfferCandidate(null);
+              setCancelOfferTargetStage(null);
+            }
+          }}
+          candidate={cancelOfferCandidate}
+          targetStage={cancelOfferTargetStage}
+          onConfirm={async () => {
+            if (cancelOfferCandidate && cancelOfferTargetStage) {
+              await executeStageChange(cancelOfferCandidate.id, cancelOfferTargetStage, {
+                offerStatus: "draft",
+              });
+              toast.warning(
+                `Penawaran kerja dibatalkan. ${cancelOfferCandidate.name} dipindahkan ke tahap ${STAGES.find((s) => s.id === cancelOfferTargetStage)?.label || cancelOfferTargetStage}.`
+              );
+              setCancelOfferCandidate(null);
+              setCancelOfferTargetStage(null);
+            }
+          }}
+        />
+
+        {/* Confirm Hire Modal (Offer -> Hired) */}
+        <ConfirmHireModal
+          open={Boolean(hireConfirmCandidate)}
+          onOpenChange={(open) => {
+            if (!open) setHireConfirmCandidate(null);
+          }}
+          candidate={hireConfirmCandidate}
+          onConfirm={async () => {
+            if (hireConfirmCandidate) {
+              await executeStageChange(hireConfirmCandidate.id, "hired", {
+                offerStatus: "accepted",
+              });
+              toast.success(`Selamat! ${hireConfirmCandidate.name} resmi diterima (Hired)!`, {
+                description: "Status pelamar dan penerimaan telah disinkronkan ke database.",
+              });
+              setHireConfirmCandidate(null);
+            }
+          }}
         />
 
         {/* Create Offer Modal */}
