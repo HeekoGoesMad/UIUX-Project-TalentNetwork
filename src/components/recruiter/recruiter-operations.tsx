@@ -198,9 +198,9 @@ export function RecruiterOperationsPage() {
               .filter((app) => scannedCandidateIds.has(app.candidateProfileId || app.id))
               .map((app, index) => {
                 let mappedStage: Stage = "screening";
-                if (["new", "shortlisted", "consent_requested", "consent_approved", "screening"].includes(app.status)) {
+                if (["new", "shortlisted", "consent_requested", "consent_approved", "screening", "review"].includes(app.status)) {
                   mappedStage = "screening";
-                } else if (["assessment", "review", "interview"].includes(app.status)) {
+                } else if (["assessment", "interview"].includes(app.status)) {
                   mappedStage = "interview";
                 } else if (app.status === "offer") {
                   mappedStage = "offer";

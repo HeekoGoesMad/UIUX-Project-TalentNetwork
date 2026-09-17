@@ -639,8 +639,8 @@ export default function TalentProfile() {
         saveDemoApplication({
           id: `demo-app-${candidate.id}`,
           jobId: `job-demo-${candidate.id}`,
-          status: "review",
-          coverNote: "Profil dibuka dan sedang ditinjau langsung oleh tim rekruter melalui Talent Network.",
+          status: "screening",
+          coverNote: "Profil dibuka dan sedang dalam tahap screening awal melalui Talent Network.",
           submittedAt: new Date().toISOString(),
           withdrawnAt: null,
           updatedAt: new Date().toISOString(),
@@ -655,6 +655,44 @@ export default function TalentProfile() {
             location: candidate.location,
           },
         });
+
+        // Ensure operations pipeline records candidate in screening stage
+        try {
+          const opsKey = "proofylink-demo-recruiter-operations";
+          const opsRaw = localStorage.getItem(opsKey);
+          if (opsRaw) {
+            const opsParsed = JSON.parse(opsRaw);
+            if (opsParsed && Array.isArray(opsParsed.candidates)) {
+              const existingIdx = opsParsed.candidates.findIndex((c: { id: string }) => c.id === candidate.id);
+              if (existingIdx >= 0) {
+                // Keep in screening stage if currently in review/interview without an actual scheduled interview
+                if (opsParsed.candidates[existingIdx].stage === "interview") {
+                  opsParsed.candidates[existingIdx].stage = "screening";
+                }
+              } else {
+                opsParsed.candidates.push({
+                  id: candidate.id,
+                  name: candidate.name,
+                  role: candidate.role || "Talent",
+                  location: candidate.location || "Indonesia",
+                  stage: "screening",
+                  owner: user?.name || "Tim Rekruter",
+                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                  appliedAt: new Date().toISOString().slice(0, 10),
+                  score: 4.5,
+                  feedback: "",
+                  offerStatus: "draft",
+                  compensation: "Rp 15.000.000 / bulan",
+                  reason: "",
+                  jobTitle: `Talent Sourcing · ${candidate.role || "Talent Network"}`,
+                });
+              }
+              localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+            }
+          }
+        } catch {
+          // ignore
+        }
       }
 
       const started = await startScreening(candidate.id);
