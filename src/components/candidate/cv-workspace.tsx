@@ -3,7 +3,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { cn } from "@/lib/utils";
@@ -11,119 +10,107 @@ import { useApp } from "@/providers/app-provider";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { POPULAR_LOCATION_SUGGESTIONS } from "@/lib/locations";
 import {
-  Brain,
   BriefcaseBusiness,
   Camera,
+  Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Edit3,
   ExternalLink,
   Eye,
   FileUp,
   GraduationCap,
+  Layers,
   Loader2,
   Plus,
   ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   User,
+  Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useUnsavedNavigationGuard } from "@/hooks/use-unsaved-navigation-guard";
 import { CvDownload } from "./cv-download";
 import { CvUnsavedBar } from "./cv-unsaved-bar";
 import { PersonalityModal } from "./personality-modal";
 import { ProfessionalSummaryModal } from "./professional-summary-modal";
 
 function blank(email = "", fullName = ""): CvProfile {
- return {
-   id: "new-cv",
-  fullName,
-  headline: "",
-  about: "",
-  location: "",
-  email,
-  phone: "",
-  salary: "",
-  skills: [],
-  hardCompetencies: [],
-  tools: [],
-  softSkills: [],
-  industries: [],
-  experience: [],
-  education: [],
-  certifications: [],
-  portfolio: [],
-  targetRole: "",
-  workArrangement: "hybrid",
-  openToWork: true,
-  careerStatus: "open-to-work",
-  updatedAt: new Date().toISOString(),
- };
+  return {
+    id: "new-cv",
+    fullName,
+    headline: "",
+    about: "",
+    location: "",
+    email,
+    phone: "",
+    salary: "",
+    skills: [],
+    hardCompetencies: [],
+    tools: [],
+    softSkills: [],
+    industries: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    portfolio: [],
+    targetRole: "",
+    workArrangement: "hybrid",
+    openToWork: true,
+    careerStatus: "open-to-work",
+    updatedAt: new Date().toISOString(),
+  };
 }
 
-// ─── Helpers ────────────────────────────────────────────────────
+// ─── Reusable Field Primitive ────────────────────────────────────────────────
 function Field({
   label,
   hint,
   children,
   span2,
+  required,
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
   span2?: boolean;
+  required?: boolean;
 }) {
   return (
-    <div className={`flex flex-col gap-1.5 text-sm font-medium${span2 ? " md:col-span-2" : ""}`}>
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      {hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}
-      {children}
-    </div>
-  );
-}
-
-const inputCls =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
-const textareaCls =
-  "min-h-24 w-full rounded-md border bg-background p-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
-const maxDocBytes = 10 * 1024 * 1024;
-
-// ─── Section wrapper ─────────────────────────────────────────────
-function FormSection({
-  id,
-  title,
-  icon,
-  children,
-}: {
-  id?: string;
-  title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div id={id} className="scroll-mt-20 space-y-4">
-      <div className="flex items-center gap-2 border-b pb-2">
-        {icon}
-        <h3 className="font-semibold text-foreground">{title}</h3>
+    <div className={cn("flex flex-col gap-1.5", span2 && "md:col-span-2")}>
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs font-semibold text-foreground">
+          {label} {required && <span className="text-destructive">*</span>}
+        </label>
+        {hint && <span className="text-[11px] text-muted-foreground/80">{hint}</span>}
       </div>
       {children}
     </div>
   );
 }
 
+const inputCls =
+  "h-9 w-full rounded-lg border border-border/80 bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-primary/60 focus-visible:ring-[3px] focus-visible:ring-primary/20 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
+const textareaCls =
+  "min-h-24 w-full rounded-lg border border-border/80 bg-background p-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-primary/60 focus-visible:ring-[3px] focus-visible:ring-primary/20 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
+const maxDocBytes = 10 * 1024 * 1024;
+
+// ─── Tag Input Primitive ─────────────────────────────────────────────────────
 function CompetencyTagInput({
   tags,
   onChange,
   placeholder,
-  colorScheme = "purple",
 }: {
   tags: string[];
   onChange: (tags: string[]) => void;
   placeholder: string;
-  colorScheme?: "purple" | "slate" | "emerald";
 }) {
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -141,12 +128,6 @@ function CompetencyTagInput({
     onChange(tags.filter((_, i) => i !== index));
   };
 
-  const badgeStyles = {
-    purple: "bg-primary/10 text-primary border-primary/20",
-    slate: "bg-slate-100 text-slate-700 border-slate-200",
-    emerald: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  };
-
   return (
     <div
       onClick={(e) => {
@@ -154,22 +135,22 @@ function CompetencyTagInput({
           inputRef.current?.focus();
         }
       }}
-      className="rounded-lg border bg-background p-2 transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 cursor-text"
+      className="min-h-10 rounded-lg border border-border/80 bg-background p-1.5 transition-[color,box-shadow] focus-within:border-primary/60 focus-within:ring-[3px] focus-within:ring-primary/20 cursor-text"
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag, idx) => (
           <span
             key={`${tag}-${idx}`}
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeStyles[colorScheme]}`}
+            className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
           >
-            {tag}
+            <span>{tag}</span>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(idx);
               }}
-              className="hover:opacity-75 focus:outline-none"
+              className="text-muted-foreground/80 hover:text-foreground focus:outline-none"
               aria-label={`Hapus ${tag}`}
             >
               <X className="size-3" />
@@ -179,7 +160,7 @@ function CompetencyTagInput({
         <input
           ref={inputRef}
           type="text"
-          className="h-7 min-w-[150px] flex-1 border-0 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
+          className="h-7 min-w-[130px] flex-1 border-0 bg-transparent px-1.5 text-xs outline-none placeholder:text-muted-foreground/70"
           value={inputVal}
           onChange={(e) => {
             const val = e.target.value;
@@ -202,14 +183,14 @@ function CompetencyTagInput({
             }
           }}
           onBlur={addCurrent}
-          placeholder={tags.length === 0 ? placeholder : "+ ketik lalu tekan koma / enter..."}
+          placeholder={tags.length === 0 ? placeholder : "+ ketik lalu enter..."}
         />
       </div>
     </div>
   );
 }
 
-// Helper to deterministically serialize only user-editable fields (excluding timestamps/metadata)
+// ─── Serialization Helper ─────────────────────────────────────────────────────
 function serializeCvData(p: CvProfile | null | undefined): string {
   if (!p) return "";
   return JSON.stringify({
@@ -240,7 +221,56 @@ function serializeCvData(p: CvProfile | null | undefined): string {
   });
 }
 
-// ─── Main Component ──────────────────────────────────────────────
+// ─── Section Configuration ───────────────────────────────────────────────────
+type SectionId = "basic" | "summary" | "experience" | "education" | "skills";
+
+interface SectionMeta {
+  id: SectionId;
+  label: string;
+  shortLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+}
+
+const SECTIONS: SectionMeta[] = [
+  {
+    id: "basic",
+    label: "Identitas & Kontak",
+    shortLabel: "Identitas",
+    icon: User,
+    description: "Informasi dasar, kontak, lokasi, dan preferensi kerja.",
+  },
+  {
+    id: "summary",
+    label: "Ringkasan & Persona",
+    shortLabel: "Ringkasan",
+    icon: Sparkles,
+    description: "Headline profesional, summary diri, dan tipe kepribadian.",
+  },
+  {
+    id: "experience",
+    label: "Pengalaman Kerja",
+    shortLabel: "Pengalaman",
+    icon: BriefcaseBusiness,
+    description: "Riwayat pekerjaan, tanggung jawab, dan pencapaian terukur.",
+  },
+  {
+    id: "education",
+    label: "Pendidikan & Studi",
+    shortLabel: "Pendidikan",
+    icon: GraduationCap,
+    description: "Riwayat institusi pendidikan, gelar, IPK, dan verifikasi kampus.",
+  },
+  {
+    id: "skills",
+    label: "Kompetensi & Portofolio",
+    shortLabel: "Kompetensi",
+    icon: Wrench,
+    description: "Keahlian teknis, tools, soft skills, dan portofolio karya.",
+  },
+];
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 export function CvWorkspace() {
   const { cvProfile, user, dbMode, saveCvProfile } = useApp();
   const [profile, setProfile] = useState<CvProfile>(
@@ -259,6 +289,9 @@ export function CvWorkspace() {
       setProfile(cvProfile);
     }
   }
+
+  const [activeSection, setActiveSection] = useState<SectionId>("basic");
+  const [viewAll, setViewAll] = useState(false);
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -281,18 +314,51 @@ export function CvWorkspace() {
     return serializeCvData(profile) !== savedSnapshot;
   }, [profile, savedSnapshot]);
 
-  // Browser-level tab close / refresh protection
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
+  const [shaking, setShaking] = useState(false);
+  const [shakeCount, setShakeCount] = useState(0);
+  const shakeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerShake = useCallback(() => {
+    setShaking(true);
+    setShakeCount((prev) => prev + 1);
+    if (shakeTimerRef.current) {
+      clearTimeout(shakeTimerRef.current);
+    }
+    shakeTimerRef.current = setTimeout(() => {
+      setShaking(false);
+    }, 850);
+  }, []);
+
+  const sectionTabsCleanupRef = useRef<(() => void) | null>(null);
+  const setSectionTabsRef = useCallback((node: HTMLDivElement | null) => {
+    if (sectionTabsCleanupRef.current) {
+      sectionTabsCleanupRef.current();
+      sectionTabsCleanupRef.current = null;
+    }
+    if (node) {
+      const handleWheel = (e: WheelEvent) => {
+        if (e.deltaY !== 0 || e.deltaX !== 0) {
+          // Prevent outer webpage scroll, even when tabs reach the boundary
+          e.preventDefault();
+          const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+          node.scrollLeft += delta;
+        }
+      };
+      node.addEventListener("wheel", handleWheel, { passive: false });
+      sectionTabsCleanupRef.current = () => {
+        node.removeEventListener("wheel", handleWheel);
+      };
+    }
+  }, []);
+
+  // Bulletproof navigation guard for links, history back/forward, mouse keys, and reload
+  useUnsavedNavigationGuard({
+    isDirty,
+    onBlocked: triggerShake,
+  });
 
   const handleReset = () => {
+    setShaking(false);
     if (cvProfile) {
       setProfile(cvProfile);
       setSavedSnapshot(serializeCvData(cvProfile));
@@ -379,7 +445,6 @@ export function CvWorkspace() {
     }
   };
 
-
   // Generic scalar updater
   const update = <K extends keyof CvProfile>(key: K, value: CvProfile[K]) =>
     setProfile((c) => ({ ...c, [key]: value }));
@@ -403,8 +468,10 @@ export function CvWorkspace() {
         },
       ],
     }));
+
   const removeExp = (i: number) =>
     setProfile((c) => ({ ...c, experience: c.experience.filter((_, idx) => idx !== i) }));
+
   const moveExp = (fromIndex: number, direction: -1 | 1) => {
     setProfile((c) => {
       const toIndex = fromIndex + direction;
@@ -415,6 +482,7 @@ export function CvWorkspace() {
       return { ...c, experience: next };
     });
   };
+
   const updateExp = (i: number, key: keyof ExperienceItem, val: unknown) =>
     setProfile((c) => {
       const exp = [...c.experience];
@@ -430,6 +498,7 @@ export function CvWorkspace() {
       exp[i] = item;
       return { ...c, experience: exp };
     });
+
   const updateExpAchievement = (i: number, j: number, val: string) =>
     setProfile((c) => {
       const exp = [...c.experience];
@@ -440,6 +509,7 @@ export function CvWorkspace() {
       exp[i] = { ...target, achievements };
       return { ...c, experience: exp };
     });
+
   const addExpAchievement = (i: number) =>
     setProfile((c) => ({
       ...c,
@@ -447,6 +517,7 @@ export function CvWorkspace() {
         idx === i ? { ...exp, achievements: [...(Array.isArray(exp.achievements) ? exp.achievements : []), ""] } : exp
       ),
     }));
+
   const removeExpAchievement = (i: number, j: number) =>
     setProfile((c) => ({
       ...c,
@@ -478,8 +549,10 @@ export function CvWorkspace() {
         },
       ],
     }));
+
   const removeEdu = (i: number) =>
     setProfile((c) => ({ ...c, education: c.education.filter((_, idx) => idx !== i) }));
+
   const moveEdu = (fromIndex: number, direction: -1 | 1) => {
     setProfile((c) => {
       const toIndex = fromIndex + direction;
@@ -490,6 +563,7 @@ export function CvWorkspace() {
       return { ...c, education: next };
     });
   };
+
   const updateEdu = (i: number, key: keyof EducationItem, val: unknown) =>
     setProfile((c) => {
       const edu = [...c.education];
@@ -532,7 +606,7 @@ export function CvWorkspace() {
       return;
     }
     setImporting(true);
-    setMessage(isImage ? "Menganalisis gambar CV dengan Vision AI..." : "Membaca dokumen CV sebagai draf...");
+    setMessage(isImage ? "Menganalisis gambar CV dengan Vision AI..." : "Mengekstrak informasi dari dokumen CV...");
     try {
       const form = new FormData();
       form.set("file", file);
@@ -556,8 +630,8 @@ export function CvWorkspace() {
         portfolio: data.portfolio ?? c.portfolio,
         sourceFileName: file.name,
       }));
-      setMessage("Draf berhasil dibuat. Tinjau semua field sebelum menyimpan.");
-      toast.success("Dokumen diimpor sebagai draf", { description: "Semua hasil ekstraksi tetap bisa kamu edit sebelum disimpan." });
+      setMessage("Draf berhasil diperbarui dari dokumen. Periksa field sebelum menyimpan.");
+      toast.success("Dokumen berhasil diekstrak", { description: "Hasil ekstraksi tampil langsung di form. Jangan lupa klik simpan." });
     } catch {
       setMessage("Impor gagal. Coba lagi atau isi manual.");
       toast.error("Impor gagal", { description: "Periksa koneksi kamu lalu coba lagi." });
@@ -572,7 +646,9 @@ export function CvWorkspace() {
     try {
       await saveCvProfile(profile);
       setSavedSnapshot(serializeCvData(profile));
+      setShaking(false);
       setMessage("Profil berhasil disimpan dan disinkronkan.");
+      toast.success("Profil berhasil disimpan!");
     } catch {
       setMessage("Profil gagal disimpan. Coba lagi.");
       toast.error("Profil gagal disimpan. Silakan coba lagi.");
@@ -581,26 +657,45 @@ export function CvWorkspace() {
     }
   }
 
-  const NAV_SECTIONS = [
-    { id: "sec-basic", label: "Info Dasar" },
-    { id: "sec-experience", label: "Pengalaman" },
-    { id: "sec-education", label: "Pendidikan" },
-    { id: "sec-skills", label: "Keahlian" },
-    { id: "sec-portfolio", label: "Portofolio" },
-  ];
+  // Section completion calculations for status badges
+  const isBasicComplete = Boolean(profile.fullName?.trim() && profile.email?.trim());
+  const isSummaryComplete = Boolean(profile.headline?.trim() || profile.about?.trim());
+  const experienceCount = profile.experience.length;
+  const educationCount = profile.education.length;
+  const skillsCount =
+    (profile.hardCompetencies?.length || profile.skills?.length || 0) +
+    (profile.tools?.length || 0) +
+    (profile.softSkills?.length || 0);
+
+  const activeIndex = SECTIONS.findIndex((s) => s.id === activeSection);
+  const currentMeta = SECTIONS[activeIndex] ?? SECTIONS[0];
+
+  const handleNextSection = () => {
+    if (activeIndex < SECTIONS.length - 1) {
+      setActiveSection(SECTIONS[activeIndex + 1].id);
+      window.scrollTo({ top: 120, behavior: "smooth" });
+    }
+  };
+
+  const handlePrevSection = () => {
+    if (activeIndex > 0) {
+      setActiveSection(SECTIONS[activeIndex - 1].id);
+      window.scrollTo({ top: 120, behavior: "smooth" });
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 sm:pb-24">
       {/* Mobile Mode Switcher (< lg) */}
-      <div className="flex lg:hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex rounded-xl border border-border/70 bg-card p-1 shadow-xs lg:hidden">
         <button
           type="button"
           onClick={() => setMobileTab("editor")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
+            "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors",
             mobileTab === "editor"
               ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           <Edit3 className="size-3.5" />
@@ -610,50 +705,54 @@ export function CvWorkspace() {
           type="button"
           onClick={() => setMobileTab("preview")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
+            "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors",
             mobileTab === "preview"
               ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           <Eye className="size-3.5" />
-          Pratinjau Live &amp; Unduh
+          Pratinjau CV
         </button>
       </div>
 
       {/* 2-Column Responsive Workspace Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-start">
-        {/* Left Column: Editor Form */}
+        {/* Left Column: Focused Section Workspace */}
         <div
           className={cn(
-            "lg:col-span-7 xl:col-span-7 space-y-6",
+            "lg:col-span-7 xl:col-span-7 space-y-4",
             mobileTab === "preview" && "hidden lg:block"
           )}
         >
-          {/* Import banner */}
-          <Card className="border-border bg-muted/40 shadow-xs">
-            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="flex items-center gap-2 font-semibold text-foreground text-sm">
-                  <FileUp className="size-4 text-primary" />
-                  Import Data dari CV (PDF / Gambar)
+          {/* Top Quiet Utility Bar: Import AI + Status */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <FileUp className="size-3.5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-foreground">
+                  Ekstraksi CV Otomatis
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Format PDF atau Gambar (PNG, JPG, WEBP maks 10 MB). AI mengekstraksi data otomatis sebagai draf yang bisa kamu tinjau.
+                <p className="truncate text-[11px] text-muted-foreground">
+                  Impor berkas PDF atau gambar untuk mengisi draf profil instan
                 </p>
               </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
               <label
                 aria-disabled={importing}
-                className={`inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-colors shrink-0 ${
-                  importing
-                    ? "pointer-events-none bg-primary/60 text-primary-foreground"
-                    : "cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                }`}
+                className={cn(
+                  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border/80 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring",
+                  importing && "pointer-events-none opacity-60"
+                )}
               >
                 <input
                   className="sr-only"
                   type="file"
-                  accept="application/pdf,.pdf,image/png,image/jpeg,image/webp"
+                  accept="application/pdf,.pdf,image/*"
                   disabled={importing}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -661,817 +760,1002 @@ export function CvWorkspace() {
                     if (f) void importPdf(f);
                   }}
                 />
-                {importing ? <Loader2 className="size-3.5 animate-spin" /> : <FileUp className="size-3.5" />}
-                {importing ? "Memproses Dokumen..." : "Pilih Dokumen CV"}
+                {importing ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5 text-muted-foreground" />}
+                <span>{importing ? "Memproses..." : "Impor CV"}</span>
               </label>
-            </CardContent>
-          </Card>
 
-          {/* Form Card */}
-          <Card className="border-border shadow-xs">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/60 pb-4">
-              <div>
-                <CardTitle className="text-foreground text-lg sm:text-xl font-bold">
-                  Tinjau CV &amp; Profil
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Isi profil Anda. Perubahan langsung disinkronkan ke lembar pratinjau.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {saving ? (
-                  <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-[11px] font-semibold gap-1.5 py-0.5">
-                    <Loader2 className="size-3 animate-spin text-primary" />
-                    Menyimpan...
-                  </Badge>
-                ) : isDirty ? (
-                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-semibold gap-1 py-0.5">
-                    <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    Ada perubahan belum disimpan
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-semibold gap-1 py-0.5">
-                    <CheckCircle2 className="size-3 text-emerald-600" />
-                    Semua perubahan tersimpan
-                  </Badge>
+              {/* View All Toggle */}
+              <button
+                type="button"
+                onClick={() => setViewAll((prev) => !prev)}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors border",
+                  viewAll
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
-              </div>
-            </CardHeader>
-
-            {/* Section Quick-Jump Chips */}
-            <div className="flex flex-wrap items-center gap-2 px-6 py-2.5 bg-slate-50 border-b border-slate-100">
-              <span className="text-xs font-semibold text-slate-500 mr-0.5">Lompat ke:</span>
-              {NAV_SECTIONS.map((sec) => (
-                <button
-                  key={sec.id}
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById(sec.id);
-                    if (el) {
-                      el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }}
-                  className="cursor-pointer inline-flex items-center rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground transition-colors shadow-2xs"
-                >
-                  {sec.label}
-                </button>
-              ))}
+                title={viewAll ? "Kembali ke mode fokus satu bagian" : "Tampilkan semua bagian sekaligus"}
+              >
+                <Layers className="size-3.5" />
+                <span className="hidden sm:inline">{viewAll ? "Mode Fokus" : "Semua Bagian"}</span>
+              </button>
             </div>
+          </div>
 
-            <CardContent className="space-y-8 pt-6">
-              <FormSection id="sec-basic" title="Informasi Dasar &amp; Foto">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Profil (Avatar)</span>
-                <div className="flex items-center gap-4">
-                  <div className="relative flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-white bg-slate-200 shadow-2xs overflow-hidden">
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt="Foto Profil" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                    ) : (
-                      <User className="size-8 text-slate-400" />
+          {/* Segmented Section Navigation Tabs */}
+          {!viewAll && (
+            <div
+              ref={setSectionTabsRef}
+              className="flex gap-1.5 overflow-x-auto rounded-xl border border-border/70 bg-card p-1.5 shadow-xs scrollbar-none overscroll-contain"
+            >
+              {SECTIONS.map((sec) => {
+                const isCurrent = activeSection === sec.id;
+                const Icon = sec.icon;
+
+                // Determine badge indicator
+                let badgeContent: React.ReactNode = null;
+                if (sec.id === "basic") {
+                  badgeContent = isBasicComplete ? (
+                    <Check className="size-3 text-emerald-600" />
+                  ) : null;
+                } else if (sec.id === "summary") {
+                  badgeContent = isSummaryComplete ? (
+                    <Check className="size-3 text-emerald-600" />
+                  ) : null;
+                } else if (sec.id === "experience") {
+                  badgeContent = (
+                    <span className="font-mono text-[10px] text-muted-foreground">{experienceCount}</span>
+                  );
+                } else if (sec.id === "education") {
+                  badgeContent = (
+                    <span className="font-mono text-[10px] text-muted-foreground">{educationCount}</span>
+                  );
+                } else if (sec.id === "skills") {
+                  badgeContent = (
+                    <span className="font-mono text-[10px] text-muted-foreground">{skillsCount}</span>
+                  );
+                }
+
+                return (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    onClick={() => setActiveSection(sec.id)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                      isCurrent
+                        ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                     )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                      <Camera className="size-3.5 text-primary" />
-                      <span>Upload Foto Profil</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={(e) => onSelectFile(e, "avatar")}
-                      />
-                    </label>
-                    {profile.avatarUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedia("avatar")}
-                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors shadow-2xs"
+                  >
+                    <Icon className={cn("size-3.5 shrink-0", isCurrent ? "text-primary-foreground" : "text-muted-foreground")} />
+                    <span>{sec.shortLabel}</span>
+                    {badgeContent && (
+                      <span
+                        className={cn(
+                          "flex size-4 items-center justify-center rounded-full text-[10px]",
+                          isCurrent
+                            ? "bg-primary-foreground/20 text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        )}
                       >
-                        <Trash2 className="size-3.5 text-red-500" />
-                        <span>Hapus</span>
-                      </button>
-                    ) : null}
-                  </div>
+                        {badgeContent}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Main Focused Editor Canvas */}
+          <div className="rounded-xl border border-border/70 bg-card p-5 sm:p-6 shadow-xs space-y-6">
+            {/* Section Header */}
+            {!viewAll && (
+              <div className="flex items-center justify-between border-b border-border/60 pb-4">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight text-foreground">
+                    {currentMeta.label}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {currentMeta.description}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {saving ? (
+                    <Badge variant="secondary" className="gap-1 text-[11px]">
+                      <Loader2 className="size-3 animate-spin" />
+                      Menyimpan...
+                    </Badge>
+                  ) : isDirty ? (
+                    <Badge variant="outline" className="gap-1 border-amber-300 bg-amber-50 text-[11px] text-amber-800">
+                      <span className="size-1.5 rounded-full bg-amber-500" />
+                      Belum disimpan
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="gap-1 text-[11px] text-emerald-700 bg-emerald-50 border-emerald-200">
+                      <CheckCircle2 className="size-3 text-emerald-600" />
+                      Tersimpan
+                    </Badge>
+                  )}
                 </div>
               </div>
+            )}
 
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">Foto Sampul (Banner)</span>
-                <div className="flex items-center gap-4">
-                  <div className="relative h-16 w-32 shrink-0 rounded-xl border-2 border-white bg-gradient-to-r from-dark-navy to-primary/80 shadow-2xs overflow-hidden">
-                    {profile.bannerUrl ? (
-                      <img src={profile.bannerUrl} alt="Foto Sampul" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                    ) : null}
+            {/* ── SECTION 1: Identitas & Kontak ── */}
+            {(viewAll || activeSection === "basic") && (
+              <div id="sec-basic" className="space-y-5">
+                {viewAll && (
+                  <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                    <User className="size-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Identitas &amp; Kontak</h3>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs">
-                      <Camera className="size-3.5 text-primary" />
-                      <span>Upload Sampul</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={(e) => onSelectFile(e, "banner")}
-                      />
-                    </label>
-                    {profile.bannerUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedia("banner")}
-                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors shadow-2xs"
-                      >
-                        <Trash2 className="size-3.5 text-red-500" />
-                        <span>Hapus</span>
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+                )}
 
-              <Field label="Nama Lengkap">
-                <input
-                  className={inputCls}
-                  value={profile.fullName}
-                  onChange={(e) => update("fullName", e.target.value)}
-                  placeholder="Nama lengkapmu"
-                />
-              </Field>
-              <Field label="Lokasi (Kabupaten/Kota, Provinsi)">
-                <input
-                  className={inputCls}
-                  value={profile.location}
-                  onChange={(e) => update("location", e.target.value)}
-                  placeholder="Sleman, D.I. Yogyakarta"
-                  list="cv-locations-list"
-                />
-                <datalist id="cv-locations-list">
-                  {POPULAR_LOCATION_SUGGESTIONS.map((loc) => (
-                    <option key={loc} value={loc} />
-                  ))}
-                </datalist>
-              </Field>
-              <Field label="Email">
-                <input
-                  className={inputCls}
-                  type="email"
-                  value={profile.email}
-                  onChange={(e) => update("email", e.target.value)}
-                  placeholder="nama@email.com"
-                />
-              </Field>
-              <Field label="Nomor Telepon / WhatsApp">
-                <IndonesianPhoneInput
-                  value={profile.phone ?? ""}
-                  onChange={(val) => update("phone", val)}
-                  placeholder="812-3456-7890"
-                />
-              </Field>
-              <Field
-                label="Ekspektasi Gaji"
-                hint="Ditunjukkan ke rekruter setelah profil dibuka."
-              >
-                <input
-                  className={inputCls}
-                  value={profile.salary ?? ""}
-                  onChange={(e) => update("salary", e.target.value)}
-                  placeholder="Contoh: Rp 15 jt – 22 jt / bln"
-                />
-              </Field>
-              <Field
-                label="Preferensi Kerja (Work Arrangement)"
-                hint="Preferensi kehadiran kerja yang kamu minati."
-              >
-                <select
-                  className={inputCls}
-                  value={profile.workArrangement || "hybrid"}
-                  onChange={(e) => update("workArrangement", e.target.value as "remote" | "hybrid" | "onsite")}
-                >
-                  <option value="hybrid">Hybrid (Kantor &amp; Remote)</option>
-                  <option value="remote">Remote (Full WFH)</option>
-                  <option value="onsite">Onsite (Bekerja di Kantor)</option>
-                </select>
-              </Field>
-              <Field
-                label="Target Role (Posisi yang Dicari)"
-                hint="Posisi yang kamu tuju. Digunakan rekruter & sistem untuk mencocokkan lowongan."
-              >
-                <input
-                  className={inputCls}
-                  value={profile.targetRole ?? ""}
-                  onChange={(e) => update("targetRole", e.target.value)}
-                  placeholder="Contoh: Accounting Executive, Financial Analyst"
-                />
-              </Field>
-              <Field
-                label="Headline Profesional (Tampil di CV)"
-                hint='Jabatan/identitas saat ini di bawah nama CV. Contoh: "Senior Accounting Executive | Tax"'
-              >
-                <input
-                  className={inputCls}
-                  value={profile.headline}
-                  onChange={(e) => update("headline", e.target.value)}
-                  placeholder="Posisi | Keahlian | Spesialisasi"
-                />
-              </Field>
-
-              {/* ── Tipe Kepribadian (16Personalities) ── */}
-              <div className="md:col-span-2 rounded-xl border border-border/80 bg-card p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                      <Brain className="size-4.5" />
+                {/* Photos row */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Avatar */}
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3.5 space-y-2.5">
+                    <span className="block text-xs font-semibold text-foreground">Foto Profil</span>
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                        {profile.avatarUrl ? (
+                          <img src={profile.avatarUrl} alt="Foto profil" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="size-7 text-muted-foreground/60" />
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                          <Camera className="size-3.5 text-muted-foreground" />
+                          <span>Unggah foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={(e) => onSelectFile(e, "avatar")}
+                          />
+                        </label>
+                        {profile.avatarUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMedia("avatar")}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="Hapus foto profil"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-bold text-foreground">
-                          Tes Kepribadian (16Personalities)
-                        </span>
+                  </div>
+
+                  {/* Banner */}
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3.5 space-y-2.5">
+                    <span className="block text-xs font-semibold text-foreground">Foto Sampul (Banner)</span>
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative h-14 w-28 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                        {profile.bannerUrl ? (
+                          <img src={profile.bannerUrl} alt="Foto sampul" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted/60 text-[10px] text-muted-foreground">Polos</div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                          <Camera className="size-3.5 text-muted-foreground" />
+                          <span>Unggah sampul</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={(e) => onSelectFile(e, "banner")}
+                          />
+                        </label>
+                        {profile.bannerUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMedia("banner")}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="Hapus foto sampul"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identity Input Grid */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Nama Lengkap" required>
+                    <input
+                      className={inputCls}
+                      value={profile.fullName}
+                      onChange={(e) => update("fullName", e.target.value)}
+                      placeholder="Nama lengkap sesuai KTP / profesional"
+                    />
+                  </Field>
+
+                  <Field label="Email" required>
+                    <input
+                      className={inputCls}
+                      type="email"
+                      value={profile.email}
+                      onChange={(e) => update("email", e.target.value)}
+                      placeholder="nama@domain.com"
+                    />
+                  </Field>
+
+                  <Field label="Nomor Telepon / WhatsApp">
+                    <IndonesianPhoneInput
+                      value={profile.phone ?? ""}
+                      onChange={(val) => update("phone", val)}
+                      placeholder="812-3456-7890"
+                    />
+                  </Field>
+
+                  <Field label="Lokasi Domisili">
+                    <input
+                      className={inputCls}
+                      value={profile.location}
+                      onChange={(e) => update("location", e.target.value)}
+                      placeholder="Contoh: Jakarta Selatan, DKI Jakarta"
+                      list="cv-locations-list"
+                    />
+                    <datalist id="cv-locations-list">
+                      {POPULAR_LOCATION_SUGGESTIONS.map((loc) => (
+                        <option key={loc} value={loc} />
+                      ))}
+                    </datalist>
+                  </Field>
+
+                  <Field label="Target Role / Posisi Impian" hint="Posisi yang kamu incar">
+                    <input
+                      className={inputCls}
+                      value={profile.targetRole ?? ""}
+                      onChange={(e) => update("targetRole", e.target.value)}
+                      placeholder="Contoh: Senior Frontend Engineer, Product Lead"
+                    />
+                  </Field>
+
+                  <Field label="Preferensi Kerja">
+                    <select
+                      className={inputCls}
+                      value={profile.workArrangement || "hybrid"}
+                      onChange={(e) => update("workArrangement", e.target.value as "remote" | "hybrid" | "onsite")}
+                    >
+                      <option value="hybrid">Hybrid (Kantor &amp; Remote)</option>
+                      <option value="remote">Remote (Full WFH)</option>
+                      <option value="onsite">Onsite (Bekerja di Kantor)</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Ekspektasi Gaji Bulanan" hint="Tampil hanya saat rekruter membuka profil" span2>
+                    <input
+                      className={inputCls}
+                      value={profile.salary ?? ""}
+                      onChange={(e) => update("salary", e.target.value)}
+                      placeholder="Contoh: Rp 18.000.000 – Rp 25.000.000 / bln"
+                    />
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            {/* ── SECTION 2: Ringkasan & Persona ── */}
+            {(viewAll || activeSection === "summary") && (
+              <div id="sec-summary" className="space-y-5">
+                {viewAll && (
+                  <div className="flex items-center gap-2 border-b border-border/60 pb-2 pt-2">
+                    <Sparkles className="size-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Ringkasan &amp; Persona</h3>
+                  </div>
+                )}
+
+                <Field
+                  label="Headline Profesional"
+                  hint="Tampil tepat di bawah nama pada header CV"
+                >
+                  <input
+                    className={inputCls}
+                    value={profile.headline}
+                    onChange={(e) => update("headline", e.target.value)}
+                    placeholder="Contoh: Senior UI/UX Designer | Design Systems &amp; User Research"
+                  />
+                </Field>
+
+                {/* Professional Summary Box */}
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground">
+                      Tentang Saya (Professional Summary)
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSummaryModalOpen(true)}
+                      className="h-7 gap-1.5 rounded-md text-xs text-primary hover:bg-primary/10 hover:text-primary"
+                    >
+                      <Sparkles className="size-3.5" />
+                      Bantuan AI Summary
+                    </Button>
+                  </div>
+                  <textarea
+                    className={textareaCls}
+                    value={profile.about}
+                    onChange={(e) => update("about", e.target.value)}
+                    placeholder="Ringkas latar belakang, keahlian utama, dan proposisi nilai yang kamu tawarkan kepada perusahaan..."
+                    rows={4}
+                  />
+                </div>
+
+                {/* Personality MBTI Card */}
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground">Tipe Kepribadian (MBTI)</span>
                         {profile.personality?.type ? (
-                          <Badge className="bg-primary text-primary-foreground font-bold text-[10px] px-2 py-0.5">
+                          <Badge variant="secondary" className="text-[11px] font-medium text-primary bg-primary/10 border-primary/20">
                             {profile.personality.type} · {profile.personality.label}
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-semibold">
-                            Belum Diisi
-                          </Badge>
+                          <span className="text-[11px] text-muted-foreground/80">Belum dipilih</span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                        {profile.personality?.tagline || "Lengkapi tipe kepribadian MBTI untuk menarik perhatian rekruter."}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {profile.personality?.tagline || "Menambah wawasan gaya kerja dan komunikasi kamu bagi tim."}
                       </p>
                     </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPersonalityModalOpen(true)}
+                      className="h-8 shrink-0 rounded-md text-xs font-medium"
+                    >
+                      {profile.personality?.type ? "Ubah Kepribadian" : "Pilih MBTI"}
+                    </Button>
                   </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPersonalityModalOpen(true)}
-                    className="shrink-0 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-xs font-semibold h-8.5 px-3 self-start sm:self-center"
-                  >
-                    <Brain className="mr-1.5 size-3.5" />
-                    {profile.personality?.type ? "Ubah Kepribadian" : "Pilih Kepribadian"}
-                  </Button>
                 </div>
               </div>
-              <div className="md:col-span-2 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-foreground">
-                    Tentang Saya
-                  </label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSummaryModalOpen(true)}
-                    className="h-7 gap-1.5 border-primary/30 text-xs font-medium text-primary hover:bg-primary/5"
-                  >
-                    <Sparkles className="size-3" />
-                    Panduan Summary
-                  </Button>
-                </div>
-                <p className="text-xs font-normal text-muted-foreground">
-                  Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa.
-                </p>
-                <textarea
-                  className={textareaCls}
-                  value={profile.about}
-                  onChange={(e) => update("about", e.target.value)}
-                  placeholder="Deskripsi profesional singkat — siapa kamu, apa yang kamu lakukan, dan nilai apa yang kamu bawa."
-                  rows={4}
-                />
+            )}
+
+            {/* ── SECTION 3: Pengalaman Kerja ── */}
+            {(viewAll || activeSection === "experience") && (
+              <div id="sec-experience" className="space-y-4">
+                {viewAll && (
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <BriefcaseBusiness className="size-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-foreground">Pengalaman Kerja</h3>
+                    </div>
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {experienceCount} posisi
+                    </Badge>
+                  </div>
+                )}
+
+                {profile.experience.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/80 p-8 text-center space-y-3">
+                    <BriefcaseBusiness className="mx-auto size-8 text-muted-foreground/50" />
+                    <div>
+                      <p className="text-xs font-medium text-foreground">Belum ada pengalaman kerja</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Tambahkan riwayat pekerjaan magang, freelance, atau full-time kamu.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addExp} className="gap-1.5 text-xs">
+                      <Plus className="size-3.5" /> Tambah Pengalaman
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {profile.experience.map((exp, i) => {
+                      const employmentTypes = ["Full Time", "Internship", "Contract", "Freelance"];
+
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5 space-y-4 transition-colors hover:border-border"
+                        >
+                          {/* Entry Title & Controls */}
+                          <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-mono font-semibold text-muted-foreground">
+                                {i + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <h4 className="truncate text-sm font-semibold text-foreground">
+                                  {exp.role || exp.company ? `${exp.role || "Posisi"} di ${exp.company || "Perusahaan"}` : `Pengalaman ${i + 1}`}
+                                </h4>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {exp.dates || "Periode belum diisi"} {exp.currentPosition ? "· Sedang Berjalan" : ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={i === 0}
+                                onClick={() => moveExp(i, -1)}
+                                aria-label="Pindahkan ke atas"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-20"
+                              >
+                                <ChevronUp className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={i === profile.experience.length - 1}
+                                onClick={() => moveExp(i, 1)}
+                                aria-label="Pindahkan ke bawah"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-20"
+                              >
+                                <ChevronDown className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeExp(i)}
+                                aria-label="Hapus pengalaman ini"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Row 1: Company & Role */}
+                          <div className="grid gap-3.5 md:grid-cols-2">
+                            <Field label="Nama Perusahaan" required>
+                              <input
+                                className={inputCls}
+                                value={exp.company}
+                                onChange={(e) => updateExp(i, "company", e.target.value)}
+                                placeholder="Contoh: PT Telkom Indonesia"
+                              />
+                            </Field>
+                            <Field label="Posisi / Jabatan" required>
+                              <input
+                                className={inputCls}
+                                value={exp.role}
+                                onChange={(e) => updateExp(i, "role", e.target.value)}
+                                placeholder="Contoh: Product Design Specialist"
+                              />
+                            </Field>
+                          </div>
+
+                          {/* Row 2: Type, Start, End */}
+                          <div className="grid gap-3.5 md:grid-cols-3">
+                            <Field label="Tipe Pekerjaan">
+                              <select
+                                className={inputCls}
+                                value={exp.employmentType || "Full Time"}
+                                onChange={(e) => updateExp(i, "employmentType", e.target.value)}
+                              >
+                                {employmentTypes.map((type) => (
+                                  <option key={type} value={type}>
+                                    {type}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Tanggal Mulai">
+                              <input
+                                className={inputCls}
+                                value={exp.startDate || ""}
+                                onChange={(e) => updateExp(i, "startDate", e.target.value)}
+                                placeholder="Contoh: Jan 2022"
+                              />
+                            </Field>
+                            <Field label="Tanggal Selesai">
+                              <input
+                                className={cn(inputCls, exp.currentPosition && "bg-muted/60 text-muted-foreground cursor-not-allowed")}
+                                disabled={Boolean(exp.currentPosition)}
+                                value={exp.currentPosition ? "Sekarang" : exp.endDate || ""}
+                                onChange={(e) => updateExp(i, "endDate", e.target.value)}
+                                placeholder={exp.currentPosition ? "Sekarang" : "Contoh: Des 2024"}
+                              />
+                            </Field>
+                          </div>
+
+                          {/* Row 3: Current Position Checkbox */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              id={`exp-current-${i}`}
+                              type="checkbox"
+                              checked={Boolean(exp.currentPosition)}
+                              onChange={(e) => updateExp(i, "currentPosition", e.target.checked)}
+                              className="size-3.5 rounded border-border text-primary focus:ring-primary"
+                            />
+                            <label htmlFor={`exp-current-${i}`} className="cursor-pointer select-none text-xs text-muted-foreground">
+                              Saya masih aktif bekerja di posisi ini
+                            </label>
+                          </div>
+
+                          {/* Row 4: Description */}
+                          <Field
+                            label="Deskripsi Tanggung Jawab & Peran"
+                            hint="Jelaskan peran utama dan lingkup kerja"
+                          >
+                            <textarea
+                              className={textareaCls}
+                              value={exp.description || ""}
+                              onChange={(e) => updateExp(i, "description", e.target.value)}
+                              placeholder="Rangkum tugas utama, kolaborasi tim, dan produk/layanan yang kamu kerjakan..."
+                              rows={3}
+                            />
+                          </Field>
+
+                          {/* Row 5: Achievements Bullets */}
+                          <div className="space-y-2.5 rounded-lg border border-border/60 bg-background p-3.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-foreground">
+                                Pencapaian Terukur (Key Results / Impact)
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => addExpAchievement(i)}
+                                className="h-7 gap-1 text-xs text-primary hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Plus className="size-3" /> Tambah Poin
+                              </Button>
+                            </div>
+
+                            {((Array.isArray(exp.achievements)
+                              ? exp.achievements
+                              : typeof exp.achievements === "string" && exp.achievements
+                              ? [exp.achievements]
+                              : []) as string[]).map((achievement, j) => (
+                              <div key={j} className="flex items-center gap-2">
+                                <span className="size-1.5 rounded-full bg-primary/70 shrink-0" />
+                                <input
+                                  className={cn(inputCls, "h-8 text-xs")}
+                                  value={achievement}
+                                  onChange={(e) => updateExpAchievement(i, j, e.target.value)}
+                                  placeholder={j === 0 ? "Contoh: Meningkatkan retensi pengguna sebesar 24% dalam 3 kuartal..." : "Tulis pencapaian terukur lainnya..."}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeExpAchievement(i, j)}
+                                  className="size-7 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                  aria-label={`Hapus pencapaian ${j + 1}`}
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addExp}
+                      className="w-full gap-1.5 rounded-lg border-dashed text-xs font-medium py-4"
+                    >
+                      <Plus className="size-3.5" /> Tambah Pengalaman Lainnya
+                    </Button>
+                  </div>
+                )}
               </div>
-            </div>
-          </FormSection>
+            )}
 
-          {/* ── Pengalaman Kerja ── */}
-          <FormSection
-            id="sec-experience"
-            title="Pengalaman Kerja"
-            icon={<BriefcaseBusiness className="size-4 text-primary" />}
-          >
-            <div className="space-y-4">
-              {profile.experience.map((exp, i) => {
-                const employmentTypes = ["Full Time", "Internship", "Contract", "Freelance"];
+            {/* ── SECTION 4: Pendidikan & Studi ── */}
+            {(viewAll || activeSection === "education") && (
+              <div id="sec-education" className="space-y-4">
+                {viewAll && (
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="size-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-foreground">Pendidikan &amp; Studi</h3>
+                    </div>
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {educationCount} institusi
+                    </Badge>
+                  </div>
+                )}
 
-                return (
-                  <div key={i} className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 space-y-4 shadow-2xs transition-all hover:border-slate-300">
-                    {/* Card Header with numbering, entity preview, reorder arrows, and delete button */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary border border-primary/20">
-                          {i + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-foreground truncate">
-                            {exp.company ? exp.company : `Pengalaman Kerja #${i + 1}`}
-                          </h4>
-                          {exp.role && (
-                            <p className="text-xs text-muted-foreground truncate">{exp.role}</p>
+                {profile.education.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/80 p-8 text-center space-y-3">
+                    <GraduationCap className="mx-auto size-8 text-muted-foreground/50" />
+                    <div>
+                      <p className="text-xs font-medium text-foreground">Belum ada riwayat pendidikan</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Tambahkan institusi sekolah, universitas, atau diploma kamu.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addEdu} className="gap-1.5 text-xs">
+                      <Plus className="size-3.5" /> Tambah Pendidikan
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {profile.education.map((edu, i) => {
+                      const partnerMatch = PARTNER_CAMPUSES.find(
+                        (c) =>
+                          edu.school.toLowerCase().includes(c.toLowerCase()) ||
+                          c.toLowerCase().includes(edu.school.toLowerCase())
+                      );
+                      const isVerified =
+                        profile.campusVerification?.institution === partnerMatch &&
+                        profile.campusVerification?.status === "verified";
+                      const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
+
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5 space-y-4 transition-colors hover:border-border"
+                        >
+                          {/* Title & Controls */}
+                          <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-mono font-semibold text-muted-foreground">
+                                {i + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <h4 className="truncate text-sm font-semibold text-foreground">
+                                  {edu.school ? edu.school : `Pendidikan ${i + 1}`}
+                                </h4>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {edu.program ? `${edu.program} · ` : ""}{edu.level || "S1"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={i === 0}
+                                onClick={() => moveEdu(i, -1)}
+                                aria-label="Pindahkan ke atas"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-20"
+                              >
+                                <ChevronUp className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={i === profile.education.length - 1}
+                                onClick={() => moveEdu(i, 1)}
+                                aria-label="Pindahkan ke bawah"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-20"
+                              >
+                                <ChevronDown className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeEdu(i)}
+                                aria-label="Hapus pendidikan ini"
+                                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Row 1: School & Major */}
+                          <div className="grid gap-3.5 md:grid-cols-2">
+                            <Field label="Sekolah / Universitas" required>
+                              <input
+                                className={inputCls}
+                                value={edu.school}
+                                onChange={(e) => updateEdu(i, "school", e.target.value)}
+                                placeholder="Contoh: Universitas Gadjah Mada"
+                              />
+                            </Field>
+                            <Field label="Jurusan / Program Studi" required>
+                              <input
+                                className={inputCls}
+                                value={edu.program}
+                                onChange={(e) => updateEdu(i, "program", e.target.value)}
+                                placeholder="Contoh: Ilmu Komputer / Informatika"
+                              />
+                            </Field>
+                          </div>
+
+                          {/* Row 2: Level, GPA, Dates */}
+                          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
+                            <Field label="Jenjang">
+                              <select
+                                className={inputCls}
+                                value={edu.level || "S1"}
+                                onChange={(e) => updateEdu(i, "level", e.target.value)}
+                              >
+                                {educationLevels.map((lvl) => (
+                                  <option key={lvl} value={lvl}>
+                                    {lvl}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="IPK / Nilai Akhir">
+                              <input
+                                className={inputCls}
+                                value={edu.gpa || ""}
+                                onChange={(e) => updateEdu(i, "gpa", e.target.value)}
+                                placeholder="Contoh: 3.82 / 4.00"
+                              />
+                            </Field>
+                            <Field label="Tahun Mulai">
+                              <input
+                                className={inputCls}
+                                value={edu.startDate || ""}
+                                onChange={(e) => updateEdu(i, "startDate", e.target.value)}
+                                placeholder="Contoh: Agu 2019"
+                              />
+                            </Field>
+                            <Field label="Tahun Selesai">
+                              <input
+                                className={cn(inputCls, edu.currentlyStudying && "bg-muted/60 text-muted-foreground cursor-not-allowed")}
+                                disabled={Boolean(edu.currentlyStudying)}
+                                value={edu.currentlyStudying ? "Sekarang" : edu.endDate || ""}
+                                onChange={(e) => updateEdu(i, "endDate", e.target.value)}
+                                placeholder={edu.currentlyStudying ? "Sekarang" : "Contoh: Jul 2023"}
+                              />
+                            </Field>
+                          </div>
+
+                          {/* Row 3: Currently Studying Checkbox */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              id={`edu-current-${i}`}
+                              type="checkbox"
+                              checked={Boolean(edu.currentlyStudying)}
+                              onChange={(e) => updateEdu(i, "currentlyStudying", e.target.checked)}
+                              className="size-3.5 rounded border-border text-primary focus:ring-primary"
+                            />
+                            <label htmlFor={`edu-current-${i}`} className="cursor-pointer select-none text-xs text-muted-foreground">
+                              Saya masih aktif menempuh studi di sini
+                            </label>
+                          </div>
+
+                          {/* Campus Partner Verification Banner */}
+                          {partnerMatch && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-background p-3 text-xs">
+                              <span className="flex items-center gap-1.5 text-foreground font-medium">
+                                <GraduationCap className="size-4 text-primary" />
+                                Terhubung ke {partnerMatch} Career Network
+                              </span>
+                              <Badge variant={isVerified ? "default" : "secondary"} className="text-[11px]">
+                                {isVerified ? "Terverifikasi Kampus" : "Mitra Kampus"}
+                              </Badge>
+                            </div>
                           )}
                         </div>
-                        {exp.currentPosition && (
-                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 font-medium hidden sm:inline-flex">
-                            Posisi Aktif
-                          </Badge>
-                        )}
-                      </div>
+                      );
+                    })}
 
-                      {/* Header Actions: Reorder & Delete */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === 0}
-                          onClick={() => moveExp(i, -1)}
-                          title="Pindahkan ke atas"
-                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          <ChevronUp className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === profile.experience.length - 1}
-                          onClick={() => moveExp(i, 1)}
-                          title="Pindahkan ke bawah"
-                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          <ChevronDown className="size-4" />
-                        </Button>
-                        <div className="h-4 w-px bg-slate-200 mx-1" />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeExp(i)}
-                          title="Hapus Pengalaman"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <Trash2 className="size-3.5 mr-1" />
-                          Hapus
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Row 1: Company Name & Position (50% / 50%) */}
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Nama Perusahaan *">
-                        <input
-                          className={inputCls}
-                          value={exp.company}
-                          onChange={(e) => updateExp(i, "company", e.target.value)}
-                          placeholder="Contoh: PT GoTo Gojek Tokopedia"
-                        />
-                      </Field>
-                      <Field label="Posisi / Jabatan *">
-                        <input
-                          className={inputCls}
-                          value={exp.role}
-                          onChange={(e) => updateExp(i, "role", e.target.value)}
-                          placeholder="Contoh: Senior UI/UX Designer"
-                        />
-                      </Field>
-                    </div>
-
-                    {/* Row 2: Employment Type, Start Date, End Date (3 equal cols) */}
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <Field label="Tipe Pekerjaan">
-                        <select
-                          className={inputCls}
-                          value={exp.employmentType || "Full Time"}
-                          onChange={(e) => updateExp(i, "employmentType", e.target.value)}
-                        >
-                          {employmentTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Bulan / Tahun Mulai">
-                        <input
-                          className={inputCls}
-                          value={exp.startDate || ""}
-                          onChange={(e) => updateExp(i, "startDate", e.target.value)}
-                          placeholder="Contoh: Jan 2021"
-                        />
-                      </Field>
-                      <Field label="Bulan / Tahun Selesai">
-                        <input
-                          className={cn(inputCls, exp.currentPosition && "bg-muted text-muted-foreground cursor-not-allowed")}
-                          disabled={Boolean(exp.currentPosition)}
-                          value={exp.currentPosition ? "Sekarang" : exp.endDate || ""}
-                          onChange={(e) => updateExp(i, "endDate", e.target.value)}
-                          placeholder={exp.currentPosition ? "Sekarang" : "Contoh: Des 2023"}
-                        />
-                      </Field>
-                    </div>
-
-                    {/* Row 3: Current Position Toggle Bar */}
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2 border border-slate-100">
-                      <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-slate-700 hover:text-slate-900">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(exp.currentPosition)}
-                          onChange={(e) => updateExp(i, "currentPosition", e.target.checked)}
-                          className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                        <span>Saya saat ini masih bekerja di posisi / perusahaan ini</span>
-                      </label>
-                      {exp.currentPosition && (
-                        <span className="text-[11px] font-semibold text-primary">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
-                      )}
-                    </div>
-
-                    {/* Row 4: Job Description */}
-                    <Field
-                      label="Deskripsi Pekerjaan & Tanggung Jawab *"
-                      hint="Jelaskan peran utama, lingkup kerja, dan kontribusi inti kamu."
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addEdu}
+                      className="w-full gap-1.5 rounded-lg border-dashed text-xs font-medium py-4"
                     >
-                      <textarea
-                        className={`${textareaCls} min-h-24`}
-                        value={exp.description || ""}
-                        onChange={(e) => updateExp(i, "description", e.target.value)}
-                        placeholder="Deskripsikan peran utama, cakupan kerja, dan tanggung jawab..."
-                        rows={3}
-                      />
-                    </Field>
+                      <Plus className="size-3.5" /> Tambah Institusi Pendidikan Lainnya
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
-                    {/* Row 5: Achievements */}
-                    <div className="space-y-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-foreground">
-                          Pencapaian Utama (Achievements) — Opsional
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Tambahkan poin pencapaian atau hasil kerja terukur yang diraih pada posisi ini.
-                        </span>
-                      </div>
-                      {((Array.isArray(exp.achievements)
-                        ? exp.achievements
-                        : typeof exp.achievements === "string" && exp.achievements
-                        ? [exp.achievements]
-                        : []) as string[]).map((achievement, j) => (
-                        <div key={j} className="flex items-start gap-2">
-                          <textarea
-                            className={`${textareaCls} flex-1 min-h-16`}
-                            aria-label={`Pencapaian ${j + 1}`}
-                            value={achievement}
-                            onChange={(e) => updateExpAchievement(i, j, e.target.value)}
-                            placeholder={j === 0 ? "Contoh: Meningkatkan efisiensi sistem sebesar 25% dalam 6 bulan..." : "Tambahkan poin pencapaian terukur lainnya..."}
-                            rows={2}
+            {/* ── SECTION 5: Kompetensi & Portofolio ── */}
+            {(viewAll || activeSection === "skills") && (
+              <div id="sec-skills" className="space-y-5">
+                {viewAll && (
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="size-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-foreground">Kompetensi &amp; Portofolio</h3>
+                    </div>
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {skillsCount} keahlian
+                    </Badge>
+                  </div>
+                )}
+
+                <Field
+                  label="Kompetensi Teknis (Hard Skills)"
+                  hint="Ketik lalu tekan koma / Enter untuk menambahkan tag"
+                >
+                  <CompetencyTagInput
+                    tags={profile.hardCompetencies?.length ? profile.hardCompetencies : profile.skills}
+                    onChange={(tags) =>
+                      setProfile((c) => ({
+                        ...c,
+                        skills: tags,
+                        hardCompetencies: tags,
+                      }))
+                    }
+                    placeholder="Contoh: React, TypeScript, UI/UX Design, Data Analysis..."
+                  />
+                </Field>
+
+                <Field
+                  label="Peralatan &amp; Software (Tools)"
+                  hint="Aplikasi atau teknologi yang kamu kuasai sehari-hari"
+                >
+                  <CompetencyTagInput
+                    tags={profile.tools}
+                    onChange={(tags) =>
+                      setProfile((c) => ({
+                        ...c,
+                        tools: tags,
+                      }))
+                    }
+                    placeholder="Contoh: Figma, GitHub, Jira, PostgreSQL, Docker..."
+                  />
+                </Field>
+
+                <Field
+                  label="Soft Skills &amp; Kemampuan Interpersonal"
+                  hint="Gaya kerja, kolaborasi tim, kepemimpinan"
+                >
+                  <CompetencyTagInput
+                    tags={profile.softSkills ?? []}
+                    onChange={(tags) =>
+                      setProfile((c) => ({
+                        ...c,
+                        softSkills: tags,
+                      }))
+                    }
+                    placeholder="Contoh: Communication, Critical Thinking, Team Leadership..."
+                  />
+                </Field>
+
+                {/* Portfolio Links */}
+                <div className="space-y-3 border-t border-border/60 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-foreground">Tautan Portofolio &amp; Karya</span>
+                      <p className="text-[11px] text-muted-foreground">Tautan ke GitHub, Behance, Dribbble, atau website pribadi</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={addPortfolio}
+                      className="h-7 gap-1 text-xs text-primary hover:bg-primary/10 hover:text-primary"
+                    >
+                      <Plus className="size-3" /> Tambah Tautan
+                    </Button>
+                  </div>
+
+                  {profile.portfolio.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      Belum ada tautan portofolio ditambahkan.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {profile.portfolio.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <ExternalLink className="size-3.5 text-muted-foreground shrink-0 ml-1" />
+                          <input
+                            className={cn(inputCls, "flex-1 text-xs")}
+                            value={item}
+                            onChange={(e) => updatePortfolio(i, e.target.value)}
+                            placeholder="https://github.com/username atau https://myportfolio.dev"
                           />
                           <button
                             type="button"
-                            onClick={() => removeExpAchievement(i, j)}
-                            className="mt-2 shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                            aria-label={`Hapus pencapaian ${j + 1}`}
+                            onClick={() => removePortfolio(i)}
+                            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="Hapus tautan portofolio"
                           >
-                            <Trash2 className="size-4" />
+                            <Trash2 className="size-3.5" />
                           </button>
                         </div>
                       ))}
-                      <div className="flex justify-end pt-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 text-xs font-semibold text-foreground hover:text-primary hover:border-primary/40 shadow-2xs"
-                          onClick={() => addExpAchievement(i)}
-                        >
-                          <Plus className="size-3.5" /> Tambah Poin Pencapaian
-                        </Button>
-                      </div>
                     </div>
-                  </div>
-                );
-              })}
-              <Button type="button" variant="outline" size="sm" onClick={addExp}>
-                <Plus className="size-4" /> Tambah Pengalaman
-              </Button>
-            </div>
-          </FormSection>
-
-          {/* ── Pendidikan ── */}
-          <FormSection
-            id="sec-education"
-            title="Pendidikan"
-            icon={<GraduationCap className="size-4 text-primary" />}
-          >
-            <div className="space-y-4">
-              {profile.education.map((edu, i) => {
-                const partnerMatch = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
-                const isVerified = profile.campusVerification?.institution === partnerMatch && profile.campusVerification?.status === "verified";
-                const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
-
-                return (
-                  <div key={i} className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 space-y-4 shadow-2xs transition-all hover:border-slate-300">
-                    {/* Card Header with numbering, school preview, reorder arrows, and delete button */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary border border-primary/20">
-                          {i + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-foreground truncate">
-                            {edu.school ? edu.school : `Pendidikan #${i + 1}`}
-                          </h4>
-                          {edu.program && (
-                            <p className="text-xs text-muted-foreground truncate">{edu.program} {edu.level ? `(${edu.level})` : ""}</p>
-                          )}
-                        </div>
-                        {edu.currentlyStudying && (
-                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 font-medium hidden sm:inline-flex">
-                            Studi Aktif
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Header Actions: Reorder & Delete */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === 0}
-                          onClick={() => moveEdu(i, -1)}
-                          title="Pindahkan ke atas"
-                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          <ChevronUp className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === profile.education.length - 1}
-                          onClick={() => moveEdu(i, 1)}
-                          title="Pindahkan ke bawah"
-                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          <ChevronDown className="size-4" />
-                        </Button>
-                        <div className="h-4 w-px bg-slate-200 mx-1" />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeEdu(i)}
-                          title="Hapus Pendidikan"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <Trash2 className="size-3.5 mr-1" />
-                          Hapus
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Row 1: School & Major (50% / 50%) */}
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Universitas / Institusi Pendidikan *">
-                        <input
-                          className={inputCls}
-                          value={edu.school}
-                          onChange={(e) => updateEdu(i, "school", e.target.value)}
-                          placeholder="Contoh: Universitas Indonesia / SMKN 1 Jakarta"
-                        />
-                      </Field>
-                      <Field label="Jurusan / Program Studi *">
-                        <input
-                          className={inputCls}
-                          value={edu.program}
-                          onChange={(e) => updateEdu(i, "program", e.target.value)}
-                          placeholder="Contoh: Teknik Informatika / Manajemen Bisnis"
-                        />
-                      </Field>
-                    </div>
-
-                    {/* Row 2: Level, GPA, Start Date, End Date (4 equal cols on md+) */}
-                    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                      <Field label="Jenjang">
-                        <select
-                          className={inputCls}
-                          value={edu.level || "S1"}
-                          onChange={(e) => updateEdu(i, "level", e.target.value)}
-                        >
-                          {educationLevels.map((lvl) => (
-                            <option key={lvl} value={lvl}>
-                              {lvl}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="IPK / Nilai Akhir">
-                        <input
-                          className={inputCls}
-                          value={edu.gpa || ""}
-                          onChange={(e) => updateEdu(i, "gpa", e.target.value)}
-                          placeholder="3.85 / 4.00"
-                        />
-                      </Field>
-                      <Field label="Bulan / Tahun Mulai">
-                        <input
-                          className={inputCls}
-                          value={edu.startDate || ""}
-                          onChange={(e) => updateEdu(i, "startDate", e.target.value)}
-                          placeholder="Contoh: Agu 2020"
-                        />
-                      </Field>
-                      <Field label="Bulan / Tahun Selesai">
-                        <input
-                          className={cn(inputCls, edu.currentlyStudying && "bg-muted text-muted-foreground cursor-not-allowed")}
-                          disabled={Boolean(edu.currentlyStudying)}
-                          value={edu.currentlyStudying ? "Sekarang" : edu.endDate || ""}
-                          onChange={(e) => updateEdu(i, "endDate", e.target.value)}
-                          placeholder={edu.currentlyStudying ? "Sekarang" : "Contoh: Jul 2024"}
-                        />
-                      </Field>
-                    </div>
-
-                    {/* Row 3: Currently Studying Toggle Bar */}
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2 border border-slate-100">
-                      <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-slate-700 hover:text-slate-900">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(edu.currentlyStudying)}
-                          onChange={(e) => updateEdu(i, "currentlyStudying", e.target.checked)}
-                          className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                        <span>Saya saat ini masih menempuh pendidikan di sini</span>
-                      </label>
-                      {edu.currentlyStudying && (
-                        <span className="text-[11px] font-semibold text-primary">Periode otomatis diatur ke &ldquo;Sekarang&rdquo;</span>
-                      )}
-                    </div>
-
-                    {partnerMatch && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-                        <span className="flex items-center gap-1.5 text-foreground font-medium">
-                          <GraduationCap className="size-3.5 text-primary" /> Terhubung ke <strong>{partnerMatch} Career Center</strong>
-                        </span>
-                        <span className={isVerified
-                          ? "inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 font-semibold text-emerald-800"
-                          : "inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-800"
-                        }>
-                          {isVerified ? "✓ Terverifikasi Resmi Kampus" : "⏳ Menunggu Verifikasi Career Center"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <Button type="button" variant="outline" size="sm" onClick={addEdu}>
-                <Plus className="size-4" /> Tambah Pendidikan
-              </Button>
-            </div>
-          </FormSection>
-
-          {/* ── Competency Framework ── */}
-          <FormSection id="sec-skills" title="Framework Kompetensi (Competencies)">
-            <div className="space-y-4">
-              {/* 1. Hard Competencies */}
-              <Field
-                label="1. Hard Competencies (Kompetensi Teknis)"
-                hint="Ketik nama kompetensi teknis lalu tekan koma (,) atau Enter. Contoh: UI/UX Design, Data Analysis, SEO"
-              >
-                <CompetencyTagInput
-                  tags={profile.hardCompetencies?.length ? profile.hardCompetencies : profile.skills}
-                  onChange={(tags) =>
-                    setProfile((c) => ({
-                      ...c,
-                      skills: tags,
-                      hardCompetencies: tags,
-                    }))
-                  }
-                  colorScheme="purple"
-                  placeholder="Ketik kompetensi teknis lalu tekan koma / Enter..."
-                />
-              </Field>
-
-              {/* 2. Tools */}
-              <Field
-                label="2. Tools &amp; Software Pendukung"
-                hint="Ketik nama software/tools lalu tekan koma (,) atau Enter. Contoh: Figma, VS Code, Notion, Docker"
-              >
-                <CompetencyTagInput
-                  tags={profile.tools}
-                  onChange={(tags) =>
-                    setProfile((c) => ({
-                      ...c,
-                      tools: tags,
-                    }))
-                  }
-                  colorScheme="slate"
-                  placeholder="Ketik tools lalu tekan koma / Enter..."
-                />
-              </Field>
-
-              {/* 3. Soft Skills */}
-              <Field
-                label="3. Soft Skills (Kompetensi Interpersonal)"
-                hint="Ketik soft skill lalu tekan koma (,) atau Enter. Contoh: Problem Solving, Leadership, Team Collaboration"
-              >
-                <CompetencyTagInput
-                  tags={profile.softSkills ?? []}
-                  onChange={(tags) =>
-                    setProfile((c) => ({
-                      ...c,
-                      softSkills: tags,
-                    }))
-                  }
-                  colorScheme="emerald"
-                  placeholder="Ketik soft skill lalu tekan koma / Enter..."
-                />
-              </Field>
-            </div>
-          </FormSection>
-
-          {/* ── Portfolio ── */}
-          <FormSection
-            id="sec-portfolio"
-            title="Portofolio"
-            icon={<ExternalLink className="size-4 text-primary" />}
-          >
-            <div className="space-y-3">
-              {profile.portfolio.map((item, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    className={inputCls + " flex-1"}
-                    value={item}
-                    onChange={(e) => updatePortfolio(i, e.target.value)}
-                    placeholder="https://link-ke-project.com atau nama project"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePortfolio(i)}
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label="Hapus portofolio"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  )}
                 </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addPortfolio}>
-                <Plus className="size-4" /> Tambah Link / Proyek
-              </Button>
-            </div>
-          </FormSection>
+              </div>
+            )}
+
+            {/* Stepper Footer Controls */}
+            {!viewAll && (
+              <div className="flex items-center justify-between border-t border-border/60 pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handlePrevSection}
+                  disabled={activeIndex === 0}
+                  className="gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
+                >
+                  <ChevronLeft className="size-3.5" />
+                  <span>Sebelumnya</span>
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  {activeIndex < SECTIONS.length - 1 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleNextSection}
+                      className="gap-1.5 text-xs font-medium"
+                    >
+                      <span>Lanjut ke {SECTIONS[activeIndex + 1].shortLabel}</span>
+                      <ChevronRight className="size-3.5" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="gap-1.5 text-xs font-medium"
+                    >
+                      {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                      <span>Simpan Seluruh Profil</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {message && (
-              <p className="rounded-lg bg-muted px-4 py-3 text-sm text-primary" role="status">
+              <p className="rounded-lg bg-muted/60 px-3.5 py-2.5 text-xs text-muted-foreground" role="status">
                 {message}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <p className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-          <ShieldCheck className="size-3.5 text-primary" />
-          Kamu mengontrol field yang dipublikasikan. Screening recruiter tidak memakai financial atau credit data.
-        </p>
+          <p className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+            <ShieldCheck className="size-3.5 text-muted-foreground shrink-0" />
+            <span>Kamu memiliki kontrol penuh atas data yang dipublikasikan. Screening rekruter aman dan terenkripsi.</span>
+          </p>
+        </div>
+
+        {/* Right Column: Sticky Live Preview Dock */}
+        <div
+          className={cn(
+            "lg:col-span-5 xl:col-span-5 lg:sticky lg:top-24 lg:h-[calc(100vh-12em)] pb-2",
+            mobileTab === "editor" && "hidden lg:block"
+          )}
+        >
+          <CvDownload profile={profile} />
+        </div>
       </div>
 
-      {/* Right Column: Sticky Live Preview Dock */}
-      <div
-        className={cn(
-          "lg:col-span-5 xl:col-span-5 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]",
-          mobileTab === "editor" && "hidden lg:block"
-        )}
-      >
-        <CvDownload profile={profile} />
-      </div>
-    </div>
+      {/* Floating Unsaved Changes Bar */}
+      <CvUnsavedBar
+        show={isDirty || saving}
+        saving={saving}
+        shaking={shaking}
+        shakeKey={shakeCount}
+        onSave={handleSave}
+        onReset={handleReset}
+      />
 
-    {/* Floating Unsaved Changes Bar */}
-    <CvUnsavedBar
-      show={isDirty || saving}
-      saving={saving}
-      shaking={false}
-      onSave={handleSave}
-      onReset={handleReset}
-    />
-
-    <ProfessionalSummaryModal
-      open={summaryModalOpen}
-      onOpenChange={setSummaryModalOpen}
-      currentSummary={profile.about}
-      cvProfile={profile}
-      onApply={async (newSummary) => {
-        update("about", newSummary);
-        if (profile.id && profile.id !== "new-cv") {
-          const updated = {
-            ...profile,
-            about: newSummary,
-          };
-          await saveCvProfile(updated);
-          setSavedSnapshot(serializeCvData(updated));
-        }
-      }}
-    />
+      <ProfessionalSummaryModal
+        open={summaryModalOpen}
+        onOpenChange={setSummaryModalOpen}
+        currentSummary={profile.about}
+        cvProfile={profile}
+        onApply={async (newSummary) => {
+          update("about", newSummary);
+          if (profile.id && profile.id !== "new-cv") {
+            const updated = {
+              ...profile,
+              about: newSummary,
+            };
+            await saveCvProfile(updated);
+            setSavedSnapshot(serializeCvData(updated));
+          }
+        }}
+      />
 
       <PersonalityModal
         open={personalityModalOpen}

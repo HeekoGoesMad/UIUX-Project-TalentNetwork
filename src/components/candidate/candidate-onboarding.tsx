@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
+  BadgeCheck,
   BriefcaseBusiness,
   Check,
   GraduationCap,
@@ -16,6 +17,7 @@ import {
   Rocket,
   ShieldCheck,
   Sparkles,
+  User,
   UserRound,
   X,
 } from "lucide-react";
@@ -550,8 +552,7 @@ export function CandidateOnboarding() {
               ProofyLink
             </div>
             <div className="mt-16">
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-purple-200">Onboarding kandidat</p>
-              <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight">Bangun profil yang terasa seperti kamu.</h1>
+              <h1 className="text-3xl font-bold leading-tight tracking-tight">Bangun profil yang terasa seperti kamu.</h1>
               <p className="mt-4 text-sm leading-6 text-slate-300">Jawab beberapa pertanyaan singkat. Kamu tetap memegang kendali sebelum profil dipublikasikan.</p>
             </div>
             <div className="mt-auto space-y-2">
@@ -598,10 +599,10 @@ export function CandidateOnboarding() {
             <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-widest text-primary">
-                    Langkah {String(step + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
+                  <h2 className="text-xl font-bold text-foreground md:text-2xl">{steps[step].title}</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Langkah {step + 1} dari {steps.length} · {steps[step].note}
                   </p>
-                  <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">{steps[step].title}</h2>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-semibold text-muted-foreground">{Math.round(((step + 1) / steps.length) * 100)}% selesai</p>
@@ -730,18 +731,21 @@ function TalentCategoryStep({ value, onChange }: { value: TalentCategory; onChan
         {(Object.keys(TALENT_CATEGORY_CONFIG) as TalentCategory[]).map((category) => {
           const config = TALENT_CATEGORY_CONFIG[category];
           const isSelected = value === category;
+          const CategoryIcon = category === "djoin-verified" ? BadgeCheck : User;
           return (
             <button
               type="button"
               key={category}
               onClick={() => onChange(category)}
               aria-pressed={isSelected}
-              className={`rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`rounded-2xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-xs" : "bg-card border-border"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-2xl">{config.badge}</span>
+                <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                  <CategoryIcon className="size-4.5" />
+                </span>
                 {isSelected && <span className="text-xs font-bold text-primary bg-secondary px-2 py-0.5 rounded-full">Dipilih</span>}
               </div>
               <strong className="mt-3 block text-base font-bold text-foreground">{config.label}</strong>
@@ -766,11 +770,11 @@ function StatusStep({ value, onChange }: { value: CareerStatus; onChange: (value
               key={status}
               onClick={() => onChange(status)}
               aria-pressed={value === status}
-              className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 value === status ? "border-primary bg-secondary ring-2 ring-primary/20" : "bg-card"
               }`}
             >
-              <span className="text-xl">{config.emoji}</span>
+              <span className={`inline-flex size-2.5 rounded-full ${config.dot}`} aria-hidden="true" />
               <strong className="mt-3 block text-sm">{careerLabels[status]}</strong>
               <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                 {status === "not-available" ? "Belum ingin menerima peluang" : "Terbuka untuk percakapan yang relevan"}
@@ -851,10 +855,11 @@ function BasicStep({
             />
           </Field>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Tentang kamu *
-          </label>
+        <Field
+          label="Tentang kamu *"
+          error={errors.about}
+          hint="Ceritakan ringkasan singkat profil, minat karier, atau keahlian utamamu. Kamu dapat menyempurnakannya nanti di workspace."
+        >
           <textarea
             required
             aria-invalid={Boolean(errors.about)}
@@ -864,14 +869,7 @@ function BasicStep({
             placeholder="Ceritakan gambaran singkat profil profesionalmu..."
             rows={4}
           />
-          {errors.about ? (
-            <p className="text-xs text-destructive">{errors.about}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Ceritakan ringkasan singkat profil, minat karier, atau keahlian utamamu. Kamu dapat menyempurnakannya nanti di workspace.
-            </p>
-          )}
-        </div>
+        </Field>
       </div>
     </Intro>
   );
@@ -957,7 +955,7 @@ function HistoryStep({
           <Card key={index} className="p-5 border-border space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs uppercase tracking-widest text-primary font-bold">
+                <span className="text-xs font-semibold text-foreground">
                   Pengalaman {index + 1}
                 </span>
                 {item.employmentType && (
@@ -1142,7 +1140,7 @@ function EducationStep({
             <Card key={index} className="p-5 border-border">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs uppercase tracking-widest text-primary font-bold">
+                  <span className="text-xs font-semibold text-foreground">
                     Pendidikan {index + 1}
                   </span>
                   {item.level && (
@@ -1325,18 +1323,18 @@ function TagsStep({
       <div className="space-y-6">
         {group(
           "skills",
-          "1. Hard Competencies (Kompetensi Teknis) *",
+          "Hard Competencies (Kompetensi Teknis) *",
           "Ketik kompetensi teknis lalu Enter (Contoh: UI/UX Design, Data Analysis, Backend Development)",
           "(Wajib, minimal 3 kompetensi)"
         )}
         {group(
           "tools",
-          "2. Tools & Teknologi Pendukung",
+          "Tools & Software Pendukung",
           "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)"
         )}
         {group(
           "softSkills",
-          "3. Soft Skills (Kompetensi Interpersonal)",
+          "Soft Skills (Kompetensi Interpersonal)",
           "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)"
         )}
       </div>

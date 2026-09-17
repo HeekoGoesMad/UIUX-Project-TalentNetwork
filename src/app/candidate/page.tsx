@@ -7,9 +7,7 @@ import {
   Briefcase,
   Building2,
   Calendar,
-  CheckCircle2,
   FileText,
-  Lock,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
@@ -18,6 +16,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useApp } from "@/providers/app-provider";
 import { useApplications } from "@/components/applications/application-ui";
 import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
@@ -65,7 +64,6 @@ function StatCell({
   unit,
   hint,
   colorClass = "text-foreground",
-  iconBgClass = "bg-muted text-muted-foreground",
 }: {
   href: string;
   icon: LucideIcon;
@@ -74,27 +72,26 @@ function StatCell({
   unit: string;
   hint: string;
   colorClass?: string;
-  iconBgClass?: string;
 }) {
   return (
     <Link href={href} className="group bg-card p-5 transition-colors hover:bg-muted/40">
       <div className="flex items-center gap-2.5">
-        <span className={`flex size-8 items-center justify-center rounded-lg transition-transform group-hover:scale-105 ${iconBgClass}`}>
+        <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-4" />
         </span>
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
-      <p className={`mt-2.5 text-2xl font-bold tracking-tight font-mono ${colorClass}`}>
-        {value} <span className="text-xs font-normal text-muted-foreground font-sans">{unit}</span>
+      <p className={`mt-2.5 font-mono text-2xl font-bold tabular-nums tracking-tight ${colorClass}`}>
+        {value} <span className="font-sans text-xs font-normal text-muted-foreground">{unit}</span>
       </p>
-      <p className="mt-1 text-xs text-muted-foreground truncate">{hint}</p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
     </Link>
   );
 }
 
 export default function CandidateHome() {
   const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
-  const { applications } = useApplications();
+  const { applications, loading } = useApplications();
 
   const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
 
@@ -123,12 +120,11 @@ export default function CandidateHome() {
     {
       href: "/candidate/applications",
       icon: Briefcase,
-      label: "Lamaran Aktif",
+      label: "Lamaran aktif",
       value: activeApplications.length,
       unit: "posisi",
       hint: "Pantau alur seleksi Anda",
       colorClass: "text-foreground",
-      iconBgClass: "bg-primary/10 text-primary",
     },
     {
       href: "/candidate/applications",
@@ -138,41 +134,37 @@ export default function CandidateHome() {
       unit: "sesi",
       hint: interviewApplications.length > 0 ? "Jadwal wawancara terjadwal" : "Belum ada jadwal",
       colorClass: interviewApplications.length > 0 ? "text-emerald-600" : "text-foreground",
-      iconBgClass: interviewApplications.length > 0 ? "bg-emerald-50 text-emerald-600" : "bg-muted text-muted-foreground",
     },
     {
       href: "/candidate/applications",
       icon: Award,
-      label: "Penawaran Kerja",
+      label: "Penawaran kerja",
       value: offerApplications.length,
       unit: "penawaran",
       hint: pendingOffer ? "Menunggu konfirmasi Anda" : "Hasil offering rekruter",
       colorClass: offerApplications.length > 0 ? "text-amber-600" : "text-foreground",
-      iconBgClass: offerApplications.length > 0 ? "bg-amber-50 text-amber-600" : "bg-muted text-muted-foreground",
     },
     {
       href: "/candidate/contact-requests",
       icon: ShieldCheck,
-      label: "Izin Skrining",
+      label: "Izin skrining",
       value: pendingConsentsCount > 0 ? pendingConsentsCount : "Aman",
       unit: pendingConsentsCount > 0 ? "menunggu" : "terlindungi",
       hint: pendingConsentsCount > 0 ? "Permintaan akses dari rekruter" : "Izin profil terkendali penuh",
       colorClass: pendingConsentsCount > 0 ? "text-amber-600" : "text-emerald-600",
-      iconBgClass: pendingConsentsCount > 0 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600",
     },
   ];
 
   return (
     <ProtectedRoute role="candidate">
-      <div className="space-y-6">
-        {/* Context Header */}
+      <div className="space-y-8">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Halo, {candidateName} 👋
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Halo, {candidateName}
             </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
-              Pantau perkembangan seleksi lamaran, izin akses rekruter, dan kesiapan kompetensi Anda.
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pantau lamaran, izin akses rekruter, dan kesiapan profil Anda.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -192,12 +184,26 @@ export default function CandidateHome() {
         </div>
 
         {/* Action Alerts */}
-        {hasAlerts && (
-          <section aria-label="Perlu perhatian" className="space-y-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Perlu Perhatian Segera
+        {loading ? (
+          <section aria-label="Perlu perhatian" className="space-y-3">
+            <Skeleton className="h-4 w-32" />
+            <Card className="overflow-hidden border-border/80 bg-card shadow-xs">
+              <div className="flex items-center gap-3.5 p-4 sm:p-5">
+                <Skeleton className="size-9 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-44" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-8 w-24 shrink-0 rounded-md" />
+              </div>
+            </Card>
+          </section>
+        ) : hasAlerts && (
+          <section aria-label="Perlu perhatian" className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">
+              Perlu perhatian
             </h2>
-            <Card className="border-amber-200/80 bg-card shadow-xs overflow-hidden">
+            <Card className="overflow-hidden border-border/80 bg-card shadow-xs">
               <div className="divide-y divide-border/60">
                 {pendingOffer && (
                   <ActionRow
@@ -247,8 +253,8 @@ export default function CandidateHome() {
         <section aria-label="Lamaran terbaru" className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-foreground">Aktivitas Lamaran Terakhir</h2>
-              <p className="text-xs text-muted-foreground">Status seleksi pada posisi yang Anda lamar</p>
+              <h2 className="text-sm font-semibold text-foreground">Lamaran terakhir</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Status seleksi pada posisi yang Anda lamar</p>
             </div>
             {applications.length > 0 && (
               <Button variant="ghost" size="sm" asChild className="text-xs font-medium text-primary hover:text-primary">
@@ -260,22 +266,42 @@ export default function CandidateHome() {
             )}
           </div>
 
-          {activeApplications.length > 0 ? (
+          {loading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-border/80 bg-card shadow-xs">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                      <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-7 w-16 rounded-md" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : activeApplications.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {activeApplications.slice(0, 3).map((app) => (
-                <Card key={app.id} className="border-border/80 bg-card hover:border-primary/40 transition-colors shadow-2xs">
-                  <CardContent className="p-4 space-y-3">
+                <Card key={app.id} className="border-border/80 bg-card shadow-xs transition-colors hover:bg-muted/40">
+                  <CardContent className="space-y-3 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-foreground truncate">
+                        <h3 className="truncate text-sm font-semibold text-foreground">
                           {app.job?.title || "Posisi Lamaran"}
                         </h3>
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground truncate mt-0.5">
+                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
                           <Building2 className="size-3 shrink-0" />
                           {app.job?.organizationName || "Perusahaan Mitra"}
                         </p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
                         app.status === "interview"
                           ? "bg-primary/10 text-primary"
                           : app.status === "offer"
@@ -286,13 +312,13 @@ export default function CandidateHome() {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                    <div className="flex items-center justify-between border-t border-border/60 pt-2.5 text-xs">
                       <span className="text-muted-foreground">
                         {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Terkirim"}
                       </span>
                       <Button variant="outline" size="sm" asChild className="h-7 px-2.5 text-xs">
                         <Link href={`/candidate/applications/${app.id}`}>
-                          Detail Alur
+                          Detail
                         </Link>
                       </Button>
                     </div>
@@ -302,83 +328,46 @@ export default function CandidateHome() {
             </div>
           ) : (
             <Card className="border-dashed border-border bg-card/50 p-6 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-3">
+              <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <Briefcase className="size-6" />
               </div>
-              <h3 className="text-sm font-bold text-foreground">Belum Ada Lamaran Aktif</h3>
-              <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                Profil Anda telah siap dilamar. Temukan peluang karier yang cocok dari lowongan terverifikasi ProofyLink.
+              <h3 className="text-sm font-semibold text-foreground">Belum ada lamaran aktif</h3>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+                Profil Anda siap dilamar. Temukan peluang yang cocok dari lowongan terverifikasi ProofyLink.
               </p>
               <Button size="sm" asChild className="mt-4 text-xs font-semibold">
                 <Link href="/jobs">
-                  Eksplorasi Lowongan Kerja
-                  <ArrowRight className="size-3.5 ml-1.5" />
+                  Lihat lowongan kerja
+                  <ArrowRight className="ml-1.5 size-3.5" />
                 </Link>
               </Button>
             </Card>
           )}
         </section>
 
-        {/* 2-Column Action Accelerators */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Card 1: AI Career Optimization */}
-          <Card className="border-border/80 bg-card shadow-2xs">
-            <CardContent className="p-5 flex flex-col justify-between h-full gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Sparkles className="size-4" />
-                  </span>
-                  <h3 className="text-sm font-bold text-foreground">AI Career Advisor</h3>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Evaluasi kecocokan CV dengan posisi target, temukan kesenjangan kompetensi (skill gaps), dan dapatkan rekomendasi langkah karier terukur.
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border/60">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <CheckCircle2 className="size-3.5 text-emerald-600" />
-                  Sinkronisasi 1-Klik ke CV
-                </span>
-                <Button variant="outline" size="sm" asChild className="text-xs font-semibold">
-                  <Link href="/candidate/career-advisor">
-                    Buka AI Advisor
-                    <ArrowRight className="size-3.5 ml-1" />
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
+        {/* Improvement shortcuts */}
+        <section aria-label="Tingkatkan profil" className="space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">Tingkatkan profil</h2>
+          <Card className="overflow-hidden border-border/80 bg-card shadow-xs">
+            <div className="divide-y divide-border/60">
+              <ActionRow
+                icon={Sparkles}
+                title="AI Career Advisor"
+                desc="Evaluasi kecocokan CV, kesenjangan skill, dan langkah karier berikutnya."
+                href="/candidate/career-advisor"
+                cta="Buka Advisor"
+              />
+              <ActionRow
+                icon={ShieldCheck}
+                title="Privasi dan verifikasi"
+                desc="Rekruter hanya melihat kontak setelah Anda memberi izin eksplisit."
+                href="/candidate/contact-requests"
+                cta="Kelola izin"
+                emerald
+              />
+            </div>
           </Card>
-
-          {/* Card 2: Privacy & Verification Trust */}
-          <Card className="border-border/80 bg-card shadow-2xs">
-            <CardContent className="p-5 flex flex-col justify-between h-full gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                    <ShieldCheck className="size-4" />
-                  </span>
-                  <h3 className="text-sm font-bold text-foreground">Privasi &amp; Verifikasi Kredensial</h3>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Data profil Anda terlindungi dengan kerangka <em>Consent-First</em>. Rekruter tidak dapat melihat data kontak sebelum mendapatkan persetujuan langsung dari Anda.
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border/60">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Lock className="size-3.5 text-emerald-600" />
-                  Kontrol Izin Penuh
-                </span>
-                <Button variant="outline" size="sm" asChild className="text-xs font-semibold">
-                  <Link href="/candidate/contact-requests">
-                    Kelola Izin Privasi
-                    <ArrowRight className="size-3.5 ml-1" />
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        </section>
 
         {/* Profile Completion / Readiness State */}
         {!readiness.complete ? (
@@ -391,9 +380,9 @@ export default function CandidateHome() {
                   <ShieldCheck className="size-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-foreground">Profil Kategori Prima &amp; Terverifikasi</p>
+                  <p className="text-sm font-semibold text-foreground">Profil lengkap dan siap dilamar</p>
                   <p className="text-xs text-muted-foreground">
-                    Semua seksi utama profil telah lengkap dan siap dipadankan dengan rekruter institusi mitra.
+                    Semua bagian utama terisi. Rekruter dapat menemukan profil Anda.
                   </p>
                 </div>
               </div>

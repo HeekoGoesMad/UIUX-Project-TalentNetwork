@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, RotateCcw, Save } from "lucide-react";
+import { useEffect } from "react";
+import { AlertTriangle, Loader2, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +9,7 @@ interface CvUnsavedBarProps {
   show: boolean;
   saving: boolean;
   shaking: boolean;
+  shakeKey?: number;
   onSave: () => void | Promise<void>;
   onReset: () => void;
 }
@@ -16,61 +18,77 @@ export function CvUnsavedBar({
   show,
   saving,
   shaking,
+  shakeKey = 0,
   onSave,
   onReset,
 }: CvUnsavedBarProps) {
+  // Mobile & Gamepad haptic vibration support when danger shake is triggered
+  useEffect(() => {
+    if (shaking && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try {
+        navigator.vibrate([40, 50, 40]);
+      } catch {
+        // Ignore vibration errors on unsupported environments
+      }
+    }
+  }, [shaking, shakeKey]);
+
   return (
     <aside
+      data-cv-unsaved-bar="true"
       role="region"
       aria-label="Notifikasi perubahan profil"
-      aria-live="polite"
+      aria-live={shaking ? "assertive" : "polite"}
       className={cn(
-        "fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 transition-all duration-300 ease-out",
+        "fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 transition-all duration-200",
         show
           ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-16 opacity-0 pointer-events-none"
+          : "translate-y-4 opacity-0 pointer-events-none"
       )}
     >
       <div
+        key={shakeKey}
         className={cn(
-          "flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl sm:rounded-full border px-4 py-3 sm:py-2.5 shadow-2xl backdrop-blur-xl transition-colors duration-200",
+          "flex flex-col items-center justify-between gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:py-2.5 transition-all duration-200",
           shaking
-            ? "animate-shake border-destructive/80 bg-destructive/15 text-destructive ring-4 ring-destructive/20 shadow-destructive/20"
-            : "border-purple-200/80 bg-white/95 text-slate-900 ring-1 ring-black/5 dark:bg-slate-900/95 dark:border-purple-900/50 dark:text-slate-100"
+            ? "animate-discord-shake border-destructive ring-2 ring-destructive/40 bg-card/95 shadow-[0_0_32px_rgba(239,68,68,0.5),0_12px_28px_rgba(0,0,0,0.35)]"
+            : "border-border/80 bg-card/95 backdrop-blur-md shadow-xl shadow-black/10"
         )}
       >
-        {/* Status Indicator */}
-        <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
-          <span className="relative flex size-2.5 shrink-0">
-            <span
-              className={cn(
-                "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                shaking ? "bg-destructive" : "bg-amber-400"
-              )}
-            />
-            <span
-              className={cn(
-                "relative inline-flex size-2.5 rounded-full",
-                shaking ? "bg-destructive" : "bg-amber-500"
-              )}
-            />
-          </span>
-          <span className="font-semibold tracking-tight">
-            {shaking ? "Simpan perubahan terlebih dahulu!" : "Ada perubahan belum disimpan"}
+        {/* Status Indicator & Alert Copy */}
+        <div className="flex items-center gap-2.5 text-sm font-medium">
+          {shaking ? (
+            <AlertTriangle className="size-4 shrink-0 text-destructive animate-pulse" />
+          ) : (
+            <span className="relative flex size-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-amber-500" />
+            </span>
+          )}
+
+          <span
+            className={cn(
+              "text-xs sm:text-sm font-medium transition-colors",
+              shaking ? "text-destructive font-semibold" : "text-foreground"
+            )}
+          >
+            {shaking
+              ? "Hati-hati — simpan atau batalkan perubahan terlebih dahulu!"
+              : "Ada perubahan belum disimpan"}
           </span>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex w-full sm:w-auto items-center justify-end gap-2">
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onReset}
             disabled={saving}
-            className="h-8 rounded-full px-3 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="h-8 rounded-lg px-3 text-xs font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground"
           >
-            <RotateCcw className="size-3.5 mr-1" />
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
             Batalkan
           </Button>
 
@@ -80,21 +98,19 @@ export function CvUnsavedBar({
             onClick={() => void onSave()}
             disabled={saving}
             className={cn(
-              "h-8 rounded-full px-4 text-xs font-semibold shadow-xs text-primary-foreground transition-transform active:scale-95",
-              shaking
-                ? "bg-destructive hover:bg-destructive/90"
-                : "bg-primary hover:bg-primary/90"
+              "h-8 rounded-lg px-4 text-xs font-medium shadow-xs transition-all",
+              shaking && "ring-2 ring-primary ring-offset-2 ring-offset-card"
             )}
           >
             {saving ? (
               <>
-                <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 Menyimpan...
               </>
             ) : (
               <>
-                <Save className="size-3.5 mr-1.5" />
-                Simpan Profil
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+                Simpan profil
               </>
             )}
           </Button>

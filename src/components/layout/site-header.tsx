@@ -308,13 +308,11 @@ export function SiteHeader() {
 
         {/* Right Actions */}
         <div className="flex shrink-0 items-center gap-2">
-          {!isPublicHeader && !isPartnerSection && visibleUser?.role !== "partner" && (
+          {!isPublicHeader && !isPartnerSection && visibleUser?.role === "recruiter" && (
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
-              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"} className="flex items-center gap-1.5">
+              <Link href="/search" className="flex items-center gap-1.5">
                 <Search className="size-3.5" />
-                <span className="hidden xl:inline text-xs">
-                  {visibleUser?.role === "candidate" ? "Eksplorasi lowongan" : "Cari talent"}
-                </span>
+                <span className="hidden xl:inline text-xs">Cari talent</span>
               </Link>
             </Button>
           )}

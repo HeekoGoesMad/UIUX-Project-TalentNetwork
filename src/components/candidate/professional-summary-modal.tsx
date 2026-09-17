@@ -11,14 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import type { CvProfile } from "@/types";
 import {
-  Briefcase,
-  Building2,
   Check,
-  Layers,
   RotateCcw,
-  Sparkles,
-  UserCheck,
-  Wrench,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -191,33 +185,26 @@ export function ProfessionalSummaryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-        <DialogHeader className="gap-1 border-b border-border pb-4 pr-10 sm:pr-12">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-lg p-4 sm:p-6">
+        <DialogHeader className="gap-1 border-b pb-4 pr-10 sm:pr-12">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="size-4" />
-              </div>
-              <DialogTitle className="text-xl font-bold text-foreground">
-                Panduan Professional Summary
-              </DialogTitle>
-            </div>
+            <DialogTitle className="text-sm font-semibold text-foreground">
+              Panduan summary profesional
+            </DialogTitle>
             {cvProfile && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleAutoPopulate}
-                className="hidden text-xs sm:inline-flex shrink-0 rounded-lg gap-1.5 border-primary/20 text-primary hover:bg-primary/5 shadow-2xs"
+                className="hidden shrink-0 gap-1.5 rounded-md text-xs font-medium sm:inline-flex"
               >
-                <Sparkles className="size-3" />
-                Isi dari Data Profil
+                Isi dari data profil
               </Button>
             )}
           </div>
-          <DialogDescription className="text-sm text-muted-foreground">
-            Bantu rekruter memahami kualifikasimu dengan formula 5 pilar standar industri:
-            Pengalaman, Kompetensi Inti, Industri, Tools, dan Kemampuan Interpersonal.
+          <DialogDescription className="text-xs text-muted-foreground">
+            Formula 5 bagian: pengalaman, kompetensi inti, industri, tools, dan soft skills.
           </DialogDescription>
         </DialogHeader>
 
@@ -226,108 +213,103 @@ export function ProfessionalSummaryModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* 1. Total Experience */}
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Briefcase className="size-3.5 text-primary" />
-                1. Total Pengalaman (Total Experience)
+              <label className="text-sm font-medium text-foreground">
+                Total pengalaman
               </label>
               <input
                 type="text"
                 value={form.totalExperience}
                 onChange={(e) => handleFieldChange("totalExperience", e.target.value)}
                 placeholder="Contoh: lebih dari 2 tahun di bidang Human Capital"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Sebutkan lama pengalaman kerja dan bidang keahlian utama.
+              <p className="text-xs text-muted-foreground">
+                Lama pengalaman dan bidang utama.
               </p>
             </div>
 
             {/* 2. Core Competencies */}
             <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Layers className="size-3.5 text-primary" />
-                2. Kompetensi Inti (Core Competencies)
+              <label className="text-sm font-medium text-foreground">
+                Kompetensi inti
               </label>
               <input
                 type="text"
                 value={form.coreCompetencies}
                 onChange={(e) => handleFieldChange("coreCompetencies", e.target.value)}
-                placeholder="Contoh: Payroll, Recruitment, HR Administration"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Contoh: Payroll, Recruitment"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Spesialisasi atau tanggung jawab inti yang paling kamu kuasai.
+              <p className="text-xs text-muted-foreground">
+                Spesialisasi yang paling dikuasai.
               </p>
             </div>
 
             {/* 3. Industry Experience */}
             <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Building2 className="size-3.5 text-primary" />
-                3. Latar Industri (Industry Experience)
+              <label className="text-sm font-medium text-foreground">
+                Latar industri
               </label>
               <input
                 type="text"
                 value={form.industryExperience}
                 onChange={(e) => handleFieldChange("industryExperience", e.target.value)}
-                placeholder="Contoh: Financial Technology dan Hospitality"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Contoh: Financial Technology"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Sektor bisnis atau industri tempat kamu pernah berkontribusi.
+              <p className="text-xs text-muted-foreground">
+                Sektor tempat pernah berkontribusi.
               </p>
             </div>
 
             {/* 4. Tools & Hard Skills */}
             <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Wrench className="size-3.5 text-primary" />
-                4. Tools dan Hard Skill
+              <label className="text-sm font-medium text-foreground">
+                Tools dan hard skill
               </label>
               <input
                 type="text"
                 value={form.toolsAndHardSkills}
                 onChange={(e) => handleFieldChange("toolsAndHardSkills", e.target.value)}
-                placeholder="Contoh: Talenta HRIS, Google Workspace, Looker Studio"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Contoh: Talenta HRIS, Google Workspace"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Software, sistem, platform, atau metode teknis yang dikuasai.
+              <p className="text-xs text-muted-foreground">
+                Software atau metode teknis yang dikuasai.
               </p>
             </div>
 
             {/* 5. Soft Skills */}
             <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <UserCheck className="size-3.5 text-primary" />
-                5. Kemampuan Interpersonal (Soft Skills)
+              <label className="text-sm font-medium text-foreground">
+                Soft skills
               </label>
               <input
                 type="text"
                 value={form.softSkills}
                 onChange={(e) => handleFieldChange("softSkills", e.target.value)}
-                placeholder="Contoh: komunikasi, networking, dan public speaking"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Contoh: komunikasi dan public speaking"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Sikap kerja, gaya komunikasi, atau keahlian kolaborasi tim.
+              <p className="text-xs text-muted-foreground">
+                Gaya komunikasi dan kolaborasi.
               </p>
             </div>
           </div>
 
           {/* Live Preview Box */}
-          <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="space-y-2 rounded-md border bg-muted p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                Pratinjau Kalimat Summary
+              <span className="text-sm font-semibold text-foreground">
+                Pratinjau summary
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleToggleManualEdit}
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                 >
-                  {isManualEdit ? "Kembalikan ke Auto-Generate" : "Edit Teks Manual"}
+                  {isManualEdit ? "Kembali ke otomatis" : "Edit manual"}
                 </button>
               </div>
             </div>
@@ -337,16 +319,16 @@ export function ProfessionalSummaryModal({
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
                 rows={4}
-                className="w-full rounded-md border border-primary/30 bg-background p-3 text-sm leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-md border bg-background p-3 text-sm leading-relaxed text-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
                 placeholder="Tulis atau sesuaikan summary di sini..."
               />
             ) : (
-              <div className="min-h-[72px] rounded-md bg-background/80 p-3 text-sm leading-relaxed text-foreground shadow-xs">
+              <div className="min-h-[72px] rounded-md bg-background p-3 text-sm leading-relaxed text-foreground shadow-xs">
                 {previewText ? (
                   <span>{previewText}</span>
                 ) : (
                   <span className="italic text-muted-foreground">
-                    Isi poin-poin di atas untuk melihat kalimat ringkasan profesional yang tersusun otomatis di sini...
+                    Isi poin di atas untuk melihat ringkasan otomatis...
                   </span>
                 )}
               </div>
@@ -354,7 +336,7 @@ export function ProfessionalSummaryModal({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col-reverse items-center justify-between gap-2 border-t border-border pt-4 sm:flex-row">
+        <DialogFooter className="flex flex-col-reverse items-center justify-between gap-2 border-t pt-4 sm:flex-row">
           <Button
             type="button"
             variant="ghost"
@@ -362,8 +344,8 @@ export function ProfessionalSummaryModal({
             onClick={handleReset}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            <RotateCcw className="mr-1.5 size-3.5" />
-            Reset Form
+            <RotateCcw className="mr-1.5 h-4 w-4" />
+            Reset
           </Button>
 
           <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
@@ -371,6 +353,7 @@ export function ProfessionalSummaryModal({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="rounded-md"
             >
               Batal
             </Button>
@@ -378,10 +361,10 @@ export function ProfessionalSummaryModal({
               type="button"
               onClick={handleApply}
               disabled={isApplying || !previewText.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-md"
             >
-              <Check className="mr-1.5 size-4" />
-              {isApplying ? "Menyimpan..." : "Terapkan ke Profil & CV"}
+              <Check className="mr-1.5 h-4 w-4" />
+              {isApplying ? "Menyimpan..." : "Terapkan"}
             </Button>
           </div>
         </DialogFooter>

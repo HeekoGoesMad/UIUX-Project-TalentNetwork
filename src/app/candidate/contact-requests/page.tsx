@@ -5,12 +5,11 @@ import {
   ArrowRight,
   Building2,
   Check,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
-  Scale,
   Shield,
   ShieldCheck,
-  UserCheck,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +18,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 import type { ConsentState } from "@/types";
 
@@ -50,6 +50,8 @@ const FIVE_PILLARS = [
   },
 ];
 
+const HISTORY_PER_PAGE = 5;
+
 export default function ContactRequestsPage() {
   const {
     user,
@@ -61,6 +63,7 @@ export default function ContactRequestsPage() {
   } = useApp();
 
   const [actingId, setActingId] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
 
   // Normalize all screening / contact requests
   const formattedRequests = useMemo(() => {
@@ -95,6 +98,18 @@ export default function ContactRequestsPage() {
   const approvedRequests = formattedRequests.filter((r) => r.state === "consented");
   const declinedRequests = formattedRequests.filter((r) => r.state === "declined");
 
+  const combinedHistory = useMemo(() => {
+    return [...approvedRequests, ...declinedRequests].sort(
+      (a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
+    );
+  }, [approvedRequests, declinedRequests]);
+
+  const totalHistoryPages = Math.ceil(combinedHistory.length / HISTORY_PER_PAGE);
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * HISTORY_PER_PAGE;
+    return combinedHistory.slice(start, start + HISTORY_PER_PAGE);
+  }, [combinedHistory, historyPage]);
+
   const handleAction = async (candidateId: string, itemId: string, action: "consented" | "declined") => {
     setActingId(itemId);
     try {
@@ -118,108 +133,70 @@ export default function ContactRequestsPage() {
   return (
     <ProtectedRoute role="candidate">
       <div className="space-y-8">
-        {/* Header */}
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Pusat Izin &amp; Privasi Skrining
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Izin &amp; Privasi
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground max-w-3xl">
-            ProofyLink beroperasi dengan prinsip <strong>Consent-First</strong>. Rekruter hanya dapat mengakses kontak lengkap dan ringkasan kecocokan risiko setelah mendapatkan izin eksplisit darimu.
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Rekruter hanya dapat melihat kontak dan ringkasan kecocokan setelah Anda memberi izin eksplisit untuk tiap perusahaan.
           </p>
         </div>
 
-        {/* 3 Value Pillars Callout */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-border/80 bg-card shadow-2xs">
-            <CardContent className="p-5">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                <ShieldCheck className="size-5" />
-              </span>
-              <h3 className="mt-3 text-sm font-semibold text-foreground">Kendali Penuh di Tanganmu</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Data kontak dan profil pribadimu tidak pernah dijual atau disiarkan tanpa izin eksplisit per perusahaan.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80 bg-card shadow-2xs">
-            <CardContent className="p-5">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Scale className="size-5" />
-              </span>
-              <h3 className="mt-3 text-sm font-semibold text-foreground">0 Biaya Kandidat</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Setiap pemindaian profil memotong 1 token dari kuota rekruter. Kamu tidak dikenakan biaya apa pun.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80 bg-card shadow-2xs">
-            <CardContent className="p-5">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                <UserCheck className="size-5" />
-              </span>
-              <h3 className="mt-3 text-sm font-semibold text-foreground">Penilaian Objektif &amp; Adil</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Skrining ProofyLink mengevaluasi kelayakan peran secara transparan, tanpa diskriminasi atribut sensitif.
-              </p>
-            </CardContent>
-          </Card>
+        <div className="flex items-start gap-3 rounded-xl border border-border/80 bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+          <span>
+            Data kontak Anda tidak pernah dibagikan tanpa persetujuan eksplisit. Menyetujui atau menolak tidak dipungut biaya dan tidak memengaruhi kelulusan akun Anda.
+          </span>
         </div>
 
         {/* Pending Requests Section */}
-        <div className="space-y-4">
+        <section aria-label="Permintaan menunggu" className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                Permintaan Menunggu Persetujuan
+              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+                Menunggu Keputusan
                 {pendingRequests.length > 0 && (
-                  <Badge className="bg-amber-500 text-white font-mono text-xs">
+                  <Badge className="bg-amber-500 font-mono text-xs text-white tabular-nums">
                     {pendingRequests.length}
                   </Badge>
                 )}
               </h2>
-              <p className="text-xs text-muted-foreground">
-                Tinjau perusahaan yang mengajukan akses kontak untuk proses wawancara.
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Tinjau perusahaan yang meminta akses kontak untuk proses wawancara.
               </p>
             </div>
           </div>
 
           {pendingRequests.length === 0 ? (
-            <Card className="border-dashed border-border bg-card/50">
-              <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <CheckCircle2 className="size-6 text-emerald-600" />
-                </div>
-                <h3 className="mt-3 text-sm font-semibold text-foreground">Tidak Ada Permintaan Tertunda</h3>
-                <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                  Semua permintaan izin kontak telah kamu tindaklanjuti. Rekruter baru yang ingin menghubungimu akan muncul di sini.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={ShieldCheck}
+              title="Tidak ada permintaan tertunda"
+              description="Semua permintaan izin sudah Anda tindaklanjuti. Permintaan baru dari rekruter akan muncul di sini."
+              className="border border-dashed border-border/80 bg-card/60 p-8 shadow-none"
+            />
           ) : (
             <div className="space-y-3">
               {pendingRequests.map((req) => (
-                <Card key={req.itemId} className="border-amber-200/80 bg-card shadow-xs">
-                  <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5">
+                <Card key={req.itemId} className="border-border/80 bg-card shadow-xs transition-colors hover:border-border">
+                  <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-start gap-3.5">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                         <Building2 className="size-5" />
                       </span>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-foreground">{req.company}</h3>
-                          <Badge variant="outline" className="text-xs text-amber-700 bg-amber-50 border-amber-200">
-                            Menunggu Konfirmasi
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-foreground">{req.company}</h3>
+                          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-[11px] font-medium text-amber-700">
+                            Menunggu konfirmasi
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          Diajukan oleh: <span className="font-medium text-foreground">{req.recruiterName}</span>
+                          Diajukan oleh <span className="font-medium text-foreground">{req.recruiterName}</span>
                           {req.email ? ` • ${req.email}` : ""}
                         </p>
                         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Clock3 className="size-3.5" />
-                          Diajukan pada {new Date(req.requestedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                          Diajukan {new Date(req.requestedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
                         </p>
                       </div>
                     </div>
@@ -230,18 +207,18 @@ export default function ContactRequestsPage() {
                         variant="outline"
                         disabled={actingId === req.itemId}
                         onClick={() => handleAction(req.candidateId, req.itemId, "declined")}
-                        className="text-xs font-medium text-muted-foreground hover:text-destructive"
+                        className="text-xs font-medium"
                       >
-                        <X className="size-3.5 mr-1" /> Tolak
+                        <X className="mr-1 size-3.5" /> Tolak
                       </Button>
                       <Button
                         size="sm"
                         variant="default"
                         disabled={actingId === req.itemId}
                         onClick={() => handleAction(req.candidateId, req.itemId, "consented")}
-                        className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                        className="bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
                       >
-                        <Check className="size-3.5 mr-1" /> Berikan Izin
+                        <Check className="mr-1 size-3.5" /> Beri izin
                       </Button>
                     </div>
                   </CardContent>
@@ -249,100 +226,164 @@ export default function ContactRequestsPage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* History / Active Authorizations */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Riwayat Otorisasi Kontak</h2>
-            <p className="text-xs text-muted-foreground">
-              Daftar rekruter yang telah kamu berikan izin atau kamu tolak sebelumnya.
-            </p>
+        <section aria-label="Riwayat otorisasi" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Riwayat Otorisasi</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Rekruter yang pernah Anda beri izin atau tolak.
+              </p>
+            </div>
+            {combinedHistory.length > 0 && (
+              <span className="text-xs text-muted-foreground tabular-nums font-mono">
+                {combinedHistory.length} catatan
+              </span>
+            )}
           </div>
 
-          {approvedRequests.length === 0 && declinedRequests.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-8 text-center text-xs text-muted-foreground">
-                Belum ada riwayat otorisasi kontak.
-              </CardContent>
-            </Card>
+          {combinedHistory.length === 0 ? (
+            <EmptyState
+              icon={Clock3}
+              title="Belum ada riwayat otorisasi"
+              description="Riwayat izin kontak dan verifikasi skrining yang pernah Anda tentukan akan tercatat di sini."
+              className="border border-dashed border-border/80 bg-card/60 p-8 shadow-none"
+            />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xs">
-              <div className="divide-y divide-border/60">
-                {approvedRequests.map((req) => (
-                  <div key={req.itemId} className="flex items-center justify-between p-4 text-xs sm:text-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-7 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">
-                        <Check className="size-4" />
-                      </span>
-                      <div>
-                        <p className="font-semibold text-foreground">{req.company}</p>
-                        <p className="text-xs text-muted-foreground">{req.recruiterName}</p>
+            <div className="space-y-3">
+              <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
+                <div className="divide-y divide-border/60">
+                  {paginatedHistory.map((req) => {
+                    const isConsented = req.state === "consented";
+                    return (
+                      <div key={req.itemId} className="flex items-center justify-between p-4 text-xs sm:text-sm">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                              isConsented ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                            }`}
+                          >
+                            {isConsented ? <Check className="size-4" /> : <X className="size-4" />}
+                          </span>
+                          <div>
+                            <p className="font-semibold text-foreground">{req.company}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {req.recruiterName} • {new Date(req.requestedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            isConsented
+                              ? "text-emerald-700 bg-emerald-50 border-emerald-200 text-xs font-medium"
+                              : "text-muted-foreground bg-muted text-xs font-medium"
+                          }
+                        >
+                          {isConsented ? "Izin Aktif" : "Ditolak"}
+                        </Badge>
                       </div>
-                    </div>
-                    <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 text-xs">
-                      Izin Aktif
-                    </Badge>
-                  </div>
-                ))}
-                {declinedRequests.map((req) => (
-                  <div key={req.itemId} className="flex items-center justify-between p-4 text-xs sm:text-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-7 items-center justify-center rounded-md bg-red-50 text-red-600">
-                        <X className="size-4" />
-                      </span>
-                      <div>
-                        <p className="font-semibold text-foreground">{req.company}</p>
-                        <p className="text-xs text-muted-foreground">{req.recruiterName}</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="text-muted-foreground bg-muted text-xs">
-                      Ditolak
-                    </Badge>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Numbered Pagination */}
+              {totalHistoryPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                  <span className="tabular-nums">
+                    Halaman {historyPage} dari {totalHistoryPages}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                      disabled={historyPage <= 1}
+                      className="h-8 px-2 text-xs"
+                      aria-label="Halaman sebelumnya"
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      <span className="hidden sm:inline">Sebelumnya</span>
+                    </Button>
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalHistoryPages }, (_, idx) => idx + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setHistoryPage(pageNum)}
+                          aria-current={pageNum === historyPage ? "page" : undefined}
+                          className={`flex size-8 items-center justify-center rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                            pageNum === historyPage
+                              ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                      disabled={historyPage >= totalHistoryPages}
+                      className="h-8 px-2 text-xs"
+                      aria-label="Halaman berikutnya"
+                    >
+                      <span className="hidden sm:inline">Berikutnya</span>
+                      <ChevronRight className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* 5-Pillar Disclosure Transparency Box */}
-        <Card className="border-border bg-card shadow-2xs">
-          <CardHeader className="pb-3 border-b">
-            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-              <Shield className="size-4.5 text-primary" />
-              Transparansi Kerangka 5 Pilar Skrining ProofyLink
+        {/* 5 Pillars Screening Info Card */}
+        <Card className="border-border/80 bg-card shadow-xs">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Shield className="size-4 text-muted-foreground" />
+              Aspek Penilaian Skrining
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              Ketika rekruter menjalankan skrining kesiapan karier dengan izinmu, berikut adalah 5 pilar berbobot yang dianalisis:
+              Jika Anda memberi izin, rekruter menilai keselarasan peran lewat 5 aspek berbobot berikut:
             </CardDescription>
           </CardHeader>
           <CardContent className="p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {FIVE_PILLARS.map((pillar) => (
-                <div key={pillar.name} className="rounded-lg border border-border/80 bg-muted/30 p-3.5 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-xs text-foreground">{pillar.name}</span>
-                    <span className="font-mono text-[11px] font-bold text-primary">{pillar.weight}</span>
+                <div key={pillar.name} className="rounded-lg border border-border/70 bg-muted/20 p-3.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-foreground">{pillar.name}</span>
+                    <Badge variant="secondary" className="font-mono text-[11px] font-semibold tabular-nums">
+                      {pillar.weight}
+                    </Badge>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">{pillar.desc}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{pillar.desc}</p>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[11px] text-muted-foreground border-t pt-3">
-              * Skrining ProofyLink tidak pernah mengevaluasi riwayat gaji, kondisi finansial personal, kredit perbankan, atau atribut yang dilindungi undang-undang ketenagakerjaan.
+            <p className="mt-4 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+              Skrining tidak menilai gaji, kondisi finansial personal, riwayat kredit, atau atribut yang dilindungi undang-undang ketenagakerjaan.
             </p>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
-          <Button variant="outline" asChild>
-            <Link href="/candidate">Kembali ke Dashboard</Link>
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-end">
+          <Button variant="outline" asChild size="sm">
+            <Link href="/candidate">Kembali ke workspace</Link>
           </Button>
-          <Button asChild>
+          <Button asChild size="sm" className="font-semibold">
             <Link href="/notifications">
-              Buka Notifikasi
-              <ArrowRight className="size-4 ml-1.5" />
+              Buka notifikasi
+              <ArrowRight className="ml-1.5 size-4" />
             </Link>
           </Button>
         </div>
