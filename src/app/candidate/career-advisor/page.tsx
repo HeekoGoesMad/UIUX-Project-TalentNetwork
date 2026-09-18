@@ -10,7 +10,7 @@ export default function CareerAdvisorPage() {
             AI Career Hub
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Evaluasi CV menyeluruh, analisis kesenjangan skill terhadap target posisi, dan rancang konsultasi langkah karir strategis berbasis AI. Hasil bersifat draf rekomendasi untuk ditinjau.
+            Evaluasi profil profesional Anda untuk menemukan area yang dapat ditingkatkan agar lebih menarik bagi recruiter dan sistem ATS.
           </p>
         </div>
         <CareerAdvisorWorkspace initialFocus="cv_review" />

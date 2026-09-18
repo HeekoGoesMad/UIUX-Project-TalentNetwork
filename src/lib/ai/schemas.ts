@@ -7,6 +7,11 @@ export const profileContextSchema = z.object({
   targetRole: z.string().max(120).default(""),
   location: z.string().max(120).default(""),
   customInstruction: z.string().max(1000).optional().default(""),
+  profileJson: z.record(z.string(), z.unknown()).optional(),
+  cvReviewResult: z.record(z.string(), z.unknown()).optional(),
+  gapAnalysisResult: z.record(z.string(), z.unknown()).optional(),
+  consultationTopic: z.string().optional(),
+  consultationQuestion: z.string().max(1000).optional(),
 });
 
 export const summarySchema = z.object({
@@ -24,10 +29,21 @@ export const structuredAdviceSchema = z.object({
   conclusion: z.string(),
 });
 
+export const improvementAreaSchema = z.object({
+  aspect: z.string(),
+  impact: z.string(),
+  recommendation: z.string(),
+});
+
 export const cvReviewPillarSchema = z.object({
   readinessLevel: z.string(),
   overallScore: z.number().min(0).max(100),
-  executiveSummary: z.string(),
+  profileSummary: z.string(),
+  keyStrengths: z.array(z.string()),
+  areasForImprovement: z.array(improvementAreaSchema),
+  recruiterPerspective: z.string(),
+  priorityRecommendations: z.array(z.string()),
+  executiveSummary: z.string().default(""),
   sectionAudits: z.array(
     z.object({
       section: z.string(),
@@ -35,15 +51,15 @@ export const cvReviewPillarSchema = z.object({
       notes: z.array(z.string()),
       recommendation: z.string(),
     })
-  ),
+  ).default([]),
   formatChecks: z.array(
     z.object({
       check: z.string(),
       passed: z.boolean(),
       tip: z.string(),
     })
-  ),
-  priorityActionItems: z.array(z.string()),
+  ).default([]),
+  priorityActionItems: z.array(z.string()).default([]),
   summary: z.string(),
   structuredAdvice: structuredAdviceSchema,
   answer: z.string(),
@@ -55,13 +71,23 @@ export const gapAnalysisPillarSchema = z.object({
   targetRole: z.string(),
   matchScore: z.number().min(0).max(100),
   matchLevel: z.string(),
+  currentPosition: z.string().default(""),
+  readinessScore: z.number().min(0).max(100).default(70),
+  readinessReason: z.string().default(""),
+  existingCompetencies: z.array(z.string()).default([]),
+  competencyGaps: z.array(z.string()).default([]),
+  experienceGaps: z.array(z.string()).default([]),
+  toolGaps: z.array(z.string()).default([]),
+  recommendedCertifications: z.array(z.string()).default([]),
+  developmentPriorities: z.array(z.string()).default([]),
+  estimatedDevelopmentTime: z.string().default("3 — 6 Bulan"),
   coreCompetencies: z.array(
     z.object({
       competency: z.string(),
       candidateLevel: z.string(),
       requiredLevel: z.string(),
       status: z.enum(["match", "gap", "exceeds"]),
-      recommendation: z.string(),
+      recommendation: z.string().default(""),
     })
   ),
   criticalGaps: z.array(z.string()),
@@ -73,6 +99,8 @@ export const gapAnalysisPillarSchema = z.object({
   nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
 });
+
+export type GapAnalysisPillarData = z.infer<typeof gapAnalysisPillarSchema>;
 
 export const careerRoadmapPillarSchema = z.object({
   targetRole: z.string(),
@@ -97,10 +125,36 @@ export const careerRoadmapPillarSchema = z.object({
   limitations: z.array(z.string()),
 });
 
+export const consultationRecommendationSchema = z.object({
+  focusArea: z.string(),
+  title: z.string(),
+  description: z.string(),
+  actionableTip: z.string(),
+});
+
+export const consultationNextStepSchema = z.object({
+  stepNumber: z.number(),
+  title: z.string(),
+  timeline: z.string(),
+  action: z.string(),
+  expectedOutcome: z.string(),
+});
+
+export const consultationAnalysisSchema = z.object({
+  overallAssessment: z.string(),
+  profileReadiness: z.string(),
+  missingDataNotices: z.array(z.string()).default([]),
+  cvReviewHighlights: z.string().default(""),
+  gapAnalysisHighlights: z.string().default(""),
+});
+
 export const careerConsultationPillarSchema = z.object({
   targetRole: z.string(),
   targetTimeline: z.string(),
   targetLevel: z.string(),
+  analysis: consultationAnalysisSchema,
+  recommendations: z.array(consultationRecommendationSchema),
+  nextSteps: z.array(consultationNextStepSchema),
   phases: z.array(
     z.object({
       phaseNumber: z.number(),
@@ -110,14 +164,13 @@ export const careerConsultationPillarSchema = z.object({
       keyActions: z.array(z.string()),
       milestone: z.string(),
     })
-  ),
-  recommendedCertifications: z.array(z.string()),
-  strategicAdvice: z.array(z.string()),
+  ).default([]),
+  recommendedCertifications: z.array(z.string()).default([]),
+  strategicAdvice: z.array(z.string()).default([]),
   interviewPitchTips: z.array(z.string()).default([]),
   summary: z.string(),
   structuredAdvice: structuredAdviceSchema,
   answer: z.string(),
-  nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
 });
 
@@ -225,6 +278,9 @@ export const advisorSchema = z.object({
     targetRole: z.string(),
     targetTimeline: z.string(),
     targetLevel: z.string(),
+    analysis: consultationAnalysisSchema.optional(),
+    recommendations: z.array(consultationRecommendationSchema).default([]),
+    actionSteps: z.array(consultationNextStepSchema).default([]),
     phases: z.array(z.object({
       phaseNumber: z.number(),
       phaseName: z.string(),
@@ -232,9 +288,9 @@ export const advisorSchema = z.object({
       outcome: z.string(),
       keyActions: z.array(z.string()),
       milestone: z.string(),
-    })),
-    recommendedCertifications: z.array(z.string()),
-    strategicAdvice: z.array(z.string()),
+    })).default([]),
+    recommendedCertifications: z.array(z.string()).default([]),
+    strategicAdvice: z.array(z.string()).default([]),
     interviewPitchTips: z.array(z.string()).default([]),
   }).optional(),
   careerRoadmapDetails: z.object({

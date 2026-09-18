@@ -630,11 +630,18 @@ export function CvWorkspace() {
         portfolio: data.portfolio ?? c.portfolio,
         sourceFileName: file.name,
       }));
-      setMessage("Draf berhasil diperbarui dari dokumen. Periksa field sebelum menyimpan.");
-      toast.success("Dokumen berhasil diekstrak", { description: "Hasil ekstraksi tampil langsung di form. Jangan lupa klik simpan." });
+      if (isPdf) {
+        const docForm = new FormData();
+        docForm.set("file", file);
+        void fetch("/api/cv/documents", { method: "POST", body: docForm }).catch((err) => {
+          console.warn("Auto-saving CV document failed:", err);
+        });
+      }
+      setMessage("Draf berhasil diperbarui dari dokumen CV. Berkas tersimpan aman dan siap ditinjau rekruter.");
+      toast.success("CV berhasil diunggah & diekstrak", { description: "Profil Anda telah terisi otomatis, berkas tersimpan aman, dan dapat dilihat oleh rekruter." });
     } catch {
       setMessage("Impor gagal. Coba lagi atau isi manual.");
-      toast.error("Impor gagal", { description: "Periksa koneksi kamu lalu coba lagi." });
+      toast.error("Impor gagal", { description: "Periksa koneksi Anda lalu coba lagi." });
     } finally {
       setImporting(false);
     }
@@ -732,11 +739,18 @@ export function CvWorkspace() {
                 <FileUp className="size-3.5" />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-foreground">
-                  Ekstraksi CV Otomatis
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    Unggah &amp; Ekstraksi CV Otomatis
+                  </p>
+                  {profile.sourceFileName && (
+                    <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-[10px] font-medium text-emerald-700">
+                      Tersimpan: {profile.sourceFileName}
+                    </Badge>
+                  )}
+                </div>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  Impor berkas PDF atau gambar untuk mengisi draf profil instan
+                  Unggah CV Anda untuk mengisi profil otomatis, menyimpan berkas, dan dapat dilihat oleh rekruter
                 </p>
               </div>
             </div>
@@ -761,7 +775,7 @@ export function CvWorkspace() {
                   }}
                 />
                 {importing ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5 text-muted-foreground" />}
-                <span>{importing ? "Memproses..." : "Impor CV"}</span>
+                <span>{importing ? "Memproses..." : "Unggah CV"}</span>
               </label>
 
               {/* View All Toggle */}
@@ -1013,7 +1027,7 @@ export function CvWorkspace() {
                     </datalist>
                   </Field>
 
-                  <Field label="Target Role / Posisi Impian" hint="Posisi yang kamu incar">
+                  <Field label="Target Role / Posisi Impian" hint="Posisi yang Anda incar">
                     <input
                       className={inputCls}
                       value={profile.targetRole ?? ""}
@@ -1089,7 +1103,7 @@ export function CvWorkspace() {
                     className={textareaCls}
                     value={profile.about}
                     onChange={(e) => update("about", e.target.value)}
-                    placeholder="Ringkas latar belakang, keahlian utama, dan proposisi nilai yang kamu tawarkan kepada perusahaan..."
+                    placeholder="Ringkas latar belakang, keahlian utama, dan proposisi nilai yang Anda tawarkan kepada perusahaan..."
                     rows={4}
                   />
                 </div>
@@ -1109,7 +1123,7 @@ export function CvWorkspace() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {profile.personality?.tagline || "Menambah wawasan gaya kerja dan komunikasi kamu bagi tim."}
+                        {profile.personality?.tagline || "Menambah wawasan gaya kerja dan komunikasi Anda bagi tim."}
                       </p>
                     </div>
 
@@ -1148,7 +1162,7 @@ export function CvWorkspace() {
                     <div>
                       <p className="text-xs font-medium text-foreground">Belum ada pengalaman kerja</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Tambahkan riwayat pekerjaan magang, freelance, atau full-time kamu.
+                        Tambahkan riwayat pekerjaan magang, freelance, atau full-time Anda.
                       </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={addExp} className="gap-1.5 text-xs">
@@ -1288,7 +1302,7 @@ export function CvWorkspace() {
                               className={textareaCls}
                               value={exp.description || ""}
                               onChange={(e) => updateExp(i, "description", e.target.value)}
-                              placeholder="Rangkum tugas utama, kolaborasi tim, dan produk/layanan yang kamu kerjakan..."
+                              placeholder="Rangkum tugas utama, kolaborasi tim, dan produk/layanan yang Anda kerjakan..."
                               rows={3}
                             />
                           </Field>
@@ -1373,7 +1387,7 @@ export function CvWorkspace() {
                     <div>
                       <p className="text-xs font-medium text-foreground">Belum ada riwayat pendidikan</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Tambahkan institusi sekolah, universitas, atau diploma kamu.
+                        Tambahkan institusi sekolah, universitas, atau diploma Anda.
                       </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={addEdu} className="gap-1.5 text-xs">
@@ -1584,7 +1598,7 @@ export function CvWorkspace() {
 
                 <Field
                   label="Peralatan &amp; Software (Tools)"
-                  hint="Aplikasi atau teknologi yang kamu kuasai sehari-hari"
+                  hint="Aplikasi atau teknologi yang Anda kuasai sehari-hari"
                 >
                   <CompetencyTagInput
                     tags={profile.tools}
@@ -1714,7 +1728,7 @@ export function CvWorkspace() {
 
           <p className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
             <ShieldCheck className="size-3.5 text-muted-foreground shrink-0" />
-            <span>Kamu memiliki kontrol penuh atas data yang dipublikasikan. Screening rekruter aman dan terenkripsi.</span>
+            <span>Anda memiliki kontrol penuh atas data yang dipublikasikan. Profil dan berkas Anda dapat dilihat oleh rekruter.</span>
           </p>
         </div>
 

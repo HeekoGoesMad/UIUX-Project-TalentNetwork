@@ -19,7 +19,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ProofyLink | Talent Intelligence & HR Screening",
+  title: "Talent Network | Talent Intelligence & HR Screening",
   description: "Platform Talent Intelligence untuk membantu recruiter menemukan, memahami, dan menyaring kandidat dengan lebih cepat serta membantu talent membangun karier yang lebih baik.",
 };
 

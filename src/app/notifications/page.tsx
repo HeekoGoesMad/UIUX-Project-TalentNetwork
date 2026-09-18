@@ -415,11 +415,6 @@ export default function NotificationsPage() {
                 </Badge>
               )}
             </div>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-primary">
-              <Link href="/candidate/contact-requests">
-                Semua Izin <ChevronRight className="ml-1 size-3.5" />
-              </Link>
-            </Button>
           </div>
 
           {formattedRequests.map((req) => {
