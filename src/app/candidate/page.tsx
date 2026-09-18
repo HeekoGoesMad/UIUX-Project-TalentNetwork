@@ -90,20 +90,12 @@ function StatCell({
 }
 
 export default function CandidateHome() {
-  const { user, cvProfile, screeningConsents, consentRequests, dbMode } = useApp();
+  const { user, cvProfile } = useApp();
   const { applications, loading } = useApplications();
 
   const candidateName = cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional";
 
   const readiness = calculateCandidateReadiness(cvProfile);
-
-  const pendingConsentsCount = dbMode
-    ? consentRequests.filter(
-        (r) =>
-          r.consentState === "pending-candidate-consent" ||
-          screeningConsents[String(r.candidateProfileId)] === "pending-candidate-consent"
-      ).length
-    : Object.values(screeningConsents).filter((state) => state === "pending-candidate-consent").length;
 
   const activeApplications = applications.filter(
     (app) => !["rejected", "withdrawn"].includes(app.status)
@@ -114,7 +106,7 @@ export default function CandidateHome() {
   );
   const pendingOffer = applications.find((app) => app.status === "offer");
 
-  const hasAlerts = Boolean(pendingOffer || interviewApplications.length > 0 || pendingConsentsCount > 0);
+  const hasAlerts = Boolean(pendingOffer || interviewApplications.length > 0);
 
   const stats = [
     {
@@ -145,13 +137,13 @@ export default function CandidateHome() {
       colorClass: offerApplications.length > 0 ? "text-amber-600" : "text-foreground",
     },
     {
-      href: "/candidate/contact-requests",
+      href: "/candidate/verifications",
       icon: ShieldCheck,
-      label: "Izin skrining",
-      value: pendingConsentsCount > 0 ? pendingConsentsCount : "Aman",
-      unit: pendingConsentsCount > 0 ? "menunggu" : "terlindungi",
-      hint: pendingConsentsCount > 0 ? "Permintaan akses dari rekruter" : "Izin profil terkendali penuh",
-      colorClass: pendingConsentsCount > 0 ? "text-amber-600" : "text-emerald-600",
+      label: "Verifikasi profil",
+      value: readiness.complete ? "100%" : `${readiness.percent}%`,
+      unit: readiness.complete ? "lengkap" : "selesai",
+      hint: readiness.complete ? "Kredensial siap kerja" : "Lengkapi profil Anda",
+      colorClass: readiness.complete ? "text-emerald-600" : "text-amber-600",
     },
   ];
 
@@ -164,7 +156,7 @@ export default function CandidateHome() {
               Halo, {candidateName}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pantau lamaran, izin akses rekruter, dan kesiapan profil Anda.
+              Pantau status lamaran dan kesiapan profil Anda.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -222,15 +214,6 @@ export default function CandidateHome() {
                     desc="Persiapkan diri dan sinkronkan kalender wawancara Anda."
                     href="/candidate/applications"
                     cta="Cek Jadwal"
-                  />
-                )}
-                {pendingConsentsCount > 0 && (
-                  <ActionRow
-                    icon={ShieldCheck}
-                    title={`${pendingConsentsCount} permintaan izin profil dari rekruter`}
-                    desc="Tinjau dan beri persetujuan aman untuk membuka detail profil Anda."
-                    href="/candidate/contact-requests"
-                    cta="Tinjau Izin"
                   />
                 )}
               </div>
@@ -356,14 +339,6 @@ export default function CandidateHome() {
                 desc="Evaluasi kecocokan CV, kesenjangan skill, dan langkah karier berikutnya."
                 href="/candidate/career-advisor"
                 cta="Buka Advisor"
-              />
-              <ActionRow
-                icon={ShieldCheck}
-                title="Privasi dan verifikasi"
-                desc="Rekruter hanya melihat kontak setelah Anda memberi izin eksplisit."
-                href="/candidate/contact-requests"
-                cta="Kelola izin"
-                emerald
               />
             </div>
           </Card>

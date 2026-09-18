@@ -45,11 +45,6 @@ const NAV_ITEMS = [
     icon: FileQuestion,
   },
   {
-    href: "/candidate/contact-requests",
-    label: "Izin & Privasi",
-    icon: ShieldCheck,
-  },
-  {
     href: "/candidate/verifications",
     label: "Verifikasi",
     icon: GraduationCap,
