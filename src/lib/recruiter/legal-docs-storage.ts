@@ -20,7 +20,7 @@ export async function storeLegalDocument(input: {
   bytes: Uint8Array;
   contentType: string;
 }): Promise<LegalDocStorageResult> {
-  const bucket = process.env.SUPABASE_LEGAL_DOCS_BUCKET?.trim();
+  const bucket = process.env.SUPABASE_LEGAL_DOCS_BUCKET?.trim() || "legal-documents";
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
