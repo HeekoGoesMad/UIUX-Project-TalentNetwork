@@ -235,7 +235,7 @@ export function HeroSection() {
                       cursorStage === "exiting" && "animate-cursor-exit"
                     )}
                   >
-                    <div className="relative flex items-center gap-1.5">
+                    <div className="relative flex items-center gap-1.5 scale-110 origin-top-left">
                       {isArtificialClicking && (
                         <span className="absolute -top-1 -left-1 size-6 rounded-full bg-[#7C3AED]/40 animate-ping" />
                       )}
