@@ -31,13 +31,13 @@ export function ScrollToTop() {
       onClick={scrollToTop}
       aria-label="Kembali ke atas"
       className={cn(
-        "fixed bottom-6 right-6 z-50 flex size-12 items-center justify-center rounded-full bg-[#201C45]/90 text-white shadow-2xl backdrop-blur-xl border border-white/20 transition-all duration-500 ease-in-out group cursor-pointer",
+        "fixed bottom-6 right-6 z-50 flex size-11 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg border border-slate-800 transition-all duration-300 ease-in-out group cursor-pointer",
         showScrollTop
-          ? "opacity-100 translate-y-0 scale-100 pointer-events-auto hover:scale-110 hover:bg-[#7C3AED] hover:border-white/40"
+          ? "opacity-100 translate-y-0 scale-100 pointer-events-auto hover:bg-slate-800 hover:scale-105"
           : "opacity-0 translate-y-6 scale-75 pointer-events-none"
       )}
     >
-      <ChevronUp className="size-6 transition-transform group-hover:-translate-y-0.5" />
+      <ChevronUp className="size-5 transition-transform group-hover:-translate-y-0.5" />
     </button>
   );
 }
