@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-slate-50/50 pt-28 sm:pt-36 pb-20 border-b border-slate-200/80">
+    <div className="min-h-screen bg-slate-50/50 py-8 sm:py-10 border-b border-slate-200/80">
       <div className="container mx-auto px-4 max-w-4xl space-y-8">
         {/* Navigation Breadcrumb */}
         <div>
@@ -103,7 +103,7 @@ export default function TermsPage() {
         {/* Focused Editorial Document Canvas */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-10 lg:p-12 shadow-xs space-y-10">
           {/* Section 1: Definisi */}
-          <section id="definisi" className="scroll-mt-28 space-y-4">
+          <section id="definisi" className="scroll-mt-20 space-y-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2.5 pb-2 border-b border-slate-100">
               <FileText className="size-5 text-[#7C3AED] shrink-0" />
               1. Definisi &amp; Ruang Lingkup Layanan
@@ -125,7 +125,7 @@ export default function TermsPage() {
           </section>
 
           {/* Section 2: Data Access Consent Callout */}
-          <section id="persetujuan" className="scroll-mt-28">
+          <section id="persetujuan" className="scroll-mt-20">
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 sm:p-6 space-y-3.5">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm sm:text-base">
                 <FileCheck2 className="size-5 text-[#7C3AED] shrink-0" />
@@ -144,7 +144,7 @@ export default function TermsPage() {
           </section>
 
           {/* Section 3: Kewajiban & Akurasi */}
-          <section id="kewajiban" className="scroll-mt-28 space-y-4">
+          <section id="kewajiban" className="scroll-mt-20 space-y-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2.5 pb-2 border-b border-slate-100">
               <Lock className="size-5 text-[#7C3AED] shrink-0" />
               3. Kewajiban &amp; Akurasi Informasi Pengguna
@@ -168,7 +168,7 @@ export default function TermsPage() {
           </section>
 
           {/* Section 4: Verifikasi Kampus */}
-          <section id="verifikasi" className="scroll-mt-28 space-y-4">
+          <section id="verifikasi" className="scroll-mt-20 space-y-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2.5 pb-2 border-b border-slate-100">
               <GraduationCap className="size-5 text-[#7C3AED] shrink-0" />
               4. Verifikasi Kampus &amp; Kemitraan Career Center
@@ -184,7 +184,7 @@ export default function TermsPage() {
           </section>
 
           {/* Section 5: Model 1 Token & Akses Kontak */}
-          <section id="token-transaksi" className="scroll-mt-28 space-y-4">
+          <section id="token-transaksi" className="scroll-mt-20 space-y-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2.5 pb-2 border-b border-slate-100">
               <WalletCards className="size-5 text-[#7C3AED] shrink-0" />
               5. Model 1 Token &amp; Transaksi Pembukaan Kontak
@@ -202,7 +202,7 @@ export default function TermsPage() {
           </section>
 
           {/* Section 6: Penegakan Hukum & Pembatasan Akun */}
-          <section id="sanksi" className="scroll-mt-28 space-y-4">
+          <section id="sanksi" className="scroll-mt-20 space-y-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2.5 pb-2 border-b border-slate-100">
               <ShieldCheck className="size-5 text-[#7C3AED] shrink-0" />
               6. Penegakan Kebijakan &amp; Sanksi Pelanggaran
