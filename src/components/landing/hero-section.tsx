@@ -148,8 +148,19 @@ export function HeroSection() {
           <div className="min-w-0 max-w-2xl">
             <h1 className="text-4xl sm:text-6xl lg:text-[4rem] font-extrabold tracking-tight text-slate-900 leading-[1.06] text-balance">
               Rekrut talent kredibel dari{" "}
-              <span className="text-slate-950 underline decoration-[#7C3AED] decoration-3 underline-offset-8">
-                sinyal nyata
+              <span className="relative inline-block group cursor-pointer select-none">
+                <span className="relative z-10 text-slate-950 transition-colors duration-200 group-hover:text-[#5B21B6]">
+                  sinyal nyata
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="hero-underline-track absolute left-0 -bottom-1 sm:-bottom-1.5 w-full h-[3.5px] sm:h-[4.5px] pointer-events-none"
+                >
+                  <span className="hero-underline-bar block w-full h-full rounded-full shadow-[0_1px_4px_rgba(124,58,237,0.25)]" />
+                  <span className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
+                    <span className="block w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                  </span>
+                </span>
               </span>
               , bukan klaim resume
             </h1>
