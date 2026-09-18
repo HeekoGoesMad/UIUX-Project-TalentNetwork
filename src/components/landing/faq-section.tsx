@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const FAQS = [
   {
@@ -45,7 +46,12 @@ export function FaqSection() {
             return (
               <div
                 key={idx}
-                className="rounded-2xl border border-slate-200 bg-white overflow-hidden transition-colors"
+                className={cn(
+                  "rounded-2xl border transition-all duration-300 overflow-hidden",
+                  isOpen
+                    ? "border-slate-300/90 bg-slate-50/40 shadow-xs"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/20"
+                )}
               >
                 <button
                   type="button"
@@ -53,23 +59,32 @@ export function FaqSection() {
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between p-5 text-left text-sm sm:text-base font-semibold text-slate-900 hover:bg-slate-50 cursor-pointer"
+                  className="w-full flex items-center justify-between p-5 text-left text-sm sm:text-base font-semibold text-slate-900 cursor-pointer transition-colors"
                 >
                   <span className="pr-4">{faq.q}</span>
                   <ChevronDown
-                    className={`size-4 text-slate-400 transition-transform duration-200 shrink-0 ${
-                      isOpen ? "rotate-180 text-slate-900" : ""
-                    }`}
+                    className={cn(
+                      "size-4 text-slate-400 transition-transform duration-300 shrink-0",
+                      isOpen && "rotate-180 text-slate-900"
+                    )}
                   />
                 </button>
+
+                {/* Smooth Animated Accordion Grid Row Expansion */}
                 <div
                   id={panelId}
                   role="region"
                   aria-labelledby={buttonId}
-                  hidden={!isOpen}
-                  className="px-5 pb-5 text-xs sm:text-sm leading-relaxed text-slate-600 border-t border-slate-100 pt-3"
+                  className={cn(
+                    "grid transition-all duration-300 ease-out",
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                  )}
                 >
-                  {faq.a}
+                  <div className="overflow-hidden">
+                    <div className="px-5 pb-5 text-xs sm:text-sm leading-relaxed text-slate-600 border-t border-slate-100/90 pt-3">
+                      {faq.a}
+                    </div>
+                  </div>
                 </div>
               </div>
             );

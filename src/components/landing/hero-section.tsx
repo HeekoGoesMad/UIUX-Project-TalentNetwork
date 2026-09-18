@@ -53,7 +53,7 @@ const CANDIDATES: CandidatePreview[] = [
       { name: "Product Strategy & Discovery", score: 95, proof: "Reduksi drop-off checkout 42%" },
       { name: "Quantitative Usability Research", score: 92, proof: "Validated usability benchmarks" },
     ],
-    verifiedSkills: ["Design Systems", "Figma", "Quantitative UX", "Design Ops"],
+    verifiedSkills: ["Figma", "Design Tokens", "UX Metrics", "DesignOps"],
     contactEmail: "rian.saputra@outlook.com",
     contactPhone: "+62 811-9012-4432",
   },
@@ -195,8 +195,8 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: Distilled Draggable Talent Dossier Card */}
-          <div className="relative w-full min-h-[480px]">
+          {/* Right Column: Exact Fixed-Height Container completely isolates outer sections */}
+          <div className="relative w-full lg:h-[490px]">
             <div
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -207,7 +207,7 @@ export function HeroSection() {
                 transition: isSnapping ? "transform 500ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms ease" : isDragging ? "none" : undefined,
                 willChange: isDragging || isSnapping ? "transform" : "auto",
               }}
-              className={`rounded-2xl border border-slate-200/90 bg-white select-none transition-shadow ${
+              className={`rounded-2xl border border-slate-200/90 bg-white select-none transition-shadow lg:h-[490px] flex flex-col justify-between ${
                 isDragging
                   ? "shadow-2xl shadow-slate-900/15 cursor-grabbing"
                   : isSnapping
@@ -215,15 +215,12 @@ export function HeroSection() {
                   : "shadow-xl shadow-slate-900/5 cursor-grab animate-hero-float"
               }`}
             >
-              {/* Dossier Header: Geser kartu affordance + Candidate Switcher */}
-              <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex size-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
-                  </span>
-                  <span className="font-mono text-xs font-semibold text-slate-700 tracking-tight flex items-center gap-1.5">
-                    <Move className="size-3.5 text-slate-400" /> Geser kartu
+              {/* Dossier Header: Clean Geser kartu affordance (no flashing green) + Candidate Switcher */}
+              <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-1.5 text-slate-500">
+                  <Move className="size-3.5 text-slate-400" />
+                  <span className="font-mono text-xs font-medium tracking-tight text-slate-600">
+                    Geser kartu
                   </span>
                 </div>
 
@@ -252,23 +249,23 @@ export function HeroSection() {
                 </div>
               </div>
 
-              {/* Dossier Body - Sizing guaranteed constant to decouple following sections */}
-              <div className="p-5 sm:p-6 space-y-4">
+              {/* Dossier Body - Sizing locked to eliminate layout shift */}
+              <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
                 {/* Candidate Header & Score */}
-                <div className="flex items-start justify-between gap-4 pb-3.5 border-b border-slate-100">
-                  <div>
+                <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100 shrink-0">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                         {selectedCandidate.code}
                       </span>
                       <span className="text-xs text-emerald-800 bg-emerald-50 font-semibold px-2 py-0.5 rounded border border-emerald-200/60">
-                        Status Terverifikasi
+                        Terverifikasi
                       </span>
                     </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-2 truncate max-w-[240px] sm:max-w-none">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1.5 truncate">
                       {selectedCandidate.role}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
                       {selectedCandidate.level} · {selectedCandidate.location} · {selectedCandidate.availability}
                     </p>
                   </div>
@@ -284,7 +281,7 @@ export function HeroSection() {
                 </div>
 
                 {/* 3 Distilled Pillar Benchmarks */}
-                <div className="space-y-2">
+                <div className="space-y-1.5 shrink-0">
                   <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
                     <span>Bukti Sinyal Kompetensi</span>
                     <span className="font-mono">Skala 100</span>
@@ -293,12 +290,12 @@ export function HeroSection() {
                     {selectedCandidate.pillars.map((pillar) => (
                       <div key={pillar.name} className="p-2 rounded-lg bg-slate-50/80 border border-slate-200/70 space-y-0.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-800 font-medium">{pillar.name}</span>
-                          <span className="font-mono text-slate-900 font-bold tabular-nums">{pillar.score}/100</span>
+                          <span className="text-slate-800 font-medium truncate pr-2">{pillar.name}</span>
+                          <span className="font-mono text-slate-900 font-bold tabular-nums shrink-0">{pillar.score}/100</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                        <p className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
                           <CheckCircle2 className="size-3 text-emerald-600 shrink-0" />
-                          <span>{pillar.proof}</span>
+                          <span className="truncate">{pillar.proof}</span>
                         </p>
                       </div>
                     ))}
@@ -306,7 +303,7 @@ export function HeroSection() {
                 </div>
 
                 {/* Verified Skill Stack */}
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <div className="flex flex-wrap gap-1.5 shrink-0">
                   {selectedCandidate.verifiedSkills.map((skill) => (
                     <span
                       key={skill}
@@ -317,8 +314,8 @@ export function HeroSection() {
                   ))}
                 </div>
 
-                {/* Distilled 1-Token Unlock Bar with Stable Fixed Height */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 space-y-2.5">
+                {/* Distilled 1-Token Unlock Bar with Constant Height Container */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2 shrink-0">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                       {unlocked ? (
@@ -335,8 +332,8 @@ export function HeroSection() {
                     </span>
                   </div>
 
-                  {/* Constant height container guarantees zero height shift when unlocking */}
-                  <div className="h-[46px] flex flex-col justify-center bg-white px-3 py-1.5 rounded-lg border border-slate-200/80">
+                  {/* Constant 42px container guarantees zero height difference */}
+                  <div className="h-[42px] flex flex-col justify-center bg-white px-3 py-1 rounded-lg border border-slate-200/80">
                     {unlocked ? (
                       <div className="space-y-0.5 text-xs font-mono">
                         <div className="flex justify-between">
