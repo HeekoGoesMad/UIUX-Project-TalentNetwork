@@ -91,13 +91,13 @@ export function AuthShell({
                 </Link>
               </div>
 
-              <div className="mb-5">
-                <span className="font-mono text-xs uppercase tracking-widest text-slate-500 font-bold">
+              <div className="mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0b2342]">
                   {title}
-                </span>
-                <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[#111827]">
-                  {description}
                 </h1>
+                <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
+                  {description}
+                </p>
               </div>
 
               {children}

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus, UserRole } from "@/types";
-import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -13,6 +13,29 @@ import { toast } from "sonner";
 import { ConsentModal } from "./consent-modal";
 import { OtpVerificationModal } from "./otp-verification-modal";
 import { RoleSelector } from "./role-selector";
+
+function GoogleLogo({ className = "size-4.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.39 7.34 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -315,8 +338,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </div>
 
       {mode === "register" && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
-          <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
+        <div className="space-y-1.5 py-1">
+          <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer select-none">
             <input
               id="terms"
               name="terms"
@@ -329,7 +352,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   setConsentAgreed(e.target.checked);
                 }
               }}
-              className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED] cursor-pointer"
+              className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-[#7C3AED] accent-[#7C3AED] focus:ring-[#7C3AED]/20 cursor-pointer"
             />
             <span className="leading-relaxed">
               Saya menyetujui{" "}
@@ -339,34 +362,29 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
+                className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
-                Syarat &amp; Ketentuan, Persetujuan Akses Data
+                Syarat &amp; Ketentuan Akses Data
               </button>{" "}
-              dan{" "}
+              serta{" "}
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
+                className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
                 Kebijakan Privasi
               </button>
               .
             </span>
           </label>
-
-          {consentAgreed ? (
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-              <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
-              <span>Persetujuan Akses Data, Syarat &amp; Kebijakan telah disetujui</span>
+          {consentAgreed && (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 pl-6.5">
+              <CheckCircle2 className="size-3.5 shrink-0" />
+              <span>Ketentuan &amp; akses data telah disetujui</span>
             </div>
-          ) : (
-            <p className="text-[11px] text-slate-500 pl-6.5">
-              Wajib ditinjau &amp; disetujui sebelum membuat akun di ProofyLink.
-            </p>
           )}
         </div>
       )}
@@ -396,21 +414,23 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </Button>
 
       {mode === "register" && (
-        <button
-          type="button"
-          className="text-xs font-semibold text-[#7C3AED] hover:underline underline-offset-2"
-          onClick={() => {
-            const typedEmail = (document.getElementById("email") as HTMLInputElement | null)?.value?.trim();
-            if (!typedEmail) {
-              toast.error("Masukkan email Anda terlebih dahulu.");
-              return;
-            }
-            setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
-            setOtpModalOpen(true);
-          }}
-        >
-          Sudah menerima kode OTP? Verifikasi sekarang
-        </button>
+        <div className="text-center">
+          <button
+            type="button"
+            className="text-xs font-medium text-slate-500 hover:text-[#7C3AED] transition-colors cursor-pointer"
+            onClick={() => {
+              const typedEmail = (document.getElementById("email") as HTMLInputElement | null)?.value?.trim();
+              if (!typedEmail) {
+                toast.error("Masukkan email Anda terlebih dahulu.");
+                return;
+              }
+              setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
+              setOtpModalOpen(true);
+            }}
+          >
+            Sudah menerima kode OTP? Verifikasi di sini
+          </button>
+        </div>
       )}
 
       {supabaseConfigured && (
@@ -423,112 +443,78 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full rounded-xl text-xs sm:text-sm"
+            className="h-11 w-full rounded-xl text-xs sm:text-sm font-medium border-slate-300 hover:bg-slate-50 gap-2.5 shadow-2xs"
             disabled={loading || googleLoading}
             onClick={handleGoogleClick}
           >
-            {googleLoading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
-            {googleLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
+            {googleLoading ? <Loader2 className="size-4.5 animate-spin text-slate-500" /> : <GoogleLogo className="size-4.5 shrink-0" />}
+            <span>{googleLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}</span>
           </Button>
         </>
       )}
 
       {process.env.NODE_ENV !== "production" && !supabaseConfigured && (
-        <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-          <Info className="size-3.5 shrink-0 text-[#7C3AED]" aria-hidden="true" />
-          Mode demo: {mode === "login" ? "masuk" : "daftar"} dengan email apa pun
-        </p>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "candidate" && (
-        <div className="mt-2 space-y-2">
-          <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <User className="size-4 text-[#7C3AED]" /> Login Cepat Demo
-              </span>
-              <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
-                Profil Lengkap
-              </span>
+        <div className="pt-2 border-t border-slate-100 space-y-2">
+          {role === "candidate" && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1 h-9 text-xs font-semibold border-purple-200 bg-purple-50/70 text-[#7C3AED] hover:bg-purple-100 rounded-xl gap-1.5"
+                onClick={() => {
+                  loginAsDemoCandidate();
+                  router.refresh();
+                  router.push("/candidate");
+                }}
+              >
+                <User className="size-3.5" /> Demo Profil (Nadia)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1 h-9 text-xs font-medium border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl gap-1.5"
+                onClick={() => {
+                  loginAsFreshCandidate();
+                  router.refresh();
+                  router.push("/candidate/onboarding");
+                }}
+              >
+                <UserPlus className="size-3.5 text-emerald-600" /> Onboarding Baru
+              </Button>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Masuk sebagai <strong>Nadia Putri Rahayu</strong> (Senior Product Designer) dengan riwayat Tokopedia &amp; OVO.
-            </p>
+          )}
+
+          {role === "recruiter" && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+              className="w-full h-9 text-xs font-semibold border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl gap-1.5"
               onClick={() => {
-                loginAsDemoCandidate();
-                router.refresh();
-                router.push("/candidate");
+                router.push("/recruiter/onboarding");
               }}
             >
-              <User className="size-3.5" /> Masuk Akun Demo (Nadia)
+              <Building2 className="size-3.5 text-slate-600" /> Demo Onboarding Rekruter
             </Button>
-          </div>
+          )}
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full h-9 text-xs font-medium border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl gap-1.5"
-            onClick={() => {
-              loginAsFreshCandidate();
-              router.refresh();
-              router.push("/candidate/onboarding");
-            }}
-          >
-            <UserPlus className="size-3.5 text-emerald-600" /> Uji Coba Daftar Kandidat Baru (Mulai Step 0)
-          </Button>
-        </div>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "recruiter" && (
-        <div className="mt-2 space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full h-9 text-xs font-semibold border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100 rounded-xl gap-1.5"
-            onClick={() => {
-              router.push("/recruiter/onboarding");
-            }}
-          >
-            <Building2 className="size-3.5 text-[#0b2342]" /> Uji Coba Onboarding Rekruter (3 Tahap)
-          </Button>
-        </div>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "partner" && (
-        <div className="mt-2 space-y-2">
-          <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <GraduationCap className="size-4 text-[#7C3AED]" /> Login Cepat Demo Kemitraan
-              </span>
-              <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
-                Kampus Mitra
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Masuk sebagai <strong>Universitas Indonesia</strong> (Career Center) untuk verifikasi mahasiswa &amp; pantau penempatan karir.
-            </p>
+          {role === "partner" && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+              className="w-full h-9 text-xs font-semibold border-purple-200 bg-purple-50/70 text-[#7C3AED] hover:bg-purple-100 rounded-xl gap-1.5"
               onClick={() => {
                 loginAsDemoPartner();
                 router.refresh();
                 router.push("/partner");
               }}
             >
-              <GraduationCap className="size-3.5" /> Masuk Akun Demo (Universitas Indonesia)
+              <GraduationCap className="size-3.5" /> Demo Kampus Mitra (UI)
             </Button>
-          </div>
+          )}
         </div>
       )}
 
