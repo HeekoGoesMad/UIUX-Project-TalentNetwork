@@ -89,7 +89,7 @@ export function HeroSection() {
   const snapTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    // Ignore drag start if user is interacting with buttons or links
+    // Ignore drag start if user is clicking button controls or links
     if ((e.target as HTMLElement).closest("button, a")) return;
 
     if (snapTimerRef.current) {
@@ -108,7 +108,7 @@ export function HeroSection() {
     const rawX = e.clientX - dragStartRef.current.x;
     const rawY = e.clientY - dragStartRef.current.y;
 
-    // Apply natural boundary damping so card stays anchored near origin
+    // Boundary damping keeps card centered near original placement
     const dampedX = rawX * 0.85;
     const dampedY = rawY * 0.85;
 
@@ -140,9 +140,9 @@ export function HeroSection() {
     : undefined;
 
   return (
-    <section className="relative bg-white pt-24 sm:pt-32 pb-16 lg:pb-24 border-b border-slate-200/80">
+    <section className="relative bg-white pt-32 sm:pt-40 lg:pt-44 pb-16 lg:pb-24 border-b border-slate-200/80">
       <div className="container mx-auto px-4 max-w-6xl">
-        {/* items-start decouples left and right column heights, eliminating vertical snap shifts */}
+        {/* items-start anchors left and right columns independently */}
         <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-start">
           {/* Left Column: Completely Independent & Stable */}
           <div className="max-w-2xl">
@@ -195,8 +195,8 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: Distilled, Lightweight Draggable Talent Dossier */}
-          <div className="relative w-full pt-1 sm:pt-2">
+          {/* Right Column: Distilled Draggable Talent Dossier Card */}
+          <div className="relative w-full min-h-[480px]">
             <div
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -215,49 +215,44 @@ export function HeroSection() {
                   : "shadow-xl shadow-slate-900/5 cursor-grab animate-hero-float"
               }`}
             >
-              {/* Dossier Header with Live Ping & Drag Affordance */}
+              {/* Dossier Header: Geser kartu affordance + Candidate Switcher */}
               <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="relative flex size-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
                   </span>
-                  <span className="font-mono text-xs font-bold text-slate-800 tracking-tight">
-                    DOSSIER SINYAL AKTIF
+                  <span className="font-mono text-xs font-semibold text-slate-700 tracking-tight flex items-center gap-1.5">
+                    <Move className="size-3.5 text-slate-400" /> Geser kartu
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-                    <Move className="size-3" /> Geser kartu
-                  </span>
-                  {/* Candidate Switcher */}
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
-                    {CANDIDATES.map((cand) => {
-                      const isActive = cand.id === selectedCandidate.id;
-                      return (
-                        <button
-                          key={cand.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCandidate(cand);
-                            setUnlocked(false);
-                          }}
-                          className={`px-2 py-0.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
-                            isActive
-                              ? "bg-slate-900 text-white shadow-xs font-semibold"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                          }`}
-                        >
-                          {cand.shortRole}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* Candidate Switcher */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                  {CANDIDATES.map((cand) => {
+                    const isActive = cand.id === selectedCandidate.id;
+                    return (
+                      <button
+                        key={cand.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCandidate(cand);
+                          setUnlocked(false);
+                        }}
+                        className={`px-2.5 py-0.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-slate-900 text-white shadow-xs font-semibold"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                      >
+                        {cand.shortRole}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Dossier Body - Distilled, Lightweight, Stable Layout */}
+              {/* Dossier Body - Sizing guaranteed constant to decouple following sections */}
               <div className="p-5 sm:p-6 space-y-4">
                 {/* Candidate Header & Score */}
                 <div className="flex items-start justify-between gap-4 pb-3.5 border-b border-slate-100">
@@ -270,7 +265,7 @@ export function HeroSection() {
                         Status Terverifikasi
                       </span>
                     </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-2">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-2 truncate max-w-[240px] sm:max-w-none">
                       {selectedCandidate.role}
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5 font-medium">
@@ -315,14 +310,14 @@ export function HeroSection() {
                   {selectedCandidate.verifiedSkills.map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-md bg-white border border-slate-200 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-700 shadow-2xs"
+                      className="rounded-md bg-white border border-slate-200 px-2.5 py-0.5 font-mono text-[11px] font-medium text-slate-700 shadow-2xs"
                     >
                       {skill}
                     </span>
                   ))}
                 </div>
 
-                {/* Distilled 1-Token Unlock Bar */}
+                {/* Distilled 1-Token Unlock Bar with Stable Fixed Height */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-semibold text-slate-800">
@@ -340,22 +335,32 @@ export function HeroSection() {
                     </span>
                   </div>
 
-                  {unlocked ? (
-                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80 space-y-1 text-xs font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">WhatsApp:</span>
-                        <span className="font-semibold text-slate-900">{selectedCandidate.contactPhone}</span>
+                  {/* Constant height container guarantees zero height shift when unlocking */}
+                  <div className="h-[46px] flex flex-col justify-center bg-white px-3 py-1.5 rounded-lg border border-slate-200/80">
+                    {unlocked ? (
+                      <div className="space-y-0.5 text-xs font-mono">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">WhatsApp:</span>
+                          <span className="font-semibold text-slate-900">{selectedCandidate.contactPhone}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Email:</span>
+                          <span className="font-semibold text-slate-900">{selectedCandidate.contactEmail}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Email:</span>
-                        <span className="font-semibold text-slate-900">{selectedCandidate.contactEmail}</span>
+                    ) : (
+                      <div className="space-y-0.5 text-xs font-mono text-slate-400">
+                        <div className="flex justify-between">
+                          <span>WhatsApp:</span>
+                          <span className="tracking-wider text-slate-500 font-sans text-[11px]">• • • •  • • • •  • • • •</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Email:</span>
+                          <span className="tracking-wider text-slate-500 font-sans text-[11px]">••••••••••@••••••.id</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 leading-normal">
-                      Kontak langsung hanya dibuka jika recruiter mengonfirmasi pembukaan dan kandidat menyetujui diskusi.
-                    </p>
-                  )}
+                    )}
+                  </div>
 
                   <Button
                     type="button"

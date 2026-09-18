@@ -23,7 +23,7 @@ export function MarqueeStatsSection() {
   ];
 
   return (
-    <section className="border-b border-slate-200/80 bg-slate-50/60 py-8">
+    <section className="relative z-10 isolate border-b border-slate-200/80 bg-slate-50/60 py-8">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           {METRICS.map((item, idx) => (
