@@ -1,7 +1,5 @@
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { CvDocumentsPanel } from "@/components/candidate/cv-documents-panel";
 import { CvWorkspace } from "@/components/candidate/cv-workspace";
-
 
 export default function CandidateCvPage() {
   return (
@@ -12,12 +10,9 @@ export default function CandidateCvPage() {
             CV &amp; Profil Studio
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Kelola profil profesional kamu, kurasi riwayat karir, dan unduh dokumen CV berstandar ATS.
+            Kelola profil profesional Anda, kurasi riwayat karier, dan unduh dokumen CV berstandar ATS.
           </p>
         </div>
-
-        {/* Collapsible Uploaded Documents Panel */}
-        <CvDocumentsPanel />
 
         {/* 2-Column Side-by-Side Workspace */}
         <CvWorkspace />
