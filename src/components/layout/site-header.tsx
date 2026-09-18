@@ -84,7 +84,6 @@ export function SiteHeader() {
   const isOnboarding = pathname?.includes("/onboarding");
   const visibleUser = hydrated && !isAuth ? user : null;
   const isPublicHeader = isLanding || isAuth || !visibleUser;
-  const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
   useEffect(() => {
     let ticking = false;
@@ -204,8 +203,6 @@ export function SiteHeader() {
           "mx-auto flex h-14 items-center justify-between transition-all duration-300 ease-out pointer-events-auto",
           scrolled
             ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
-            : isOverDarkHeader
-            ? "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-dark-top text-white"
             : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-foreground"
         )}
       >
@@ -225,7 +222,7 @@ export function SiteHeader() {
           <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
             <ShieldCheck className="size-5" />
           </span>
-          <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-foreground")}>
+          <span className="text-lg font-bold whitespace-nowrap text-foreground">
             Talent<span className="text-primary"> Network</span>
           </span>
         </Link>
@@ -238,12 +235,7 @@ export function SiteHeader() {
               <a
                 key={link.href}
                 href={link.href}
-                className={cn(
-                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
-                  isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
-                )}
+                className="rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 text-muted-foreground hover:bg-slate-100 hover:text-foreground"
               >
                 {link.label}
               </a>
@@ -252,11 +244,8 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
-                  isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
-                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  isLinkActive(link.href) && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
+                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 text-muted-foreground hover:bg-slate-100 hover:text-foreground",
+                  isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
                 )}
               >
                 {link.label}
@@ -272,8 +261,6 @@ export function SiteHeader() {
                   "flex items-center gap-1.5 rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   isRecruiterFeatureActive
                     ? "bg-[#7C3AED] text-white font-semibold shadow-xs"
-                    : isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
                 )}
               >
@@ -353,8 +340,7 @@ export function SiteHeader() {
               href={settingsHref}
               className={cn(
                 "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
-                pathname === settingsHref && "border-primary bg-primary/10 text-primary",
-                isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
+                pathname === settingsHref && "border-primary bg-primary/10 text-primary"
               )}
               aria-label="Pengaturan Akun"
               title="Pengaturan Akun"
@@ -367,7 +353,7 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn("rounded-full shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+              className="rounded-full shrink-0 text-foreground hover:bg-slate-100"
               aria-label="Keluar dari akun"
               onClick={logout}
             >
@@ -379,7 +365,7 @@ export function SiteHeader() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full font-medium transition-all border-white/20 bg-white/10 text-slate-800 hover:bg-slate-100 px-4 whitespace-nowrap"
+                  className="rounded-full font-medium transition-all border-slate-200 bg-white text-slate-800 hover:bg-slate-50 px-4 whitespace-nowrap"
                   asChild
                 >
                   <Link href="/register">
@@ -408,7 +394,7 @@ export function SiteHeader() {
             ref={menuButtonRef}
             variant="ghost"
             size="icon"
-            className={cn("rounded-full md:hidden shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+            className="rounded-full md:hidden shrink-0 text-foreground hover:bg-slate-100"
             aria-label={open ? "Tutup menu" : "Buka menu"}
             aria-expanded={open}
             aria-controls="mobile-menu"
