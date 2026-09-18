@@ -142,10 +142,10 @@ export function HeroSection() {
   return (
     <section className="relative bg-white pt-32 sm:pt-40 lg:pt-44 pb-16 lg:pb-24 border-b border-slate-200/80">
       <div className="container mx-auto px-4 max-w-6xl">
-        {/* items-start anchors left and right columns independently */}
-        <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-start">
+        {/* Strict fixed-width right column [minmax(0,1fr)_440px] locks left column width permanently */}
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_440px] items-start">
           {/* Left Column: Completely Independent & Stable */}
-          <div className="max-w-2xl">
+          <div className="min-w-0 max-w-2xl">
             <h1 className="text-4xl sm:text-6xl lg:text-[4rem] font-extrabold tracking-tight text-slate-900 leading-[1.06] text-balance">
               Rekrut talent kredibel dari{" "}
               <span className="text-slate-950 underline decoration-[#7C3AED] decoration-3 underline-offset-8">
@@ -195,8 +195,8 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: Exact Fixed-Height Container completely isolates outer sections */}
-          <div className="relative w-full lg:h-[490px]">
+          {/* Right Column: Fixed 440px width container permanently prevents pushing into left column */}
+          <div className="relative w-full max-w-[440px] mx-auto lg:mx-0 lg:w-[440px] shrink-0">
             <div
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -207,7 +207,7 @@ export function HeroSection() {
                 transition: isSnapping ? "transform 500ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms ease" : isDragging ? "none" : undefined,
                 willChange: isDragging || isSnapping ? "transform" : "auto",
               }}
-              className={`rounded-2xl border border-slate-200/90 bg-white select-none transition-shadow lg:h-[490px] flex flex-col justify-between ${
+              className={`rounded-2xl border border-slate-200/90 bg-white select-none transition-shadow ${
                 isDragging
                   ? "shadow-2xl shadow-slate-900/15 cursor-grabbing"
                   : isSnapping
@@ -215,8 +215,8 @@ export function HeroSection() {
                   : "shadow-xl shadow-slate-900/5 cursor-grab animate-hero-float"
               }`}
             >
-              {/* Dossier Header: Clean Geser kartu affordance (no flashing green) + Candidate Switcher */}
-              <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3 shrink-0">
+              {/* Dossier Header: Clean Geser kartu affordance + Candidate Switcher */}
+              <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3 rounded-t-2xl">
                 <div className="flex items-center gap-1.5 text-slate-500">
                   <Move className="size-3.5 text-slate-400" />
                   <span className="font-mono text-xs font-medium tracking-tight text-slate-600">
@@ -250,9 +250,9 @@ export function HeroSection() {
               </div>
 
               {/* Dossier Body - Sizing locked to eliminate layout shift */}
-              <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
+              <div className="p-5 sm:p-6 space-y-4">
                 {/* Candidate Header & Score */}
-                <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100 shrink-0">
+                <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
@@ -281,7 +281,7 @@ export function HeroSection() {
                 </div>
 
                 {/* 3 Distilled Pillar Benchmarks */}
-                <div className="space-y-1.5 shrink-0">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
                     <span>Bukti Sinyal Kompetensi</span>
                     <span className="font-mono">Skala 100</span>
@@ -303,7 +303,7 @@ export function HeroSection() {
                 </div>
 
                 {/* Verified Skill Stack */}
-                <div className="flex flex-wrap gap-1.5 shrink-0">
+                <div className="flex flex-wrap gap-1.5">
                   {selectedCandidate.verifiedSkills.map((skill) => (
                     <span
                       key={skill}
@@ -315,7 +315,7 @@ export function HeroSection() {
                 </div>
 
                 {/* Distilled 1-Token Unlock Bar with Constant Height Container */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2 shrink-0">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                       {unlocked ? (
@@ -363,7 +363,7 @@ export function HeroSection() {
                     type="button"
                     size="sm"
                     onClick={() => setUnlocked(!unlocked)}
-                    className={`w-full h-8 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    className={`w-full h-8.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                       unlocked
                         ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                         : "bg-slate-900 text-white hover:bg-slate-800"
