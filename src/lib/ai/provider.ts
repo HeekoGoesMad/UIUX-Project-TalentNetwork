@@ -4,7 +4,7 @@ import { createAzure } from "@ai-sdk/azure";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { cvBuilderSchema, cvImportSchema, gapsSchema, cvReviewPillarSchema, gapAnalysisPillarSchema, careerConsultationPillarSchema, profileContextSchema, questionsSchema, recruiterOutreachPromptSchema, recruiterPromptInputSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
+import { careerConsultationPillarSchema, cvBuilderSchema, cvImportSchema, cvReviewPillarSchema, gapAnalysisPillarSchema, gapsSchema, profileContextSchema, questionsSchema, recruiterOutreachPromptSchema, recruiterPromptInputSchema, roadmapSchema, screeningSchema, summarySchema } from "./schemas";
 
 const defaultVersion = "proofylink-screening-v1";
 
@@ -225,6 +225,19 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
 
   const skillCheck = checkSkillsQuality(context.skills, role);
 
+  const profileJsonBlock = context.profileJson
+    ? `\n\n--- DOKUMEN PROFIL KANDIDAT LENGKAP (FORMAT JSON TERSTRUKTUR - PRIVASI AMAN) ---\n` +
+      `Berikut adalah data riwayat profesional lengkap kandidat (data kontak pribadi seperti email/telepon/gaji telah disaring demi privasi):\n` +
+      `${JSON.stringify(context.profileJson, null, 2)}\n` +
+      `--- AKHIR DOKUMEN PROFIL ---\n\n` +
+      `PETUNJUK ANALISIS BERBASIS DATA KONKRET KANDIDAT:\n` +
+      `- Evaluasi riwayat pekerjaan aktual di atas (posisi, perusahaan, deskripsi tugas, dan poin pencapaian terukur).\n` +
+      `- Evaluasi riwayat pendidikan dan program studi aktual di atas.\n` +
+      `- Evaluasi kombinasi keahlian teknis dan peralatan/tools kerja aktual di atas.\n` +
+      `- Jika ada poin pengalaman kerja yang belum memiliki metrik atau bukti nyata, sebutkan secara spesifik posisi dan perusahaannya.\n` +
+      `- Sesuaikan penilaian dan kesiapan melamar dengan target posisi "${role}".\n`
+    : "";
+
   // ─────────────────────────────────────────────────────────────────────────────
   // PILAR 1: REVIEW CV KESELURUHAN & KESIAPAN MELAMAR (cv_review / ats)
   // ─────────────────────────────────────────────────────────────────────────────
@@ -236,9 +249,45 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
       overallScore: skillCheck.isPlausible
         ? Math.min(95, 70 + context.skills.length * 4)
         : 52,
+      profileSummary: skillCheck.isPlausible
+        ? `Profil profesional untuk posisi ${role} memiliki struktur informasi dan riwayat pengalaman kerja yang rapi serta mudah dibaca oleh rekruter. Profil menunjukkan kesiapan melamar ke industri terkait dengan beberapa area penguatan pada pembuktian hasil kerja nyata.`
+        : `Profil untuk posisi ${role} memiliki susunan dasar yang rapi, namun keahlian yang tercantum saat ini (${context.skills.join(", ") || "belum lengkap"}) belum mencerminkan standar kebutuhan posisi ${role}. Diperlukan pembaruan keahlian dan uraian hasil kerja nyata untuk meyakinkan rekruter.`,
+      keyStrengths: [
+        "Riwayat pengalaman kerja disusun secara kronologis dengan peran dan tanggung jawab yang terdefinisi dengan jelas.",
+        skillCheck.isPlausible
+          ? `Kombinasi keahlian (${skillCheck.cleanedSkills.slice(0, 3).join(", ")}) sudah relevan dengan target posisi ${role}.`
+          : "Format dasar data profil dan kontak tersaji dengan jelas sebagai fondasi yang baik.",
+        "Tata letak informasi profil bersih, profesional, dan nyaman dipindai oleh tim rekruter dalam proses screening awal.",
+        "Riwayat pendidikan terverifikasi dan tautan portofolio dapat diakses dengan baik.",
+      ],
+      areasForImprovement: [
+        {
+          aspect: "Pembuktian hasil kerja nyata pada uraian pengalaman",
+          impact: "Rekruter kesulitan mengukur seberapa besar dampak dan skala kontribusi nyata dari pekerjaan yang pernah Anda lakukan.",
+          recommendation: "Tambahkan metrik hasil kerja nyata (seperti persentase pencapaian, efisiensi waktu, atau skala pengguna) pada setiap pengalaman kerja utama.",
+        },
+        {
+          aspect: "Ringkasan profesional (Tentang Saya / About)",
+          impact: "Profil belum langsung menarik perhatian rekruter dalam beberapa detik pertama karena spesialisasi industri belum ditegaskan.",
+          recommendation: "Pertegas ringkasan dengan formula 3 bagian: peran utama Anda, keahlian andalan, dan fokus industri yang Anda tekuni.",
+        },
+        {
+          aspect: "Pengelompokan keahlian dan alat kerja (tools)",
+          impact: "Rekruter dan sistem seleksi membutuhkan waktu lebih lama untuk memverifikasi kesesuaian alat kerja yang dicari.",
+          recommendation: "Kelompokkan keahlian ke dalam kategori Keahlian Teknis, Alat Kerja (Tools), dan Keahlian Interpersonal.",
+        },
+      ],
+      recruiterPerspective: skillCheck.isPlausible
+        ? `Dari perspektif recruiter, profil Anda memiliki kredibilitas awal yang solid dan layak dipertimbangkan untuk tahap seleksi berikutnya. Profil Anda akan jauh lebih menonjol dan berdaya saing tinggi jika setiap poin pengalaman kerja dilengkapi dengan angka atau bukti dampak nyata.`
+        : `Dari perspektif recruiter, profil Anda memiliki kerapian format yang baik, namun belum menunjukkan kecocokan kompetensi yang cukup untuk posisi ${role}. Rekruter akan mencari bukti penguasaan keterampilan inti sebelum meloloskan ke tahap wawancara.`,
+      priorityRecommendations: [
+        "Tambahkan bukti hasil kerja nyata (angka %, jumlah proyek, atau efisiensi waktu) pada 2 pengalaman kerja teratas.",
+        "Perkuat ringkasan profesional dengan menyebutkan spesialisasi industri dan nilai tambah unik Anda.",
+        "Kelompokkan daftar keahlian dan alat kerja agar langsung dapat dipindai rekruter dalam hitungan detik.",
+      ],
       executiveSummary: skillCheck.isPlausible
-        ? `Tinjauan CV untuk posisi ${role}: Susunan informasi dan riwayat pengalaman kerja sudah rapi serta mudah dibaca oleh perekrut. Rekomendasi utama adalah melengkapi bukti hasil kerja nyata dan memperjelas keahlian unggulanmu.`
-        : `Tinjauan CV untuk posisi ${role}: Susunan dasar CV sudah rapi, namun keahlian yang tercantum saat ini (${context.skills.join(", ") || "belum lengkap"}) belum sesuai dengan kebutuhan posisi ${role}. Disarankan untuk memperbarui daftar keahlian dengan kemampuan utama yang dicari perusahaan serta melengkapi uraian pengalaman dengan contoh hasil kerja nyata.`,
+        ? `Tinjauan profil untuk posisi ${role}: Susunan informasi sudah rapi dan mudah dibaca oleh perekrut. Rekomendasi utama adalah melengkapi bukti hasil kerja nyata dan memperjelas keahlian unggulan Anda.`
+        : `Tinjauan profil untuk posisi ${role}: Susunan dasar sudah rapi, namun keahlian yang tercantum saat ini belum sesuai dengan kebutuhan posisi ${role}. Disarankan untuk memperbarui daftar keahlian dengan kemampuan utama yang dicari perusahaan.`,
       sectionAudits: [
         {
           section: "1. Headline & Identitas Profesional",
@@ -247,16 +296,16 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
             `Sudah menyebutkan target peran (${role}) dengan jelas dan profesional.`,
             "Tampilan teks bersih, rapi, dan mudah dibaca oleh perekrut maupun sistem seleksi.",
           ],
-          recommendation: "Kamu bisa menambahkan bidang industri yang kamu minati (misal: teknologi, keuangan, atau e-commerce) agar profilmu lebih menonjol.",
+          recommendation: "Anda bisa menambahkan bidang industri yang Anda minati (misal: teknologi, keuangan, atau e-commerce) agar profil Anda lebih menonjol.",
         },
         {
           section: "2. Ringkasan Profil (Tentang Saya / About)",
           status: "needs_improvement" as const,
           notes: [
             "Belum merangkum total tahun pengalaman kerja secara ringkas.",
-            "Kalimat pembuka masih bisa diperkuat dengan nilai tambah atau pencapaian terbaikmu.",
+            "Kalimat pembuka masih bisa diperkuat dengan nilai tambah atau pencapaian terbaik Anda.",
           ],
-          recommendation: "Tuliskan 2-3 kalimat ringkas: peran utamamu, keahlian andalan, dan kontribusi terbaik yang pernah kamu berikan.",
+          recommendation: "Tuliskan 2-3 kalimat ringkas: peran utama Anda, keahlian andalan, dan kontribusi terbaik yang pernah Anda berikan.",
         },
         {
           section: "3. Riwayat Pengalaman Kerja (Experience)",
@@ -289,26 +338,20 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
           notes: [
             "Riwayat pendidikan tertera dengan jelas dan tautan proyek dapat diakses dengan baik.",
           ],
-          recommendation: "Pastikan setiap proyek di portofolio mencantumkan peran spesifikmu dan hasil positif yang dicapai.",
+          recommendation: "Pastikan setiap proyek di portofolio mencantumkan peran spesifik Anda dan hasil positif yang dicapai.",
         },
       ],
       formatChecks: [
         { check: "Kerapian Format & Judul Bagian Baku", passed: true, tip: "Gunakan judul bagian standar: Pengalaman Kerja, Pendidikan, Keahlian, Portofolio." },
         { check: "Kesesuaian Kata Kunci & Keahlian Pokok", passed: skillCheck.isPlausible, tip: "Gunakan istilah dan nama keahlian yang umum dipakai dalam lowongan pekerjaan peran ini." },
-        { check: "Keterbacaan Poin Uraian & Tata Letak", passed: true, tip: "Gunakan poin-poin ringkas agar perekrut nyaman membaca profilmu dalam hitungan detik." },
-        { check: "Kelengkapan Tautan Kontak & Portofolio", passed: true, tip: "Pastikan email, nomor kontak, dan tautan profil profesional aktif dan mudah dihubungi." },
+        { check: "Keterbacaan Poin Uraian & Tata Letak", passed: true, tip: "Gunakan poin-poin ringkas agar perekrut nyaman membaca profil Anda dalam hitungan detik." },
+        { check: "Kelengkapan Tautan Kontak & Portofolio", passed: true, tip: "Pastikan tautan portofolio dan profil profesional aktif dan mudah diakses." },
       ],
-      priorityActionItems: skillCheck.isPlausible
-        ? [
-            "Tambahkan bukti hasil kerja nyata (misal: persentase keberhasilan atau hasil proyek) pada 2 pengalaman kerja teratas.",
-            "Lengkapi bagian ringkasan 'Tentang Saya' dengan menyebutkan bidang industri yang kamu minati.",
-            "Kelompokkan daftar keahlian agar perekrut dapat langsung melihat keunggulan utamamu.",
-          ]
-        : [
-            `Perbarui daftar keahlian di CV agar sesuai dengan kompetensi peran ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
-            "Tambahkan bukti hasil kerja nyata pada uraian pengalaman kerja agar rekruter lebih yakin.",
-            "Tulis ringkasan singkat di bagian 'Tentang Saya' yang menjelaskan keunggulan dan minat karirmu.",
-          ],
+      priorityActionItems: [
+        "Tambahkan bukti hasil kerja nyata (misal: persentase keberhasilan atau hasil proyek) pada 2 pengalaman kerja teratas.",
+        "Lengkapi bagian ringkasan 'Tentang Saya' dengan menyebutkan bidang industri yang Anda minati.",
+        "Kelompokkan daftar keahlian agar perekrut dapat langsung melihat keunggulan utama Anda.",
+      ],
       summary: skillCheck.isPlausible
         ? `Tinjauan CV untuk posisi ${role}: Susunan CV sudah rapi dan mudah dibaca. Fokus utama perbaikan adalah menambahkan bukti hasil nyata dan memperjelas keahlian unggulan.`
         : `Tinjauan CV untuk posisi ${role}: Susunan CV sudah rapi, namun keahlian yang tercantum saat ini (${context.skills.join(", ") || "belum lengkap"}) belum sesuai dengan kebutuhan peran ${role}. Prioritaskan perbaikan kompetensi inti agar sesuai dengan standar industri.`,
@@ -318,35 +361,29 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
           "Format susunan CV sudah rapi, bersih, dan mudah dibaca oleh perekrut maupun sistem seleksi.",
           skillCheck.isPlausible
             ? `Keahlian yang dicantumkan (${skillCheck.cleanedSkills.slice(0, 3).join(", ")}) sudah mengarah ke posisi target.`
-            : "Informasi profil dan kontak utama sudah terisi dengan jelas.",
+            : "Informasi profil utama sudah terisi dengan jelas.",
         ],
         whatNotGood: skillCheck.isPlausible
           ? [
               "Uraian pengalaman kerja masih bisa diperjelas dengan bukti hasil nyata (misal: jumlah pengguna, persentase keberhasilan, atau efisiensi waktu).",
-              "Ringkasan profil belum menonjolkan bidang industri utama yang kamu minati atau kuasai.",
+              "Ringkasan profil belum menonjolkan bidang industri utama yang Anda minati atau kuasai.",
             ]
           : [
               skillCheck.competencyFeedback,
               "Uraian pengalaman kerja masih kurang bukti hasil kerja nyata yang meyakinkan perekrut.",
             ],
         conclusion: skillCheck.isPlausible
-          ? "Terapkan rekomendasi di atas untuk membuat CV kamu semakin menarik dan meningkatkan peluang dipanggil wawancara."
+          ? "Terapkan rekomendasi di atas untuk membuat CV Anda semakin menarik dan meningkatkan peluang dipanggil wawancara."
           : `Perbaiki daftar keahlian agar sesuai dengan standar posisi ${role} untuk membuka peluang lebih besar saat melamar pekerjaan.`,
       },
       answer: skillCheck.isPlausible
-        ? `Review CV: Susunan CV kamu untuk peran ${role} sudah baik. Fokuskan perbaikan pada penambahan contoh hasil kerja nyata dan pengelompokan keahlian yang lebih spesifik.`
-        : `Review CV: Struktur CV kamu sudah rapi, namun keahlian yang tercantum saat ini belum selaras dengan kebutuhan posisi ${role}. Prioritaskan pembaruan daftar keahlian inti dan lengkapi bukti hasil kerja nyata.`,
-      nextSteps: skillCheck.isPlausible
-        ? [
-            "Buka CV Workspace untuk menambahkan angka atau bukti hasil nyata pada riwayat pengalaman.",
-            "Lengkapi ringkasan 'Tentang Saya' dengan menyebutkan bidang industri yang kamu kuasai.",
-            "Jalankan ulang evaluasi untuk melihat peningkatan skor kesiapan CV kamu.",
-          ]
-        : [
-            `Buka CV Workspace dan perbarui daftar keahlian agar sesuai dengan posisi ${role}.`,
-            "Tambahkan pengalaman kerja atau proyek latihan yang membuktikan kemampuan barumu.",
-            "Jalankan kembali evaluasi untuk memantau peningkatan kesiapan karirmu.",
-          ],
+        ? `Review CV: Susunan CV Anda untuk peran ${role} sudah baik. Fokuskan perbaikan pada penambahan contoh hasil kerja nyata dan pengelompokan keahlian yang lebih spesifik.`
+        : `Review CV: Struktur CV Anda sudah rapi, namun keahlian yang tercantum saat ini belum selaras dengan kebutuhan posisi ${role}. Prioritaskan pembaruan daftar keahlian inti dan lengkapi bukti hasil kerja nyata.`,
+      nextSteps: [
+        "Buka CV Workspace untuk menambahkan angka atau bukti hasil nyata pada riwayat pengalaman.",
+        "Lengkapi ringkasan 'Tentang Saya' dengan menyebutkan bidang industri yang Anda kuasai.",
+        "Jalankan ulang evaluasi untuk melihat peningkatan skor kesiapan CV Anda.",
+      ],
       limitations: [
         "Saran evaluasi disusun berdasarkan praktik terbaik rekrutmen dan standar seleksi kerja saat ini.",
         "Setiap perusahaan dapat memiliki kriteria penilaian dan preferensi khusus sesuai kebutuhan tim mereka.",
@@ -354,55 +391,48 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
     };
 
     const prompt =
-      `Anda adalah Career Coach & Senior Recruiter di ProofyLink Talent Network.\n` +
-      `Tugas Anda: Lakukan Review CV Keseluruhan dan kesiapan melamar kerja secara ramah, mudah dipahami, komunikatif, dan objektif dalam Bahasa Indonesia untuk kandidat berikut:\n\n` +
+      `Anda adalah Senior Recruiter, Talent Acquisition Manager, Career Coach, dan HR Consultant dengan pengalaman lebih dari 15 tahun dalam merekrut kandidat di berbagai industri.\n` +
+      `Tugas Anda adalah mengevaluasi profil kandidat berdasarkan data yang tersedia di ProofyLink.\n` +
+      `Analisis harus objektif, profesional, spesifik, dan berdasarkan informasi yang diberikan. Jangan memberikan penilaian umum atau motivasi yang tidak relevan.\n\n` +
+      `Fokus pada:\n` +
+      `1. Kualitas profil profesional.\n` +
+      `2. Kekuatan pengalaman kerja.\n` +
+      `3. Relevansi kompetensi dengan pengalaman.\n` +
+      `4. Kelengkapan informasi untuk recruiter.\n` +
+      `5. Kemampuan profil menarik perhatian recruiter.\n` +
+      `6. Potensi perbaikan yang dapat dilakukan kandidat.\n\n` +
+      `Gunakan bahasa yang mudah dipahami oleh kandidat (selalu gunakan kata sapaan formal 'Anda').\n` +
+      `Jangan hanya menyebutkan kekurangan, tetapi jelaskan dampaknya terhadap peluang kandidat dan berikan rekomendasi yang dapat langsung diterapkan.\n\n` +
       `- Target Peran yang Dituju: ${role}\n` +
       `- Headline Profil: ${context.headline || "Belum ditentukan"}\n` +
       `- Ringkasan Tentang Saya: ${context.about || "Belum diisi"}\n` +
       `- Keahlian yang Tercantum (Skills): ${context.skills.join(", ") || "Belum ada keahlian yang diisi"}\n` +
-      `- Lokasi: ${context.location || "Indonesia"}` +
+      `- Lokasi Domisili: ${context.location || "Indonesia"}` +
       customNote +
+      profileJsonBlock +
       `\n\n` +
       `ATURAN WAJIB EVALUASI KEAHLIAN (SKILLS):\n` +
       `1. Periksa dengan kritis keaslian dan relevansi keahlian kandidat: [${context.skills.join(", ")}] terhadap target peran "${role}".\n` +
-      `   - Jika keahlian yang tercantum TIDAK RELEVAN, TIDAK JELAS, atau berupa KATA ACANG/DUMMY (seperti 'plo', 'pluh', 'plar', 'test', 'asdf', teks tanpa arti, atau keahlian yang tidak berkaitan dengan ${role}):\n` +
-      `     * DILARANG KERAS MEMUJINYA DI 'whatGood'! JANGAN katakan fokus peran atau keahlian sudah konsisten!\n` +
-      `     * Berikan status 'needs_improvement' pada audit keahlian (Skills & Tools).\n` +
-      `     * Masukkan ke 'whatNotGood' saran perbaikan kompetensi yang tegas dan jelas: "Keahlian yang tercantum saat ini (${context.skills.join(", ")}) belum sesuai dengan kebutuhan posisi ${role}. Perbaiki kompetensi agar sesuai dengan peran yang dituju (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")})."\n` +
-      `     * Masukkan ke 'priorityActionItems': "Perbarui daftar keahlian di profil agar relevan dengan posisi ${role}."\n` +
-      `     * Berikan skor kesiapan yang wajar (skor di bawah 55) karena kompetensi utama belum terpenuhi.\n` +
-      `   - Jika keahlian kandidat valid dan relevan dengan ${role}, baru apresiasi di 'whatGood' dan sarankan pengelompokan keahlian.\n\n` +
-      `PANDUAN GAYA BAHASA (GENERAL & MUDAH DIPAHAMI KANDIDAT):\n` +
-      `2. Gunakan Bahasa Indonesia yang ramah, sopan, dan mudah dipahami oleh kandidat tanpa istilah teknikal yang membingungkan:\n` +
-      `   - JANGAN gunakan istilah 'parser ATS' atau 'kegagalan parser ATS'. Gunakan: 'sistem seleksi otomatis dan tim perekrut'.\n` +
-      `   - JANGAN gunakan 'metrik kuantitatif' atau 'metrik kuantitatif nyata (%, angka, efisiensi)'. Gunakan: 'bukti hasil kerja nyata (angka %, jumlah proyek, efisiensi waktu)'.\n` +
-      `   - JANGAN gunakan 'domain industri spesifik'. Gunakan: 'bidang industri yang ditekuni (misal: teknologi, perbankan, retail)'.\n` +
-      `   - JANGAN gunakan 'strong action verbs' atau 'metode STAR' tanpa penjelasan. Gunakan: 'kata kerja aktif yang jelas (misal: Memimpin, Merancang, Mengembangkan)'.\n\n` +
-      `PANDUAN STRUKTUR OUTPUT:\n` +
-      `1. readinessLevel: Pilih dari 'Sangat Siap Kerja', 'Cukup Siap (Perlu Pengayaan)', atau 'Perlu Penyesuaian Keahlian'.\n` +
-      `2. overallScore: Berikan skor 0-100 yang adil dan objektif.\n` +
-      `3. executiveSummary: 2-3 kalimat rangkuman ramah mengenai kondisi CV saat ini dan saran utama pengembangannya.\n` +
-      `4. sectionAudits: Wajib mencakup 5 bagian CV:\n` +
-      `   - '1. Headline & Identitas Profesional'\n` +
-      `   - '2. Ringkasan Profil (Tentang Saya / About)'\n` +
-      `   - '3. Riwayat Pengalaman Kerja (Experience)'\n` +
-      `   - '4. Daftar Keahlian & Alat Kerja (Skills & Tools)'\n` +
-      `   - '5. Pendidikan & Bukti Portofolio'\n` +
-      `   Untuk setiap bagian tentukan status ('good' atau 'needs_improvement'), notes (minimal 2 observasi jelas), dan recommendation (solusi perbaikan yang mudah dipahami).\n` +
-      `5. formatChecks: Evaluasi 4 aspek kerapian CV:\n` +
-      `   - 'Kerapian Format & Judul Bagian Baku'\n` +
-      `   - 'Kesesuaian Kata Kunci & Keahlian Pokok'\n` +
-      `   - 'Keterbacaan Poin Uraian & Tata Letak'\n` +
-      `   - 'Kelengkapan Tautan Kontak & Portofolio'\n` +
-      `6. priorityActionItems: 3 langkah aksi paling mendesak dan mudah dijalankan.\n` +
-      `7. structuredAdvice: opening, whatGood (minimal 2 poin), whatNotGood (minimal 2 poin), dan conclusion.\n` +
-      `8. nextSteps: minimal 3 langkah tindak lanjut langsung.`;
+      `   - Jika keahlian yang tercantum TIDAK RELEVAN, TIDAK JELAS, atau berupa KATA ACAK/DUMMY (seperti 'plo', 'pluh', 'plar', 'test', dsb):\n` +
+      `     * DILARANG KERAS MEMUJINYA! Jangan katakan keahlian sudah konsisten!\n` +
+      `     * Masukkan ke 'areasForImprovement' bahwa keahlian belum sesuai kebutuhan posisi ${role} dan sebutkan dampak serta rekomendasi keahlian riil (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).\n` +
+      `     * Berikan skor kesiapan di bawah 55 karena kompetensi utama belum terpenuhi.\n\n` +
+      `Berikan output dalam format terstruktur berikut:\n` +
+      `1. profileSummary: Ringkasan singkat mengenai kondisi profil kandidat saat ini.\n` +
+      `2. keyStrengths: Sebutkan 3-5 kekuatan utama yang terlihat dari profil.\n` +
+      `3. areasForImprovement: Array objek yang menjelaskan aspek yang masih kurang/belum optimal, dampaknya terhadap peluang kandidat, dan rekomendasi yang dapat langsung diterapkan.\n` +
+      `4. recruiterPerspective: Jelaskan bagaimana recruiter kemungkinan akan melihat profil kandidat ini.\n` +
+      `5. priorityRecommendations: Berikan 3-5 langkah yang paling penting untuk meningkatkan profil kandidat.\n` +
+      `6. readinessLevel: Pilih dari 'Sangat Siap Kerja', 'Cukup Siap (Perlu Pengayaan)', atau 'Perlu Penyesuaian Keahlian'.\n` +
+      `7. overallScore: Skor objektif 0-100.\n` +
+      `8. structuredAdvice: opening, whatGood (minimal 2 poin), whatNotGood (minimal 2 poin), dan conclusion.\n` +
+      `9. nextSteps: minimal 3 langkah tindak lanjut langsung.`;
 
     const aiOut = await aiResult(cvReviewPillarSchema, prompt, cvFallback, options);
 
     return {
       focus: "cv_review" as const,
-      summary: aiOut.summary || aiOut.executiveSummary,
+      summary: aiOut.profileSummary || aiOut.summary || aiOut.executiveSummary,
       headlineSuggestions: [],
       starBullets: [],
       pillars: [],
@@ -410,10 +440,15 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
       cvReviewDetails: {
         readinessLevel: aiOut.readinessLevel,
         overallScore: aiOut.overallScore,
-        executiveSummary: aiOut.executiveSummary,
+        profileSummary: aiOut.profileSummary || aiOut.executiveSummary,
+        keyStrengths: aiOut.keyStrengths?.length ? aiOut.keyStrengths : cvFallback.keyStrengths,
+        areasForImprovement: aiOut.areasForImprovement?.length ? aiOut.areasForImprovement : cvFallback.areasForImprovement,
+        recruiterPerspective: aiOut.recruiterPerspective || cvFallback.recruiterPerspective,
+        priorityRecommendations: aiOut.priorityRecommendations?.length ? aiOut.priorityRecommendations : cvFallback.priorityRecommendations,
+        executiveSummary: aiOut.executiveSummary || aiOut.profileSummary,
         sectionAudits: aiOut.sectionAudits,
         formatChecks: aiOut.formatChecks,
-        priorityActionItems: aiOut.priorityActionItems,
+        priorityActionItems: aiOut.priorityRecommendations || aiOut.priorityActionItems,
       },
       answer: aiOut.answer,
       nextSteps: aiOut.nextSteps,
@@ -428,7 +463,84 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
   // ─────────────────────────────────────────────────────────────────────────────
   if (focus === "gap_analysis" || focus === "role" || focus === "headline") {
     const gapFallback = {
+      currentPosition: skillCheck.isPlausible
+        ? `Kandidat memiliki latar belakang ${context.headline || "profesional"} dengan riwayat pendidikan dan pengalaman kerja di bidang terkait. Memiliki pemahaman operasional yang cukup dengan beberapa pencapaian kerja.`
+        : `Kandidat saat ini berada pada tahap eksplorasi awal dengan keahlian yang tercantum (${context.skills.join(", ") || "belum lengkap"}) belum mencerminkan kualifikasi standar peran ${role}.`,
       targetRole: role,
+      readinessScore: skillCheck.isPlausible
+        ? Math.min(95, 75 + context.skills.length * 3)
+        : 42,
+      readinessReason: skillCheck.isPlausible
+        ? `Kandidat telah memiliki fondasi kompetensi dan tools yang relevan untuk posisi ${role}, namun masih memerlukan bukti proyek berskala lebih besar dan spesialisasi alat kerja industri untuk mencapai kesiapan penuh.`
+        : `Keahlian yang tercantum saat ini belum selaras dengan standar kompetensi industri untuk peran ${role}. Dibutuhkan penyesuaian kompetensi dan pembangunan keahlian inti sebelum melamar.`,
+      existingCompetencies: skillCheck.isPlausible
+        ? [
+            `Pemahaman dasar alur kerja dan metodologi standar di bidang ${role}.`,
+            "Kemampuan kolaborasi tim dan koordinasi lintas fungsi yang efektif.",
+            "Keterampilan komunikasi profesional dan penyusunan dokumentasi kerja.",
+            "Adaptabilitas terhadap teknologi dan metodologi kerja baru.",
+          ]
+        : [
+            "Format struktur profil dan riwayat pendidikan tersusun rapi.",
+            "Tujuan karier dan aspirasi peran target telah terdefinisi dengan jelas.",
+            "Kemauan untuk belajar dan mengembangkan keterampilan baru.",
+          ],
+      competencyGaps: skillCheck.isPlausible
+        ? [
+            "Pengambilan keputusan berbasis data dan analisis metrik dampak bisnis.",
+            "Kepemimpinan inisiatif proyek secara mandiri dari tahap perancangan hingga implementasi.",
+            "Strategi pemecahan masalah kompleks berskala enterprise.",
+          ]
+        : [
+            `Penguasaan kompetensi dasar untuk peran ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+            "Pemahaman metodologi dan alur kerja standar industri.",
+            "Keterampilan teknis terapan yang dapat langsung digunakan dalam pekerjaan nyata.",
+          ],
+      experienceGaps: skillCheck.isPlausible
+        ? [
+            "Pengalaman mengelola proyek skala menengah-besar dengan pemangku kepentingan lintas divisi.",
+            "Studi kasus nyata yang mendokumentasikan proses penyelesaian masalah dari awal hingga akhir.",
+            "Pengalaman mengukur Return on Investment (ROI) atau dampak terukur dari hasil pekerjaan.",
+          ]
+        : [
+            `Belum memiliki pengalaman proyek nyata atau studi kasus yang relevan dengan ${role}.`,
+            "Belum memiliki rekam jejak penyelesaian tugas profesional di bidang terkait.",
+            "Belum ada portofolio yang dapat dinilai kualitas hasil kerjanya oleh rekruter.",
+          ],
+      toolGaps: skillCheck.isPlausible
+        ? [
+            `Alat kerja analitik dan pelaporan data standar industri untuk peran ${role}.`,
+            "Platform kolaborasi dan otomasi kerja tingkat lanjut yang umum digunakan perusahaan.",
+          ]
+        : [
+            `Tools esensial yang wajib dikuasai untuk peran ${role}.`,
+            "Alat kerja kolaborasi standar industri.",
+          ],
+      recommendedCertifications: skillCheck.isPlausible
+        ? [
+            `Sertifikasi Profesional Tingkat Lanjut sesuai spesialisasi ${role}.`,
+            "Sertifikasi Manajemen Proyek / Metodologi Agile & Scrum.",
+          ]
+        : [
+            `Kursus / Sertifikasi Tingkat Pemula (Foundational) untuk peran ${role}.`,
+            "Pelatihan Praktis Berbasis Proyek (Bootcamp / Project-based Learning).",
+          ],
+      developmentPriorities: skillCheck.isPlausible
+        ? [
+            "Prioritas 1: Bangun 1-2 studi kasus komprehensif yang membuktikan kemampuan pemecahan masalah Anda.",
+            `Prioritas 2: Kuasai alat kerja analitik dan otomasi standar industri yang paling sering disyaratkan lowongan ${role}.`,
+            "Prioritas 3: Ikuti sertifikasi profesional untuk memperkuat kredibilitas kompetensi teknis di mata rekruter.",
+            "Prioritas 4: Ambil inisiatif tanggung jawab lebih besar dalam proyek saat ini untuk memperkaya portofolio kepemimpinan.",
+          ]
+        : [
+            `Prioritas 1: Pelajari dan kuasai 3 kompetensi inti untuk posisi ${role} (${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+            "Prioritas 2: Selesaikan minimal 1 proyek latihan mandiri sebagai bukti pemahaman dasar.",
+            "Prioritas 3: Ikuti kursus terstruktur untuk mendapatkan pemahaman alur kerja industri.",
+            "Prioritas 4: Perbarui profil ProofyLink setelah menyelesaikan materi atau proyek baru.",
+          ],
+      estimatedDevelopmentTime: skillCheck.isPlausible ? "3 — 6 Bulan" : "6 — 12 Bulan",
+
+      // Backward-compatible properties
       matchScore: skillCheck.isPlausible ? 82 : 40,
       matchLevel: skillCheck.isPlausible ? "Tinggi (Selaras Baik)" : "Perlu Penyesuaian Kompetensi",
       coreCompetencies: [
@@ -458,7 +570,7 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
           candidateLevel: "Dasar",
           requiredLevel: "Menengah",
           status: "gap" as const,
-          recommendation: "Cantumkan contoh bagaimana hasil kerjamu membantu menyelesaikan masalah atau mempercepat efisiensi tim.",
+          recommendation: "Cantumkan contoh bagaimana hasil kerja Anda membantu menyelesaikan masalah atau mempercepat efisiensi tim.",
         },
       ],
       criticalGaps: skillCheck.isPlausible
@@ -479,21 +591,21 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
       strategicRecommendations: skillCheck.isPlausible
         ? [
             "Tutup kesenjangan dengan membuat 1 studi kasus mendalam tentang proses kerja di portofolio.",
-            "Cantumkan alat kerja yang kamu kuasai secara spesifik di bagian keahlian.",
-            "Tuliskan kontribusimu bersama tim pada deskripsi pencapaian karir.",
+            "Cantumkan alat kerja yang Anda kuasai secara spesifik di bagian keahlian.",
+            "Tuliskan kontribusi Anda bersama tim pada deskripsi pencapaian karir.",
           ]
         : [
             `Perbarui profil dengan mempelajari keahlian dasar untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
-            "Buat minimal satu proyek sederhana atau studi kasus untuk membuktikan kemampuanmu.",
+            "Buat minimal satu proyek sederhana atau studi kasus untuk membuktikan kemampuan Anda.",
             "Ikuti kursus atau pelatihan daring untuk membangun fondasi keahlian yang dibutuhkan.",
           ],
       summary: skillCheck.isPlausible
-        ? `Evaluasi Kesenjangan Karir untuk ${role}: Tingkat keselarasan saat ini mencapai 82%. Keunggulan utama pada komunikasi dan kolaborasi tim, dengan area peningkatan pada pembuktian dampak kerja.`
-        : `Evaluasi Kesenjangan Karir untuk ${role}: Tingkat keselarasan saat ini masih 40%. Diperlukan perbaikan kompetensi agar daftar keahlian selaras dengan kebutuhan peran ${role}.`,
+        ? `Analisis Kesenjangan Karier untuk ${role}: Tingkat kesiapan saat ini mencapai ${Math.min(95, 75 + context.skills.length * 3)}%. Kandidat memiliki fondasi yang baik dengan estimasi waktu pengembangan 3 — 6 Bulan.`
+        : `Analisis Kesenjangan Karier untuk ${role}: Tingkat kesiapan saat ini masih 42%. Diperlukan fokus pengembangan kompetensi inti dengan estimasi waktu 6 — 12 Bulan.`,
       structuredAdvice: {
-        opening: `Berdasarkan perbandingan profilmu dengan kebutuhan umum posisi ${role}:`,
+        opening: `Berdasarkan perbandingan profil Anda dengan kebutuhan umum posisi ${role}:`,
         whatGood: [
-          "Kamu memiliki motivasi dan tujuan karir yang terarah menuju peran target ini.",
+          "Anda memiliki motivasi dan tujuan karir yang terarah menuju peran target ini.",
           skillCheck.isPlausible
             ? `Sebagian keahlian dasar (${skillCheck.cleanedSkills.slice(0, 2).join(" & ")}) sudah relevan dengan kebutuhan industri.`
             : "Format dasar data profil sudah terisi dengan rapi sebagai langkah awal.",
@@ -508,76 +620,92 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
               "Belum terlihat bukti hasil kerja atau portofolio nyata yang mendukung posisi ini.",
             ],
         conclusion: skillCheck.isPlausible
-          ? "Fokuskan waktu pada penyusunan studi kasus portofolio untuk membuktikan kemampuanmu kepada calon perekrut."
+          ? "Fokuskan waktu pada penyusunan studi kasus portofolio untuk membuktikan kemampuan Anda kepada calon perekrut."
           : `Mulailah dengan memperkuat keahlian dasar yang paling sering dicari perekrut untuk posisi ${role}.`,
       },
       answer: skillCheck.isPlausible
-        ? `Gap Analysis: Profilmu sudah berada di jalur yang benar untuk posisi ${role}. Lengkapi portofolio dengan studi kasus nyata untuk menutup kesenjangan yang ada.`
+        ? `Gap Analysis: Profil Anda sudah berada di jalur yang benar untuk posisi ${role}. Lengkapi portofolio dengan studi kasus nyata untuk menutup kesenjangan yang ada.`
         : `Gap Analysis: Keahlian saat ini belum selaras dengan kualifikasi ${role}. Prioritaskan penyesuaian kompetensi dengan mempelajari keterampilan inti yang dicari perusahaan.`,
       nextSteps: skillCheck.isPlausible
         ? [
-            "Tambahkan 1 studi kasus di portofolio yang membuktikan proses kerjamu secara runtut.",
-            "Perbarui daftar alat kerja dan metode yang kamu kuasai di profil CV.",
+            "Tambahkan 1 studi kasus di portofolio yang membuktikan proses kerja Anda secara runtut.",
+            "Perbarui daftar alat kerja dan metode yang Anda kuasai di profil CV.",
             "Siapkan cerita pengalaman kolaborasi tim untuk dibahas saat wawancara.",
           ]
         : [
             `Pelajari 2-3 keahlian pokok yang wajib dimiliki untuk peran ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
-            "Buat proyek latihan mandiri sebagai bukti kemampuan awalmu.",
+            "Buat proyek latihan mandiri sebagai bukti kemampuan awal Anda.",
             "Perbarui profil ProofyLink setelah menyelesaikan materi atau proyek baru.",
           ],
       limitations: [
-        "Analisis kesenjangan ini membandingkan profilmu dengan kualifikasi umum di pasar kerja saat ini.",
+        "Analisis kesenjangan ini membandingkan profil Anda dengan kualifikasi umum di pasar kerja saat ini.",
         "Kebutuhan spesifik dapat berbeda di tiap perusahaan tergantung pada skala dan jenis bisnisnya.",
       ],
     };
 
     const prompt =
-      `Anda adalah Career Coach & Senior Recruiter di ProofyLink Talent Network.\n` +
-      `Tugas Anda: Lakukan Analisis Kesenjangan Karir (Gap Analysis) antara profil kandidat saat ini dengan kualifikasi umum untuk posisi target secara ramah, komunikatif, dan mudah dipahami dalam Bahasa Indonesia.\n\n` +
-      `- Target Peran yang Dituju: ${role}\n` +
+      `Anda adalah AI Career Consultant dan Talent Development Specialist.\n` +
+      `Tugas Anda adalah membandingkan kondisi kandidat saat ini dengan posisi atau karier impian yang ingin dicapai ("${role}") secara objektif, mendalam, dan terstruktur.\n\n` +
+      `Gunakan data riwayat profesional kandidat berikut:\n` +
+      `- Target Posisi Impian yang Dituju: ${role}\n` +
       `- Headline Profil: ${context.headline || "Belum ditentukan"}\n` +
       `- Ringkasan Tentang Saya: ${context.about || "Belum diisi"}\n` +
       `- Keahlian yang Tercantum (Skills): ${context.skills.join(", ") || "Belum ada keahlian yang diisi"}\n` +
-      `- Lokasi: ${context.location || "Indonesia"}` +
+      `- Lokasi Domisili: ${context.location || "Indonesia"}` +
       customNote +
+      profileJsonBlock +
       `\n\n` +
-      `ATURAN WAJIB EVALUASI KEAHLIAN (SKILLS):\n` +
-      `1. Periksa dengan teliti apakah keahlian kandidat: [${context.skills.join(", ")}] cocok dengan posisi target "${role}".\n` +
+      `ATURAN WAJIB EVALUASI KEAHLIAN (SKILLS) & KESELARASAN DENGAN TARGET PERAN:\n` +
+      `1. Periksa dengan teliti kecocokan keahlian dan pengalaman kandidat terhadap posisi target "${role}".\n` +
       `   - Jika keahlian kandidat TIDAK RELEVAN, TIDAK JELAS, atau berupa kata acak/dummy (seperti 'plo', 'pluh', 'plar', 'test', dsb):\n` +
-      `     * DILARANG MEMUJI KEAHLIAN INI DI 'whatGood'!\n` +
-      `     * Berikan skor kecocokan rendah (di bawah 50).\n` +
+      `     * DILARANG MEMUJI KEAHLIAN INI DI 'whatGood' atau 'transferableStrengths'!\n` +
+      `     * Berikan skor kecocokan (matchScore) rendah (di bawah 50).\n` +
       `     * Di 'criticalGaps' dan 'whatNotGood', tegaskan bahwa keahlian saat ini belum sesuai dan sarankan perbaikan kompetensi agar sesuai dengan posisi ${role} (misalnya: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).\n` +
       `     * Cantumkan keahlian riil yang seharusnya dipelajari.\n` +
-      `   - Jika keahlian relevan, berikan evaluasi gap yang objektif dan solutif.\n\n` +
-      `PANDUAN GAYA BAHASA (MUDAH DIPAHAMI & GENERAL):\n` +
-      `2. Gunakan Bahasa Indonesia yang komunikatif, ramah, dan membumi. Hindari istilah teknis yang berlebihan (hindari kata-kata rumit seperti 'tokenization', 'A/B testing mutlak', 'metrik kuantitatif'). Gunakan istilah sederhana seperti 'bukti hasil nyata', 'riset pengguna', 'alat kerja standar'.\n\n` +
-      `PANDUAN OUTPUT:\n` +
-      `1. matchScore: Angka 0-100 kecocokan profil terhadap target posisi ${role}.\n` +
-      `2. matchLevel: Tingkat keselarasan ('Tinggi', 'Menengah', atau 'Perlu Penyesuaian Kompetensi').\n` +
-      `3. coreCompetencies: 4 kompetensi penting untuk posisi ${role} lengkap dengan candidateLevel, requiredLevel, status ('match', 'gap', atau 'exceeds'), dan recommendation yang mudah dipahami.\n` +
-      `4. criticalGaps: 3 kesenjangan keahlian atau pengalaman yang perlu segera diperbaiki.\n` +
-      `5. transferableStrengths: 2-3 keunggulan atau potensi positif kandidat.\n` +
+      `   - Jika keahlian relevan, berikan evaluasi gap yang objektif, mendalam, dan solutif.\n\n` +
+      `PANDUAN GAYA BAHASA (KONSISTEN DENGAN KATA SAPAAN FORMAL 'ANDA'):\n` +
+      `2. Gunakan Bahasa Indonesia yang komunikatif, sopan, dan profesional:\n` +
+      `   - Selalu gunakan kata sapaan formal 'Anda' (JANGAN gunakan 'kamu' atau akhiran '-mu').\n` +
+      `   - Gunakan istilah sederhana yang membumi (misal: 'bukti hasil kerja nyata', 'alat kerja standar industri', 'proyek portofolio nyata').\n\n` +
+      `PANDUAN OUTPUT TERSTRUKTUR:\n` +
+      `1. matchScore: Angka 0-100 kecocokan profil terhadap target posisi impian ${role}.\n` +
+      `2. matchLevel: Tingkat keselarasan ('Tinggi (Selaras Baik)', 'Menengah (Perlu Pengayaan)', atau 'Perlu Penyesuaian Kompetensi').\n` +
+      `3. coreCompetencies: Array 4 kompetensi penting untuk posisi ${role} yang dievaluasi langsung dari data kandidat:\n` +
+      `   - competency: Nama kompetensi inti\n` +
+      `   - candidateLevel: Level kandidat saat ini ('Dasar', 'Menengah', atau 'Mahir')\n` +
+      `   - requiredLevel: Level yang dibutuhkan industri ('Menengah' atau 'Mahir')\n` +
+      `   - status: 'match' (jika sesuai), 'gap' (jika kurang), atau 'exceeds' (jika melebihi target)\n` +
+      `   - recommendation: Rekomendasi perbaikan konkret yang dapat langsung diterapkan kandidat\n` +
+      `4. criticalGaps: 3 kesenjangan keahlian atau pengalaman yang perlu segera diperbaiki untuk mencapai posisi ${role}.\n` +
+      `5. transferableStrengths: 2-3 keunggulan atau potensi positif kandidat yang dapat ditonjolkan.\n` +
       `6. strategicRecommendations: 3 langkah nyata untuk menutup kesenjangan tersebut.\n` +
-      `7. structuredAdvice: opening, whatGood (minimal 2 poin), whatNotGood (minimal 2 poin), conclusion.\n` +
-      `8. nextSteps: minimal 3 langkah aksi terarah.`;
+      `7. summary: Ringkasan menyeluruh evaluasi kesenjangan karier.\n` +
+      `8. structuredAdvice: opening, whatGood (minimal 2 poin), whatNotGood (minimal 2 poin), conclusion.\n` +
+      `9. nextSteps: minimal 3 langkah aksi terarah.`;
 
     const aiOut = await aiResult(gapAnalysisPillarSchema, prompt, gapFallback, options);
 
+    const calculatedScore = aiOut.matchScore ?? aiOut.readinessScore ?? gapFallback.matchScore;
+
     return {
       focus: "gap_analysis" as const,
-      summary: aiOut.summary,
+      summary: aiOut.summary || `Analisis Kesenjangan Karier untuk posisi ${aiOut.targetRole || role}: Tingkat kesiapan saat ini ${calculatedScore}/100.`,
       headlineSuggestions: [],
       starBullets: [],
       pillars: [],
       structuredAdvice: aiOut.structuredAdvice,
       gapAnalysisDetails: {
-        targetRole: aiOut.targetRole,
-        matchScore: aiOut.matchScore,
-        matchLevel: aiOut.matchLevel,
-        coreCompetencies: aiOut.coreCompetencies,
-        criticalGaps: aiOut.criticalGaps,
-        transferableStrengths: aiOut.transferableStrengths,
-        strategicRecommendations: aiOut.strategicRecommendations,
+        targetRole: aiOut.targetRole || role,
+        matchScore: calculatedScore,
+        matchLevel: aiOut.matchLevel || (calculatedScore >= 75
+          ? "Tinggi (Selaras Baik)"
+          : calculatedScore >= 50
+          ? "Menengah (Perlu Pengayaan)"
+          : "Perlu Penyesuaian Kompetensi"),
+        coreCompetencies: aiOut.coreCompetencies?.length ? aiOut.coreCompetencies : gapFallback.coreCompetencies,
+        criticalGaps: aiOut.criticalGaps?.length ? aiOut.criticalGaps : gapFallback.criticalGaps,
+        transferableStrengths: aiOut.transferableStrengths?.length ? aiOut.transferableStrengths : gapFallback.transferableStrengths,
+        strategicRecommendations: aiOut.strategicRecommendations?.length ? aiOut.strategicRecommendations : gapFallback.strategicRecommendations,
       },
       answer: aiOut.answer,
       nextSteps: aiOut.nextSteps,
@@ -588,12 +716,121 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PILAR 3: CAREER CONSULTATION & PERSIAPAN REKRUTMEN (career_consultation / career_roadmap / star)
+  // PILAR 3: AI CAREER CONSULTATION (career_consultation / career_roadmap / star)
   // ─────────────────────────────────────────────────────────────────────────────
+  const cvReviewBlock = context.cvReviewResult
+    ? `\n\n--- HASIL AI CV REVIEW (PILAR 1) TERAKHIR ---\n${JSON.stringify(context.cvReviewResult, null, 2)}\n--- AKHIR HASIL AI CV REVIEW ---\n`
+    : "";
+
+  const gapAnalysisBlock = context.gapAnalysisResult
+    ? `\n\n--- HASIL AI CAREER GAP ANALYSIS (PILAR 2) TERAKHIR ---\n${JSON.stringify(context.gapAnalysisResult, null, 2)}\n--- AKHIR HASIL AI CAREER GAP ANALYSIS ---\n`
+    : "";
+
+  const questionTopicBlock = (context.consultationQuestion || context.customInstruction || context.consultationTopic)
+    ? `\n\n--- PERTANYAAN / TOPIK KONSULTASI DARI KANDIDAT ---\n` +
+      (context.consultationTopic ? `Fokus Topik: ${context.consultationTopic}\n` : "") +
+      (context.consultationQuestion ? `Pertanyaan Spesifik: "${context.consultationQuestion}"\n` : "") +
+      (context.customInstruction ? `Instruksi Tambahan: "${context.customInstruction}"\n` : "") +
+      `--- AKHIR PERTANYAAN KANDIDAT ---\n`
+    : "";
+
   const consultationFallback = {
     targetRole: role,
     targetTimeline: "3 — 6 Bulan Kesiapan",
     targetLevel: skillCheck.isPlausible ? `Kesiapan Kompetitif untuk ${role}` : `Kandidat Siap Kerja untuk ${role}`,
+    analysis: {
+      overallAssessment: skillCheck.isPlausible
+        ? `Profil profesional Anda memiliki fondasi yang solid untuk posisi ${role}. Kombinasi pengalaman kerja dan keahlian teknis seperti ${context.skills.slice(0, 3).join(", ") || "yang terdaftar"} telah menjadi modal awal yang berharga. Fokus utama Anda saat ini adalah menyelaraskan bukti dampak terukur pada portofolio dan mempertajam personal branding agar langsung menarik perhatian hiring manager.`
+        : `Profil Anda memiliki susunan identitas dan pendidikan yang baik, namun kompetensi teknis yang tercantum saat ini (${context.skills.join(", ") || "belum lengkap"}) masih memiliki jarak yang signifikan terhadap kualifikasi standar posisi ${role}. Anda perlu memprioritaskan pembangunan kompetensi dasar dan proyek pembuktian sebelum aktif melamar.`,
+      profileReadiness: skillCheck.isPlausible
+        ? "Cukup Siap & Kompetitif — Membutuhkan penguatan pembuktian portofolio terukur dan strategi pitching interview."
+        : "Tahap Eksplorasi Awal — Memerlukan pembangunan 2-3 keahlian esensial industri dan 1 karya portofolio mandiri.",
+      missingDataNotices: skillCheck.isPlausible
+        ? [
+            "Data metrik pencapaian kuantitatif (%) pada riwayat pengalaman kerja masih dapat diperkaya.",
+            "Tautan studi kasus portofolio langsung ke hasil akhir proyek belum sepenuhnya terlampir.",
+          ]
+        : [
+            `Lengkapi keahlian inti peran ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
+            "Sertakan minimal 1 tautan portofolio atau proyek nyata sebagai bukti pemecahan masalah.",
+          ],
+      cvReviewHighlights: skillCheck.isPlausible
+        ? "CV terstruktur rapi dan ramah ATS; catatan perbaikan berfokus pada kuantifikasi pencapaian kerja dan kategorisasi tools."
+        : `CV membutuhkan penyelarasan kata kunci industri dan pembaruan daftar keahlian target peran ${role}.`,
+      gapAnalysisHighlights: skillCheck.isPlausible
+        ? "Kompetensi inti mayoritas selaras; kesenjangan terdapat pada penguasaan tooling tingkat lanjut dan kepemimpinan proyek."
+        : `Kesenjangan kritis pada penguasaan keahlian spesifik industri seperti ${skillCheck.recommendedSkillsForRole.slice(0, 2).join(", ")}.`,
+    },
+    recommendations: [
+      {
+        focusArea: "Pengembangan karier",
+        title: `Peta Jalan Transisi Menuju ${role}`,
+        description: `Susun rencana karier 6 bulan dengan membagi fase pembelajaran menjadi penguasaan keahlian inti, publikasi portofolio, dan lamaran aktif ke perusahaan target.`,
+        actionableTip: `Tentukan 5 perusahaan impian dan catat kesamaan kualifikasi yang mereka butuhkan sebagai panduan belajar mingguan.`,
+      },
+      {
+        focusArea: "Peningkatan kompetensi",
+        title: "Penguasaan Keahlian Kunci Berdampak Tinggi",
+        description: skillCheck.isPlausible
+          ? `Perdalam keahlian analitis dan metodologi kerja industri untuk meningkatkan nilai tawar Anda saat wawancara teknis.`
+          : `Prioritaskan mempelajari 3 keahlian utama untuk peran ${role}: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}.`,
+        actionableTip: `Alokasikan 5-7 jam per minggu untuk latihan studi kasus nyata menggunakan alat kerja standar industri.`,
+      },
+      {
+        focusArea: "Pengembangan portofolio",
+        title: "Studi Kasus Pembuktian (Proof of Work)",
+        description: "Recruiter ingin melihat bagaimana Anda memecahkan masalah nyata dari tahap identifikasi hingga metrik dampak akhir.",
+        actionableTip: "Pilih 1 proyek terbaik, buat ringkasan 1 halaman dengan struktur: Masalah, Solusi Anda, dan Metrik Hasil Terukur.",
+      },
+      {
+        focusArea: "Penyusunan CV",
+        title: "Optimalisasi CV Berbasis Pencapaian (STAR/XYZ)",
+        description: "Ubah deskripsi tugas harian yang pasif menjadi narasi pencapaian proaktif dengan angka atau persentase yang jelas.",
+        actionableTip: "Tulis ulang minimal 2 poin pekerjaan teratas menggunakan format 'Mencapai [X], diukur dengan [Y], melalui tindakan [Z]'.",
+      },
+      {
+        focusArea: "Persiapan interview",
+        title: "Teknik Pitching 2 Menit & Jawaban Perilaku (Behavioral)",
+        description: "Latih cara menceritakan latar belakang Anda secara ringkas dan lugas, serta siapkan narasi tantangan kerja yang pernah Anda selesaikan.",
+        actionableTip: "Gunakan formula STAR (Situation, Task, Action, Result) untuk menjawab pertanyaan 'Ceritakan proyek tersulit yang pernah Anda tangani'.",
+      },
+      {
+        focusArea: "Strategi mencapai target karier",
+        title: "Personal Branding & Visibilitas ke Recruiter",
+        description: "Pastikan profil ProofyLink dan jejaring profesional Anda aktif mencerminkan spesialisasi dan ketersediaan kerja.",
+        actionableTip: "Publikasikan satu tulisan singkat atau breakdown proyek di media profesional untuk menarik perhatian hiring manager.",
+      },
+    ],
+    nextSteps: [
+      {
+        stepNumber: 1,
+        title: "Audit & Lengkapi Data Profil",
+        timeline: "Minggu 1",
+        action: "Perbarui bagian keahlian dan lampirkan tautan portofolio proyek terbaru pada halaman CV & Profil.",
+        expectedOutcome: "Profil memiliki kelengkapan data di atas 90% dan siap dipindai oleh recruiter.",
+      },
+      {
+        stepNumber: 2,
+        title: "Poles Portofolio Studi Kasus Unggulan",
+        timeline: "Minggu 2 — 3",
+        action: "Susun 1 studi kasus mendalam yang mencakup proses pengambilan keputusan dan dampak terukur.",
+        expectedOutcome: "Memiliki bukti kerja nyata yang langsung memvalidasi kompetensi di mata recruiter.",
+      },
+      {
+        stepNumber: 3,
+        title: "Simulasi Wawancara & Pitching STAR",
+        timeline: "Minggu 4",
+        action: "Latih 3 cerita pencapaian utama dengan formula STAR dan siapkan jawaban untuk celah pengalaman.",
+        expectedOutcome: "Percaya diri dan lugas saat menyampaikan nilai tambah unik Anda di hadapan hiring manager.",
+      },
+      {
+        stepNumber: 4,
+        title: "Penyebaran Lamaran Terarah & Networking",
+        timeline: "Bulan 2 — 3",
+        action: "Kirimkan lamaran ke posisi yang selaras minimal 70% dan hubungi recruiter atau alumni di industri terkait.",
+        expectedOutcome: "Mendapatkan undangan interview pertama dari perusahaan yang sesuai dengan target karier.",
+      },
+    ],
     phases: [
       {
         phaseNumber: 1,
@@ -657,11 +894,11 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
       "Jika ada kesenjangan pengalaman atau transisi karir, tonjolkan kecepatan belajar dan transferable skills yang relevan.",
       "Tunjukkan antusiasme dengan mempelajari produk atau tantangan bisnis perusahaan sebelum sesi interview.",
     ],
-    summary: `Career Consultation untuk ${role}: Panduan strategis kesiapan diri dalam 3-6 bulan yang berfokus pada pembuktian portofolio, visibilitas di mata HRD, dan penguasaan teknik pitching wawancara kerja.`,
+    summary: `Career Consultation untuk ${role}: Panduan komprehensif analisis profil, rekomendasi berbasis 7 fokus karier, serta langkah aksi terarah menuju target peran Anda.`,
     structuredAdvice: {
-      opening: `Konsultasi persiapan karir dan strategi memikat HRD untuk posisi ${role}:`,
+      opening: `Konsultasi persiapan karier dan strategi memikat HRD untuk posisi ${role}:`,
       whatGood: [
-        "Arah tujuan karir sudah terdefinisi jelas menuju target peran yang diinginkan.",
+        "Arah tujuan karier sudah terdefinisi jelas menuju target peran yang diinginkan.",
         "Kombinasi keahlian dasar menjadi modal berharga untuk melangkah ke tahap seleksi.",
       ],
       whatNotGood: skillCheck.isPlausible
@@ -673,61 +910,69 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
             skillCheck.competencyFeedback,
             "Hindari melamar tanpa proyek pembuktian; siapkan minimal satu karya nyata sebagai modal pitching.",
           ],
-      conclusion: "Terapkan rekomendasi di atas untuk membangun kepercayaan diri dan daya pikat profilmu di hadapan HRD.",
+      conclusion: "Terapkan rekomendasi di atas untuk membangun kepercayaan diri dan daya pikat profil Anda di hadapan hiring manager.",
     },
-    answer: `Career Consultation: Panduan persiapan karir dan teknik memikat HRD untuk posisi ${role} melalui penguatan portofolio nyata, visibilitas profesional, dan kesiapan wawancara kerja.`,
-    nextSteps: skillCheck.isPlausible
-      ? [
-          "Pilih 1 proyek terbaik dan tuliskan ulang uraian hasilnya menggunakan metode STAR.",
-          "Tinjau kelengkapan profil ProofyLink agar mudah ditemukan dalam pencarian talent.",
-          "Latih pitching ringkas 2 menit tentang siapa dirimu dan keunggulan utamamu.",
-        ]
-      : [
-          `Mulai pelajari 2-3 keahlian utama untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).`,
-          "Buat 1 proyek latihan sederhana untuk dijadikan portofolio awal.",
-          "Jalankan kembali konsultasi ini setelah portofolio barumu siap.",
-        ],
+    answer: `Career Consultation: Panduan persiapan karier dan teknik memikat HRD untuk posisi ${role} melalui penguatan portofolio nyata, visibilitas profesional, dan kesiapan wawancara kerja.`,
     limitations: [
-      "Konsultasi ini merupakan panduan umum berbasis tren pasar kerja dan simulasi sudut pandang HRD sebagai referensi mandiri.",
-      "ProofyLink bukan penasihat karir bersertifikasi; proses rekrutmen aktual bergantung pada kebutuhan spesifik masing-masing perusahaan.",
+      "Konsultasi ini merupakan panduan strategis berbasis data profil Anda dan tren industri rekrutmen ProofyLink.",
+      "ProofyLink bukan penasihat karier bersertifikasi; proses rekrutmen aktual bergantung pada kebutuhan spesifik masing-masing perusahaan.",
     ],
   };
 
   const prompt =
-    `Anda adalah Lead Technical Recruiter & Talent Advisor di ProofyLink Talent Network.\n` +
-    `Tugas Anda: Berikan Career Consultation (Konsultasi Karir & Kesiapan Rekrutmen) yang ramah, membumi, dan berorientasi pada sudut pandang HRD/perekrut dalam Bahasa Indonesia untuk membantu kandidat dilirik perusahaan.\n\n` +
+    `Anda adalah AI Career Consultant & Talent Development Advisor di ProofyLink Talent Network.\n` +
+    `Tugas Anda adalah membantu pengguna memahami profil profesionalnya, mengembangkan karier, meningkatkan peluang kerja, dan mengambil keputusan karier yang lebih baik.\n\n` +
+    `Anda memiliki akses terhadap data profesional kandidat:\n` +
+    `- Profil kandidat (identitas, domisili, headline)\n` +
+    `- Ringkasan profesional (About / summary)\n` +
+    `- Riwayat pendidikan\n` +
+    `- Pengalaman kerja\n` +
+    `- Kompetensi (skills)\n` +
+    `- Tools yang dikuasai\n` +
+    `- Career Status\n` +
+    `- Career Goal (Target Posisi / Karier)\n` +
+    `- Hasil AI CV Review (Pilar 1)\n` +
+    `- Hasil AI Career Gap Analysis (Pilar 2)\n\n` +
+    `PRINSIP DAN PANDUAN KONSULTASI WAJIB:\n` +
+    `1. Selalu gunakan data kandidat sebagai konteks utama sebelum memberikan jawaban.\n` +
+    `2. Jika informasi yang tersedia belum cukup (misal: belum ada portofolio, tools belum dirinci, atau pengalaman belum terukur), secara eksplisit minta pengguna melengkapi data yang diperlukan di bagian 'analysis.missingDataNotices'.\n` +
+    `3. Jangan memberikan jawaban umum yang tidak terkait dengan profil kandidat.\n` +
+    `4. Berikan jawaban yang:\n` +
+    `   - Spesifik\n` +
+    `   - Praktis\n` +
+    `   - Mudah diterapkan\n` +
+    `   - Profesional\n` +
+    `   - Berorientasi tindakan\n` +
+    `5. Fokus jawaban pada 7 pilar ini:\n` +
+    `   1. Pengembangan karier\n` +
+    `   2. Peningkatan kompetensi\n` +
+    `   3. Persiapan rekrutmen\n` +
+    `   4. Pengembangan portofolio\n` +
+    `   5. Penyusunan CV\n` +
+    `   6. Persiapan interview\n` +
+    `   7. Strategi mencapai target karier\n` +
+    `6. Jika pengguna bertanya mengenai karier tertentu, sesuaikan rekomendasi dengan profil dan pengalaman yang dimiliki pengguna saat ini.\n` +
+    `7. Format output WAJIB mencakup 3 bagian utama:\n` +
+    `   ### Analisis (memuat overallAssessment, profileReadiness, missingDataNotices, cvReviewHighlights, gapAnalysisHighlights)\n` +
+    `   ### Rekomendasi (memuat array recommendations terpetakan ke 7 fokus jawaban, dengan title, description, dan actionableTip yang praktis)\n` +
+    `   ### Langkah Selanjutnya (memuat array nextSteps berurutan dengan stepNumber, title, timeline, action, dan expectedOutcome)\n\n` +
+    `DATA KONTEKS KANDIDAT SAAT INI:\n` +
     `- Target Peran yang Dituju: ${role}\n` +
     `- Headline Profil: ${context.headline || "Belum ditentukan"}\n` +
     `- Ringkasan (About): ${context.about || "Belum diisi"}\n` +
     `- Keahlian Terdaftar (Skills): ${context.skills.join(", ") || "Belum diisi"}\n` +
     `- Lokasi: ${context.location || "Indonesia"}` +
     customNote +
-    `\n\n` +
-    `ATURAN WAJIB EVALUASI KEAHLIAN (SKILLS):\n` +
-    `1. Periksa keahlian kandidat: [${context.skills.join(", ")}] terhadap target peran "${role}".\n` +
-    `   - Jika keahlian kandidat TIDAK RELEVAN atau berupa kata-kata dummy (seperti 'plo', 'pluh', 'plar', 'test', dsb):\n` +
-    `     * JANGAN memujinya di 'whatGood'!\n` +
-    `     * Fase 1 WAJIB difokuskan pada Penyelarasan & Pembangunan Keahlian Inti untuk posisi ${role} (misal: ${skillCheck.recommendedSkillsForRole.slice(0, 3).join(", ")}).\n` +
-    `     * Di 'whatNotGood', sampaikan dengan ramah bahwa kandidat perlu membangun kompetensi nyata terlebih dahulu sebelum siap dilirik HRD untuk peran ${role}.\n\n` +
-    `PANDUAN GAYA BAHASA & SUDUT PANDANG REKRUTER (RAMAH & MEMBUMI):\n` +
-    `2. Gunakan sudut pandang "Bagaimana HRD memandang profil ini". Berikan tips nyata agar kandidat tahu apa yang dicari HRD pada saat screening CV, peninjauan portofolio, dan sesi wawancara.\n` +
-    `3. HINDARI janji pasti atau bahasa legal absolut. Jadikan konsultasi ini sebagai panduan umum yang memberdayakan kandidat.\n\n` +
-    `Struktur Output yang Wajib Diisi:\n` +
-    `1. targetTimeline: Berikan estimasi waktu realistis (misal: '3 — 6 Bulan Kesiapan').\n` +
-    `2. targetLevel: Tentukan level target kompetensi kandidat.\n` +
-    `3. phases: Tepat 3 tahapan strategis:\n` +
-    `   - Fase 1: Penguatan Portofolio & Pembuktian Hasil Nyata\n` +
-    `   - Fase 2: Personal Branding & Visibilitas ke Perekrut\n` +
-    `   - Fase 3: Strategi Pitching Wawancara & Evaluasi Tawaran\n` +
-    `   Setiap fase memiliki phaseNumber, phaseName, timeframe, outcome, minimal 3 keyActions, dan milestone.\n` +
-    `4. recommendedCertifications: Sebutkan 3 sertifikasi atau topik pelatihan relevan.\n` +
-    `5. strategicAdvice: Berikan 3 saran strategis dari kacamata HRD.\n` +
-    `6. interviewPitchTips: Berikan 3 tips praktis cara mengkomunikasikan keunggulan diri saat wawancara (termasuk tips transisi karir / gap pengalaman).\n` +
-    `7. structuredAdvice: opening, whatGood (min 2), whatNotGood (min 2), dan conclusion.\n` +
-    `8. nextSteps: Minimal 3 aksi nyata langsung.\n` +
-    `9. limitations: Sertakan disclaimer bahwa ini panduan umum berbasis tren pasar kerja dan ProofyLink bukan penasihat karir bersertifikasi.`;
+    profileJsonBlock +
+    cvReviewBlock +
+    gapAnalysisBlock +
+    questionTopicBlock;
 
   const aiOut = await aiResult(careerConsultationPillarSchema, prompt, consultationFallback, options);
+
+  const formattedNextSteps = (aiOut.nextSteps || consultationFallback.nextSteps).map((s) =>
+    typeof s === "string" ? s : `${s.title} (${s.timeline}): ${s.action}`
+  );
 
   return {
     focus: "career_consultation" as const,
@@ -740,21 +985,24 @@ export async function careerAdvisor(input: unknown, options?: AiOptions) {
       targetRole: aiOut.targetRole,
       targetTimeline: aiOut.targetTimeline,
       targetLevel: aiOut.targetLevel,
-      phases: aiOut.phases,
-      recommendedCertifications: aiOut.recommendedCertifications,
-      strategicAdvice: aiOut.strategicAdvice,
-      interviewPitchTips: aiOut.interviewPitchTips || consultationFallback.interviewPitchTips,
+      analysis: aiOut.analysis || consultationFallback.analysis,
+      recommendations: aiOut.recommendations || consultationFallback.recommendations,
+      actionSteps: aiOut.nextSteps || consultationFallback.nextSteps,
+      phases: aiOut.phases?.length ? aiOut.phases : consultationFallback.phases,
+      recommendedCertifications: aiOut.recommendedCertifications?.length ? aiOut.recommendedCertifications : consultationFallback.recommendedCertifications,
+      strategicAdvice: aiOut.strategicAdvice?.length ? aiOut.strategicAdvice : consultationFallback.strategicAdvice,
+      interviewPitchTips: aiOut.interviewPitchTips?.length ? aiOut.interviewPitchTips : consultationFallback.interviewPitchTips,
     },
     careerRoadmapDetails: {
       targetRole: aiOut.targetRole,
       targetTimeline: aiOut.targetTimeline,
       targetLevel: aiOut.targetLevel,
-      phases: aiOut.phases,
-      recommendedCertifications: aiOut.recommendedCertifications,
-      strategicAdvice: aiOut.strategicAdvice,
+      phases: aiOut.phases?.length ? aiOut.phases : consultationFallback.phases,
+      recommendedCertifications: aiOut.recommendedCertifications?.length ? aiOut.recommendedCertifications : consultationFallback.recommendedCertifications,
+      strategicAdvice: aiOut.strategicAdvice?.length ? aiOut.strategicAdvice : consultationFallback.strategicAdvice,
     },
     answer: aiOut.answer,
-    nextSteps: aiOut.nextSteps,
+    nextSteps: formattedNextSteps,
     limitations: aiOut.limitations,
     modelVersion: defaultVersion,
     source: getSource(),

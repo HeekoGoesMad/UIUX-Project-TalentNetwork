@@ -39,7 +39,7 @@ const initial: AppState = {
 };
 
 const demoNotifications: BootstrapNotification[] = [
-  { id: "demo-notification-1", type: "system", title: "Selamat datang di ProofyLink", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
+  { id: "demo-notification-1", type: "system", title: "Selamat datang di Talent Network", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
   { id: "demo-notification-2", type: "message_received", title: "Pesan baru tersedia", body: "Anda memiliki percakapan demo yang siap ditinjau.", data: {}, readAt: "2026-08-13T08:00:00Z", createdAt: "2026-08-13T08:00:00Z" },
 ];
 
@@ -812,6 +812,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(profile.industries?.length ? { industries: profile.industries } : {}),
             ...(profile.certifications?.length ? { certifications: profile.certifications } : {}),
             ...(profile.bannerUrl !== undefined ? { bannerUrl: profile.bannerUrl || null } : {}),
+            ...(profile.careerAdvisorResults ? { careerAdvisorResults: profile.careerAdvisorResults } : {}),
           },
         },
       ],

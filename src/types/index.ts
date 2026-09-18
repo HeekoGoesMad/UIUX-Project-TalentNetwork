@@ -179,6 +179,14 @@ export type CvProfile = {
   campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
+  careerAdvisorResults?: Record<string, CareerAdvisorSavedResult>;
+};
+
+export type CareerAdvisorSavedResult = {
+  result: unknown;
+  generatedAt: string;
+  targetRole?: string;
+  analysisCount?: number;
 };
 
 export type ConsentState = "not-requested" | "pending-candidate-consent" | "consented" | "declined" | "consent-expired" | "withdrawn" | "screening-in-progress" | "screening-completed" | "disputed";
