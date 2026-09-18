@@ -410,20 +410,45 @@ function AdminCompaniesContent() {
   return (
     <AdminShell title="Manajemen & Verifikasi Perusahaan">
       <div className="space-y-6">
+        {/* Top Header Card with Quick Summary */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                Direktori Perusahaan
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Verifikasi legalitas, izin berusaha, dan status akun rekruter terdaftar.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-bold text-[#7C3AED] border border-purple-200/80">
+                <Building2 className="size-3.5" />
+                {companies.length} Terdaftar
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 border border-amber-200/80">
+                <Clock className="size-3.5" />
+                {companies.filter((c) => c.verificationStatus === "pending").length} Menunggu Review
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Top Controls: Search & Filter Tabs */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <Input
               type="text"
               placeholder="Cari nama perusahaan, NIB, NPWP, atau email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-white border-slate-200 text-xs rounded-xl h-10"
+              className="pl-10 bg-white border-slate-200 text-xs rounded-xl h-10 shadow-2xs"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {[
               { id: "all", label: "Semua Status" },
               { id: "pending", label: "Pending" },
@@ -438,10 +463,10 @@ function AdminCompaniesContent() {
                 size="sm"
                 onClick={() => setStatusFilter(st.id)}
                 className={cn(
-                  "text-xs rounded-xl h-8 font-semibold",
+                  "text-xs rounded-xl h-8.5 font-bold transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5",
                   statusFilter === st.id
-                    ? "bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "bg-purple-50/80 text-[#7C3AED] border border-purple-300 font-bold shadow-2xs"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-medium"
                 )}
               >
                 {st.label}
@@ -451,7 +476,8 @@ function AdminCompaniesContent() {
               variant="outline"
               size="sm"
               onClick={fetchCompanies}
-              className="h-8 rounded-xl border-slate-200 px-2.5"
+              className="h-8.5 rounded-xl border-slate-200 px-2.5 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all hover:-translate-y-0.5"
+              title="Segarkan data"
             >
               <RefreshCw className={cn("size-3.5", loading ? "animate-spin" : "")} />
             </Button>
@@ -459,12 +485,12 @@ function AdminCompaniesContent() {
         </div>
 
         {/* Master Data Table */}
-        <Card className="border border-slate-200/90 bg-white shadow-2xs overflow-hidden rounded-2xl">
+        <Card className="border border-slate-200/90 bg-white shadow-xs overflow-hidden rounded-2xl">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">
+                  <tr className="border-b border-slate-200 bg-slate-50/90 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">
                     <th className="py-3.5 px-4">Nama Perusahaan &amp; Sektor</th>
                     <th className="py-3.5 px-4">Legalitas (NIB / NPWP)</th>
                     <th className="py-3.5 px-4">Skala &amp; Lokasi</th>
@@ -477,16 +503,16 @@ function AdminCompaniesContent() {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">
-                        <Loader2 className="size-6 animate-spin mx-auto mb-2 text-[#7C3AED]" />
-                        Memuat data master perusahaan...
+                      <td colSpan={7} className="py-14 text-center text-muted-foreground">
+                        <Loader2 className="size-7 animate-spin mx-auto mb-2 text-[#7C3AED]" />
+                        <span className="font-medium text-xs">Memuat data master perusahaan...</span>
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">
-                        <Building2 className="size-8 mx-auto mb-2 text-slate-300" />
-                        Tidak ada data perusahaan yang sesuai kriteria pencarian.
+                      <td colSpan={7} className="py-14 text-center text-muted-foreground">
+                        <Building2 className="size-9 mx-auto mb-2 text-slate-300" />
+                        <span className="font-medium text-xs">Tidak ada data perusahaan yang sesuai kriteria pencarian.</span>
                       </td>
                     </tr>
                   ) : (
@@ -495,25 +521,25 @@ function AdminCompaniesContent() {
                       const Icon = cfg.icon;
 
                       return (
-                        <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3 px-4">
+                        <tr key={c.id} className="hover:bg-purple-50/20 transition-colors">
+                          <td className="py-3.5 px-4">
                             <p className="font-bold text-slate-900 text-sm">{c.name}</p>
                             <p className="text-[11px] text-slate-500 mt-0.5">
                               {c.industry || "Sektor belum dipilih"}
                             </p>
                           </td>
-                          <td className="py-3 px-4 font-mono text-[11px] text-slate-600">
-                            <div>NIB: {c.nib || "-"}</div>
-                            <div>NPWP: {c.npwp || "-"}</div>
+                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
+                            <div>NIB: <span className="font-semibold text-slate-800">{c.nib || "-"}</span></div>
+                            <div>NPWP: <span className="font-semibold text-slate-800">{c.npwp || "-"}</span></div>
                           </td>
-                          <td className="py-3 px-4 text-slate-600">
-                            <div>{c.companyScale || "-"}</div>
+                          <td className="py-3.5 px-4 text-slate-600">
+                            <div className="font-medium text-slate-800">{c.companyScale || "-"}</div>
                             <div className="text-[11px] text-slate-500">{c.city || c.province || "-"}</div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <span
                               className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold border",
+                                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border",
                                 cfg.badgeClass
                               )}
                             >
@@ -521,20 +547,21 @@ function AdminCompaniesContent() {
                               {cfg.label}
                             </span>
                           </td>
-                          <td className="py-3 px-4">
-                            <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 capitalize text-[10px] font-semibold">
+                          <td className="py-3.5 px-4">
+                            <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 capitalize text-[10px] font-bold">
                               {c.subscriptionTier}
                             </Badge>
                           </td>
-                          <td className="py-3 px-4 font-bold text-slate-900">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
                             {c.tokenBalance} Token
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
+                                variant="outline"
                                 onClick={() => openReviewModal(c)}
-                                className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 rounded-xl gap-1.5 shadow-xs"
+                                className="border-purple-200 text-[#7C3AED] hover:bg-purple-50 hover:border-purple-300 text-xs font-semibold h-8 px-3 rounded-xl gap-1.5 shadow-2xs cursor-pointer transition-all hover:-translate-y-0.5"
                               >
                                 <Eye className="size-3.5" />
                                 Review
@@ -543,7 +570,7 @@ function AdminCompaniesContent() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeleteCompany(c)}
-                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 text-xs h-8 px-2.5 rounded-xl gap-1 shadow-xs"
+                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 text-xs h-8 px-2.5 rounded-xl gap-1 shadow-2xs cursor-pointer transition-all hover:-translate-y-0.5"
                                 title={`Hapus perusahaan ${c.name}`}
                               >
                                 <Trash2 className="size-3.5" />
@@ -562,15 +589,15 @@ function AdminCompaniesContent() {
 
         {/* Modal Detail & Review Perusahaan */}
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden">
-            <DialogHeader className="border-b pb-3.5">
+          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden rounded-2xl">
+            <DialogHeader className="border-b border-slate-100 pb-3.5">
               <div className="flex items-center justify-between">
                 <div>
                   <DialogTitle className="text-lg font-bold text-slate-900">
                     Review Perusahaan: {selectedCompany?.name}
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    ID: <span className="font-mono">{selectedCompany?.id}</span> · Terdaftar sejak{" "}
+                    ID: <span className="font-mono text-slate-700 font-semibold">{selectedCompany?.id}</span> · Terdaftar sejak{" "}
                     {selectedCompany?.createdAt
                       ? new Date(selectedCompany.createdAt).toLocaleDateString("id-ID")
                       : "-"}
@@ -579,30 +606,45 @@ function AdminCompaniesContent() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 pt-3">
+              <div className="flex gap-1.5 pt-3">
                 <Button
                   size="sm"
                   variant={activeTab === "legal" ? "default" : "outline"}
                   onClick={() => setActiveTab("legal")}
-                  className={cn("text-xs h-7 rounded-lg", activeTab === "legal" ? "bg-[#7C3AED] text-white" : "")}
+                  className={cn(
+                    "text-xs h-8 rounded-xl font-bold transition-all cursor-pointer",
+                    activeTab === "legal"
+                      ? "bg-purple-50 text-[#7C3AED] border border-purple-300 shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  )}
                 >
-                  Legalitas &amp; Bisnis
+                  Informasi &amp; Legalitas
                 </Button>
                 <Button
                   size="sm"
                   variant={activeTab === "verification" ? "default" : "outline"}
                   onClick={() => setActiveTab("verification")}
-                  className={cn("text-xs h-7 rounded-lg", activeTab === "verification" ? "bg-[#7C3AED] text-white" : "")}
+                  className={cn(
+                    "text-xs h-8 rounded-xl font-bold transition-all cursor-pointer",
+                    activeTab === "verification"
+                      ? "bg-purple-50 text-[#7C3AED] border border-purple-300 shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  )}
                 >
-                  Status Verifikasi Admin
+                  Status Verifikasi
                 </Button>
                 <Button
                   size="sm"
                   variant={activeTab === "subscription" ? "default" : "outline"}
                   onClick={() => setActiveTab("subscription")}
-                  className={cn("text-xs h-7 rounded-lg", activeTab === "subscription" ? "bg-[#7C3AED] text-white" : "")}
+                  className={cn(
+                    "text-xs h-8 rounded-xl font-bold transition-all cursor-pointer",
+                    activeTab === "subscription"
+                      ? "bg-purple-50 text-[#7C3AED] border border-purple-300 shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  )}
                 >
-                  Langganan &amp; Penggunaan
+                  Langganan &amp; Token
                 </Button>
               </div>
             </DialogHeader>
@@ -673,9 +715,9 @@ function AdminCompaniesContent() {
                         <Building2 className="size-4" />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 text-xs">Profil Entitas Bisnis &amp; Operasional</p>
+                        <p className="font-bold text-slate-900 text-xs">Profil Perusahaan</p>
                         <p className="text-[11px] text-muted-foreground">
-                          Informasi entitas perusahaan yang ditampilkan pada kandidat saat permintaan screening.
+                          Informasi perusahaan yang ditampilkan kepada kandidat saat permintaan kontak.
                         </p>
                       </div>
                     </div>
@@ -884,7 +926,7 @@ function AdminCompaniesContent() {
                 <div className="space-y-4 text-xs">
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
                     <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                      Keputusan Verifikasi Compliance
+                      Keputusan Verifikasi
                     </p>
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">
@@ -905,7 +947,7 @@ function AdminCompaniesContent() {
 
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">
-                        Catatan Verifikasi Admin (Alasan persetujuan / instruksi revisi / penolakan):
+                        Catatan Verifikasi:
                       </label>
                       <textarea
                         value={formNotes}

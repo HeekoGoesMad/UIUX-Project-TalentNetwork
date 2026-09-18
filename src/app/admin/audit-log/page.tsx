@@ -128,20 +128,45 @@ export default function AdminAuditLogPage() {
   return (
     <AdminShell title="Riwayat Jejak Aktivitas (Audit Logs)">
       <div className="space-y-6">
+        {/* Top Header Card with Quick Summary */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                Riwayat Aktivitas Platform
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Catatan transparan aktivitas verifikasi, kuota token, dan operasional akun.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-bold text-[#7C3AED] border border-purple-200/80">
+                <ScrollText className="size-3.5" />
+                {logs.length} Catatan Log
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 border border-emerald-200/80">
+                <span className="size-1.5 rounded-full bg-emerald-500"></span>
+                Tersinkronisasi Otomatis
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Top Controls */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <Input
               type="text"
               placeholder="Cari aksi, email pelaku, atau nama perusahaan..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-white border-slate-200 text-xs rounded-xl h-10"
+              className="pl-10 bg-white border-slate-200 text-xs rounded-xl h-10 shadow-2xs"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {ACTION_CATEGORIES.map((cat) => (
               <Button
                 key={cat.id}
@@ -149,10 +174,10 @@ export default function AdminAuditLogPage() {
                 size="sm"
                 onClick={() => setCategoryFilter(cat.id)}
                 className={cn(
-                  "text-xs rounded-xl h-8 font-semibold",
+                  "text-xs rounded-xl h-8.5 font-bold transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5",
                   categoryFilter === cat.id
-                    ? "bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "bg-purple-50/80 text-[#7C3AED] border border-purple-300 font-bold shadow-2xs"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-medium"
                 )}
               >
                 {cat.label}
@@ -162,7 +187,8 @@ export default function AdminAuditLogPage() {
               variant="outline"
               size="sm"
               onClick={fetchLogs}
-              className="h-8 rounded-xl border-slate-200 px-2.5"
+              className="h-8.5 rounded-xl border-slate-200 px-2.5 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all hover:-translate-y-0.5"
+              title="Segarkan log"
             >
               <RefreshCw className={cn("size-3.5", loading ? "animate-spin" : "")} />
             </Button>
@@ -170,17 +196,17 @@ export default function AdminAuditLogPage() {
         </div>
 
         {/* Audit Log Table */}
-        <Card className="border border-slate-200/90 bg-white shadow-2xs overflow-hidden rounded-2xl">
+        <Card className="border border-slate-200/90 bg-white shadow-xs overflow-hidden rounded-2xl">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">
-                    <th className="py-3.5 px-4">Waktu Kejadian</th>
-                    <th className="py-3.5 px-4">Nama Perusahaan Terkait</th>
-                    <th className="py-3.5 px-4">Pelaku (Actor)</th>
-                    <th className="py-3.5 px-4">Tipe Aktivitas &amp; Aksi</th>
-                    <th className="py-3.5 px-4">Detail / Entitas</th>
+                    <th className="py-3.5 px-4">Waktu</th>
+                    <th className="py-3.5 px-4">Perusahaan</th>
+                    <th className="py-3.5 px-4">Pelaku</th>
+                    <th className="py-3.5 px-4">Aktivitas</th>
+                    <th className="py-3.5 px-4">Detail Entitas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

@@ -251,6 +251,31 @@ function AdminPartnershipsContent() {
   return (
     <AdminShell title="Manajemen & Verifikasi Partnership">
       <div className="space-y-6">
+        {/* Top Header Card with Quick Summary */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                Direktori Kemitraan Kampus &amp; Instansi
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Verifikasi berkas Surat Keputusan (SK) kerja sama dan integrasi penyaluran talent.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-bold text-[#7C3AED] border border-purple-200/80">
+                <GraduationCap className="size-3.5" />
+                {partnerships.length} Lembaga Terdaftar
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 border border-amber-200/80">
+                <Clock className="size-3.5" />
+                {partnerships.filter((p) => p.verificationStatus === "pending").length} Menunggu Review
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Search & Filter Toolbar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
@@ -278,10 +303,10 @@ function AdminPartnershipsContent() {
                   key={st.key}
                   onClick={() => setStatusFilter(st.key)}
                   className={cn(
-                    "rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-2xs",
+                    "rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5",
                     active
-                      ? "bg-[#7C3AED] text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                      ? "bg-purple-50/80 text-[#7C3AED] border border-purple-300 font-bold shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 font-medium"
                   )}
                 >
                   {st.label}
@@ -295,7 +320,7 @@ function AdminPartnershipsContent() {
               size="icon"
               onClick={fetchPartnerships}
               disabled={loading}
-              className="rounded-xl size-9 border-slate-200 bg-white hover:bg-slate-50 shadow-2xs"
+              className="rounded-xl size-9 border-slate-200 bg-white hover:bg-slate-50 shadow-2xs cursor-pointer transition-all hover:-translate-y-0.5"
               title="Segarkan data"
             >
               <RefreshCw className={cn("size-3.5 text-slate-600", loading && "animate-spin")} />
@@ -304,11 +329,11 @@ function AdminPartnershipsContent() {
         </div>
 
         {/* Table Content Card */}
-        <Card className="rounded-2xl border-slate-200/80 shadow-xs overflow-hidden bg-white">
+        <Card className="rounded-2xl border-slate-200/90 shadow-xs overflow-hidden bg-white">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <thead className="bg-slate-50/90 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wider text-slate-600">
                   <tr>
                     <th className="py-3.5 px-4 font-bold">Nama Lembaga / Instansi</th>
                     <th className="py-3.5 px-4 font-bold">Surat SK</th>
@@ -403,8 +428,9 @@ function AdminPartnershipsContent() {
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
+                                variant="outline"
                                 onClick={() => openReviewModal(p)}
-                                className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 px-3 rounded-xl gap-1.5 shadow-2xs"
+                                className="border-purple-200 text-[#7C3AED] hover:bg-purple-50 hover:border-purple-300 text-xs font-semibold h-8 px-3 rounded-xl gap-1.5 shadow-2xs cursor-pointer transition-all hover:-translate-y-0.5"
                               >
                                 <Eye className="size-3.5" />
                                 Review
@@ -413,7 +439,7 @@ function AdminPartnershipsContent() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeletePartnership(p)}
-                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 text-xs h-8 px-2.5 rounded-xl gap-1 shadow-2xs"
+                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 text-xs h-8 px-2.5 rounded-xl gap-1 shadow-2xs cursor-pointer transition-all hover:-translate-y-0.5"
                                 title={`Hapus kemitraan ${p.name}`}
                               >
                                 <Trash2 className="size-3.5" />
@@ -435,7 +461,7 @@ function AdminPartnershipsContent() {
           <DialogContent className="max-w-2xl flex flex-col p-6 overflow-hidden rounded-2xl">
             <DialogHeader className="border-b border-slate-100 pb-3.5">
               <DialogTitle className="text-lg font-bold text-slate-900">
-                Review Partnership: {selectedPartnership?.name}
+                Review Kemitraan: {selectedPartnership?.name}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                 ID: <span className="font-mono">{selectedPartnership?.id}</span> · Terdaftar sejak{" "}
@@ -443,18 +469,12 @@ function AdminPartnershipsContent() {
                   ? new Date(selectedPartnership.createdAt).toLocaleDateString("id-ID")
                   : "-"}
               </DialogDescription>
-
-              <div className="pt-2">
-                <span className="inline-block bg-purple-50 text-[#7C3AED] border border-purple-200 px-3 py-1 rounded-lg text-xs font-bold">
-                  Status Verifikasi Admin
-                </span>
-              </div>
             </DialogHeader>
 
             <div className="py-4 space-y-4 text-xs">
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3.5">
                 <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                  Keputusan Verifikasi Compliance
+                  Keputusan Verifikasi
                 </p>
 
                 <div>
@@ -467,7 +487,7 @@ function AdminPartnershipsContent() {
                     onChange={(e) => setFormStatus(e.target.value as PartnershipItem["verificationStatus"])}
                     className="w-full h-10 text-xs rounded-xl border border-slate-300 bg-white px-3 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="pending">Pending Verification (Menunggu Peninjauan)</option>
+                    <option value="pending">Pending (Menunggu Peninjauan)</option>
                     <option value="approved">Approved (Setujui Lembaga &amp; Aktifkan Kemitraan)</option>
                     <option value="need_revision">Need Revision (Minta Perbaikan Dokumen / SK)</option>
                     <option value="rejected">Rejected (Tolak Pendaftaran Kemitraan)</option>
@@ -476,13 +496,13 @@ function AdminPartnershipsContent() {
 
                 <div>
                   <label htmlFor="verification-notes" className="font-semibold text-slate-700 block mb-1.5">
-                    Catatan Verifikasi Admin (Alasan persetujuan / instruksi revisi / penolakan):
+                    Catatan Verifikasi:
                   </label>
                   <textarea
                     id="verification-notes"
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="Tuliskan catatan hasil verifikasi atau detail berkas yang perlu diperbaiki oleh lembaga..."
+                    placeholder="Tuliskan catatan hasil verifikasi atau detail berkas yang perlu diperbaiki..."
                     className="w-full h-28 p-3 text-xs rounded-xl border border-slate-300 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed"
                   />
                 </div>
