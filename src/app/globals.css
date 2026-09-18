@@ -191,17 +191,55 @@ body { background: var(--background); color: var(--foreground); font-family: var
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease-out;
 }
 
+.hero-underline-bar-active,
 .group:hover .hero-underline-bar {
   transform: scaleY(1.35) scaleX(1.03);
   box-shadow: 0 3px 16px -1px rgba(124, 58, 237, 0.6), 0 0 8px rgba(236, 72, 153, 0.35);
   animation: hero-underline-flow 2.5s ease infinite;
 }
 
+/* Artificial Cursor Authored Motion */
+@keyframes artificial-cursor-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(52px, 36px, 0);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes artificial-cursor-exit {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(24px, 18px, 0);
+  }
+}
+
+.animate-cursor-enter {
+  animation: artificial-cursor-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-cursor-exit {
+  animation: artificial-cursor-exit 0.6s ease-in forwards;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  .animate-fade-in, .animate-fade-up, .animate-scale-in, .animate-shake, .animate-discord-shake, .animate-shimmer, .animate-hero-float, .hero-underline-track, .group:hover .hero-underline-bar { animation: none !important; }
+  .animate-fade-in, .animate-fade-up, .animate-scale-in, .animate-shake, .animate-discord-shake, .animate-shimmer, .animate-hero-float, .hero-underline-track, .group:hover .hero-underline-bar, .hero-underline-bar-active, .animate-cursor-enter, .animate-cursor-exit { animation: none !important; }
   .hero-underline-track { transform: scaleX(1) !important; opacity: 1 !important; }
-  .group:hover .hero-underline-bar { transform: none !important; }
+  .group:hover .hero-underline-bar, .hero-underline-bar-active { transform: none !important; }
+  .animate-cursor-enter, .animate-cursor-exit { display: none !important; }
 }
 
 /* Accessibility Preferences */

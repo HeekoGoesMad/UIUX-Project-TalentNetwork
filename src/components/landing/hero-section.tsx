@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Lock, Move, ShieldCheck, Unlock, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface CandidatePreview {
   id: string;
@@ -81,6 +82,52 @@ export function HeroSection() {
   const [selectedCandidate, setSelectedCandidate] = useState<CandidatePreview>(CANDIDATES[0]);
   const [unlocked, setUnlocked] = useState<boolean>(false);
 
+  // Artificial Cursor Demonstration (runs once on web visit after load)
+  const [cursorStage, setCursorStage] = useState<"idle" | "visible" | "exiting" | "done">("idle");
+  const [isArtificialHovered, setIsArtificialHovered] = useState<boolean>(false);
+  const [isArtificialClicking, setIsArtificialClicking] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    // Phase 1: Wait for everything to load first (1500ms)
+    const enterTimer = setTimeout(() => {
+      setCursorStage("visible");
+    }, 1500);
+
+    // Phase 2: Arrives at text (2300ms) -> trigger click tap and active hover
+    const clickTimer = setTimeout(() => {
+      setIsArtificialClicking(true);
+      setIsArtificialHovered(true);
+    }, 2300);
+
+    // Phase 2b: Release click tap (2450ms), stay hovered
+    const releaseClickTimer = setTimeout(() => {
+      setIsArtificialClicking(false);
+    }, 2450);
+
+    // Phase 3: Hold highlight statement for 1.4s, then exit (3750ms)
+    const exitTimer = setTimeout(() => {
+      setIsArtificialHovered(false);
+      setCursorStage("exiting");
+    }, 3750);
+
+    // Phase 4: Finish fade-out and unmount completely (4400ms)
+    const doneTimer = setTimeout(() => {
+      setCursorStage("done");
+    }, 4400);
+
+    return () => {
+      clearTimeout(enterTimer);
+      clearTimeout(clickTimer);
+      clearTimeout(releaseClickTimer);
+      clearTimeout(exitTimer);
+      clearTimeout(doneTimer);
+    };
+  }, []);
+
   // Drag physics state
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -149,18 +196,68 @@ export function HeroSection() {
             <h1 className="text-4xl sm:text-6xl lg:text-[4rem] font-extrabold tracking-tight text-slate-900 leading-[1.06] text-balance">
               Rekrut talent kredibel dari{" "}
               <span className="relative inline-block group cursor-pointer select-none">
-                <span className="relative z-10 text-slate-950 transition-colors duration-200 group-hover:text-[#5B21B6]">
+                <span
+                  className={cn(
+                    "relative z-10 text-slate-950 transition-colors duration-200 group-hover:text-[#5B21B6]",
+                    isArtificialHovered && "text-[#5B21B6]"
+                  )}
+                >
                   sinyal nyata
                 </span>
                 <span
                   aria-hidden="true"
                   className="hero-underline-track absolute left-0 -bottom-1 sm:-bottom-1.5 w-full h-[3.5px] sm:h-[4.5px] pointer-events-none"
                 >
-                  <span className="hero-underline-bar block w-full h-full rounded-full shadow-[0_1px_4px_rgba(124,58,237,0.25)]" />
+                  <span
+                    className={cn(
+                      "hero-underline-bar block w-full h-full rounded-full shadow-[0_1px_4px_rgba(124,58,237,0.25)]",
+                      isArtificialHovered && "hero-underline-bar-active"
+                    )}
+                  />
                   <span className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
-                    <span className="block w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                    <span
+                      className={cn(
+                        "block w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full transition-transform duration-700 ease-out",
+                        (isArtificialHovered || "group-hover:translate-x-full"),
+                        isArtificialHovered && "translate-x-full"
+                      )}
+                    />
                   </span>
                 </span>
+
+                {/* Artificial Cursor (Visit Highlight Motion) */}
+                {cursorStage !== "idle" && cursorStage !== "done" && (
+                  <div
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute -bottom-7 right-2 sm:-bottom-8 sm:right-4 z-30 pointer-events-none select-none",
+                      cursorStage === "visible" && "animate-cursor-enter",
+                      cursorStage === "exiting" && "animate-cursor-exit"
+                    )}
+                  >
+                    <div className="relative flex items-center gap-1.5">
+                      {isArtificialClicking && (
+                        <span className="absolute -top-1 -left-1 size-6 rounded-full bg-[#7C3AED]/40 animate-ping" />
+                      )}
+                      <svg
+                        className={cn(
+                          "size-5 sm:size-5.5 text-slate-900 drop-shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition-transform duration-150",
+                          isArtificialClicking ? "scale-90 -rotate-3" : "scale-100"
+                        )}
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.54.35-.85L5.85 2.86a.5.5 0 0 0-.35.35Z"
+                          className="fill-slate-900 stroke-white stroke-[1.5]"
+                        />
+                      </svg>
+                      <span className="rounded-md bg-[#7C3AED] px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-xs tracking-tight whitespace-nowrap">
+                        Recruiter
+                      </span>
+                    </div>
+                  </div>
+                )}
               </span>
               , bukan klaim resume
             </h1>
