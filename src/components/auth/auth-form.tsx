@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus, UserRole } from "@/types";
-import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, Sparkles, User } from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -315,7 +315,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </div>
 
       {mode === "register" && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
           <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
             <input
               id="terms"
@@ -329,7 +329,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   setConsentAgreed(e.target.checked);
                 }
               }}
-              className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
+              className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED] cursor-pointer"
             />
             <span className="leading-relaxed">
               Saya menyetujui{" "}
@@ -339,7 +339,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                className="font-bold text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
                 Syarat &amp; Ketentuan, Persetujuan Akses Data
               </button>{" "}
@@ -350,7 +350,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                className="font-bold text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
                 Kebijakan Privasi
               </button>
@@ -364,8 +364,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               <span>Persetujuan Akses Data, Syarat &amp; Kebijakan telah disetujui</span>
             </div>
           ) : (
-            <p className="text-[11px] text-slate-500 pl-6">
-              💡 Wajib ditinjau &amp; disetujui sebelum membuat akun di ProofyLink.
+            <p className="text-[11px] text-slate-500 pl-6.5">
+              Wajib ditinjau &amp; disetujui sebelum membuat akun di ProofyLink.
             </p>
           )}
         </div>
@@ -445,7 +445,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
+                <User className="size-4 text-[#7C3AED]" /> Login Cepat Demo
               </span>
               <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
                 Profil Lengkap
@@ -480,7 +480,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               router.push("/candidate/onboarding");
             }}
           >
-            <Sparkles className="size-3.5 text-emerald-600" /> Uji Coba Daftar Kandidat Baru (Mulai Step 0)
+            <UserPlus className="size-3.5 text-emerald-600" /> Uji Coba Daftar Kandidat Baru (Mulai Step 0)
           </Button>
         </div>
       )}
@@ -506,7 +506,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo Kemitraan
+                <GraduationCap className="size-4 text-[#7C3AED]" /> Login Cepat Demo Kemitraan
               </span>
               <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
                 Kampus Mitra
@@ -541,11 +541,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "login" ? "Daftar di sini" : "Masuk di sini"}
         </Link>
       </p>
-
-      <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 pt-1">
-        <CheckCircle2 className="size-3.5 text-[#7C3AED]" />
-        <span>{supabaseConfigured ? "Autentikasi Supabase aktif" : "Lingkungan demo terverifikasi"}</span>
-      </div>
 
       {pendingRegistration && (
         <OtpVerificationModal

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ReactNode } from "react";
-import { ShieldCheck, Sparkles, Check, Lock, WalletCards, GraduationCap } from "lucide-react";
+import { ShieldCheck, Check, Lock, WalletCards, GraduationCap } from "lucide-react";
 
 export function AuthShell({
   children,
@@ -18,11 +18,7 @@ export function AuthShell({
       <div className="w-full max-w-6xl my-auto">
         <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white shadow-xl grid lg:grid-cols-[1fr_1.25fr]">
           {/* Left Decorative & Trust Panel (Desktop) */}
-          <aside className="navy-grid relative hidden flex-col justify-between p-8 lg:p-12 text-white lg:flex overflow-hidden">
-            {/* Ambient Background Glows */}
-            <div className="absolute -top-20 -left-20 size-80 bg-[#7c3aed]/25 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -right-20 size-80 bg-[#ec4899]/20 rounded-full blur-3xl pointer-events-none" />
-
+          <aside className="relative hidden flex-col justify-between p-8 lg:p-12 text-white lg:flex overflow-hidden bg-slate-900 border-r border-slate-800">
             <div className="relative z-10">
               <Link href="/" className="inline-flex items-center gap-2 font-bold tracking-tight">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-white shadow-md">
@@ -35,9 +31,9 @@ export function AuthShell({
 
               <div className="mt-10 max-w-md">
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold text-[#ddd6fe] backdrop-blur-md border border-white/10">
-                  <Sparkles className="size-3.5" /> Verified Talent Intelligence
+                  <ShieldCheck className="size-3.5 text-[#a78bfa]" /> Verified Talent Intelligence
                 </div>
-                <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight lg:text-4xl">
+                <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight lg:text-4xl text-white">
                   Bangun koneksi dari sinyal yang tepat.
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -57,7 +53,7 @@ export function AuthShell({
                   <div className="flex size-7 items-center justify-center rounded-lg bg-[#7c3aed]/30 text-[#ddd6fe] shrink-0">
                     <Lock className="size-4" />
                   </div>
-                  <span className="text-xs sm:text-sm">Consent-first & Garansi 100% Bebas Spam</span>
+                  <span className="text-xs sm:text-sm">Consent-first &amp; Garansi 100% Bebas Spam</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex size-7 items-center justify-center rounded-lg bg-[#7c3aed]/30 text-[#ddd6fe] shrink-0">
@@ -69,14 +65,14 @@ export function AuthShell({
                   <div className="flex size-7 items-center justify-center rounded-lg bg-[#7c3aed]/30 text-[#ddd6fe] shrink-0">
                     <GraduationCap className="size-4" />
                   </div>
-                  <span className="text-xs sm:text-sm">Dukungan Kemitraan Kampus, Lembaga & Individual</span>
+                  <span className="text-xs sm:text-sm">Dukungan Kemitraan Kampus, Lembaga &amp; Individual</span>
                 </div>
               </div>
             </div>
 
             <div className="relative z-10 border-t border-white/10 pt-4 text-xs text-slate-400 flex items-center justify-between">
               <span>ProofyLink Talent Network © 2026</span>
-              <span className="font-mono text-[#ddd6fe]">v1.0 Demo</span>
+              <span className="text-xs text-slate-400 font-medium">Consent-First &amp; Terverifikasi</span>
             </div>
           </aside>
 
