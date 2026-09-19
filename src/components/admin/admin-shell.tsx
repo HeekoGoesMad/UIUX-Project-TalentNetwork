@@ -14,9 +14,7 @@ import {
   Settings,
   ShieldCheck,
   X,
-  Lock,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/app-provider";
 import { cn } from "@/lib/utils";
@@ -54,7 +52,17 @@ const adminNavGroups: NavGroup[] = [
   },
 ];
 
-export function AdminShell({ title, children }: { title: string; children: ReactNode }) {
+export function AdminShell({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useApp();
@@ -78,15 +86,15 @@ export function AdminShell({ title, children }: { title: string; children: React
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-slate-900 antialiased relative selection:bg-purple-100 selection:text-purple-900">
+    <div className="min-h-screen bg-slate-50/80 text-slate-900 antialiased flex flex-col selection:bg-purple-100 selection:text-purple-900">
       {/* ─── Admin Top Bar ─── */}
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 sm:px-8 backdrop-blur-md">
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Mobile hamburger toggle */}
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden size-9 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl"
+            className="lg:hidden size-9 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu navigasi"}
           >
@@ -95,37 +103,47 @@ export function AdminShell({ title, children }: { title: string; children: React
 
           <Link
             href="/admin"
-            className="flex items-center gap-2.5 font-bold text-slate-900 transition-opacity hover:opacity-85"
+            className="flex items-center gap-2.5 font-bold text-slate-900 transition-opacity hover:opacity-90"
           >
-            <div className="flex size-9 items-center justify-center rounded-xl bg-[#7C3AED] text-white shadow-xs">
-              <ShieldCheck className="size-5" />
+            <div className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white shadow-xs">
+              <ShieldCheck className="size-4.5" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-base font-extrabold tracking-tight text-slate-900">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold tracking-tight text-slate-900">
                 Talent <span className="text-[#7C3AED]">Network</span>
               </span>
-              <Badge variant="outline" className="border-purple-200 text-[#7C3AED] bg-purple-50/50 text-[10px] font-bold px-2 py-0">
-                Admin
-              </Badge>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                Konsol Admin
+              </span>
             </div>
           </Link>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-4">
-          {/* Live System Operational Indicator */}
-          <div className="hidden md:flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-2xs">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
-            </span>
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Live System Operational Indicator (Strict, no decorative pulse ping) */}
+          <div className="hidden sm:flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+            <span className="size-1.5 rounded-full bg-emerald-500"></span>
             <span>Sistem Normal</span>
             {timeStr && <span className="text-[11px] text-slate-400 font-mono">· {timeStr}</span>}
+          </div>
+
+          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+          {/* User badge */}
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-md bg-purple-50 border border-purple-200 font-bold text-[#7C3AED] text-xs">
+              AD
+            </div>
+            <div className="hidden md:block text-left leading-none">
+              <p className="text-xs font-semibold text-slate-900">Admin System</p>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5">superadmin@talentnetwork.id</p>
+            </div>
           </div>
 
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl px-2.5 sm:px-3 h-9 transition-colors"
+            className="gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-2.5 h-8 transition-colors"
             onClick={async () => {
               await logout();
               router.push("/login");
@@ -135,27 +153,15 @@ export function AdminShell({ title, children }: { title: string; children: React
             <span className="hidden sm:inline">Kembali ke Web</span>
             <span className="sm:hidden">Keluar</span>
           </Button>
-
-          <div className="h-5 w-px bg-slate-200" />
-
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-xl bg-purple-50 border border-purple-200 font-bold text-[#7C3AED] text-xs shadow-2xs">
-              AD
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="text-xs font-bold text-slate-900 leading-tight">Admin System</p>
-              <p className="text-[10px] text-slate-400 font-mono">superadmin@talentnetwork.id</p>
-            </div>
-          </div>
         </div>
       </header>
 
-      {/* ─── Main Admin Layout with Responsive Sidebar ─── */}
-      <div className="relative z-10 container mx-auto grid gap-8 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 lg:grid-cols-[250px_1fr]">
+      {/* ─── Main Admin Layout with Edge-Anchored Sidebar ─── */}
+      <div className="flex-1 flex w-full">
         {/* ─── Mobile Sidebar Backdrop & Drawer ─── */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-xs lg:hidden animate-fade-in"
+            className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
@@ -164,128 +170,136 @@ export function AdminShell({ title, children }: { title: string; children: React
         {/* ─── Sidebar Navigation ─── */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-72 bg-white p-5 shadow-2xl transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-full lg:rounded-2xl lg:border lg:border-slate-200/80 lg:p-4.5 lg:shadow-xs lg:transition-none",
+            "fixed inset-y-0 left-0 z-50 w-64 bg-white p-4 border-r border-slate-200 transition-transform duration-200 ease-out lg:static lg:z-auto lg:transition-none flex flex-col justify-between",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-            "lg:sticky lg:top-24 h-fit max-h-[calc(100vh-7rem)] overflow-y-auto"
+            "lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] overflow-y-auto"
           )}
         >
-          {/* Mobile Drawer Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 lg:hidden">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
-                <ShieldCheck className="size-4" />
+          <div className="space-y-6">
+            {/* Mobile Drawer Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+                  <ShieldCheck className="size-4" />
+                </div>
+                <span className="font-bold text-slate-900 text-sm">Talent Network Admin</span>
               </div>
-              <span className="font-bold text-slate-900 text-sm">Talent Network Admin</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-lg text-slate-500"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="size-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-lg text-slate-500"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
 
-          {/* Navigation Groups */}
-          <nav className="space-y-5" aria-label="Navigasi admin">
-            {adminNavGroups.map((group) => (
-              <div key={group.heading} className="space-y-1">
-                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {group.heading}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive =
-                      item.href === "/admin"
-                        ? pathname === "/admin"
-                        : pathname === item.href || (item.href !== "#" && pathname.startsWith(`${item.href}/`));
+            {/* Navigation Groups */}
+            <nav className="space-y-5" aria-label="Navigasi admin">
+              {adminNavGroups.map((group) => (
+                <div key={group.heading} className="space-y-1">
+                  <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {group.heading}
+                  </p>
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        item.href === "/admin"
+                          ? pathname === "/admin"
+                          : pathname === item.href || (item.href !== "#" && pathname.startsWith(`${item.href}/`));
 
-                    if (item.disabled) {
+                      if (item.disabled) {
+                        return (
+                          <div
+                            key={item.label}
+                            className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-400 opacity-60 cursor-not-allowed select-none"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Icon className="size-4 text-slate-400 shrink-0" />
+                              <span className="truncate">{item.label}</span>
+                            </div>
+                            {item.badge && (
+                              <span className="rounded px-1.5 py-0.2 text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
                       return (
-                        <div
-                          key={item.label}
-                          className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium text-slate-400 opacity-60 cursor-not-allowed select-none"
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={cn(
+                            "group flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors",
+                            isActive
+                              ? "bg-purple-50 text-[#7C3AED] font-semibold border-l-2 border-[#7C3AED] rounded-l-none"
+                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          )}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className="size-4 text-slate-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              className={cn(
+                                "size-4 shrink-0 transition-colors",
+                                isActive ? "text-[#7C3AED]" : "text-slate-400 group-hover:text-slate-600"
+                              )}
+                            />
                             <span className="truncate">{item.label}</span>
                           </div>
                           {item.badge && (
-                            <span className="rounded-full px-1.5 py-0.2 text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[9px] font-bold font-mono shrink-0",
+                                isActive ? "bg-[#7C3AED] text-white" : "bg-slate-100 text-slate-600 border border-slate-200"
+                              )}
+                            >
                               {item.badge}
                             </span>
                           )}
-                        </div>
+                        </Link>
                       );
-                    }
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={cn(
-                          "group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150",
-                          isActive
-                            ? "bg-purple-50/80 text-[#7C3AED] border border-purple-200/90 font-bold shadow-2xs"
-                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5"
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Icon
-                            className={cn(
-                              "size-4 shrink-0 transition-colors",
-                              isActive ? "text-[#7C3AED]" : "text-slate-400 group-hover:text-slate-700"
-                            )}
-                          />
-                          <span className="truncate">{item.label}</span>
-                        </div>
-                        {item.badge && (
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0",
-                              isActive ? "bg-white text-[#7C3AED] border border-purple-200" : "bg-purple-50 text-[#7C3AED]"
-                            )}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </nav>
+              ))}
+            </nav>
+          </div>
 
-          {/* Sidebar Footer Security Widget */}
-          <div className="mt-6 border-t border-slate-100 pt-4 space-y-2">
-            <div className="rounded-xl border border-slate-200/70 bg-slate-50/50 p-3 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
-                <Lock className="size-3.5 text-[#7C3AED] shrink-0" />
-                <span>Sistem Terverifikasi</span>
-              </div>
-              <p className="text-[10.5px] text-slate-500 mt-0.5 leading-relaxed">
-                Log audit sesi aman &amp; tersinkronisasi.
-              </p>
-              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span>Talent Network v1.2</span>
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-emerald-500"></span> Aktif
-                </span>
-              </div>
+          {/* Sidebar Technical Ledger Footer */}
+          <div className="pt-4 border-t border-slate-200/80 mt-auto">
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span className="font-mono font-medium">Talent Network</span>
+              <span className="font-mono text-[10px] text-slate-400">v1.2</span>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">
+              <span className="size-1.5 rounded-full bg-emerald-500"></span>
+              <span>Koneksi Supabase Aktif</span>
             </div>
           </div>
         </aside>
 
-        {/* ─── Main Content ─── */}
-        <main className="min-w-0 flex-1 space-y-6">
-          <div className="pb-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              {title}
-            </h1>
+        {/* ─── Main Content Canvas ─── */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-0.5">
+                <Link href="/admin" className="hover:text-slate-900 transition-colors font-medium">
+                  Admin
+                </Link>
+                <span>/</span>
+                <span className="text-[#7C3AED] font-semibold">{title}</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+              )}
+            </div>
+            {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
           </div>
           {children}
         </main>

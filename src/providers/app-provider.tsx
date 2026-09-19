@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory, CareerAdvisorSavedResult } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -136,6 +136,10 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     : undefined;
   const industries = Array.isArray(preferences.industries) ? (preferences.industries as string[]) : [];
   const certifications = Array.isArray(preferences.certifications) ? (preferences.certifications as string[]) : [];
+  const careerAdvisorResults =
+    preferences.careerAdvisorResults && typeof preferences.careerAdvisorResults === "object"
+      ? (preferences.careerAdvisorResults as Record<string, CareerAdvisorSavedResult>)
+      : undefined;
 
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
@@ -165,6 +169,7 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     personality,
     campusVerification,
     updatedAt: candidate?.updatedAt ?? base?.updatedAt ?? new Date().toISOString(),
+    careerAdvisorResults,
   };
 }
 
@@ -343,7 +348,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remoteProfile = remoteCvProfile(payload);
       setState((current) => ({
         ...current,
-        cvProfile: remoteProfile,
+        cvProfile: remoteProfile
+          ? {
+              ...remoteProfile,
+              careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
+            }
+          : current.cvProfile,
         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
         tokens: payload.token?.balance ?? 0,
         screeningTokens: payload.token?.balance ?? 0,

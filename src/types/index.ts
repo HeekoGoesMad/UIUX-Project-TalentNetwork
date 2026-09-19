@@ -187,6 +187,8 @@ export type CareerAdvisorSavedResult = {
   generatedAt: string;
   targetRole?: string;
   analysisCount?: number;
+  topic?: string;
+  question?: string;
 };
 
 export type ConsentState = "not-requested" | "pending-candidate-consent" | "consented" | "declined" | "consent-expired" | "withdrawn" | "screening-in-progress" | "screening-completed" | "disputed";
