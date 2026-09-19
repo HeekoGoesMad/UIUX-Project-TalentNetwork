@@ -7,13 +7,25 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
+  Bookmark,
   Briefcase,
   Building2,
   Calendar,
+  CalendarClock,
   Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Clock3,
+  Copy,
   ExternalLink,
+  Eye,
+  FileQuestion,
+  MessageSquare,
   Send,
+  ShieldCheck,
+  Sparkles,
   UserRound,
   X,
 } from "lucide-react";
@@ -25,6 +37,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
 import { DEMO_JOBS, type Job } from "@/lib/jobs";
+import {
+  type RecruiterActivity,
+  listCandidateActivities,
+  markCandidateActivityAsRead,
+} from "@/lib/recruiter-activity";
 import { useApp } from "@/providers/app-provider";
 
 export const applicationStatuses = ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer", "hired", "rejected", "withdrawn"] as const;
@@ -36,57 +53,386 @@ const activeStatuses = applicationStatuses.filter((status) => status !== "withdr
 const stageColors: Record<ApplicationStatus, string> = { new: "bg-muted text-muted-foreground", shortlisted: "bg-muted text-muted-foreground", consent_requested: "bg-muted text-muted-foreground", consent_approved: "bg-muted text-muted-foreground", screening: "bg-muted text-muted-foreground", assessment: "bg-muted text-muted-foreground", review: "bg-muted text-muted-foreground", interview: "bg-primary/10 text-primary", offer: "bg-emerald-50 text-emerald-700", hired: "bg-emerald-50 text-emerald-700", rejected: "bg-red-50 text-red-700", withdrawn: "bg-muted text-muted-foreground" };
 
 export const storageKey = "proofylink-demo-applications";
-export function demoApplications(): Application[] { try { return JSON.parse(localStorage.getItem(storageKey) ?? "[]") as Application[]; } catch { return []; } }
-export function saveDemoApplication(application: Application) { localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application])); }
-function statusBadge(status: ApplicationStatus) { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>; }
-function State({ text, error = false }: { text: string; error?: boolean }) { return <div className={`rounded-2xl border p-8 text-center text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "bg-card text-muted-foreground"}`} role={error ? "alert" : "status"}>{text}</div>; }
+
+export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
+  {
+    id: "demo-app-001",
+    jobId: "demo-job-1",
+    status: "interview",
+    coverNote: "Tertarik berkontribusi pada pengembangan sistem pembayaran digital dan UX research.",
+    submittedAt: "2026-09-14T08:30:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-18T10:00:00.000Z",
+    job: {
+      id: "demo-job-1",
+      title: "Senior Product Designer",
+      organizationName: "PT Fintek Karya Nusantara (LinkAja)",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-002",
+    jobId: "demo-job-2",
+    status: "assessment",
+    coverNote: "Fokus pada riset pengguna dan penguatan standardisasi design system di sektor perbankan.",
+    submittedAt: "2026-09-10T14:20:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-16T11:00:00.000Z",
+    job: {
+      id: "demo-job-2",
+      title: "Lead UX Researcher",
+      organizationName: "PT Bank Mandiri (Persero) Tbk",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-003",
+    jobId: "demo-job-3",
+    status: "review",
+    coverNote: "Memiliki keahlian mendalam dalam tokenisasi design token dan komponen multi-brand.",
+    submittedAt: "2026-09-08T09:00:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-15T16:00:00.000Z",
+    job: {
+      id: "demo-job-3",
+      title: "UI/UX Design System Specialist",
+      organizationName: "PT Telkom Indonesia Tbk",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-004",
+    jobId: "demo-job-4",
+    status: "offer",
+    coverNote: "Pengalaman 5+ tahun dalam merancang solusi e-commerce dan merchant center.",
+    submittedAt: "2026-09-01T11:15:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-17T13:45:00.000Z",
+    job: {
+      id: "demo-job-4",
+      title: "Product Designer - Merchant Solutions",
+      organizationName: "PT Bukalapak.com Tbk",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-005",
+    jobId: "demo-job-5",
+    status: "hired",
+    coverNote: "Tertarik memimpin perancangan interaksi produk digital inovatif di Djoin.",
+    submittedAt: "2026-08-20T10:00:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-05T09:00:00.000Z",
+    job: {
+      id: "demo-job-5",
+      title: "Senior Interaction Designer",
+      organizationName: "PT Djoin Digital Inovasi",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-006",
+    jobId: "demo-job-6",
+    status: "rejected",
+    coverNote: "Melamar posisi product design.",
+    submittedAt: "2026-08-10T14:00:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-08-18T10:00:00.000Z",
+    job: {
+      id: "demo-job-6",
+      title: "Junior UI Designer",
+      organizationName: "PT Global Tiket Network (Tiket.com)",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+];
+
+export function demoApplications(): Application[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      localStorage.setItem(storageKey, JSON.stringify(DEFAULT_DEMO_APPLICATIONS));
+      return DEFAULT_DEMO_APPLICATIONS;
+    }
+    const parsed = JSON.parse(raw) as Application[];
+    return parsed.length > 0 ? parsed : DEFAULT_DEMO_APPLICATIONS;
+  } catch {
+    return DEFAULT_DEMO_APPLICATIONS;
+  }
+}
+
+export function saveDemoApplication(application: Application) {
+  localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application]));
+}
+
+function statusBadge(status: ApplicationStatus) {
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>;
+}
+
+function State({ text, error = false }: { text: string; error?: boolean }) {
+  return <div className={`rounded-2xl border p-8 text-center text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "bg-card text-muted-foreground"}`} role={error ? "alert" : "status"}>{text}</div>;
+}
+
+function PaginationControls({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  itemLabel,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  itemLabel: string;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalItems <= pageSize) return null;
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border/70 mt-4">
+      <p className="text-xs text-muted-foreground font-medium">
+        Menampilkan <span className="font-semibold text-foreground">{start}–{end}</span> dari{" "}
+        <span className="font-semibold text-foreground">{totalItems}</span> {itemLabel}
+      </p>
+      <div className="flex items-center gap-1.5 self-center sm:self-auto">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-2.5 text-xs"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="size-3.5 mr-1" />
+          Sebelumnya
+        </Button>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(page)}
+              className={`size-8 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                currentPage === page
+                  ? "bg-primary text-primary-foreground shadow-2xs font-bold"
+                  : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-2.5 text-xs"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+        >
+          Selanjutnya
+          <ChevronRight className="size-3.5 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function useApplications() {
   const { dbMode } = useApp();
-  const [applications, setApplications] = useState<Application[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const [attempt, setAttempt] = useState(0);
-  useEffect(() => { let active = true; setLoading(true); setError(null); if (!dbMode) { setApplications(demoApplications()); setLoading(false); return () => { active = false; }; } fetch("/api/applications", { cache: "no-store" }).then(async (response) => { const payload = await response.json() as { applications?: Application[]; error?: string }; if (!response.ok) throw new Error(payload.error ?? "Aplikasi belum dapat dimuat."); if (active) setApplications(payload.applications ?? []); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Aplikasi belum dapat dimuat."); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [dbMode, attempt]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    if (!dbMode) {
+      setApplications(demoApplications());
+      setLoading(false);
+      return () => { active = false; };
+    }
+    fetch("/api/applications", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { applications?: Application[]; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Aplikasi belum dapat dimuat.");
+        if (active) setApplications(payload.applications ?? []);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : "Aplikasi belum dapat dimuat.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [dbMode, attempt]);
+
   return { applications, setApplications, loading, error, dbMode, retry: () => setAttempt((count) => count + 1) };
 }
 
 export function CandidateApplicationsPage() {
-  const { applications, loading, error, dbMode, retry } = useApplications();
-  const [filter, setFilter] = useState<"all" | "active" | "interview" | "offer" | "rejected">("all");
+  const { applications, loading: appsLoading, error, dbMode, retry } = useApplications();
+  const [mainTab, setMainTab] = useState<"applications" | "invitations">("applications");
+  const [appFilter, setAppFilter] = useState<"all" | "active" | "interview" | "offer" | "rejected">("all");
+  const [invFilter, setInvFilter] = useState<"all" | "interview" | "message" | "saved" | "viewed">("all");
 
-  const counts = useMemo(() => {
-    return {
-      all: applications.length,
-      active: applications.filter((a) => ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(a.status)).length,
-      interview: applications.filter((a) => a.status === "interview").length,
-      offer: applications.filter((a) => a.status === "offer" || a.status === "hired").length,
-      rejected: applications.filter((a) => a.status === "rejected" || a.status === "withdrawn").length,
-    };
-  }, [applications]);
+  // Pagination states
+  const ITEMS_PER_PAGE = 3;
+  const [appPage, setAppPage] = useState(1);
+  const [invPage, setInvPage] = useState(1);
 
-  const chips = [
-    { id: "all" as const, label: "Semua", count: counts.all },
-    { id: "active" as const, label: "Aktif", count: counts.active },
-    { id: "interview" as const, label: "Wawancara", count: counts.interview },
-    { id: "offer" as const, label: "Penawaran", count: counts.offer },
-    { id: "rejected" as const, label: "Selesai / Ditolak", count: counts.rejected },
+  // Recruiter activities state
+  const [activities, setActivities] = useState<RecruiterActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setActivitiesLoading(true);
+
+    if (!dbMode) {
+      setActivities(listCandidateActivities());
+      setActivitiesLoading(false);
+      return () => { active = false; };
+    }
+
+    fetch("/api/candidate/recruiter-activities", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Gagal memuat aktivitas rekruter.");
+        const data = (await res.json()) as { activities?: RecruiterActivity[] };
+        if (active && data.activities) {
+          setActivities(data.activities);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setActivities(listCandidateActivities());
+        }
+      })
+      .finally(() => {
+        if (active) setActivitiesLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [dbMode]);
+
+  const appCounts = useMemo(() => ({
+    all: applications.length,
+    active: applications.filter((a) => ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(a.status)).length,
+    interview: applications.filter((a) => a.status === "interview").length,
+    offer: applications.filter((a) => a.status === "offer" || a.status === "hired").length,
+    rejected: applications.filter((a) => a.status === "rejected" || a.status === "withdrawn").length,
+  }), [applications]);
+
+  const invCounts = useMemo(() => ({
+    all: activities.length,
+    interview: activities.filter((a) => a.type === "interview_invited").length,
+    message: activities.filter((a) => a.type === "message_received").length,
+    saved: activities.filter((a) => a.type === "profile_saved").length,
+    viewed: activities.filter((a) => a.type === "profile_viewed").length,
+  }), [activities]);
+
+  const unreadInvitations = useMemo(
+    () => activities.filter((a) => !a.isRead).length,
+    [activities]
+  );
+
+  const filteredApps = useMemo(() => applications.filter((item) => {
+    if (appFilter === "all") return true;
+    if (appFilter === "active") return ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(item.status);
+    if (appFilter === "interview") return item.status === "interview";
+    if (appFilter === "offer") return item.status === "offer" || item.status === "hired";
+    return item.status === "rejected" || item.status === "withdrawn";
+  }), [applications, appFilter]);
+
+  const totalAppPages = Math.ceil(filteredApps.length / ITEMS_PER_PAGE) || 1;
+  const paginatedApps = useMemo(() => {
+    const start = (appPage - 1) * ITEMS_PER_PAGE;
+    return filteredApps.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredApps, appPage]);
+
+  const filteredInvs = useMemo(() => activities.filter((item) => {
+    if (invFilter === "all") return true;
+    if (invFilter === "interview") return item.type === "interview_invited";
+    if (invFilter === "message") return item.type === "message_received";
+    if (invFilter === "saved") return item.type === "profile_saved";
+    if (invFilter === "viewed") return item.type === "profile_viewed";
+    return true;
+  }), [activities, invFilter]);
+
+  const totalInvPages = Math.ceil(filteredInvs.length / ITEMS_PER_PAGE) || 1;
+  const paginatedInvs = useMemo(() => {
+    const start = (invPage - 1) * ITEMS_PER_PAGE;
+    return filteredInvs.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredInvs, invPage]);
+
+  const appChips = [
+    { id: "all" as const, label: "Semua Lamaran", count: appCounts.all },
+    { id: "active" as const, label: "Dalam Proses", count: appCounts.active },
+    { id: "interview" as const, label: "Wawancara", count: appCounts.interview },
+    { id: "offer" as const, label: "Penawaran", count: appCounts.offer },
+    { id: "rejected" as const, label: "Selesai / Ditolak", count: appCounts.rejected },
   ];
 
-  const filtered = useMemo(() => applications.filter((item) => {
-    if (filter === "all") return true;
-    if (filter === "active") return ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(item.status);
-    if (filter === "interview") return item.status === "interview";
-    if (filter === "offer") return item.status === "offer" || item.status === "hired";
-    return item.status === "rejected" || item.status === "withdrawn";
-  }), [applications, filter]);
+  const invChips = [
+    { id: "all" as const, label: "Semua Aktivitas", count: invCounts.all },
+    { id: "interview" as const, label: "Undangan Wawancara", count: invCounts.interview },
+    { id: "message" as const, label: "Pesan Masuk", count: invCounts.message },
+    { id: "saved" as const, label: "Profil Disimpan", count: invCounts.saved },
+    { id: "viewed" as const, label: "Profil Dilihat", count: invCounts.viewed },
+  ];
+
+  const copyMeetLink = (url: string) => {
+    void navigator.clipboard.writeText(url);
+    toast.success("Tautan meeting disalin ke papan klip!");
+  };
+
+  const handleActionClick = (activityId: string) => {
+    const updated = markCandidateActivityAsRead(activityId);
+    setActivities(updated);
+  };
 
   return (
     <ProtectedRoute role="candidate">
       <div className="space-y-6">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        {/* Page Header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Lamaran
+              Lamaran & Minat Rekruter
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pantau tahapan seleksi, jadwal wawancara, dan penawaran kerja Anda.
+              Pantau posisi yang Anda lamar dan seluruh riwayat minat maupun undangan masuk dari tim rekruter.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -106,123 +452,634 @@ export function CandidateApplicationsPage() {
 
         {!dbMode && (
           <p className="rounded-lg bg-amber-50 border border-amber-200 px-3.5 py-2 text-xs text-amber-900">
-            Mode demo: data aplikasi tersimpan di browser ini.
+            Mode demo: data lamaran dan aktivitas rekruter tersimpan di browser ini.
           </p>
         )}
 
-        {/* Filter Chips with Count Badges */}
-        <div className="flex flex-wrap gap-2">
-          {chips.map((chip) => {
-            const isActive = filter === chip.id;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => setFilter(chip.id)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                  isActive
-                    ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
-                    : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <span>{chip.label}</span>
-                <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
-                  isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
-                }`}>
-                  {chip.count}
-                </span>
-              </button>
-            );
-          })}
+        {/* Top-Level Segmented Tabs */}
+        <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/60 p-1 sm:w-fit">
+          <button
+            type="button"
+            onClick={() => setMainTab("applications")}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              mainTab === "applications"
+                ? "bg-card text-foreground shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Briefcase className="size-4" />
+            <span>Lamaran Saya</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                mainTab === "applications"
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {appCounts.all}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainTab("invitations")}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              mainTab === "invitations"
+                ? "bg-card text-foreground shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CalendarClock className="size-4" />
+            <span>Undangan & Aktivitas Recruiter</span>
+            {unreadInvitations > 0 && (
+              <span className="size-2 rounded-full bg-primary animate-pulse" title={`${unreadInvitations} aktivitas baru`} />
+            )}
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                mainTab === "invitations"
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {invCounts.all}
+            </span>
+          </button>
         </div>
 
-        {/* Application Cards List */}
-        <div className="mt-4">
-          {loading ? (
-            <div className="grid gap-3.5">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="border-border/80 bg-card shadow-xs">
-                  <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0 flex-1 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-5 w-48" />
-                        <Skeleton className="h-5 w-20 rounded-full" />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-end sm:self-center">
-                      <Skeleton className="h-8 w-20 rounded-md" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* TAB 1: LAMARAN SAYA */}
+        {mainTab === "applications" && (
+          <div className="space-y-4">
+            {/* Filter Chips */}
+            <div className="flex flex-wrap gap-2">
+              {appChips.map((chip) => {
+                const isActive = appFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setAppFilter(chip.id);
+                      setAppPage(1);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                        : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <span>{chip.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                        isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
+                      }`}
+                    >
+                      {chip.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          ) : error ? (
-            <div className="space-y-3">
-              <State text={error} error />
-              <Button variant="outline" onClick={retry}>Coba lagi</Button>
-            </div>
-          ) : applications.length === 0 ? (
-            <Card className="border-dashed border-border bg-card/60 p-8 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-3">
-                <Briefcase className="size-6" />
-              </div>
-              <h3 className="text-base font-bold text-foreground">Belum Ada Lamaran</h3>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-                Profil profesional Anda siap digunakan untuk melamar lowongan kerja terverifikasi di ProofyLink.
-              </p>
-              <Button asChild className="mt-4 text-xs font-semibold" size="sm">
-                <Link href="/jobs">
-                  Eksplorasi Lowongan Kerja
-                  <ArrowRight className="size-3.5 ml-1.5" />
-                </Link>
-              </Button>
-            </Card>
-          ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-border/80 bg-card p-8 text-center text-sm text-muted-foreground">
-              Tidak ada lamaran pada filter ini.
-            </div>
-          ) : (
-            <div className="grid gap-3.5">
-              {filtered.map((application) => (
-                <Link key={application.id} href={`/candidate/applications/${application.id}`} className="block group">
-                  <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
-                    <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
-                            {application.job?.title ?? "Posisi Lamaran"}
-                          </h2>
-                        </div>
-                        <p className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                          <Building2 className="size-3.5 shrink-0" />
-                          <span className="font-medium text-foreground">{application.job?.organizationName ?? "Perusahaan Mitra"}</span>
-                          <span aria-hidden="true" className="text-border">•</span>
-                          <span>Dikirim {formatDate(application.submittedAt)}</span>
-                        </p>
-                      </div>
 
-                      <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end shrink-0">
-                        {statusBadge(application.status)}
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
-                          Detail
-                          <ArrowRight className="size-3.5" />
-                        </span>
+            {/* Application Cards List */}
+            {appsLoading ? (
+              <div className="grid gap-3.5">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="border-border/80 bg-card shadow-xs">
+                    <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1 space-y-2.5">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-5 w-48" />
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 self-end sm:self-center">
+                        <Skeleton className="h-8 w-20 rounded-md" />
                       </div>
                     </CardContent>
                   </Card>
-                </Link>
-              ))}
+                ))}
+              </div>
+            ) : error ? (
+              <div className="space-y-3">
+                <State text={error} error />
+                <Button variant="outline" onClick={retry}>Coba lagi</Button>
+              </div>
+            ) : applications.length === 0 ? (
+              <Card className="border-dashed border-border bg-card/60 p-8 text-center">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-3">
+                  <Briefcase className="size-6" />
+                </div>
+                <h3 className="text-base font-bold text-foreground">Belum Ada Lamaran</h3>
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+                  Profil profesional Anda siap digunakan untuk melamar lowongan kerja terverifikasi di ProofyLink.
+                </p>
+                <Button asChild className="mt-4 text-xs font-semibold" size="sm">
+                  <Link href="/jobs">
+                    Eksplorasi Lowongan Kerja
+                    <ArrowRight className="size-3.5 ml-1.5" />
+                  </Link>
+                </Button>
+              </Card>
+            ) : filteredApps.length === 0 ? (
+              <div className="rounded-xl border border-border/80 bg-card p-8 text-center text-sm text-muted-foreground">
+                Tidak ada lamaran pada filter ini.
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                <div className="grid gap-3.5">
+                  {paginatedApps.map((application) => (
+                    <Link key={application.id} href={`/candidate/applications/${application.id}`} className="block group">
+                      <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
+                        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+                                {application.job?.title ?? "Posisi Lamaran"}
+                              </h2>
+                            </div>
+                            <p className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                              <Building2 className="size-3.5 shrink-0" />
+                              <span className="font-medium text-foreground">{application.job?.organizationName ?? "Perusahaan Mitra"}</span>
+                              <span aria-hidden="true" className="text-border">•</span>
+                              <span>Dikirim {formatDate(application.submittedAt)}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end shrink-0">
+                            {statusBadge(application.status)}
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
+                              Detail
+                              <ArrowRight className="size-3.5" />
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                <PaginationControls
+                  currentPage={appPage}
+                  totalPages={totalAppPages}
+                  totalItems={filteredApps.length}
+                  pageSize={ITEMS_PER_PAGE}
+                  itemLabel="lamaran"
+                  onPageChange={setAppPage}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: UNDANGAN & AKTIVITAS RECRUITER */}
+        {mainTab === "invitations" && (
+          <div className="space-y-4">
+            {/* Filter Chips for Inbound Interactions */}
+            <div className="flex flex-wrap gap-2">
+              {invChips.map((chip) => {
+                const isActive = invFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setInvFilter(chip.id);
+                      setInvPage(1);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                        : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <span>{chip.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                        isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
+                      }`}
+                    >
+                      {chip.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* Invitations List */}
+            {activitiesLoading ? (
+              <div className="grid gap-3.5">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="border-border/80 bg-card p-5">
+                    <div className="flex items-start gap-4">
+                      <Skeleton className="size-10 rounded-xl" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-3 w-64" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredInvs.length === 0 ? (
+              <Card className="border-dashed border-border bg-card/60 p-8 text-center">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mb-3">
+                  <Sparkles className="size-6" />
+                </div>
+                <h3 className="text-base font-bold text-foreground">Belum Ada Aktivitas pada Kategori Ini</h3>
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+                  Tingkatkan kelengkapan portofolio dan CV Anda agar profil Anda lebih sering muncul di pencarian bakat terverifikasi rekruter.
+                </p>
+                <Button asChild variant="outline" size="sm" className="mt-4 text-xs font-semibold">
+                  <Link href="/candidate/cv">
+                    Tinjau Kesiapan Profil & CV
+                  </Link>
+                </Button>
+              </Card>
+            ) : (
+              <div className="space-y-3.5">
+                <div className="grid gap-3.5">
+                  {paginatedInvs.map((activity) => {
+                    const isInterview = activity.type === "interview_invited";
+                    const isMessage = activity.type === "message_received";
+                    const isAssessment = activity.type === "assessment_invited";
+                    const isSaved = activity.type === "profile_saved";
+                    const isViewed = activity.type === "profile_viewed";
+
+                    return (
+                      <Card
+                        key={activity.id}
+                        className={`border bg-card transition-all ${
+                          isInterview
+                            ? "border-primary/30 hover:border-primary/60 shadow-xs"
+                            : isAssessment
+                            ? "border-emerald-200 hover:border-emerald-300"
+                            : isMessage
+                            ? "border-blue-200/80 hover:border-blue-300"
+                            : "border-border/80 hover:border-border"
+                        }`}
+                      >
+                        <CardContent className="p-5">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            {/* Main Information */}
+                            <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                              {/* Company Avatar / Badge */}
+                              <div
+                                className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                                  isInterview
+                                    ? "bg-primary/10 text-primary"
+                                    : isAssessment
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : isMessage
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : isSaved
+                                    ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                    : "bg-muted text-muted-foreground border border-border"
+                                }`}
+                              >
+                                {activity.companyInitial}
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                {/* Header Meta */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-bold text-sm text-foreground">
+                                    {activity.companyName}
+                                  </span>
+                                  <span aria-hidden="true" className="text-border">•</span>
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    {formatDate(activity.createdAt)}
+                                  </span>
+
+                                  {/* Distinct Status Badge */}
+                                  {isInterview && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-[11px] font-semibold">
+                                      <Calendar className="size-3" /> Undangan Wawancara
+                                    </span>
+                                  )}
+                                  {isMessage && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold">
+                                      <MessageSquare className="size-3" /> Pesan Rekruter
+                                    </span>
+                                  )}
+                                  {isAssessment && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold">
+                                      <FileQuestion className="size-3" /> Undangan Asesmen
+                                    </span>
+                                  )}
+                                  {isSaved && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-[11px] font-medium">
+                                      <Bookmark className="size-3" /> Disimpan ke Shortlist
+                                    </span>
+                                  )}
+                                  {isViewed && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground border border-border px-2 py-0.5 text-[11px] font-medium">
+                                      <Eye className="size-3" /> Profil Dilihat
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Title / Target Role */}
+                                <h3 className="text-sm font-semibold text-foreground">
+                                  {activity.title}
+                                </h3>
+
+                                {activity.targetRole && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Posisi terkait: <span className="font-medium text-foreground">{activity.targetRole}</span>
+                                  </p>
+                                )}
+
+                                {/* Recruiter Identity when relevant */}
+                                {(isMessage || isInterview) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Dari: <span className="font-medium text-foreground">{activity.recruiterName}</span> ({activity.recruiterRole})
+                                  </p>
+                                )}
+
+                                {/* Excerpt / Agenda Snippet */}
+                                {activity.snippet && (
+                                  <div className={`mt-2 rounded-lg p-3 text-xs leading-relaxed ${
+                                    isMessage
+                                      ? "bg-blue-50/50 border border-blue-100 text-foreground italic"
+                                      : "bg-muted/40 text-muted-foreground"
+                                  }`}>
+                                    {isMessage && <span className="font-semibold text-blue-700 not-italic mr-1.5">Pesan:</span>}
+                                    {activity.snippet}
+                                  </div>
+                                )}
+
+                                {/* Interview Specific Metadata Pill */}
+                                {isInterview && activity.metadata?.scheduledAt && (
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs text-foreground bg-primary/5 rounded-lg border border-primary/10 px-3 py-2">
+                                    <span className="flex items-center gap-1 font-semibold text-primary">
+                                      <Clock3 className="size-3.5" />
+                                      {new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeStyle: "short" }).format(new Date(activity.metadata.scheduledAt))} WIB
+                                    </span>
+                                    <span aria-hidden="true" className="text-border">•</span>
+                                    <span>Durasi {activity.metadata.durationMinutes ?? 45} Menit</span>
+                                    <span aria-hidden="true" className="text-border">•</span>
+                                    <span className="font-medium text-emerald-700">Online Google Meet</span>
+                                  </div>
+                                )}
+
+                                {/* Profile View Transparency Note */}
+                                {isViewed && (
+                                  <p className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                    <ShieldCheck className="size-3 text-emerald-600 shrink-0" />
+                                    <span>Sesuai Kebijakan Privasi, data finansial & dokumen sensitif Anda tidak dibuka tanpa persetujuan eksplisit.</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Interactive Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-2 self-end sm:self-center shrink-0">
+                              {isInterview && (
+                                <>
+                                  {activity.metadata?.meetingUrl && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs h-8"
+                                      onClick={() => copyMeetLink(activity.metadata?.meetingUrl ?? "")}
+                                    >
+                                      <Copy className="size-3.5 mr-1" />
+                                      Salin Link
+                                    </Button>
+                                  )}
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    className="text-xs font-semibold h-8"
+                                    onClick={() => handleActionClick(activity.id)}
+                                  >
+                                    <Link href="/candidate/messages">
+                                      Konfirmasi Jadwal
+                                      <ArrowRight className="size-3.5 ml-1" />
+                                    </Link>
+                                  </Button>
+                                </>
+                              )}
+
+                              {isMessage && (
+                                <Button
+                                  asChild
+                                  size="sm"
+                                  className="text-xs font-semibold h-8"
+                                  onClick={() => handleActionClick(activity.id)}
+                                >
+                                  <Link href="/candidate/messages">
+                                    <MessageSquare className="size-3.5 mr-1" />
+                                    Balas Pesan
+                                  </Link>
+                                </Button>
+                              )}
+
+                              {isAssessment && (
+                                <Button
+                                  asChild
+                                  size="sm"
+                                  className="text-xs font-semibold h-8 bg-emerald-600 hover:bg-emerald-700"
+                                  onClick={() => handleActionClick(activity.id)}
+                                >
+                                  <Link href={activity.actionUrl || `/candidate/assessments/demo-invitation-1`}>
+                                    <FileQuestion className="size-3.5 mr-1" />
+                                    Mulai Asesmen
+                                  </Link>
+                                </Button>
+                              )}
+
+                              {(isSaved || isViewed) && (
+                                <span className="text-[11px] text-muted-foreground italic px-2 py-1 bg-muted/40 rounded-md">
+                                  Tercatat otomatis
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination Controls */}
+                <PaginationControls
+                  currentPage={invPage}
+                  totalPages={totalInvPages}
+                  totalItems={filteredInvs.length}
+                  pageSize={ITEMS_PER_PAGE}
+                  itemLabel="aktivitas"
+                  onPageChange={setInvPage}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );
+}
+
+function getDemoApplicationHistory(app: Application): History[] {
+  const baseTime = new Date(app.submittedAt).getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  if (app.id === "demo-app-001") {
+    return [
+      {
+        id: "hist-001-1",
+        fromStatus: null,
+        toStatus: "new",
+        reason: "Berkas lamaran dan portofolio kandidat berhasil dikirim melalui platform ProofyLink.",
+        changedBy: "Kandidat",
+        createdAt: new Date(baseTime).toISOString(),
+      },
+      {
+        id: "hist-001-2",
+        fromStatus: "new",
+        toStatus: "shortlisted",
+        reason: "Profil dinilai cocok dengan kebutuhan posisi Senior Product Designer dan masuk dalam daftar unggulan.",
+        changedBy: "Talent Acquisition",
+        createdAt: new Date(baseTime + 1 * dayMs + 3600000).toISOString(),
+      },
+      {
+        id: "hist-001-3",
+        fromStatus: "shortlisted",
+        toStatus: "screening",
+        reason: "Pemeriksaan riwayat pengalaman desain dan verifikasi latar belakang profesional.",
+        changedBy: "Senior Recruiter",
+        createdAt: new Date(baseTime + 1 * dayMs + 7 * 3600000).toISOString(),
+      },
+      {
+        id: "hist-001-4",
+        fromStatus: "screening",
+        toStatus: "assessment",
+        reason: "Kandidat diundang mengikuti studi kasus interaktif: Redesign Checkout Flow & Design System.",
+        changedBy: "Hiring Team",
+        createdAt: new Date(baseTime + 2 * dayMs + 2 * 3600000).toISOString(),
+      },
+      {
+        id: "hist-001-5",
+        fromStatus: "assessment",
+        toStatus: "review",
+        reason: "Penyelesaian asesmen desain diterima dan mendapatkan skor kompetensi 94 / 100.",
+        changedBy: "Design Evaluator",
+        createdAt: new Date(baseTime + 3 * dayMs + 8 * 3600000).toISOString(),
+      },
+      {
+        id: "hist-001-6",
+        fromStatus: "review",
+        toStatus: "interview",
+        reason: "Hasil asesmen memuaskan. Undangan sesi wawancara mendalam dijadwalkan bersama Tim Desain & Manajerial.",
+        changedBy: "Head of Product Design",
+        createdAt: new Date(baseTime + 4 * dayMs + 1 * 3600000).toISOString(),
+      },
+    ];
+  }
+
+  if (app.id === "demo-app-002") {
+    return [
+      {
+        id: "hist-002-1",
+        fromStatus: null,
+        toStatus: "new",
+        reason: "Lamaran terkirim untuk lowongan Lead UX Researcher.",
+        changedBy: "Kandidat",
+        createdAt: new Date(baseTime).toISOString(),
+      },
+      {
+        id: "hist-002-2",
+        fromStatus: "new",
+        toStatus: "shortlisted",
+        reason: "Profil memenuhi kualifikasi riset perbankan digital.",
+        changedBy: "HR Recruiter",
+        createdAt: new Date(baseTime + 1 * dayMs).toISOString(),
+      },
+      {
+        id: "hist-002-3",
+        fromStatus: "shortlisted",
+        toStatus: "screening",
+        reason: "Verifikasi metodologi riset dan portofolio usability testing.",
+        changedBy: "Talent Acquisition",
+        createdAt: new Date(baseTime + 2 * dayMs).toISOString(),
+      },
+      {
+        id: "hist-002-4",
+        fromStatus: "screening",
+        toStatus: "assessment",
+        reason: "Undangan studi kasus User Research Methodology telah dikirimkan ke email kandidat.",
+        changedBy: "Lead Researcher",
+        createdAt: new Date(baseTime + 3 * dayMs).toISOString(),
+      },
+    ];
+  }
+
+  if (app.id === "demo-app-003") {
+    return [
+      {
+        id: "hist-003-1",
+        fromStatus: null,
+        toStatus: "new",
+        reason: "Berkas lamaran terkirim ke tim rekruter PT Telkom Indonesia.",
+        changedBy: "Kandidat",
+        createdAt: new Date(baseTime).toISOString(),
+      },
+      {
+        id: "hist-003-2",
+        fromStatus: "new",
+        toStatus: "shortlisted",
+        reason: "Keahlian design system multi-brand sesuai kebutuhan produk.",
+        changedBy: "Recruiter",
+        createdAt: new Date(baseTime + 1 * dayMs).toISOString(),
+      },
+      {
+        id: "hist-003-3",
+        fromStatus: "shortlisted",
+        toStatus: "assessment",
+        reason: "Tes teknis pembuatan token Figma dan komponen React diberikan.",
+        changedBy: "Hiring Manager",
+        createdAt: new Date(baseTime + 2 * dayMs).toISOString(),
+      },
+      {
+        id: "hist-003-4",
+        fromStatus: "assessment",
+        toStatus: "review",
+        reason: "Submission kode komponen dan dokumentasi token sedang dalam evaluasi tim teknis.",
+        changedBy: "Engineering Lead",
+        createdAt: new Date(baseTime + 3 * dayMs).toISOString(),
+      },
+    ];
+  }
+
+  return [
+    {
+      id: `${app.id}-h1`,
+      fromStatus: null,
+      toStatus: "new",
+      reason: "Lamaran berhasil dikirim dan terdaftar pada sistem ProofyLink.",
+      changedBy: "Kandidat",
+      createdAt: app.submittedAt,
+    },
+    ...(app.status !== "new"
+      ? [
+          {
+            id: `${app.id}-h2`,
+            fromStatus: "new" as const,
+            toStatus: app.status,
+            reason: `Perkembangan tahap seleksi diperbarui menjadi ${labels[app.status]}.`,
+            changedBy: "Tim Rekruter",
+            createdAt: app.updatedAt || new Date().toISOString(),
+          },
+        ]
+      : []),
+  ];
 }
 
 export function CandidateApplicationDetailPage({ applicationId }: { applicationId: string }) {
@@ -232,6 +1089,23 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // History pagination / collapse state
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const INITIAL_HISTORY_LIMIT = 3;
+
+  const sortedHistory = useMemo(() => {
+    return [...history].sort((a, b) => {
+      const timeB = new Date(b.createdAt).getTime();
+      const timeA = new Date(a.createdAt).getTime();
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
+  }, [history]);
+
+  const visibleHistory = useMemo(() => {
+    if (showAllHistory) return sortedHistory;
+    return sortedHistory.slice(0, INITIAL_HISTORY_LIMIT);
+  }, [sortedHistory, showAllHistory]);
 
   // Hiring Flow: Interviews & Offers
   const [interviews, setInterviews] = useState<Array<{ id: string; title: string; scheduledAt: string; timezone: string; durationMinutes: number; meetingUrl: string | null; status: string }>>([]);
@@ -243,7 +1117,44 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
     if (!dbMode) {
       const item = demoApplications().find((candidateApplication) => candidateApplication.id === applicationId) ?? null;
       setApplication(item);
-      setHistory(item ? [{ id: `${item.id}-history`, fromStatus: null, toStatus: "new", reason: "Lamaran dikirim kandidat.", changedBy: "demo", createdAt: item.submittedAt }] : []);
+      if (item) {
+        setHistory(getDemoApplicationHistory(item));
+        if (item.status === "interview") {
+          setInterviews([
+            {
+              id: `demo-int-${item.id}`,
+              title: `Wawancara Teknis & User: ${item.job?.title ?? "Product Design"}`,
+              scheduledAt: "2026-09-24T14:00:00.000Z",
+              timezone: "WIB (UTC+7)",
+              durationMinutes: 45,
+              meetingUrl: "https://meet.google.com/xyz-demo-link",
+              status: "scheduled",
+            },
+          ]);
+        } else {
+          setInterviews([]);
+        }
+        if (item.status === "offer" || item.status === "hired") {
+          setOffers([
+            {
+              id: `demo-off-${item.id}`,
+              salary: 24000000,
+              currency: "IDR",
+              startDate: "2026-10-01T09:00:00.000Z",
+              expirationDate: "2026-09-28T23:59:59.000Z",
+              benefits: "BPJS Kesehatan & Ketenagakerjaan, Asuransi Swasta, Wellness Allowance, Tunjangan Perangkat Kerja",
+              notes: "Kami sangat terkesan dengan kualifikasi dan portofolio Anda. Selamat bergabung bersama tim kami!",
+              status: item.status === "hired" ? "accepted" : "pending",
+            },
+          ]);
+        } else {
+          setOffers([]);
+        }
+      } else {
+        setHistory([]);
+        setInterviews([]);
+        setOffers([]);
+      }
       setLoading(false);
       return;
     }
@@ -657,35 +1568,104 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             {/* Stage History & Audit Log */}
             <Card className="border-border/80 bg-card shadow-xs">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">
-                  Riwayat &amp; Catatan Perkembangan Lamaran
-                </CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base font-bold text-foreground">
+                      Riwayat &amp; Catatan Perkembangan Lamaran
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Kronologi pembaruan status lamaran (diurutkan dari yang terbaru).
+                    </p>
+                  </div>
+                  {sortedHistory.length > 0 && (
+                    <span className="text-xs font-mono text-muted-foreground tabular-nums bg-muted px-2 py-0.5 rounded-full w-fit">
+                      {sortedHistory.length} catatan
+                    </span>
+                  )}
+                </div>
               </CardHeader>
-              <CardContent>
-                {history.length === 0 ? (
+              <CardContent className="space-y-4">
+                {sortedHistory.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Belum ada riwayat tambahan — berkas lamaran telah diterima sistem.</p>
                 ) : (
-                  <div className="space-y-4">
-                    {history.map((item, index) => (
-                      <div key={item.id} className="flex gap-3">
-                        <div className="flex flex-col items-center">
-                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                            <Check className="size-3.5" />
-                          </span>
-                          {index < history.length - 1 && <span className="mt-1 h-full w-px bg-border/80" />}
-                        </div>
-                        <div className="pb-2">
-                          <p className="text-xs font-bold text-foreground">{labels[item.toStatus]}</p>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(item.createdAt)}</p>
-                          {item.reason && (
-                            <p className="mt-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg p-2.5 leading-relaxed">
-                              {item.reason}
-                            </p>
+                  <>
+                    <div className="space-y-3.5">
+                      {visibleHistory.map((item, index) => {
+                        const isLatest = index === 0;
+                        return (
+                          <div key={item.id} className="flex gap-3.5">
+                            <div className="flex flex-col items-center">
+                              <span
+                                className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                                  isLatest
+                                    ? "bg-primary text-primary-foreground shadow-xs ring-4 ring-primary/10"
+                                    : "bg-muted border border-border text-muted-foreground"
+                                }`}
+                              >
+                                {isLatest ? <Check className="size-3.5" /> : <Clock3 className="size-3" />}
+                              </span>
+                              {index < visibleHistory.length - 1 && (
+                                <span className="mt-1 h-full w-px bg-border/80 min-h-6" />
+                              )}
+                            </div>
+                            <div className="flex-1 pb-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-foreground">
+                                  {labels[item.toStatus]}
+                                </span>
+                                {isLatest && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.2 text-[10px] font-semibold">
+                                    Tahap Terbaru
+                                  </span>
+                                )}
+                                {item.changedBy && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    oleh <span className="font-medium text-foreground">{item.changedBy}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-[11px] font-mono text-muted-foreground">
+                                {formatDate(item.createdAt)}
+                              </p>
+                              {item.reason && (
+                                <p className="mt-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg p-2.5 leading-relaxed border border-border/50">
+                                  {item.reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Expand / Shrink Toggle */}
+                    {sortedHistory.length > INITIAL_HISTORY_LIMIT && (
+                      <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-border/70">
+                        <button
+                          type="button"
+                          onClick={() => setShowAllHistory(!showAllHistory)}
+                          className="group inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer py-1.5 px-3 rounded-lg hover:bg-primary/5 border border-primary/20 bg-card shadow-2xs w-fit"
+                        >
+                          {showAllHistory ? (
+                            <>
+                              <span>Tampilkan lebih sedikit</span>
+                              <ChevronUp className="size-3.5 transition-transform group-hover:-translate-y-0.5" />
+                            </>
+                          ) : (
+                            <>
+                              <span>... Lihat semua riwayat ({sortedHistory.length})</span>
+                              <ChevronDown className="size-3.5 transition-transform group-hover:translate-y-0.5" />
+                            </>
                           )}
-                        </div>
+                        </button>
+                        <span className="text-[11px] text-muted-foreground">
+                          {showAllHistory
+                            ? `Menampilkan seluruh ${sortedHistory.length} pembaruan`
+                            : `Menampilkan ${INITIAL_HISTORY_LIMIT} dari ${sortedHistory.length} pembaruan`}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
