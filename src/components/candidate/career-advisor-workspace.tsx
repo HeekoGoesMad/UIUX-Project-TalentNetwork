@@ -19,6 +19,7 @@ import {
     Copy,
     Download,
     FileText,
+    Lock,
     Quote,
     RotateCcw,
     Sparkles,
@@ -30,6 +31,8 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { checkCareerAdvisorCooldown, getCareerHubCooldownDays } from "@/lib/career-advisor/cooldown";
+import type { CareerAdvisorSavedResult, CvProfile } from "@/types";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_consultation" | "career_roadmap" | "ats" | "headline" | "star";
 
@@ -189,8 +192,12 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   const skills = useMemo(() => cvProfile?.skills || ["Product Design", "UX Research", "Design Systems", "Figma", "User Journey Mapping"], [cvProfile?.skills]);
 
   const [appliedToCv, setAppliedToCv] = useState(false);
-  const [consultationTopic, setConsultationTopic] = useState<string>("Semua Fokus");
-  const [consultationQuestion, setConsultationQuestion] = useState<string>("");
+  const [consultationTopic, setConsultationTopic] = useState<string>(
+    () => cvProfile?.careerAdvisorResults?.career_consultation?.topic || "Semua Fokus"
+  );
+  const [consultationQuestion, setConsultationQuestion] = useState<string>(
+    () => cvProfile?.careerAdvisorResults?.career_consultation?.question || ""
+  );
 
   const hasCvReview = Boolean(cvProfile?.careerAdvisorResults?.cv_review?.result);
   const hasGapAnalysis = Boolean(cvProfile?.careerAdvisorResults?.gap_analysis?.result);
@@ -208,6 +215,10 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   const hasSavedResult = Boolean(savedRecord?.result);
   // Hasil evaluasi aktif: utamakan hasil baru yang sedang dianalisis, jika tidak ada fallback ke hasil tersimpan di profil
   const result: AdvisorResult | null = freshResult ?? (savedRecord?.result as AdvisorResult | null) ?? null;
+
+  const cooldown = useMemo(() => checkCareerAdvisorCooldown(savedRecord?.generatedAt), [savedRecord?.generatedAt]);
+  const isCooldownActive = cooldown.isCooldown;
+  const cooldownDays = useMemo(() => getCareerHubCooldownDays(), []);
 
   const lastAnalyzedDate = savedRecord?.generatedAt
     ? new Intl.DateTimeFormat("id-ID", {
@@ -265,6 +276,11 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   function handleFocusChange(newFocus: FocusType) {
     setSelectedFocus(newFocus);
     setFreshResult(null);
+    if (newFocus === "career_consultation") {
+      const rec = cvProfile?.careerAdvisorResults?.career_consultation;
+      if (rec?.topic) setConsultationTopic(rec.topic);
+      if (rec?.question) setConsultationQuestion(rec.question);
+    }
   }
 
   useEffect(() => {
@@ -284,7 +300,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
     }
   }, [isStreaming, result]);
 
-  async function runAdvisor() {
+  async function runAdvisor(options?: { devForce?: boolean }) {
     setLoading(true);
     setIsStreaming(false);
     try {
@@ -303,6 +319,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
           gapAnalysisResult: cvProfile?.careerAdvisorResults?.gap_analysis?.result,
           consultationTopic: selectedFocus === "career_consultation" && consultationTopic !== "Semua Fokus" ? consultationTopic : undefined,
           consultationQuestion: selectedFocus === "career_consultation" && consultationQuestion.trim() ? consultationQuestion.trim() : undefined,
+          devForce: options?.devForce,
         }),
       });
 
@@ -316,22 +333,46 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
       setIsStreaming(true);
 
       // Simpan output ke cvProfile agar persisten di AppProvider dan localStorage
-      if (cvProfile) {
-        const currentCount = cvProfile.careerAdvisorResults?.[selectedFocus]?.analysisCount || 0;
-        const updatedAdvisorResults = {
-          ...cvProfile.careerAdvisorResults,
-          [selectedFocus]: {
-            result: data,
-            generatedAt: new Date().toISOString(),
-            analysisCount: currentCount + 1,
-          },
-        };
+      const savedItem: CareerAdvisorSavedResult = (data._savedRecord as CareerAdvisorSavedResult | undefined) || {
+        result: data,
+        generatedAt: new Date().toISOString(),
+        targetRole: activeTargetRole,
+        analysisCount: (cvProfile?.careerAdvisorResults?.[selectedFocus]?.analysisCount || 0) + 1,
+        ...(selectedFocus === "career_consultation" && consultationTopic !== "Semua Fokus" ? { topic: consultationTopic } : {}),
+        ...(selectedFocus === "career_consultation" && consultationQuestion.trim() ? { question: consultationQuestion.trim() } : {}),
+      };
 
-        saveCvProfile({
-          ...cvProfile,
-          careerAdvisorResults: updatedAdvisorResults,
-        });
-      }
+      const updatedAdvisorResults = {
+        ...(cvProfile?.careerAdvisorResults || {}),
+        [selectedFocus]: savedItem,
+      };
+
+      const baseProfile: CvProfile = cvProfile || {
+        id: "candidate-draft",
+        fullName: "Kandidat",
+        headline,
+        about,
+        location: "Jakarta",
+        email: "",
+        phone: "",
+        skills,
+        tools: [],
+        industries: [],
+        experience: [],
+        education: [],
+        certifications: [],
+        portfolio: [],
+        targetRole: activeTargetRole,
+        workArrangement: "hybrid",
+        openToWork: true,
+        careerStatus: "open-to-work",
+        updatedAt: new Date().toISOString(),
+      };
+
+      saveCvProfile({
+        ...baseProfile,
+        careerAdvisorResults: updatedAdvisorResults,
+      });
 
       toast.success(
         hasSavedResult
@@ -343,6 +384,18 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleDevResetCooldown() {
+    if (!cvProfile?.careerAdvisorResults?.[selectedFocus]) return;
+    const updatedAdvisorResults = { ...cvProfile.careerAdvisorResults };
+    delete updatedAdvisorResults[selectedFocus];
+    saveCvProfile({
+      ...cvProfile,
+      careerAdvisorResults: updatedAdvisorResults,
+    });
+    setFreshResult(null);
+    toast.info("Cooldown untuk pilar ini direset (khusus mode development).");
   }
 
   function handleDownloadPdf() {
@@ -926,7 +979,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
         )}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs">
-          <div className="space-y-1">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-foreground">
                 Evaluasi pilar:{" "}
@@ -941,38 +994,117 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                   {savedRecord.analysisCount ? ` · Analisis ke-${savedRecord.analysisCount}` : ""}
                 </Badge>
               )}
+              {isCooldownActive && (
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-medium gap-1">
+                  <Lock className="size-3 text-amber-600" />
+                  Cooldown aktif · {cooldown.daysRemaining} hari lagi
+                </Badge>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {savedRecord
-                ? isProfileUpdatedAfterAnalysis
-                  ? "Ada pembaruan data profil sejak analisis ini. Anda dapat menjalankan analisis ulang untuk memperbarui rekomendasi."
-                  : "Hasil evaluasi tersimpan siap ditinjau kapan saja tanpa perlu memanggil ulang AI."
+                ? isCooldownActive
+                  ? `Hasil evaluasi pilar ini telah disimpan dan dapat Anda pelajari di bawah. Untuk mengontrol penggunaan kuota token AI, analisis ulang dapat dijalankan kembali 1 kali setiap ${cooldownDays} hari (tersedia pada ${cooldown.nextAvailableFormatted}).`
+                  : isProfileUpdatedAfterAnalysis
+                  ? "Ada pembaruan data profil sejak analisis ini. Cooldown telah selesai, Anda dapat menjalankan analisis ulang untuk memperbarui rekomendasi."
+                  : "Hasil evaluasi tersimpan siap ditinjau kapan saja. Cooldown telah selesai, Anda dapat menjalankan analisis ulang jika diperlukan."
                 : `AI akan menganalisis riwayat profil, pengalaman kerja, pendidikan, dan keahlian Anda secara menyeluruh untuk target posisi ${activeTargetRole}.`}
             </p>
           </div>
-          <Button
-            onClick={() => void runAdvisor()}
-            disabled={loading}
-            size="default"
-            variant={savedRecord ? "outline" : "default"}
-            className="w-full sm:w-auto shrink-0 gap-2 font-semibold px-5 shadow-xs cursor-pointer"
-          >
-            {loading ? (
-              <>
-                <Bot className="size-4 animate-spin" /> Menganalisis profil...
-              </>
-            ) : savedRecord ? (
-              <>
-                <RotateCcw className="size-4" /> Analisis ulang
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-4" /> Analisis dan hasilkan rekomendasi
-              </>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
+            <Button
+              onClick={() => void runAdvisor()}
+              disabled={loading || isCooldownActive}
+              size="default"
+              variant={savedRecord ? "outline" : "default"}
+              className={cn(
+                "w-full sm:w-auto shrink-0 gap-2 font-semibold px-5 shadow-xs",
+                isCooldownActive ? "cursor-not-allowed opacity-75" : "cursor-pointer"
+              )}
+            >
+              {loading ? (
+                <>
+                  <Bot className="size-4 animate-spin" /> Menganalisis profil...
+                </>
+              ) : isCooldownActive ? (
+                <>
+                  <Lock className="size-4 text-amber-600" /> Analisis Ulang ({cooldown.daysRemaining}h lagi)
+                </>
+              ) : savedRecord ? (
+                <>
+                  <RotateCcw className="size-4" /> Analisis ulang
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" /> Analisis dan hasilkan rekomendasi
+                </>
+              )}
+            </Button>
+            {process.env.NODE_ENV !== "production" && isCooldownActive && (
+              <div className="flex items-center gap-1.5 justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void runAdvisor({ devForce: true })}
+                  disabled={loading}
+                  className="text-[11px] h-8 px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-100/50"
+                  title="Abaikan cooldown untuk kebutuhan pengujian developer"
+                >
+                  Force Run (Dev)
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDevResetCooldown}
+                  className="text-[11px] h-8 px-2 text-muted-foreground hover:text-foreground"
+                  title="Hapus data cooldown untuk pilar ini"
+                >
+                  Reset (Dev)
+                </Button>
+              </div>
             )}
-          </Button>
+          </div>
         </div>
       </div>
+
+      {/* ─── Empty State when unanalyzed ─── */}
+      {!result && !loading && (
+        <Card className="border-border/80 bg-card p-8 sm:p-12 text-center rounded-xl shadow-xs animate-fade-up">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-4">
+            {selectedFocus === "cv_review" && <FileText className="size-7" />}
+            {selectedFocus === "gap_analysis" && <Target className="size-7" />}
+            {selectedFocus === "career_consultation" && <Compass className="size-7" />}
+          </div>
+          <h3 className="text-lg font-bold text-foreground">
+            {selectedFocus === "cv_review" && "Evaluasi Mendalam CV & Profil Profesional"}
+            {selectedFocus === "gap_analysis" && "Analisis Kesenjangan Karier & Kompetensi"}
+            {selectedFocus === "career_consultation" && "Sesi Konsultasi & Peta Jalan Karier AI"}
+          </h3>
+          <p className="mt-2 max-w-lg mx-auto text-sm text-muted-foreground leading-relaxed">
+            {selectedFocus === "cv_review" &&
+              "Dapatkan audit lengkap struktur CV, kesiapan ATS, identifikasi kekuatan kunci, serta rekomendasi perbaikan spesifik berdasarkan profil profesional Anda."}
+            {selectedFocus === "gap_analysis" &&
+              `Bandingkan profil Anda saat ini dengan standar industri untuk posisi target ${activeTargetRole}. Temukan skill gap kritis dan rekomendasi aksi peningkatan.`}
+            {selectedFocus === "career_consultation" &&
+              "Dapatkan rencana aksi pengembangan karier 6 bulan, tips pitching wawancara, dan rekomendasi strategis yang terpersonalisasi untuk perjalanan karier Anda."}
+          </p>
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={() => void runAdvisor()}
+              size="lg"
+              className="gap-2 font-semibold shadow-xs"
+            >
+              <Sparkles className="size-4" /> Mulai Analisis {focusPresets.find((p) => p.id === selectedFocus)?.label}
+            </Button>
+          </div>
+          <div className="mt-6 border-t pt-4 max-w-md mx-auto flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Clock className="size-3.5" />
+            <span>Hasil analisis akan otomatis tersimpan di halaman ini dan dapat ditinjau kapan saja.</span>
+          </div>
+        </Card>
+      )}
 
       {/* ─── Advice Results ─── */}
       {result && (
@@ -992,6 +1124,11 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                   <Clock className="size-3.5 text-muted-foreground" />
                   Hasil tersimpan · Dianalisis: {lastAnalyzedDate}
                   {savedRecord.analysisCount ? ` (${savedRecord.analysisCount}x analisis)` : ""}
+                  {isCooldownActive && (
+                    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] py-0 px-1.5 ml-1">
+                      Cooldown {cooldown.daysRemaining}h lagi
+                    </Badge>
+                  )}
                 </span>
               ) : (
                 <span className="text-xs text-muted-foreground">Hasil analisis siap ditinjau.</span>
@@ -1336,6 +1473,22 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                       </Badge>
                     </div>
                   </div>
+                  {(savedRecord?.topic || savedRecord?.question) && (
+                    <div className="mt-3 rounded-lg border bg-card/60 p-3 space-y-1 text-xs border-primary/15">
+                      {savedRecord.topic && (
+                        <p className="text-foreground">
+                          <span className="text-muted-foreground font-medium">Fokus Topik Konsultasi: </span>
+                          <strong className="text-primary font-semibold">{savedRecord.topic}</strong>
+                        </p>
+                      )}
+                      {savedRecord.question && (
+                        <p className="text-foreground">
+                          <span className="text-muted-foreground font-medium">Pertanyaan yang Dikonsultasikan: </span>
+                          <span className="italic text-foreground font-medium">&ldquo;{savedRecord.question}&rdquo;</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
               </Card>
 
