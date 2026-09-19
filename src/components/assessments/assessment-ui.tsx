@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, Clock3, FileQuestion, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Briefcase, Check, Clock3, FileQuestion, Plus, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +46,7 @@ export function CandidateAssessmentList() {
   const { dbMode } = useApp();
   const [invitations, setInvitations] = useState<ReturnType<typeof listDemoInvitations>>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "started" | "submitted">("all");
 
   useEffect(() => {
     if (!dbMode) {
@@ -59,15 +60,74 @@ export function CandidateAssessmentList() {
       .finally(() => setLoading(false));
   }, [dbMode]);
 
+  const counts = {
+    all: invitations.length,
+    pending: invitations.filter((i) => i.status === "pending").length,
+    started: invitations.filter((i) => i.status === "started").length,
+    submitted: invitations.filter((i) => i.status === "submitted").length,
+  };
+
+  const filtered = invitations.filter((invite) => {
+    if (statusFilter === "all") return true;
+    return invite.status === statusFilter;
+  });
+
   return (
     <div className="space-y-6">
+      {/* Navigation Breadcrumb */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Asesmen
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Kerjakan tes dari rekruter untuk memvalidasi kesiapan Anda pada peran yang dilamar.
-        </p>
+        <Link
+          href="/candidate/applications"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Kembali ke Lamaran & Minat Rekruter</span>
+        </Link>
+      </div>
+
+      {/* Page Title Header */}
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Asesmen Keterampilan & Peran
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Kerjakan tes penilaian dari rekruter untuk memvalidasi kesiapan teknis dan kecocokan peran Anda.
+          </p>
+        </div>
+      </div>
+
+      {/* Status Filter Chips */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: "all" as const, label: "Semua Asesmen", count: counts.all },
+          { id: "pending" as const, label: "Perlu Dikerjakan", count: counts.pending },
+          { id: "started" as const, label: "Sedang Berlangsung", count: counts.started },
+          { id: "submitted" as const, label: "Selesai & Dikirim", count: counts.submitted },
+        ].map((chip) => {
+          const isActive = statusFilter === chip.id;
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => setStatusFilter(chip.id)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                isActive
+                  ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                  : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <span>{chip.label}</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                  isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
+                }`}
+              >
+                {chip.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -104,51 +164,69 @@ export function CandidateAssessmentList() {
             </div>
             <h2 className="mt-4 text-base font-semibold text-foreground">Belum ada undangan asesmen</h2>
             <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-              Undangan tes dari rekruter untuk lamaran aktif Anda akan muncul di sini.
+              Undangan tes dari rekruter untuk lamaran aktif Anda maupun undangan mandiri talent pool akan muncul di sini.
             </p>
           </CardContent>
         </Card>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-border/80 bg-card p-8 text-center text-sm text-muted-foreground">
+          Tidak ada asesmen pada filter ini.
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {invitations.map((invite) => {
+          {filtered.map((invite) => {
             const isSubmitted = invite.status === "submitted";
             const isStarted = invite.status === "started";
+            const isFromApplication = Boolean(invite.applicationId);
 
             return (
-                <Card key={invite.id} className="border-border/80 bg-card shadow-xs transition-colors hover:bg-muted/40">
-                <CardHeader className="border-b pb-3">
+              <Card key={invite.id} className="border-border/80 bg-card shadow-xs transition-colors hover:border-primary/40">
+                <CardHeader className="border-b pb-3.5 space-y-2">
+                  {/* Origin Badge */}
+                  <div className="flex items-center gap-1.5">
+                    {isFromApplication ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/5 text-primary border border-primary/20 px-2.5 py-0.5 text-[11px] font-medium">
+                        <Briefcase className="size-3" /> Terkait Lamaran Kerja
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 text-[11px] font-medium">
+                        <Sparkles className="size-3" /> Undangan Mandiri Rekruter
+                      </span>
+                    )}
+                  </div>
+
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="text-sm font-semibold text-foreground">
+                      <CardTitle className="text-base font-bold text-foreground">
                         {invite.templateName}
                       </CardTitle>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Untuk <span className="font-medium text-foreground">{invite.candidateName}</span>
+                        Kandidat: <span className="font-medium text-foreground">{invite.candidateName}</span>
                       </p>
                     </div>
                     <span
-                      className={`inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                      className={`inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                         isSubmitted
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                           : isStarted
                           ? "border-primary/20 bg-primary/10 text-primary"
-                          : "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-amber-200 bg-amber-50 text-amber-800"
                       }`}
                     >
-                      {isSubmitted ? "Terkirim" : isStarted ? "Berlangsung" : "Belum dikerjakan"}
+                      {isSubmitted ? "Selesai / Terkirim" : isStarted ? "Sedang Berlangsung" : "Perlu Dikerjakan"}
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-5 flex items-center justify-between gap-4">
+                <CardContent className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock3 className="size-3.5" />
-                    <span>Evaluasi Human-Reviewed</span>
+                    <Clock3 className="size-3.5 text-primary" />
+                    <span>Evaluasi Human-Reviewed (~20 Menit)</span>
                   </div>
                   <Button
                     size="sm"
                     variant={isSubmitted ? "outline" : "default"}
                     asChild
-                    className="text-xs font-semibold"
+                    className={`text-xs font-semibold ${!isSubmitted && !isStarted ? "bg-primary hover:bg-primary/90" : ""}`}
                   >
                     <Link href={`/candidate/assessments/${invite.id}`}>
                       {isStarted ? "Lanjutkan Tes" : isSubmitted ? "Tinjau Status" : "Mulai Asesmen"}
