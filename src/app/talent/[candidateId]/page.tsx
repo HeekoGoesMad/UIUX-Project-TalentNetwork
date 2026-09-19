@@ -25,7 +25,6 @@ import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, Scre
 import {
     AlertCircle,
     ArrowLeft,
-    ArrowRight,
     Banknote,
     Bookmark,
     Brain,
@@ -42,7 +41,6 @@ import {
     Loader2,
     Lock,
     Mail,
-    MessageSquareQuote,
     Phone,
     Printer,
     RefreshCw,
@@ -798,7 +796,7 @@ export default function TalentProfile() {
               {unlocked && (
                 <Button
                   size="default"
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 font-bold text-xs sm:text-sm h-10 px-4 shadow-md hover:shadow-lg transition-all"
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs sm:text-sm h-10 px-4 shadow-xs hover:shadow-sm transition-all cursor-pointer"
                   onClick={() => setAssignModalOpen(true)}
                 >
                   <Briefcase className="mr-2 size-4" />
@@ -1329,66 +1327,6 @@ export default function TalentProfile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── STREAMLINED SHORTCUT WIDGET ── */}
-      {unlocked && (
-        <aside
-          aria-label="Aksi Cepat Rekruter"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3.5 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-950/60 xl:flex-col xl:items-start xl:gap-2">
-            <div className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED] to-pink-500 text-white shadow-xs">
-                <Sparkles className="size-3.5" />
-              </span>
-              <div>
-                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[130px] xl:max-w-[170px]">
-                  {candidate.name}
-                </p>
-                <p className="text-[10px] text-muted-foreground font-mono">
-                  Aksi Rekrutmen
-                </p>
-              </div>
-            </div>
-            <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
-              Profil Terbuka
-            </Badge>
-          </div>
-
-          <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8.5 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-3 dark:border-purple-800 xl:justify-start"
-              onClick={() => setQuestionModalOpen(true)}
-            >
-              <Brain className="mr-2 size-3.5 text-[#7C3AED]" />
-              Pertanyaan AI
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8.5 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-3 dark:border-purple-800 xl:justify-start"
-              onClick={() => setPromptModalOpen(true)}
-            >
-              <MessageSquareQuote className="mr-2 size-3.5 text-[#7C3AED]" />
-              Prompt Pesan
-            </Button>
-            <div className="pt-2 border-t border-purple-100 dark:border-purple-900/50 mt-1 w-full">
-              <Button
-                size="sm"
-                className="h-9 text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 w-full justify-between dark:bg-purple-900/40 dark:hover:bg-purple-900/60 shadow-xs font-medium"
-                asChild
-              >
-                <Link href="/recruiter/operations">
-                  <span>Lanjutkan di Operations</span>
-                  <ArrowRight className="size-3.5 ml-1.5" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </aside>
-      )}
-
       {/* Recruiter Hiring Flow Modals */}
       <InterviewQuestionModal
         open={questionModalOpen}
@@ -1429,12 +1367,14 @@ export default function TalentProfile() {
         candidate={candidate}
       />
 
-      {/* Floating candidate-locked direct chat */}
+      {/* Unified Bottom-Right Recruiter Quick Actions & Chat Hub */}
       <CandidateFloatingChat
         candidate={candidate}
         unlocked={unlocked}
         dbMode={dbMode}
         currentUserEmail={user?.email}
+        onOpenQuestionModal={() => setQuestionModalOpen(true)}
+        onOpenPromptModal={() => setPromptModalOpen(true)}
       />
     </div>
   );
