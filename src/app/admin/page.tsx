@@ -4,15 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Building2,
-  CheckCircle2,
   Clock,
   Coins,
   FileCheck,
   ArrowRight,
-  Activity,
   RefreshCw,
   ChevronRight,
-  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { AdminChecking, AdminDenied, AdminPopup } from "@/components/admin/admin-denied";
@@ -52,9 +50,86 @@ interface DashboardData {
   }>;
 }
 
+const AUDIT_ACTION_MAP: Record<
+  string,
+  { label: string; tag: string; color: "violet" | "emerald" | "amber" | "slate" | "blue" }
+> = {
+  "screening.run.started": {
+    label: "Pemeriksaan Profil Dimulai",
+    tag: "Screening",
+    color: "violet",
+  },
+  "screening.run.completed": {
+    label: "Pemeriksaan Profil Selesai",
+    tag: "Screening",
+    color: "violet",
+  },
+  "application.created": {
+    label: "Lamaran Kandidat Masuk",
+    tag: "Rekrutmen",
+    color: "blue",
+  },
+  "admin.company.deleted": {
+    label: "Entitas Perusahaan Dihapus",
+    tag: "Sistem",
+    color: "slate",
+  },
+  "company.verification.submitted": {
+    label: "Pengajuan Berkas Verifikasi",
+    tag: "Verifikasi",
+    color: "amber",
+  },
+  "company.verification.approved": {
+    label: "Legalitas Perusahaan Disetujui",
+    tag: "Verifikasi",
+    color: "emerald",
+  },
+  "company.verification.rejected": {
+    label: "Legalitas Perusahaan Ditolak",
+    tag: "Verifikasi",
+    color: "slate",
+  },
+  "token.grant": {
+    label: "Alokasi Kuota Token",
+    tag: "Finansial",
+    color: "violet",
+  },
+  "token.deduct": {
+    label: "Pengurangan Saldo Token",
+    tag: "Finansial",
+    color: "violet",
+  },
+  "user.login": {
+    label: "Sesi Masuk Berhasil",
+    tag: "Otentikasi",
+    color: "slate",
+  },
+};
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return "Baru saja";
+    if (diffMins < 60) return `${diffMins}m lalu`;
+    if (diffHours < 24) return `${diffHours}j lalu`;
+    if (diffDays === 1) return "Kemarin";
+    if (diffDays < 7) return `${diffDays}h lalu`;
+    return date.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
 
   const fetchDashboard = useCallback(async () => {
@@ -67,6 +142,10 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         const json = await res.json();
         setData(json);
+        const now = new Date();
+        setLastRefreshed(
+          now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+        );
       } else if (res.status === 401) {
         failGate(401);
       } else if (res.status === 403) {
@@ -116,164 +195,165 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <AdminShell title="Ikhtisar Platform">
-      <div className="space-y-6">
-        {/* ─── 1. Welcome Card (Minimalist, Clean White with Subtle Outline) ─── */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-2xs transition-all hover:border-slate-300">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#7C3AED]">
-                <Sparkles className="size-3.5" />
-                <span>Panel Administrator</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                Selamat Datang di Talent Network
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-xl leading-relaxed">
-                Pantau status verifikasi perusahaan, sirkulasi kuota token, dan ringkasan aktivitas platform terkini.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start sm:self-center">
-              {metrics.pendingVerification > 0 && (
-                <Link href="/admin/companies?status=pending">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200/90 bg-purple-50/60 px-3.5 py-2 text-xs font-semibold text-[#7C3AED] hover:bg-purple-100/70 hover:-translate-y-0.5 transition-all shadow-2xs cursor-pointer">
-                    <Clock className="size-3.5" />
-                    <span>{metrics.pendingVerification} Perlu Ditinjau</span>
-                    <ArrowRight className="size-3" />
-                  </span>
-                </Link>
-              )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchDashboard}
-                disabled={loading}
-                className="gap-2 text-xs font-semibold h-9 rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 transition-all cursor-pointer shadow-2xs"
-              >
-                <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
-                Perbarui Data
-              </Button>
-            </div>
-          </div>
+    <AdminShell
+      title="Ikhtisar Operasional"
+      subtitle="Konsol verifikasi legalitas perusahaan, audit aktivitas, dan sirkulasi kuota"
+      actions={
+        <div className="flex items-center gap-2.5">
+          {lastRefreshed && (
+            <span className="hidden sm:inline-block text-[11px] font-mono text-slate-400">
+              Diperbarui {lastRefreshed} WIB
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchDashboard}
+            disabled={loading}
+            className="gap-2 text-xs font-semibold h-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
+            <span>Perbarui Data</span>
+          </Button>
         </div>
-
-        {/* ─── 2. Core 4 Minimalist Metric Cards with Hover Lift & Purple Outlines ─── */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* 1. Total Perusahaan */}
-          <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:border-purple-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Total Perusahaan
-              </p>
-              <div className="size-8 rounded-lg bg-slate-100 group-hover:bg-purple-50 group-hover:text-[#7C3AED] flex items-center justify-center text-slate-600 transition-colors">
-                <Building2 className="size-4" />
+      }
+    >
+      <div className="space-y-6">
+        {/* ─── 1. Urgent Triage Alert Banner (Rendered when verification queue has items) ─── */}
+        {metrics.pendingVerification > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-3.5 text-amber-950 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 border border-amber-300/80 font-bold">
+                <Clock className="size-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-950">
+                  Tindakan Diperlukan: {metrics.pendingVerification} Berkas Perusahaan Menunggu Tinjauan Legal
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Pendaftaran terhambat sampai dokumen legalitas (NIB/NPWP) divalidasi oleh tim admin.
+                </p>
               </div>
             </div>
-            <p className="text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
+            <Link href="/admin/companies?status=pending">
+              <Button
+                size="sm"
+                className="bg-amber-700 hover:bg-amber-800 text-white font-semibold text-xs h-8 px-3.5 rounded-lg shadow-xs shrink-0 cursor-pointer"
+              >
+                <span>Tinjau Berkas</span>
+                <ArrowRight className="size-3.5 ml-1.5" />
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {/* ─── 2. Segmented Operational KPI Ledger Strip (Unified single bar, no fluffy cards) ─── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+          {/* Segment 1: Total Perusahaan */}
+          <div className="p-4 sm:p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Total Entitas
+              </span>
+              <Building2 className="size-4 text-slate-400" />
+            </div>
+            <p className="mt-2 text-2xl sm:text-3xl font-bold font-mono text-slate-900 tracking-tight">
               {metrics.totalCompanies}
             </p>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-2 font-medium">
-              <span className="text-emerald-700 font-semibold">{metrics.verifiedCompanies} Disetujui</span>
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+              <span className="text-emerald-700 font-semibold">{metrics.verifiedCompanies} Aktif</span>
               <span>·</span>
               <span className="text-amber-700 font-semibold">{metrics.pendingVerification} Pending</span>
+              <span>·</span>
+              <span className="text-slate-400">{metrics.rejectedCompanies} Ditolak</span>
             </div>
           </div>
 
-          {/* 2. Menunggu Verifikasi */}
+          {/* Segment 2: Menunggu Review (Highlighted if backlog exists) */}
           <div
             className={cn(
-              "group rounded-2xl border bg-white p-5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
-              metrics.pendingVerification > 0
-                ? "border-amber-200/90 hover:border-amber-300"
-                : "border-slate-200/80 hover:border-purple-200"
+              "p-4 sm:p-5 transition-colors",
+              metrics.pendingVerification > 0 ? "bg-amber-50/40" : "bg-white"
             )}
           >
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Menunggu Review
-              </p>
-              <div
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Antrean Legalitas
+              </span>
+              <Clock
                 className={cn(
-                  "size-8 rounded-lg flex items-center justify-center transition-colors",
-                  metrics.pendingVerification > 0
-                    ? "bg-amber-50 text-amber-600"
-                    : "bg-slate-100 text-slate-600 group-hover:bg-purple-50 group-hover:text-[#7C3AED]"
+                  "size-4",
+                  metrics.pendingVerification > 0 ? "text-amber-600" : "text-slate-400"
                 )}
-              >
-                <Clock className="size-4" />
-              </div>
+              />
             </div>
             <p
               className={cn(
-                "text-3xl font-extrabold mt-2 tracking-tight",
+                "mt-2 text-2xl sm:text-3xl font-bold font-mono tracking-tight",
                 metrics.pendingVerification > 0 ? "text-amber-800" : "text-slate-900"
               )}
             >
               {metrics.pendingVerification}
             </p>
-            <p className="text-[11px] text-slate-500 mt-2">
-              {metrics.pendingVerification > 0 ? "Dokumen NIB/NPWP siap ditinjau" : "Semua berkas telah diperiksa"}
+            <p className="mt-1.5 text-[11px] text-slate-500 truncate">
+              {metrics.pendingVerification > 0
+                ? "Dokumen NIB/NPWP siap ditinjau"
+                : "Seluruh berkas terverifikasi"}
             </p>
           </div>
 
-          {/* 3. Saldo Token Aktif */}
-          <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:border-purple-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+          {/* Segment 3: Sirkulasi Kuota Token */}
+          <div className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Saldo Token Beredar
-              </p>
-              <div className="size-8 rounded-lg bg-slate-100 group-hover:bg-purple-50 group-hover:text-[#7C3AED] flex items-center justify-center text-slate-600 transition-colors">
-                <Coins className="size-4" />
-              </div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Sirkulasi Token
+              </span>
+              <Coins className="size-4 text-slate-400" />
             </div>
-            <p className="text-3xl font-extrabold text-[#7C3AED] mt-2 tracking-tight font-mono">
+            <p className="mt-2 text-2xl sm:text-3xl font-bold font-mono text-slate-900 tracking-tight">
               {metrics.totalActiveTokens.toLocaleString("id-ID")}
             </p>
-            <p className="text-[11px] text-slate-500 mt-2">
-              Total kuota di seluruh akun rekruter
+            <p className="mt-1.5 text-[11px] text-slate-500 truncate">
+              Total saldo aktif di rekruter
             </p>
           </div>
 
-          {/* 4. Konsumsi Fitur */}
-          <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:border-purple-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+          {/* Segment 4: Konsumsi Fitur Platform */}
+          <div className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Penggunaan Fitur
-              </p>
-              <div className="size-8 rounded-lg bg-slate-100 group-hover:bg-purple-50 group-hover:text-[#7C3AED] flex items-center justify-center text-slate-600 transition-colors">
-                <FileCheck className="size-4" />
-              </div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Konsumsi Fitur
+              </span>
+              <FileCheck className="size-4 text-slate-400" />
             </div>
-            <p className="text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">
+            <p className="mt-2 text-2xl sm:text-3xl font-bold font-mono text-slate-900 tracking-tight">
               {totalFeatureUsage}
             </p>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-2">
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
               <span>{metrics.totalTalentUnlock} Unlock</span>
               <span>·</span>
-              <span>{metrics.totalFinancialScreening} Screening</span>
+              <span>{metrics.totalFinancialScreening} Skrining</span>
             </div>
           </div>
         </div>
 
-        {/* ─── 3. Action Center: Antrean Verifikasi & Aktivitas Terkini (Two Clean Minimalist Columns) ─── */}
-        <div className="grid gap-6 lg:grid-cols-2 items-start">
-          {/* Antrean Verifikasi Perusahaan */}
-          <Card className="border border-slate-200/90 bg-white shadow-2xs rounded-2xl overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-3.5">
-              <div>
+        {/* ─── 3. Asymmetric Workstation (60% Verification Triage + 40% Live Audit Feed) ─── */}
+        <div className="grid gap-6 lg:grid-cols-12 items-start">
+          {/* Left Column (7 cols): Antrean Verifikasi Perusahaan */}
+          <Card className="lg:col-span-7 border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-slate-50/50">
+              <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-bold text-slate-900">
                   Antrean Verifikasi Perusahaan
                 </CardTitle>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Pendaftaran perusahaan baru yang membutuhkan peninjauan dokumen.
-                </p>
+                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 border-slate-300 text-slate-600 bg-white">
+                  {data?.pendingList?.length ?? 0} Tertunda
+                </Badge>
               </div>
               <Link href="/admin/companies?status=pending">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] hover:bg-purple-50 rounded-xl">
-                  Lihat Semua
-                  <ArrowRight className="size-3.5" />
+                <Button variant="ghost" size="sm" className="gap-1 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] hover:bg-purple-50 rounded-lg h-7 px-2">
+                  <span>Lihat Direktori</span>
+                  <ArrowRight className="size-3" />
                 </Button>
               </Link>
             </CardHeader>
@@ -284,26 +364,38 @@ export default function AdminDashboardPage() {
                   {data.pendingList.map((c) => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between p-4 hover:bg-slate-50/70 transition-colors"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-slate-50/60 transition-colors"
                     >
-                      <div className="min-w-0 flex-1 pr-3">
-                        <p className="text-sm font-bold text-slate-900 truncate">{c.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {c.industry || "Sektor belum diisi"} {c.city ? `· ${c.city}` : ""}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-900 truncate">{c.name}</p>
+                          <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-bold px-1.5 py-0">
+                            Pending
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Sektor: <span className="text-slate-700 font-medium">{c.industry || "Tidak tercantum"}</span>
+                          {c.city ? ` · ${c.city}` : ""}
                         </p>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono pt-0.5">
+                          <span className="flex items-center gap-1">
+                            <Clock className="size-3" />
+                            Diajukan {formatRelativeTime(c.createdAt)}
+                          </span>
+                          <span>·</span>
+                          <span className="rounded bg-slate-100 border border-slate-200 px-1 py-0.2 text-[9px] text-slate-600">
+                            NIB & NPWP
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold">
-                          Pending
-                        </Badge>
+                      <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                         <Link href={`/admin/companies?reviewId=${c.id}`}>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="text-xs font-semibold h-8 px-3 rounded-xl border-purple-200 text-[#7C3AED] hover:bg-purple-50 hover:border-purple-300 transition-all cursor-pointer"
+                            className="text-xs font-semibold h-8 px-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white transition-colors cursor-pointer shadow-xs"
                           >
-                            Review
-                            <ChevronRight className="size-3 ml-1" />
+                            <span>Periksa Berkas</span>
+                            <ChevronRight className="size-3.5 ml-1" />
                           </Button>
                         </Link>
                       </div>
@@ -311,62 +403,83 @@ export default function AdminDashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center text-xs text-slate-500 space-y-1.5">
-                  <CheckCircle2 className="size-6 text-emerald-500 mx-auto" />
-                  <p className="font-semibold text-slate-800 text-sm">Semua antrean tuntas</p>
-                  <p className="text-slate-400">Tidak ada peninjauan perusahaan yang tertunda saat ini.</p>
+                <div className="p-8 text-center space-y-2">
+                  <div className="size-9 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
+                    <ShieldCheck className="size-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">Antrean Verifikasi Bersih</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Seluruh pengajuan legalitas dan pendaftaran perusahaan telah selesai ditinjau.
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Aktivitas Terbaru Platform */}
-          <Card className="border border-slate-200/90 bg-white shadow-2xs rounded-2xl overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-3.5">
-              <div>
-                <CardTitle className="text-sm font-bold text-slate-900">
-                  Aktivitas Terbaru
-                </CardTitle>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Catatan transaksi, verifikasi, dan pemindaian di platform.
-                </p>
-              </div>
+          {/* Right Column (5 cols): Jejak Audit Real-time */}
+          <Card className="lg:col-span-5 border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-slate-50/50">
+              <CardTitle className="text-sm font-bold text-slate-900">
+                Jejak Audit Real-time
+              </CardTitle>
               <Link href="/admin/audit-log">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] hover:bg-purple-50 rounded-xl">
-                  Semua Log
-                  <ArrowRight className="size-3.5" />
+                <Button variant="ghost" size="sm" className="gap-1 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] hover:bg-purple-50 rounded-lg h-7 px-2">
+                  <span>Semua Log</span>
+                  <ArrowRight className="size-3" />
                 </Button>
               </Link>
             </CardHeader>
 
-            <CardContent className="p-0">
+            <CardContent className="p-4">
               {data?.recentActivities && data.recentActivities.length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {data.recentActivities.map((log) => (
-                    <div key={log.id} className="p-4 flex items-start gap-3 hover:bg-slate-50/70 transition-colors">
-                      <div className="size-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5 text-slate-500">
-                        <Activity className="size-3.5" />
+                <div className="space-y-4">
+                  {data.recentActivities.slice(0, 5).map((log) => {
+                    const meta = AUDIT_ACTION_MAP[log.action] || {
+                      label: log.action,
+                      tag: "Sistem",
+                      color: "slate" as const,
+                    };
+
+                    return (
+                      <div key={log.id} className="flex items-start gap-3">
+                        <div
+                          className={cn(
+                            "size-2 rounded-full mt-1.5 shrink-0",
+                            meta.color === "emerald" && "bg-emerald-500",
+                            meta.color === "amber" && "bg-amber-500",
+                            meta.color === "violet" && "bg-[#7C3AED]",
+                            meta.color === "blue" && "bg-blue-500",
+                            meta.color === "slate" && "bg-slate-400"
+                          )}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-slate-900 truncate">
+                              {meta.label}
+                            </p>
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                              {formatRelativeTime(log.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {log.organizationName ? `${log.organizationName} · ` : ""}
+                            Oleh: {log.actorEmail || "Sistem"}
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                            {new Date(log.createdAt).toLocaleString("id-ID", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">
-                          {log.action}
-                        </p>
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {log.organizationName ? `${log.organizationName} · ` : ""}
-                          Oleh: {log.actorEmail || "Sistem"}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                          {new Date(log.createdAt).toLocaleString("id-ID", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="p-8 text-center text-xs text-slate-500">
+                <div className="p-6 text-center text-xs text-slate-500">
                   Belum ada aktivitas baru tercatat di platform.
                 </div>
               )}
@@ -374,14 +487,16 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
 
-        {/* ─── 4. Simple, Clean System Status Note ─── */}
-        <div className="flex items-center justify-between rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-xs text-slate-500">
+        {/* ─── 4. High-Precision System Telemetry Status Bar ─── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-2xs">
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-emerald-500"></span>
-            <span>Sistem tersinkronisasi dengan database</span>
+            <span className="font-medium text-slate-700">Database Supabase & Drizzle Tersinkronisasi</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px] text-slate-400 font-mono">Latensi Operasional Normal</span>
           </div>
           <span className="text-[11px] font-mono text-slate-400">
-            Pertumbuhan bulanan: {metrics.monthlyGrowth > 0 ? `+${metrics.monthlyGrowth}%` : `${metrics.monthlyGrowth}%`}
+            Pertumbuhan Bulanan: {metrics.monthlyGrowth > 0 ? `+${metrics.monthlyGrowth}%` : `${metrics.monthlyGrowth}%`}
           </span>
         </div>
       </div>
