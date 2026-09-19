@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
-  ChevronDown,
+  ArrowRight,
+  Brain,
   Loader2,
   MessageSquare,
+  MessageSquareQuote,
   Send,
-  Sparkles,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +31,8 @@ interface CandidateFloatingChatProps {
   unlocked: boolean;
   dbMode: boolean;
   currentUserEmail?: string;
+  onOpenQuestionModal?: () => void;
+  onOpenPromptModal?: () => void;
 }
 
 export function CandidateFloatingChat({
@@ -36,9 +40,10 @@ export function CandidateFloatingChat({
   unlocked,
   dbMode,
   currentUserEmail,
+  onOpenQuestionModal,
+  onOpenPromptModal,
 }: CandidateFloatingChatProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -53,7 +58,7 @@ export function CandidateFloatingChat({
     });
   };
 
-  // Initialize or fetch conversation
+  // Initialize or fetch conversation when chat is open
   useEffect(() => {
     if (!isOpen || !unlocked) return;
 
@@ -64,7 +69,6 @@ export function CandidateFloatingChat({
       setLoading(true);
       try {
         if (dbMode && isUuidCandidate) {
-          // Get or create conversation via API
           const convRes = await fetch("/api/conversations", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -77,7 +81,6 @@ export function CandidateFloatingChat({
 
           if (convRes.ok && convData.conversationId && isMounted) {
             setConversationId(convData.conversationId);
-            // Fetch messages
             const msgRes = await fetch(
               `/api/messages?conversationId=${encodeURIComponent(
                 convData.conversationId
@@ -148,11 +151,11 @@ export function CandidateFloatingChat({
   }, [isOpen, unlocked, candidate.id, candidate.name, candidate.role, candidate.targetRole, dbMode, currentUserEmail]);
 
   useEffect(() => {
-    if (isOpen && !isMinimized) {
+    if (isOpen) {
       scrollToBottom(false);
       inputRef.current?.focus();
     }
-  }, [isOpen, isMinimized, messages.length]);
+  }, [isOpen, messages.length]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -189,7 +192,6 @@ export function CandidateFloatingChat({
           throw new Error(errData.error || "Gagal mengirim pesan.");
         }
       } else {
-        // Save demo message to local storage
         const storageKey = `direct_chat_${candidate.id}`;
         const current = [...messages, newMsg];
         localStorage.setItem(storageKey, JSON.stringify(current));
@@ -207,27 +209,65 @@ export function CandidateFloatingChat({
   // Only appear after recruiter unlocks/scans candidate
   if (!unlocked) return null;
 
-  // Floating trigger button (when closed or minimized)
-  if (!isOpen || isMinimized) {
+  const firstName = candidate.name.split(" ")[0];
+
+  // Collapsed Unified Floating Dock (Bottom-Right)
+  if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+      <aside
+        aria-label="Aksi Cepat & Chat Rekruter"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-1.5 rounded-full border border-purple-200/80 bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(124,58,237,0.16)] backdrop-blur-md transition-all duration-300 hover:shadow-[0_14px_36px_rgba(124,58,237,0.22)] dark:border-purple-900/60 dark:bg-slate-900/95 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      >
+        {/* Shortcut: Pertanyaan AI */}
+        {onOpenQuestionModal && (
+          <button
+            type="button"
+            onClick={onOpenQuestionModal}
+            title="Pertanyaan Wawancara AI"
+            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-purple-50 hover:text-[#7C3AED] dark:text-slate-200 dark:hover:bg-purple-950/60 dark:hover:text-purple-300 cursor-pointer"
+          >
+            <Brain className="size-3.5 text-[#7C3AED]" />
+            <span className="hidden sm:inline">Pertanyaan AI</span>
+          </button>
+        )}
+
+        {/* Shortcut: Prompt Pesan */}
+        {onOpenPromptModal && (
+          <button
+            type="button"
+            onClick={onOpenPromptModal}
+            title="Prompt Pesan Outreach"
+            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-purple-50 hover:text-[#7C3AED] dark:text-slate-200 dark:hover:bg-purple-950/60 dark:hover:text-purple-300 cursor-pointer"
+          >
+            <MessageSquareQuote className="size-3.5 text-[#7C3AED]" />
+            <span className="hidden sm:inline">Prompt Pesan</span>
+          </button>
+        )}
+
+        {/* Shortcut: Operations */}
+        <Link
+          href="/recruiter/operations"
+          title="Buka Halaman Operations"
+          className="flex items-center gap-1 rounded-full px-2.5 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <span className="hidden md:inline">Operations</span>
+          <ArrowRight className="size-3.5" />
+        </Link>
+
+        {/* Subtle vertical separator */}
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+        {/* Primary Action: Chat Candidate (Solid Purple #7C3AED, NO gradient) */}
         <button
           type="button"
-          onClick={() => {
-            setIsOpen(true);
-            setIsMinimized(false);
-          }}
-          className="group flex items-center gap-2.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-4 py-3 text-white shadow-[0_8px_24px_rgba(124,58,237,0.35)] transition-all hover:scale-105 hover:shadow-[0_12px_28px_rgba(124,58,237,0.45)] active:scale-95 cursor-pointer"
-          aria-label={`Chat langsung dengan ${candidate.name}`}
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 rounded-full bg-[#7C3AED] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-[#6D28D9] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          aria-label={`Buka chat dengan ${candidate.name}`}
         >
-          <div className="relative">
-            <MessageSquare className="size-5" />
-          </div>
-          <span className="text-xs font-semibold tracking-wide sm:inline">
-            Chat {candidate.name.split(" ")[0]}
-          </span>
+          <MessageSquare className="size-4" />
+          <span>Chat {firstName}</span>
         </button>
-      </div>
+      </aside>
     );
   }
 
@@ -236,10 +276,10 @@ export function CandidateFloatingChat({
     <div
       role="dialog"
       aria-label={`Percakapan langsung dengan ${candidate.name}`}
-      className="fixed bottom-6 right-6 z-50 flex h-[490px] max-h-[calc(100vh-5rem)] w-[360px] sm:w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-purple-200/90 bg-white shadow-[0_16px_40px_rgba(124,58,237,0.22)] dark:border-slate-800 dark:bg-slate-900 animate-in fade-in slide-in-from-bottom-5 duration-200"
+      className="fixed bottom-6 right-6 z-50 flex h-[500px] max-h-[calc(100vh-5rem)] w-[360px] sm:w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-purple-200/90 bg-white shadow-[0_16px_40px_rgba(124,58,237,0.22)] dark:border-slate-800 dark:bg-slate-900 animate-in fade-in-50 zoom-in-95 slide-in-from-bottom-6 duration-300 ease-out"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-purple-100 bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 px-4 py-3 text-white shadow-xs dark:border-purple-900/50">
+      {/* Header — Solid Purple (#7C3AED, NO gradient) */}
+      <div className="flex items-center justify-between bg-[#7C3AED] px-4 py-3 text-white shadow-xs">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative shrink-0">
             <div className="size-9 rounded-full border-2 border-white/80 overflow-hidden bg-white/10">
@@ -262,36 +302,52 @@ export function CandidateFloatingChat({
           </div>
         </div>
 
-        {/* Header Action Controls */}
+        {/* Header Action Controls: Mini-Icon Bar for quick AI & Operations without closing chat */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Dropdown / Minimize button to shrink to icon */}
-          <button
-            type="button"
-            onClick={() => setIsMinimized(true)}
-            title="Kecilkan chatbox menjadi icon"
-            className="rounded-lg p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white cursor-pointer"
-            aria-label="Kecilkan chatbox"
+          {onOpenQuestionModal && (
+            <button
+              type="button"
+              onClick={onOpenQuestionModal}
+              title="Pertanyaan Wawancara AI"
+              className="rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white cursor-pointer"
+              aria-label="Pertanyaan AI"
+            >
+              <Brain className="size-4" />
+            </button>
+          )}
+          {onOpenPromptModal && (
+            <button
+              type="button"
+              onClick={onOpenPromptModal}
+              title="Prompt Pesan Outreach AI"
+              className="rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white cursor-pointer"
+              aria-label="Prompt Pesan"
+            >
+              <MessageSquareQuote className="size-4" />
+            </button>
+          )}
+          <Link
+            href="/recruiter/operations"
+            title="Lanjutkan di Operations"
+            className="rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white cursor-pointer"
+            aria-label="Operations"
           >
-            <ChevronDown className="size-4" />
-          </button>
+            <ArrowRight className="size-4" />
+          </Link>
+
+          <div className="h-4 w-px bg-white/30 mx-0.5" />
+
+          {/* Single Close Button (No duplicate dropdown) */}
           <button
             type="button"
             onClick={() => setIsOpen(false)}
             title="Tutup chatbox"
-            className="rounded-lg p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white cursor-pointer"
+            className="rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white cursor-pointer"
             aria-label="Tutup percakapan"
           >
             <X className="size-4" />
           </button>
         </div>
-      </div>
-
-      {/* Candidate Notice / Security banner */}
-      <div className="border-b border-purple-50 bg-purple-50/50 px-3.5 py-1.5 text-[11px] text-purple-900/80 flex items-center gap-1.5 dark:bg-purple-950/20 dark:border-purple-900/30 dark:text-purple-200">
-        <Sparkles className="size-3 text-[#7C3AED] shrink-0" />
-        <span className="truncate">
-          Terkunci langsung ke <strong>{candidate.name}</strong>
-        </span>
       </div>
 
       {/* Chat Messages Body */}
@@ -322,7 +378,7 @@ export function CandidateFloatingChat({
                 className={cn(
                   "rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs leading-relaxed break-words",
                   msg.isMine
-                    ? "bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-br-xs"
+                    ? "bg-[#7C3AED] text-white rounded-br-xs"
                     : "bg-white border border-slate-200/90 text-foreground dark:bg-slate-800 dark:border-slate-700 rounded-bl-xs"
                 )}
               >
@@ -351,7 +407,7 @@ export function CandidateFloatingChat({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={`Ketik pesan ke ${candidate.name.split(" ")[0]}...`}
+            placeholder={`Ketik pesan ke ${firstName}...`}
             className="flex-1 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-purple-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:focus:border-purple-400"
             disabled={sending}
           />
@@ -359,7 +415,7 @@ export function CandidateFloatingChat({
             type="submit"
             size="sm"
             disabled={!inputText.trim() || sending}
-            className="h-8.5 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-xs"
+            className="h-8.5 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-xs cursor-pointer"
           >
             {sending ? (
               <Loader2 className="size-3.5 animate-spin" />
