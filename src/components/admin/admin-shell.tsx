@@ -47,7 +47,7 @@ const adminNavGroups: NavGroup[] = [
     items: [
       { label: "Kuota Token", href: "/admin/tokens", icon: Coins },
       { label: "Audit Log", href: "/admin/audit-log", icon: ScrollText },
-      { label: "Pengaturan", href: "#", icon: Settings, badge: "Segera", disabled: true },
+      { label: "Pengaturan", href: "/admin/settings", icon: Settings },
     ],
   },
 ];
