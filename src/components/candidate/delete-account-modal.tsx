@@ -78,6 +78,30 @@ export function DeleteAccountModal({
     onOpenChange(nextOpen);
   };
 
+  const purgeClientStorage = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          (key.startsWith("proofylink") ||
+            key.startsWith("candidate") ||
+            key.includes("onboarding") ||
+            key.includes("a11y") ||
+            key.includes("workspace") ||
+            key.includes("cv"))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      sessionStorage.clear();
+    } catch {
+      // ignore storage access errors
+    }
+  };
+
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -88,8 +112,10 @@ export function DeleteAccountModal({
       // In development bypass or demo mode without real backend
       if (devBypass) {
         await new Promise((res) => setTimeout(res, 1200));
-        toast.success("Demo Mode: Akun kandidat berhasil di-reset.");
+        purgeClientStorage();
+        toast.success("Demo Mode: Akun kandidat berhasil di-reset dan data lokal dibersihkan.");
         await logout();
+        onOpenChange(false);
         router.push("/login?deleted=true");
         return;
       }
@@ -110,15 +136,8 @@ export function DeleteAccountModal({
         throw new Error(data?.error || "Gagal memproses penghapusan akun.");
       }
 
-      // Cleanup local browser state
-      try {
-        localStorage.removeItem("proofylink_candidate_workspace");
-        localStorage.removeItem("candidate-onboarding-draft");
-        localStorage.removeItem("candidate-cv-storage");
-        sessionStorage.clear();
-      } catch {
-        // ignore
-      }
+      // Comprehensive cleanup of local browser state
+      purgeClientStorage();
 
       toast.success(
         data?.message || "Akun dan seluruh data Anda telah berhasil dihapus secara permanen."

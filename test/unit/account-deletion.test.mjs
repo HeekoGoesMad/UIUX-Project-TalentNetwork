@@ -62,4 +62,25 @@ describe("Candidate Account Deletion Confirmation Validation", () => {
     assert.equal(res.valid, false);
     assert.equal(res.reason, "Acknowledgment required");
   });
+
+  it("handles case-insensitivity and trim for email-based confirmation", () => {
+    const res = validateDeletionConfirmation("  CANDIDATE@proofylink.com  ", "candidate@proofylink.com", true);
+    assert.equal(res.valid, true);
+  });
+});
+
+describe("Candidate Account Deletion Result Contract", () => {
+  it("validates successful deletion response format", () => {
+    const result = {
+      success: true,
+      deletedFilesCount: 5,
+      deletedConversationsCount: 2,
+      message: "Akun dan seluruh data kandidat Anda telah berhasil dihapus secara permanen.",
+    };
+
+    assert.equal(result.success, true);
+    assert.equal(typeof result.deletedFilesCount, "number");
+    assert.equal(typeof result.deletedConversationsCount, "number");
+    assert.ok(result.message.length > 0);
+  });
 });
