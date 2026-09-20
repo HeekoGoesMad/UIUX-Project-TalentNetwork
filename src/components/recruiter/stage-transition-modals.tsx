@@ -250,13 +250,13 @@ export function ConfirmHireModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 my-2 text-xs text-emerald-900 space-y-1">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 my-2 text-xs text-emerald-900 space-y-1.5">
           <p className="font-bold text-emerald-800">{candidate.name}</p>
           <p className="text-[11px] text-emerald-700">Posisi: {candidate.role}</p>
           <p className="text-[11px] text-emerald-700">Kompensasi: {candidate.compensation || "Rp 15.000.000 / bulan"}</p>
-          <p className="text-[10px] text-emerald-600 pt-1">
-            Status lamaran akan diperbarui menjadi Diterima dan tersinkronisasi ke seluruh sistem.
-          </p>
+          <div className="pt-1.5 border-t border-emerald-200/80 text-[11px] text-emerald-800 font-medium">
+            Tindakan ini bersifat final. Pipeline pelamar akan dikunci dan dinyatakan selesai.
+          </div>
         </div>
 
         <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
