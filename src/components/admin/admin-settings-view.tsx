@@ -314,26 +314,6 @@ export function AdminSettingsView() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#7C3AED]">
-              Konsol Manajemen Sistem
-            </span>
-            <Badge variant="outline" className="text-[10px] border-purple-200 bg-purple-50 text-[#7C3AED]">
-              Akses Penuh
-            </Badge>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            Pengaturan Sistem &amp; Akun
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-2xl">
-            Konfigurasikan aksesibilitas antarmuka pengguna, saluran peringatan operasional, profil akun administrator, dan parameter konsol.
-          </p>
-        </div>
-      </div>
-
       {/* ── Mobile Segmented Tab Bar (< md) ── */}
       <div className="flex md:hidden overflow-x-auto gap-1.5 border-b border-slate-200 pb-2 -mx-4 px-4 scrollbar-none">
         {NAV_ITEMS.map((item) => {
@@ -441,7 +421,11 @@ export function AdminSettingsView() {
           {/* ═════════════════════════════════════════════════════════════════ */}
           {activeTab === "accessibility" && (
             <div className="space-y-6">
-              <AccessibilitySettings />
+              <AccessibilitySettings
+                titleClassName="text-slate-900"
+                descriptionClassName="text-slate-500"
+                cardTitleClassName="text-slate-900"
+              />
             </div>
           )}
 
