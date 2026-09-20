@@ -15,7 +15,9 @@ export function getSource(): "mock" | "local" | "azure" {
   return "azure";
 }
 
-type AiOptions = { strict?: boolean };
+export type AiOptions = { strict?: boolean; maxTokens?: number };
+
+export const DEFAULT_MAX_OUTPUT_TOKENS = 4000;
 
 function label(score: number) {
   return score >= 80 ? "Sangat Sesuai" : score >= 60 ? "Sesuai" : score >= 40 ? "Cukup" : "Kurang Sesuai";
@@ -83,6 +85,7 @@ function getAzure(baseURL: string, apiKey: string, apiVersion?: string, useDeplo
 
 export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, fallback: z.infer<T>, options: AiOptions = {}): Promise<z.infer<T>> {
   const currentSource = getSource();
+  const maxTokens = options.maxTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 
   if (currentSource === "mock") {
     return {
@@ -98,7 +101,7 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
     const apiKey = process.env.LOCAL_AI_API_KEY?.trim() ?? "ollama";
     try {
       const localAi = getLocalAi(baseURL, apiKey);
-      const result = await generateObject({ model: localAi.chat(model), schema, prompt });
+      const result = await generateObject({ model: localAi.chat(model), schema, prompt, maxTokens });
       return {
         ...(result.object as Record<string, unknown>),
         source: "local",
@@ -140,7 +143,7 @@ export async function aiResult<T extends z.ZodType>(schema: T, prompt: string, f
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25_000);
     try {
-      const result = await generateObject({ model: azure.chat(deployment), schema, prompt, abortSignal: controller.signal });
+      const result = await generateObject({ model: azure.chat(deployment), schema, prompt, maxTokens, abortSignal: controller.signal });
       clearTimeout(timeoutId);
       return {
         ...(result.object as Record<string, unknown>),

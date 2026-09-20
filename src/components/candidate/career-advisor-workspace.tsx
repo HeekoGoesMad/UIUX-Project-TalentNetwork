@@ -31,7 +31,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { checkCareerAdvisorCooldown, getCareerHubCooldownDays } from "@/lib/career-advisor/cooldown";
+import { checkCareerAdvisorCooldown } from "@/lib/career-advisor/cooldown";
 import type { CareerAdvisorSavedResult, CvProfile } from "@/types";
 
 export type FocusType = "cv_review" | "gap_analysis" | "career_consultation" | "career_roadmap" | "ats" | "headline" | "star";
@@ -216,9 +216,29 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   // Hasil evaluasi aktif: utamakan hasil baru yang sedang dianalisis, jika tidak ada fallback ke hasil tersimpan di profil
   const result: AdvisorResult | null = freshResult ?? (savedRecord?.result as AdvisorResult | null) ?? null;
 
+  const [rateLimitSecondsRemaining, setRateLimitSecondsRemaining] = useState<number>(0);
+  const [rateLimitMessage, setRateLimitMessage] = useState<string>("");
+
+  useEffect(() => {
+    if (rateLimitSecondsRemaining <= 0) return;
+    const interval = setInterval(() => {
+      setRateLimitSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setRateLimitMessage("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitSecondsRemaining]);
+
   const cooldown = useMemo(() => checkCareerAdvisorCooldown(savedRecord?.generatedAt), [savedRecord?.generatedAt]);
   const isCooldownActive = cooldown.isCooldown;
-  const cooldownDays = useMemo(() => getCareerHubCooldownDays(), []);
+  const isRateLimited = rateLimitSecondsRemaining > 0;
+  const rateLimitMinutesRemaining = Math.max(1, Math.ceil(rateLimitSecondsRemaining / 60));
+  const isBlocked = isCooldownActive || isRateLimited;
 
   const lastAnalyzedDate = savedRecord?.generatedAt
     ? new Intl.DateTimeFormat("id-ID", {
@@ -325,6 +345,10 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
 
       const data = await response.json();
       if (!response.ok || data.error) {
+        if (response.status === 429 && data.retryAfterSeconds) {
+          setRateLimitSecondsRemaining(data.retryAfterSeconds);
+          setRateLimitMessage(data.error);
+        }
         throw new Error(data.error || "Gagal mengambil rekomendasi karier.");
       }
 
@@ -387,6 +411,8 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
   }
 
   function handleDevResetCooldown() {
+    setRateLimitSecondsRemaining(0);
+    setRateLimitMessage("");
     if (!cvProfile?.careerAdvisorResults?.[selectedFocus]) return;
     const updatedAdvisorResults = { ...cvProfile.careerAdvisorResults };
     delete updatedAdvisorResults[selectedFocus];
@@ -395,7 +421,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
       careerAdvisorResults: updatedAdvisorResults,
     });
     setFreshResult(null);
-    toast.info("Cooldown untuk pilar ini direset (khusus mode development).");
+    toast.info("Status limit dan cooldown untuk pilar ini direset (khusus mode development).");
   }
 
   function handleDownloadPdf() {
@@ -994,7 +1020,13 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                   {savedRecord.analysisCount ? ` · Analisis ke-${savedRecord.analysisCount}` : ""}
                 </Badge>
               )}
-              {isCooldownActive && (
+              {isRateLimited && (
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-medium gap-1">
+                  <Lock className="size-3 text-amber-600" />
+                  Batas tercapai · {rateLimitMinutesRemaining} menit lagi
+                </Badge>
+              )}
+              {!isRateLimited && isCooldownActive && (
                 <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-medium gap-1">
                   <Lock className="size-3 text-amber-600" />
                   Cooldown aktif · {cooldown.daysRemaining} hari lagi
@@ -1003,28 +1035,34 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               {savedRecord
-                ? isCooldownActive
-                  ? `Hasil evaluasi pilar ini telah disimpan dan dapat Anda pelajari di bawah. Untuk mengontrol penggunaan kuota token AI, analisis ulang dapat dijalankan kembali 1 kali setiap ${cooldownDays} hari (tersedia pada ${cooldown.nextAvailableFormatted}).`
+                ? isRateLimited
+                  ? rateLimitMessage || `Batas analisis sementara tercapai. Anda dapat menganalisis ulang dalam ${rateLimitMinutesRemaining} menit.`
+                  : isCooldownActive
+                  ? `Hasil evaluasi pilar ini telah disimpan dan dapat Anda pelajari di bawah. Analisis ulang dapat dijalankan kembali pada ${cooldown.nextAvailableFormatted}.`
                   : isProfileUpdatedAfterAnalysis
-                  ? "Ada pembaruan data profil sejak analisis ini. Cooldown telah selesai, Anda dapat menjalankan analisis ulang untuk memperbarui rekomendasi."
-                  : "Hasil evaluasi tersimpan siap ditinjau kapan saja. Cooldown telah selesai, Anda dapat menjalankan analisis ulang jika diperlukan."
-                : `AI akan menganalisis riwayat profil, pengalaman kerja, pendidikan, dan keahlian Anda secara menyeluruh untuk target posisi ${activeTargetRole}.`}
+                  ? "Ada pembaruan data profil sejak analisis ini. Anda dapat menjalankan analisis ulang untuk memperbarui rekomendasi."
+                  : "Hasil evaluasi tersimpan siap ditinjau. Anda dapat menjalankan analisis ulang jika diperlukan (kuota: 3x per 30 menit, maksimal 10x per hari)."
+                : `AI akan menganalisis riwayat profil, pengalaman kerja, pendidikan, dan keahlian Anda secara menyeluruh untuk target posisi ${activeTargetRole} (kuota: 3x per 30 menit, maksimal 10x per hari).`}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
             <Button
               onClick={() => void runAdvisor()}
-              disabled={loading || isCooldownActive}
+              disabled={loading || isBlocked}
               size="default"
               variant={savedRecord ? "outline" : "default"}
               className={cn(
                 "w-full sm:w-auto shrink-0 gap-2 font-semibold px-5 shadow-xs",
-                isCooldownActive ? "cursor-not-allowed opacity-75" : "cursor-pointer"
+                isBlocked ? "cursor-not-allowed opacity-75" : "cursor-pointer"
               )}
             >
               {loading ? (
                 <>
                   <Bot className="size-4 animate-spin" /> Menganalisis profil...
+                </>
+              ) : isRateLimited ? (
+                <>
+                  <Lock className="size-4 text-amber-600" /> Tunggu ({rateLimitMinutesRemaining}m)
                 </>
               ) : isCooldownActive ? (
                 <>
@@ -1040,7 +1078,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                 </>
               )}
             </Button>
-            {process.env.NODE_ENV !== "production" && isCooldownActive && (
+            {process.env.NODE_ENV !== "production" && isBlocked && (
               <div className="flex items-center gap-1.5 justify-end">
                 <Button
                   type="button"
@@ -1049,7 +1087,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                   onClick={() => void runAdvisor({ devForce: true })}
                   disabled={loading}
                   className="text-[11px] h-8 px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-100/50"
-                  title="Abaikan cooldown untuk kebutuhan pengujian developer"
+                  title="Abaikan limit untuk kebutuhan pengujian developer"
                 >
                   Force Run (Dev)
                 </Button>
@@ -1059,7 +1097,7 @@ export function CareerAdvisorWorkspace({ initialFocus = "cv_review" }: { initial
                   size="sm"
                   onClick={handleDevResetCooldown}
                   className="text-[11px] h-8 px-2 text-muted-foreground hover:text-foreground"
-                  title="Hapus data cooldown untuk pilar ini"
+                  title="Hapus status batas untuk pilar ini"
                 >
                   Reset (Dev)
                 </Button>

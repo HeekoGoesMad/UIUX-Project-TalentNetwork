@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 import { useApp } from "@/providers/app-provider";
 
@@ -144,7 +145,19 @@ export function AccessibilityInitializer() {
   return null;
 }
 
-export function AccessibilitySettings() {
+export interface AccessibilitySettingsProps {
+  className?: string;
+  titleClassName?: string;
+  descriptionClassName?: string;
+  cardTitleClassName?: string;
+}
+
+export function AccessibilitySettings({
+  className,
+  titleClassName,
+  descriptionClassName,
+  cardTitleClassName,
+}: AccessibilitySettingsProps = {}) {
   const { user } = useApp();
   const userKey = getUserStorageKey(user?.email);
 
@@ -258,13 +271,13 @@ export function AccessibilitySettings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", className)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          <h2 className={cn("text-lg font-bold tracking-tight text-foreground sm:text-xl", titleClassName)}>
             Aksesibilitas &amp; Tampilan
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className={cn("text-xs text-muted-foreground", descriptionClassName)}>
             Sesuaikan kenyamanan visual dan interaksi platform sesuai preferensi Anda.
           </p>
         </div>
@@ -288,7 +301,9 @@ export function AccessibilitySettings() {
                 <Type className="size-4" />
               </div>
               <div>
-                <CardTitle className="text-base">Ukuran Teks</CardTitle>
+                <CardTitle className={cn("text-sm font-bold text-foreground", cardTitleClassName)}>
+                  Ukuran Teks
+                </CardTitle>
                 <CardDescription className="text-xs">
                   Atur skala keterbacaan teks di seluruh antarmuka workspace.
                 </CardDescription>
@@ -346,7 +361,9 @@ export function AccessibilitySettings() {
                 <Contrast className="size-4" />
               </div>
               <div>
-                <CardTitle className="text-base">Kenyamanan Visual &amp; Kontras</CardTitle>
+                <CardTitle className={cn("text-sm font-bold text-foreground", cardTitleClassName)}>
+                  Kenyamanan Visual &amp; Kontras
+                </CardTitle>
                 <CardDescription className="text-xs">
                   Opsi untuk mempertegas batas elemen dan jarak baca.
                 </CardDescription>
@@ -414,7 +431,9 @@ export function AccessibilitySettings() {
                 <MousePointerClick className="size-4" />
               </div>
               <div>
-                <CardTitle className="text-base">Interaksi &amp; Gerakan (Motion)</CardTitle>
+                <CardTitle className={cn("text-sm font-bold text-foreground", cardTitleClassName)}>
+                  Interaksi &amp; Gerakan (Motion)
+                </CardTitle>
                 <CardDescription className="text-xs">
                   Kontrol animasi transisi dan navigasi keyboard ramah disabilitas.
                 </CardDescription>

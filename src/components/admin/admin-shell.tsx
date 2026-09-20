@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -65,25 +65,8 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useApp();
+  const { user, logout } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [timeStr, setTimeStr] = useState<string>("");
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeStr(
-        now.toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Asia/Jakarta",
-        }) + " WIB"
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000 * 60);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50/80 text-slate-900 antialiased flex flex-col selection:bg-purple-100 selection:text-purple-900">
@@ -103,47 +86,35 @@ export function AdminShell({
 
           <Link
             href="/admin"
-            className="flex items-center gap-2.5 font-bold text-slate-900 transition-opacity hover:opacity-90"
+            className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
           >
-            <div className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white shadow-xs">
-              <ShieldCheck className="size-4.5" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold tracking-tight text-slate-900">
-                Talent <span className="text-[#7C3AED]">Network</span>
-              </span>
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
-                Konsol Admin
-              </span>
-            </div>
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
+              <ShieldCheck className="size-5" />
+            </span>
+            <span className="text-lg font-bold whitespace-nowrap text-slate-900">
+              Talent<span className="text-primary"> Network</span>
+            </span>
+            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10.5px] font-semibold text-primary border border-purple-200/80">
+              Konsol Admin
+            </span>
           </Link>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* Live System Operational Indicator (Strict, no decorative pulse ping) */}
-          <div className="hidden sm:flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
-            <span className="size-1.5 rounded-full bg-emerald-500"></span>
-            <span>Sistem Normal</span>
-            {timeStr && <span className="text-[11px] text-slate-400 font-mono">· {timeStr}</span>}
-          </div>
-
-          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {/* User badge */}
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-purple-50 border border-purple-200 font-bold text-[#7C3AED] text-xs">
-              AD
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 py-1 pl-1.5 pr-2.5 sm:pr-3">
+            <div className="flex size-6 items-center justify-center rounded-full bg-purple-100 font-bold text-primary text-xs">
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
             </div>
-            <div className="hidden md:block text-left leading-none">
-              <p className="text-xs font-semibold text-slate-900">Admin System</p>
-              <p className="text-[10px] text-slate-400 font-mono mt-0.5">superadmin@talentnetwork.id</p>
-            </div>
+            <span className="text-xs font-semibold text-slate-800">
+              {user?.name || "Admin"}
+            </span>
           </div>
 
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-2.5 h-8 transition-colors"
+            className="gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-2.5 h-8 transition-colors cursor-pointer"
             onClick={async () => {
               await logout();
               router.push("/login");
@@ -178,11 +149,13 @@ export function AdminShell({
           <div className="space-y-6">
             {/* Mobile Drawer Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
-              <div className="flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
-                  <ShieldCheck className="size-4" />
-                </div>
-                <span className="font-bold text-slate-900 text-sm">Talent Network Admin</span>
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-xs">
+                  <ShieldCheck className="size-4.5" />
+                </span>
+                <span className="text-base font-bold text-slate-900">
+                  Talent<span className="text-primary"> Network</span>
+                </span>
               </div>
               <Button
                 variant="ghost"
