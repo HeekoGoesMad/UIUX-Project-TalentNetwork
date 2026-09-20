@@ -109,14 +109,8 @@ export default function Shortlist() {
                         <Trash2 className="size-3" /> Hapus
                       </Button>
                       <Button size="sm" variant="ghost" asChild>
-                        <Link
-                          href={
-                            screeningConsents[candidate.id] === "screening-completed"
-                              ? `/recruiter/screenings/${candidate.id}`
-                              : `/recruiter/screenings/new?candidateId=${candidate.id}`
-                          }
-                        >
-                          Screening
+                        <Link href="/recruiter/operations">
+                          Pipeline Operasi
                         </Link>
                       </Button>
                     </div>

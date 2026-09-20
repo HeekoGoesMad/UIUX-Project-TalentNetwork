@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { formatApplicationStageNotification } from "@/lib/notifications/candidate-formatter";
 import { writeAuditLog } from "@/lib/audit";
 type CurrentUser = Exclude<Awaited<ReturnType<typeof getCurrentAppUser>>, { error: string; status: number }>;
 type ParticipantRow = { application: typeof schema.applications.$inferSelect; jobTitle: string; organizationId: string; organizationName: string; candidateName: string | null; candidateHeadline: string | null; candidateLocation: string | null; candidateUserId: string };
@@ -70,7 +71,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
            .where(and(eq(schema.jobs.id, participant.application.jobId), or(inArray(schema.organizationMembers.role, ["owner", "admin"]), and(eq(schema.organizationMembers.role, "recruiter"), eq(schema.users.recruiterProvisioningStatus, "active")))));
           await Promise.all(recipients.map(({ userId }) => createNotificationWithDeliveries(tx, systemNotification({ userId, title: "Kandidat menarik lamaran", body: `${participant.value.candidate.name ?? "Kandidat"} menarik lamaran untuk ${participant.value.job.title}.`, data: notificationData(`application:${applicationId}:withdrawn:${userId}`, `/recruiter/applications/${applicationId}`, { applicationId, status: "withdrawn" }) }))));
        } else {
-          await createNotificationWithDeliveries(tx, systemNotification({ userId: participant.candidateUserId, title: `Status lamaran: ${parsed.data.status}`, body: `Status lamaran untuk ${participant.value.job.title} berubah menjadi ${parsed.data.status}.`, data: notificationData(`application:${applicationId}:stage:${parsed.data.status}:${participant.candidateUserId}`, `/candidate/applications/${applicationId}`, { applicationId, status: parsed.data.status }) }));
+          const stageNotif = formatApplicationStageNotification({
+            stage: parsed.data.status,
+            jobTitle: participant.value.job.title,
+            organizationName: participant.value.job.organizationName,
+          });
+          await createNotificationWithDeliveries(
+            tx,
+            systemNotification({
+              userId: participant.candidateUserId,
+              title: stageNotif.title,
+              body: stageNotif.body,
+              data: notificationData(
+                `application:${applicationId}:stage:${parsed.data.status}:${participant.candidateUserId}`,
+                `/candidate/applications/${applicationId}`,
+                { applicationId, status: parsed.data.status }
+              ),
+            })
+          );
        }
        return next;
     });

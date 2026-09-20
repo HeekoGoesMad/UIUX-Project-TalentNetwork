@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Award,
   BadgeCheck,
   BriefcaseBusiness,
   Check,
+  Clock,
   GraduationCap,
   Hammer,
   Loader2,
@@ -105,19 +107,18 @@ const careerLabels: Record<CareerStatus, string> = {
 
 const draftKey = "proofylink-onboarding-draft";
 
-const requiredLabels: Record<TextField, string> = {
+const requiredLabels: Record<string, string> = {
   fullName: "Nama lengkap",
-  email: "Email",
+  email: "Email aktif",
   phone: "Nomor telepon",
   headline: "Headline profesional",
   about: "Tentang kamu",
   location: "Domisili saat ini",
-  targetRole: "Peran yang dituju",
 };
 
 const requiredByStep: Record<number, TextField[]> = {
   2: ["fullName", "email", "phone", "headline", "about"],
-  3: ["location", "targetRole"],
+  3: ["location"],
 };
 
 function isDemoCandidateProfile(profile?: CvProfile | null) {
@@ -152,25 +153,54 @@ const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, emai
 
 function Field({
   label,
+  required,
+  optional,
+  id,
+  extraBadge,
   children,
   hint,
   error,
 }: {
-  label: string;
+  label: React.ReactNode;
+  required?: boolean;
+  optional?: boolean;
+  id?: string;
+  extraBadge?: React.ReactNode;
   children: React.ReactNode;
   hint?: string;
   error?: string;
 }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
+    <div className="space-y-1.5" id={id ? `field-${id}` : undefined}>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          htmlFor={id}
+          className="text-sm font-semibold text-foreground flex items-center gap-1.5 select-none"
+        >
+          <span>{label}</span>
+          {required && (
+            <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+              Wajib
+            </span>
+          )}
+          {optional && (
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
+              Opsional
+            </span>
+          )}
+        </label>
+        {extraBadge && <div>{extraBadge}</div>}
+      </div>
       {children}
       {error ? (
-        <span role="alert" className="block text-xs font-medium text-destructive">{error}</span>
+        <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 animate-fade-up">
+          <AlertCircle className="size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
       ) : hint ? (
-        <span className="block text-xs text-muted-foreground">{hint}</span>
+        <p className="text-xs text-muted-foreground leading-relaxed">{hint}</p>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -222,6 +252,9 @@ export function CandidateOnboarding() {
     softSkills: "",
   });
   const [errors, setErrors] = useState<Partial<Record<TextField, string>>>({});
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [educationError, setEducationError] = useState<string | null>(null);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
   const [edits, setEdits] = useState(0);
   const restoredRef = useRef(false);
   const draftAppliedRef = useRef(false);
@@ -230,6 +263,9 @@ export function CandidateOnboarding() {
   const goToStep = (targetStep: number) => {
     if (targetStep < 0 || targetStep >= steps.length) return;
     setStep(targetStep);
+    setStepError(null);
+    setEducationError(null);
+    setSkillsError(null);
     try {
       window.localStorage.setItem(draftKey, JSON.stringify({ form, step: targetStep }));
     } catch {
@@ -339,6 +375,7 @@ export function CandidateOnboarding() {
     setForm((current) => ({ ...current, [key]: value }));
     setEdits((current) => current + 1);
     if (key in requiredLabels) setErrors((current) => ({ ...current, [key as TextField]: undefined }));
+    setStepError(null);
   };
 
   const updateHistory = (index: number, key: keyof HistoryItem, value: unknown) =>
@@ -360,7 +397,7 @@ export function CandidateOnboarding() {
       })
     );
 
-  const updateEducation = (index: number, key: keyof EducationItem, value: unknown) =>
+  const updateEducation = (index: number, key: keyof EducationItem, value: unknown) => {
     setValue(
       "education",
       form.education.map((item, itemIndex) => {
@@ -377,15 +414,21 @@ export function CandidateOnboarding() {
         return updated;
       })
     );
+    setEducationError(null);
+  };
 
   const addTag = (kind: "skills" | "tools" | "softSkills") => {
     const value = tagInput[kind].trim();
     if (!value || form[kind].includes(value)) return;
     setValue(kind, [...form[kind], value]);
     setTagInput((current) => ({ ...current, [kind]: "" }));
+    if (kind === "skills") setSkillsError(null);
   };
 
-  const removeTag = (kind: "skills" | "tools" | "softSkills", tag: string) => setValue(kind, form[kind].filter((item) => item !== tag));
+  const removeTag = (kind: "skills" | "tools" | "softSkills", tag: string) => {
+    setValue(kind, form[kind].filter((item) => item !== tag));
+    if (kind === "skills") setSkillsError(null);
+  };
 
   const validateFields = (fields: TextField[]) => {
     const found: Partial<Record<TextField, string>> = {};
@@ -412,21 +455,34 @@ export function CandidateOnboarding() {
     const found = validateFields(Object.keys(requiredLabels) as TextField[]);
     const missing = Object.keys(found) as TextField[];
     if (missing.length > 0) {
-      toast.error("Profil belum lengkap", { description: "Lengkapi isian wajib yang bertanda merah sebelum mempublikasikan." });
       setStep(missing.some((field) => requiredByStep[2]?.includes(field)) ? 2 : 3);
+      setStepError("Lengkapi seluruh isian wajib sebelum mempublikasikan profil.");
+      const firstKey = missing[0];
+      setTimeout(() => {
+        const el = document.getElementById(`input-${firstKey}`) || document.querySelector(`[name="${firstKey}"]`);
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
     const hasValidEducation = form.education.some((item) => item.school.trim() && item.program.trim());
     if (!hasValidEducation) {
-      toast.error("Pendidikan wajib diisi", { description: "Isi minimal 1 riwayat institusi dan program studi pada langkah pendidikan." });
       setStep(5);
+      setEducationError("Isi minimal 1 riwayat institusi dan program studi pada langkah pendidikan.");
+      setTimeout(() => {
+        const el = document.getElementById("input-education-school-0");
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
     if (form.skills.length < 3) {
-      toast.error("Skill belum cukup", { description: "Tambahkan minimal 3 keahlian utama kamu." });
       setStep(6);
+      setSkillsError(`Tambahkan minimal 3 keahlian teknis kamu (saat ini: ${form.skills.length}/3).`);
+      setTimeout(() => {
+        const el = document.getElementById("input-tags-skills");
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
@@ -503,9 +559,16 @@ export function CandidateOnboarding() {
     event.preventDefault();
 
     if (step === 2 || step === 3) {
-      const found = validateFields(requiredByStep[step] ?? []);
-      if ((Object.keys(found) as TextField[]).length > 0) {
-        toast.error("Periksa kembali formulir", { description: "Ada isian wajib yang belum terisi dengan benar." });
+      const fieldsToValidate = requiredByStep[step] ?? [];
+      const found = validateFields(fieldsToValidate);
+      const missingKeys = Object.keys(found) as TextField[];
+      if (missingKeys.length > 0) {
+        setStepError("Mohon lengkapi isian wajib yang ditandai sebelum melanjutkan.");
+        const firstKey = missingKeys[0];
+        setTimeout(() => {
+          const el = document.getElementById(`input-${firstKey}`) || document.querySelector(`[name="${firstKey}"]`);
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
@@ -513,14 +576,22 @@ export function CandidateOnboarding() {
     if (step === 5) {
       const hasValidEducation = form.education.some((item) => item.school.trim() && item.program.trim());
       if (!hasValidEducation) {
-        toast.error("Pendidikan wajib diisi", { description: "Isi minimal 1 riwayat institusi dan program studi kamu." });
+        setEducationError("Mohon lengkapi minimal 1 riwayat institusi dan program studi formal.");
+        setTimeout(() => {
+          const el = document.getElementById("input-education-school-0");
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
 
     if (step === 6) {
       if (form.skills.length < 3) {
-        toast.error("Skill minimal 3", { description: "Tambahkan setidaknya 3 keahlian utama untuk memudahkan pencocokan." });
+        setSkillsError(`Tambahkan minimal 3 keahlian teknis (saat ini: ${form.skills.length}/3).`);
+        setTimeout(() => {
+          const el = document.getElementById("input-tags-skills");
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
@@ -642,6 +713,20 @@ export function CandidateOnboarding() {
             <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
                 <div className="mx-auto max-w-2xl animate-fade-up">
+                  {stepError && (
+                    <div
+                      role="alert"
+                      className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-destructive animate-fade-up shadow-xs"
+                    >
+                      <AlertCircle className="size-4.5 shrink-0 mt-0.5 text-destructive" />
+                      <div>
+                        <p className="font-bold text-sm text-destructive">Periksa Isian Wajib</p>
+                        <p className="mt-0.5 text-muted-foreground leading-relaxed">
+                          {stepError}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {step === 0 && <TalentCategoryStep value={form.talentCategory} onChange={(value) => setValue("talentCategory", value)} />}
                   {step === 1 && <StatusStep value={form.careerStatus} onChange={(value) => setValue("careerStatus", value)} />}
                   {step === 2 && <BasicStep form={form} errors={errors} setValue={setValue} />}
@@ -660,6 +745,7 @@ export function CandidateOnboarding() {
                       update={updateEducation}
                       add={() => setValue("education", [...form.education, { ...emptyEducation }])}
                       remove={(index) => setValue("education", form.education.filter((_, itemIndex) => itemIndex !== index))}
+                      educationError={educationError}
                     />
                   )}
                   {step === 6 && (
@@ -669,6 +755,7 @@ export function CandidateOnboarding() {
                       setTagInput={setTagInput}
                       addTag={addTag}
                       removeTag={removeTag}
+                      skillsError={skillsError}
                     />
                   )}
                   {step === 7 && <ArrangementStep value={form.workArrangement} onChange={(value) => setValue("workArrangement", value)} />}
@@ -815,9 +902,9 @@ function BasicStep({
     <Intro title="Mari kenalan lebih dekat." text="Tulis ringkasan singkat agar recruiter langsung memahami kontak dan arah kariermu.">
       <div className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Nama lengkap *" error={errors.fullName}>
+          <Field label="Nama lengkap" required id="fullName" error={errors.fullName}>
             <input
-              required
+              id="input-fullName"
               aria-invalid={Boolean(errors.fullName)}
               autoComplete="name"
               className={inputClass}
@@ -826,9 +913,9 @@ function BasicStep({
               placeholder="Contoh: Budi Pratama / Siti Rahmawati"
             />
           </Field>
-          <Field label="Email aktif *" error={errors.email}>
+          <Field label="Email aktif" required id="email" error={errors.email}>
             <input
-              required
+              id="input-email"
               aria-invalid={Boolean(errors.email)}
               type="email"
               autoComplete="email"
@@ -841,17 +928,28 @@ function BasicStep({
           </Field>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Nomor telepon / WhatsApp *" error={errors.phone} hint="Digunakan recruiter untuk menghubungi saat screening disetujui">
+          <Field
+            label="Nomor telepon / WhatsApp"
+            required
+            id="phone"
+            extraBadge={
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                <Clock className="size-2.5" /> Verifikasi Segera Hadir
+              </span>
+            }
+            error={errors.phone}
+            hint="Metode verifikasi telepon segera hadir. Saat ini nomor disimpan sebagai kontak untuk dihubungi recruiter saat screening disetujui."
+          >
             <IndonesianPhoneInput
-              required
+              id="input-phone"
               error={Boolean(errors.phone)}
               value={form.phone}
               onChange={(val) => setValue("phone", val)}
             />
           </Field>
-          <Field label="Headline profesional *" hint="Contoh: Senior Product Designer | UX Research" error={errors.headline}>
+          <Field label="Headline profesional" required id="headline" hint="Contoh: Senior Product Designer | UX Research" error={errors.headline}>
             <input
-              required
+              id="input-headline"
               aria-invalid={Boolean(errors.headline)}
               className={inputClass}
               value={form.headline}
@@ -861,12 +959,14 @@ function BasicStep({
           </Field>
         </div>
         <Field
-          label="Tentang kamu *"
+          label="Tentang kamu"
+          required
+          id="about"
           error={errors.about}
           hint="Ceritakan ringkasan singkat profil, minat karier, atau keahlian utamamu. Kamu dapat menyempurnakannya nanti di workspace."
         >
           <textarea
-            required
+            id="input-about"
             aria-invalid={Boolean(errors.about)}
             className={textareaClass}
             value={form.about}
@@ -893,12 +993,14 @@ function LocationStep({
     <Intro title="Di mana kamu ingin bekerja?" text="Lokasi membantu recruiter menemukan kecocokan yang realistis.">
       <div className="space-y-5">
         <Field
-          label="Domisili saat ini (Kabupaten/Kota, Provinsi) *"
+          label="Domisili saat ini (Kabupaten/Kota, Provinsi)"
+          required
+          id="location"
           hint="Wajib pisahkan dengan koma: [Kabupaten/Kota], [Provinsi]. Contoh: Sleman, D.I. Yogyakarta"
           error={errors.location}
         >
           <input
-            required
+            id="input-location"
             aria-invalid={Boolean(errors.location)}
             className={inputClass}
             value={form.location}
@@ -912,14 +1014,13 @@ function LocationStep({
             ))}
           </datalist>
         </Field>
-        <Field label="Peran yang dituju *" hint="Satu peran utama membantu profilmu tampil lebih fokus." error={errors.targetRole}>
+        <Field label="Peran yang dituju" optional id="targetRole" hint="Satu peran utama membantu profilmu tampil lebih fokus.">
           <input
-            required
-            aria-invalid={Boolean(errors.targetRole)}
+            id="input-targetRole"
             className={inputClass}
             value={form.targetRole}
             onChange={(event) => setValue("targetRole", event.target.value)}
-            placeholder="Senior Product Designer"
+            placeholder="Contoh: Senior Product Designer (Opsional)"
           />
         </Field>
         <Card className="border-emerald-200 bg-emerald-50 p-5">
@@ -983,18 +1084,16 @@ function HistoryStep({
 
             {/* Row 1: Company Name & Position */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nama Perusahaan (Company Name) *">
+              <Field label="Nama Perusahaan" optional>
                 <input
-                  required
                   className={inputClass}
                   value={item.company}
                   onChange={(event) => update(index, "company", event.target.value)}
                   placeholder="Contoh: PT GoTo Gojek Tokopedia"
                 />
               </Field>
-              <Field label="Jabatan / Posisi (Position) *">
+              <Field label="Jabatan / Posisi" optional>
                 <input
-                  required
                   className={inputClass}
                   value={item.role}
                   onChange={(event) => update(index, "role", event.target.value)}
@@ -1004,7 +1103,7 @@ function HistoryStep({
             </div>
 
             {/* Row 2: Employment Type */}
-            <Field label="Tipe Pekerjaan (Employment Type) *">
+            <Field label="Tipe Pekerjaan" optional>
               <select
                 className={inputClass}
                 value={item.employmentType || "Full Time"}
@@ -1021,7 +1120,7 @@ function HistoryStep({
             {/* Row 3: Start Date, End Date, & Current Position Checkbox */}
             <div className="space-y-2">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Tanggal / Tahun Mulai (Start Date) *">
+                <Field label="Tanggal / Tahun Mulai (Start Date)" optional>
                   <input
                     className={inputClass}
                     value={item.startDate || ""}
@@ -1030,7 +1129,7 @@ function HistoryStep({
                   />
                 </Field>
 
-                <Field label="Tanggal / Tahun Selesai (End Date)">
+                <Field label="Tanggal / Tahun Selesai (End Date)" optional>
                   <input
                     className={inputClass}
                     disabled={Boolean(item.currentPosition)}
@@ -1053,13 +1152,13 @@ function HistoryStep({
               </label>
             </div>
 
-            {/* Row 4: Job Description (Mandatory) */}
+            {/* Row 4: Job Description */}
             <Field
-              label="Deskripsi Pekerjaan & Tanggung Jawab (Job Description) *"
-              hint="Jelaskan peran utama dan tanggung jawab harianmu (Wajib diisi)"
+              label="Deskripsi Pekerjaan & Tanggung Jawab"
+              optional
+              hint="Jelaskan peran utama dan tanggung jawab harianmu"
             >
               <textarea
-                required
                 rows={3}
                 className={`${textareaClass} min-h-24`}
                 value={item.description || ""}
@@ -1068,10 +1167,11 @@ function HistoryStep({
               />
             </Field>
 
-            {/* Row 5: Achievement (Optional) */}
+            {/* Row 5: Achievement */}
             <Field
-              label="Pencapaian Utama (Achievement - Opsional)"
-              hint="Tuliskan hasil konkret, metrik atau capaian terbaik selama bekerja di sini (Opsional)"
+              label="Pencapaian Utama (Achievement)"
+              optional
+              hint="Tuliskan hasil konkret, metrik atau capaian terbaik selama bekerja di sini"
             >
               <textarea
                 rows={2}
@@ -1097,25 +1197,41 @@ function EducationStep({
   update,
   add,
   remove,
+  educationError,
 }: {
   items: EducationItem[];
   update: (index: number, key: keyof EducationItem, value: unknown) => void;
   add: () => void;
   remove: (index: number) => void;
+  educationError?: string | null;
 }) {
   const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
 
   return (
     <Intro
-      title="Latar belajarmu *"
-      text="Pendidikan formal atau kampus. Kampus mitra kami akan memverifikasi profilmu secara resmi!"
+      title="Latar belajarmu"
+      text="Pendidikan formal atau kampus. Fitur verifikasi resmi terintegrasi dengan kampus mitra akan segera hadir."
     >
       <div className="space-y-4">
+        {educationError && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-xs text-destructive animate-fade-up"
+          >
+            <AlertCircle className="size-4 shrink-0 mt-0.5" />
+            <span>{educationError}</span>
+          </div>
+        )}
         {/* Partner campus quick suggestions */}
         <div className="rounded-xl border border-primary/20 bg-secondary/60 p-3.5 text-xs">
-          <p className="font-semibold text-primary mb-1.5 flex items-center gap-1.5">
-            <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi Djoin untuk Verifikasi Otomatis:
-          </p>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+            <p className="font-semibold text-primary flex items-center gap-1.5">
+              <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi:
+            </p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              <Clock className="size-2.5" /> Verifikasi Kampus Segera Hadir
+            </span>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {PARTNER_CAMPUSES.map((campus) => (
               <button
@@ -1169,7 +1285,7 @@ function EducationStep({
               <div className="space-y-4">
                 {/* Education Level & Institution */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Jenjang Pendidikan *">
+                  <Field label="Jenjang pendidikan" required>
                     <select
                       className={inputClass}
                       value={item.level || "S1"}
@@ -1184,9 +1300,9 @@ function EducationStep({
                   </Field>
 
                   <div className="sm:col-span-2">
-                    <Field label="Institusi / Universitas *">
+                    <Field label="Institusi / Universitas" required id={`education-school-${index}`}>
                       <input
-                        required
+                        id={`input-education-school-${index}`}
                         className={inputClass}
                         value={item.school}
                         onChange={(event) => update(index, "school", event.target.value)}
@@ -1199,9 +1315,9 @@ function EducationStep({
                 {/* Major & GPA */}
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="sm:col-span-2">
-                    <Field label="Jurusan / Program Studi *">
+                    <Field label="Jurusan / Program Studi" required id={`education-program-${index}`}>
                       <input
-                        required
+                        id={`input-education-program-${index}`}
                         className={inputClass}
                         value={item.program}
                         onChange={(event) => update(index, "program", event.target.value)}
@@ -1210,7 +1326,7 @@ function EducationStep({
                     </Field>
                   </div>
 
-                  <Field label="IPK / Nilai Akhir (GPA)">
+                  <Field label="IPK / Nilai Akhir (GPA)" optional>
                     <input
                       className={inputClass}
                       value={item.gpa || ""}
@@ -1223,7 +1339,7 @@ function EducationStep({
                 {/* Dates & Currently Studying */}
                 <div className="space-y-2">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Tahun / Bulan Mulai (Start Date)">
+                    <Field label="Tahun / Bulan Mulai (Start Date)" optional>
                       <input
                         className={inputClass}
                         value={item.startDate || ""}
@@ -1232,7 +1348,7 @@ function EducationStep({
                       />
                     </Field>
 
-                    <Field label="Tahun / Bulan Selesai (End Date)">
+                    <Field label="Tahun / Bulan Selesai (End Date)" optional>
                       <input
                         className={inputClass}
                         disabled={Boolean(item.currentlyStudying)}
@@ -1256,10 +1372,15 @@ function EducationStep({
                 </div>
 
                 {partnerMatch && (
-                  <div className="flex items-center gap-2 rounded-lg bg-secondary/60 p-2.5 text-xs text-primary font-medium border border-border">
-                    <GraduationCap className="size-4 shrink-0" />
-                    <span>
-                      Terhubung ke Career Center <strong>{partnerMatch}</strong>. Profilmu akan masuk ke antrean verifikasi resmi!
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50/70 p-2.5 text-xs text-amber-900 font-medium border border-amber-200/80">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <GraduationCap className="size-4 shrink-0 text-amber-700" />
+                      <span className="truncate">
+                        Terhubung ke Career Center <strong>{partnerMatch}</strong>.
+                      </span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 shrink-0 text-[10px] font-semibold text-amber-700 bg-white/80 border border-amber-200 px-2 py-0.5 rounded-full">
+                      <Clock className="size-2.5" /> Verifikasi Segera Hadir
                     </span>
                   </div>
                 )}
@@ -1282,16 +1403,37 @@ function TagsStep({
   setTagInput,
   addTag,
   removeTag,
+  skillsError,
 }: {
   form: FormState;
   tagInput: { skills: string; tools: string; softSkills: string };
   setTagInput: React.Dispatch<React.SetStateAction<{ skills: string; tools: string; softSkills: string }>>;
   addTag: (kind: "skills" | "tools" | "softSkills") => void;
   removeTag: (kind: "skills" | "tools" | "softSkills", tag: string) => void;
+  skillsError?: string | null;
 }) {
-  const group = (kind: "skills" | "tools" | "softSkills", label: string, placeholder: string, minNote?: string) => (
-    <Field label={label} hint={`Tekan Enter untuk menambahkan tag. ${minNote ?? ""}`}>
-      <div className="rounded-md border bg-transparent p-2 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+  const group = (
+    kind: "skills" | "tools" | "softSkills",
+    label: string,
+    placeholder: string,
+    required?: boolean,
+    optional?: boolean,
+    hint?: string,
+    error?: string | null
+  ) => (
+    <Field
+      label={label}
+      required={required}
+      optional={optional}
+      hint={hint}
+      error={error ?? undefined}
+      id={`input-tags-${kind}`}
+    >
+      <div
+        className={`rounded-md border bg-transparent p-2 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 ${
+          error ? "border-destructive ring-1 ring-destructive/30" : ""
+        }`}
+      >
         <div className="flex flex-wrap gap-2">
           {form[kind].map((tag) => (
             <span
@@ -1305,6 +1447,7 @@ function TagsStep({
             </span>
           ))}
           <input
+            id={`input-tags-${kind}`}
             className="h-7 min-w-[140px] flex-1 border-0 bg-transparent px-1 text-sm outline-none"
             value={tagInput[kind]}
             onChange={(event) => setTagInput((current) => ({ ...current, [kind]: event.target.value }))}
@@ -1323,25 +1466,34 @@ function TagsStep({
 
   return (
     <Intro
-      title="Framework Kompetensi (Competencies) *"
+      title="Framework Kompetensi (Competencies)"
       text="Klasifikasikan keahlianmu ke dalam Hard Competencies, Tools, dan Soft Skills untuk memudahkan pencocokan cerdas dengan kriteria rekruter."
     >
       <div className="space-y-6">
         {group(
           "skills",
-          "Hard Competencies (Kompetensi Teknis) *",
+          "Hard Competencies (Kompetensi Teknis)",
           "Ketik kompetensi teknis lalu Enter (Contoh: UI/UX Design, Data Analysis, Backend Development)",
-          "(Wajib, minimal 3 kompetensi)"
+          true,
+          false,
+          `Tekan Enter untuk menambahkan. Minimal 3 kompetensi teknis (${form.skills.length}/3 ditambahkan).`,
+          skillsError
         )}
         {group(
           "tools",
           "Tools & Software Pendukung",
-          "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)"
+          "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)",
+          false,
+          true,
+          "Tekan Enter untuk menambahkan tools dan software yang kamu kuasai."
         )}
         {group(
           "softSkills",
           "Soft Skills (Kompetensi Interpersonal)",
-          "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)"
+          "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)",
+          false,
+          true,
+          "Tekan Enter untuk menambahkan kompetensi komunikasi dan interpersonal."
         )}
       </div>
     </Intro>
@@ -1415,7 +1567,7 @@ function ReviewStep({ form }: { form: FormState }) {
             <span className="text-slate-500">•</span>
             <span>{form.workArrangement}</span>
             <span className="text-slate-500">•</span>
-            <span>{form.phone || "No. Telepon belum diisi"}</span>
+            <span>{form.phone ? `${form.phone} (Verifikasi Segera Hadir)` : "No. Telepon belum diisi"}</span>
           </p>
         </div>
         <div className="grid gap-5 p-6 sm:grid-cols-2">
@@ -1430,7 +1582,10 @@ function ReviewStep({ form }: { form: FormState }) {
             value={`${form.education.filter((item) => item.school || item.program).length} entri`}
           />
           <Summary label="Skill & tools" value={`${form.skills.length + form.tools.length} item`} />
-          <Summary label="Status kontak" value={form.email} />
+          <Summary
+            label="Status kontak & verifikasi"
+            value={`${form.email} (Email) • ${form.phone || "No. Telepon"} (Telepon - Verifikasi Segera Hadir)`}
+          />
         </div>
       </Card>
       <div className="mt-5 flex gap-3 rounded-xl bg-secondary/50 border border-primary/20 p-4 text-sm text-foreground">

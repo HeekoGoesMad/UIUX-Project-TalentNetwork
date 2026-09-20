@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -10,6 +10,8 @@ import {
   Download,
   GripVertical,
   Kanban,
+  Keyboard,
+  Lock,
   MapPin,
   MessageSquare,
   Search,
@@ -24,12 +26,19 @@ import { useApp } from "@/providers/app-provider";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import { CandidateAvatar } from "@/components/talent/avatar";
+import { CandidateQuickPeek } from "@/components/recruiter/candidate-quick-peek";
+import { KeyboardShortcutsModal } from "@/components/recruiter/keyboard-shortcuts-modal";
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
   ConfirmHireModal,
   DemoteInterviewWarningModal,
 } from "@/components/recruiter/stage-transition-modals";
+import {
+  getDefaultStatusHistory,
+  type StatusHistoryItem,
+} from "@/components/recruiter/candidate-status-git-graph";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +61,8 @@ export type Candidate = {
   applicationId?: string;
   jobId?: string;
   jobTitle?: string;
+  avatarUrl?: string;
+  statusHistory?: StatusHistoryItem[];
 };
 
 export type Interview = {
@@ -77,30 +88,143 @@ const STAGES: Array<{ id: Stage; label: string; bg: string; border: string; text
   { id: "rejected", label: "Tidak Lolos", bg: "bg-slate-50/70", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-400" },
 ];
 
+const defaultJobs = [
+  { id: "job-1", title: "Senior Product Designer" },
+  { id: "job-2", title: "Frontend Architect" },
+  { id: "job-3", title: "Product Manager" },
+  { id: "job-4", title: "Backend Engineer (Go/Node)" },
+];
+
+export const SUPABASE_AVATARS: Record<string, string> = {
+  "candidate-adrienne": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "Adrienne Kayana Wistara Lie": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "cd6ec533-5d1c-4f87-842c-888de3e825ec": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "Alga Ramandika Praba": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/c168acf4-0e8c-4a9f-bcea-36afe5bc9e80/5d11592b-e5ee-485e-8644-df3147cbbae0-FOTO_LinkedIn_MaterialBlack.jpg.webp",
+  "b082c226-1a6e-42a6-80e0-150ce5f01745": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/c168acf4-0e8c-4a9f-bcea-36afe5bc9e80/5d11592b-e5ee-485e-8644-df3147cbbae0-FOTO_LinkedIn_MaterialBlack.jpg.webp",
+  "Ariel Oka": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/58069525-3b98-4de5-82e2-5aea635cda3f/eaeb085e-daf7-4e8c-8c7b-fd2f7d2d5293-byredo%20mojave.jpg.webp",
+  "1b1c3dcd-4251-44cb-a594-2fc57ee00533": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/58069525-3b98-4de5-82e2-5aea635cda3f/eaeb085e-daf7-4e8c-8c7b-fd2f7d2d5293-byredo%20mojave.jpg.webp",
+  "Hasyim Kipuw": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/7703ba04-6939-49f7-bdc4-ea28bb81327f/76d940fe-a608-4500-881d-585f9da91779-Lv%20imagination.jpg.webp",
+  "383de31e-01c2-4d02-b3e4-b563af72ab32": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/7703ba04-6939-49f7-bdc4-ea28bb81327f/76d940fe-a608-4500-881d-585f9da91779-Lv%20imagination.jpg.webp",
+  "Muhammad Adi Firmansyahah": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/423c7744-0fbd-4b30-91ca-cd05d5c3223e/208e3174-b077-445a-b9cd-76d9e59c3108-1000150213.jpg.webp",
+  "64781ee2-f82f-40c0-9178-4a76860b6f56": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/423c7744-0fbd-4b30-91ca-cd05d5c3223e/208e3174-b077-445a-b9cd-76d9e59c3108-1000150213.jpg.webp",
+};
 
 const initialCandidates: Candidate[] = [
-  { id: "candidate-1", name: "Nadia Putri Rahayu", role: "Senior Product Designer", location: "Jakarta Selatan", stage: "interview", owner: "Raka Pratama", dueDate: "2026-08-20", appliedAt: "2026-07-28", score: 4.6, feedback: "Portfolio kuat di design system.", offerStatus: "draft", compensation: "Rp 28–32 juta / bulan", reason: "" },
-  { id: "candidate-2", name: "Bima Adinata", role: "Frontend Architect", location: "Bandung", stage: "screening", owner: "Sari Wijaya", dueDate: "2026-08-18", appliedAt: "2026-08-02", score: 4.1, feedback: "Perlu validasi stakeholder management.", offerStatus: "draft", compensation: "Rp 25–29 juta / bulan", reason: "" },
-  { id: "candidate-3", name: "Maya Kusuma", role: "Product Manager", location: "Jakarta Barat", stage: "offer", owner: "Raka Pratama", dueDate: "2026-08-19", appliedAt: "2026-07-22", score: 4.8, feedback: "Sangat kuat di systems thinking dan discovery.", offerStatus: "sent", compensation: "Rp 31 juta / bulan", reason: "" },
-  { id: "candidate-4", name: "Rizky Maulana", role: "Backend Engineer (Go/Node)", location: "Surabaya", stage: "interview", owner: "Dimas Nugroho", dueDate: "2026-08-21", appliedAt: "2026-07-30", score: 3.7, feedback: "", offerStatus: "draft", compensation: "Rp 24–28 juta / bulan", reason: "" },
-  { id: "candidate-5", name: "Tasya Lestari", role: "Data Scientist", location: "Yogyakarta", stage: "hired", owner: "Sari Wijaya", dueDate: "2026-08-04", appliedAt: "2026-07-04", score: 4.9, feedback: "Keahlian modeling sangat relevan.", offerStatus: "accepted", compensation: "Rp 30 juta / bulan", reason: "" },
+  {
+    id: "cd6ec533-5d1c-4f87-842c-888de3e825ec",
+    name: "Adrienne Kayana Wistara Lie",
+    role: "Product Management Intern",
+    location: "Denpasar Barat, Bali",
+    stage: "hired",
+    owner: "Adrienne",
+    dueDate: "2026-09-25",
+    appliedAt: "2026-09-09",
+    score: 4.8,
+    feedback: "Kandidat ini memenuhi kompetensi inti lowongan dan selaras dengan standar peran.",
+    offerStatus: "accepted",
+    compensation: "Rp 15.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
+    jobId: "job-1",
+    jobTitle: "Product Management Intern",
+  },
+  {
+    id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
+    name: "Alga Ramandika Praba",
+    role: "Software Engineer",
+    location: "Gianyar, Bali",
+    stage: "interview",
+    owner: "Raka Pratama",
+    dueDate: "2026-08-20",
+    appliedAt: "2026-07-28",
+    score: 4.6,
+    feedback: "Portfolio kuat di backend engineering & database architecture.",
+    offerStatus: "draft",
+    compensation: "Rp 25.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Alga Ramandika Praba"],
+    jobId: "job-2",
+    jobTitle: "Frontend Architect",
+  },
+  {
+    id: "1b1c3dcd-4251-44cb-a594-2fc57ee00533",
+    name: "Ariel Oka",
+    role: "Software Engineer",
+    location: "Bali, Denpasar",
+    stage: "screening",
+    owner: "Sari Wijaya",
+    dueDate: "2026-08-18",
+    appliedAt: "2026-08-02",
+    score: 4.1,
+    feedback: "Perlu validasi stakeholder management.",
+    offerStatus: "draft",
+    compensation: "Rp 22.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Ariel Oka"],
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
+  },
+  {
+    id: "383de31e-01c2-4d02-b3e4-b563af72ab32",
+    name: "Hasyim Kipuw",
+    role: "Senior Software Engineer",
+    location: "Bali, Denpasar",
+    stage: "offer",
+    owner: "Raka Pratama",
+    dueDate: "2026-08-19",
+    appliedAt: "2026-07-22",
+    score: 4.8,
+    feedback: "Sangat kuat di systems architecture dan high concurrency.",
+    offerStatus: "sent",
+    compensation: "Rp 31.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Hasyim Kipuw"],
+    jobId: "job-4",
+    jobTitle: "Backend Engineer (Go/Node)",
+  },
+  {
+    id: "64781ee2-f82f-40c0-9178-4a76860b6f56",
+    name: "Muhammad Adi Firmansyahah",
+    role: "Human Capital Specialist",
+    location: "Bali",
+    stage: "interview",
+    owner: "Dimas Nugroho",
+    dueDate: "2026-08-21",
+    appliedAt: "2026-07-30",
+    score: 4.5,
+    feedback: "Pengalaman solid di talent acquisition & HR operations.",
+    offerStatus: "draft",
+    compensation: "Rp 18.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Muhammad Adi Firmansyahah"],
+    jobId: "job-1",
+    jobTitle: "Senior Product Designer",
+  },
 ];
 
 const initialInterviews: Interview[] = [
-  { id: "interview-1", candidateId: "candidate-1", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Portfolio Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
-  { id: "interview-2", candidateId: "candidate-4", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "System Design & Culture", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
+  { id: "interview-1", candidateId: "b082c226-1a6e-42a6-80e0-150ce5f01745", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Architecture Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
+  { id: "interview-2", candidateId: "64781ee2-f82f-40c0-9178-4a76860b6f56", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "HR & Culture Leadership", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
 ];
 
 const DB_CACHE_KEY = "proofylink-ops-db-cache-v1";
 
-function readInitialState(isDb: boolean) {
+function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews: Interview[] } {
   if (isDb) {
     try {
       const cached = typeof window !== "undefined" ? localStorage.getItem(DB_CACHE_KEY) : null;
       if (cached) {
         const parsed = JSON.parse(cached) as { candidates?: Candidate[]; interviews?: Interview[] };
         if (Array.isArray(parsed?.candidates)) {
-          return { candidates: parsed.candidates, interviews: parsed.interviews ?? [] };
+          const resolved: Candidate[] = parsed.candidates.map((c) => ({
+            ...c,
+            avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+            statusHistory:
+              c.statusHistory && c.statusHistory.length > 0
+                ? c.statusHistory
+                : getDefaultStatusHistory(c, c.owner || "Adrienne"),
+          }));
+          return { candidates: resolved, interviews: parsed.interviews ?? [] };
         }
       }
     } catch {}
@@ -117,20 +241,88 @@ function readInitialState(isDb: boolean) {
         status: iv.status === "Dibatalkan" ? ("Dibatalkan" as const) : isPast ? ("Selesai" as const) : iv.status,
       };
     });
-    return { candidates: parsed?.candidates ?? initialCandidates, interviews: loadedInterviews };
+    const loadedCandidates: Candidate[] = (parsed?.candidates ?? initialCandidates).map((c) => ({
+      ...c,
+      avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+      statusHistory:
+        c.statusHistory && c.statusHistory.length > 0
+          ? c.statusHistory
+          : getDefaultStatusHistory(c, c.owner || "Adrienne"),
+    }));
+    return { candidates: loadedCandidates, interviews: loadedInterviews };
   } catch {
-    return { candidates: initialCandidates, interviews: initialInterviews };
+    return {
+      candidates: initialCandidates.map((c) => ({
+        ...c,
+        statusHistory: getDefaultStatusHistory(c, c.owner || "Adrienne"),
+      })),
+      interviews: initialInterviews,
+    };
   }
+}
+
+export type TransitionValidationResult =
+  | { allowed: true }
+  | { allowed: false; reason: string };
+
+export function validateCandidateStageTransition(
+  candidate: Candidate,
+  targetStage: Stage,
+  isAdministrativeAction = false
+): TransitionValidationResult {
+  // Disallow moving to the exact same stage
+  if (candidate.stage === targetStage) {
+    return { allowed: false, reason: "Kandidat sudah berada di tahap ini." };
+  }
+
+  // 1. Strict lock on 'hired' candidates (only HR Administrative Renege can bypass)
+  if (candidate.stage === "hired" && !isAdministrativeAction) {
+    return {
+      allowed: false,
+      reason:
+        "Status kandidat telah Diterima (Hired) dan terkunci secara administratif. Gunakan menu 'Batalkan Penerimaan (Renege)' pada detail kandidat jika memerlukan tindakan administratif khusus.",
+    };
+  }
+
+  // 2. Talent Pool Guardrail: Candidates without an assigned active job cannot advance to interview, offer, or hired
+  const isTalentPool = !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+  if (isTalentPool && (targetStage === "interview" || targetStage === "offer" || targetStage === "hired")) {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat masih berstatus Talent Pool dan belum memiliki lowongan aktif. Harap tugaskan kandidat ke salah satu lowongan kerja aktif terlebih dahulu sebelum melanjutkan ke tahap wawancara atau penawaran.",
+    };
+  }
+
+  // 3. Hired Prerequisite Guardrail: Can only be reached from 'offer'
+  if (targetStage === "hired" && candidate.stage !== "offer") {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat harus melalui tahap Penawaran (Offer) terlebih dahulu sebelum dapat diresmikan sebagai Hired.",
+    };
+  }
+
+  // 4. Rejected Candidate Guardrail: Must be re-activated to 'screening' first before active pipeline
+  if (candidate.stage === "rejected" && (targetStage === "interview" || targetStage === "offer" || targetStage === "hired")) {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat telah berstatus Tidak Lolos. Harap aktifkan kembali kandidat ke tahap Screening (Tekan 1) terlebih dahulu jika ingin meninjau ulang profil sebelum melanjutkan proses seleksi.",
+    };
+  }
+
+  return { allowed: true };
 }
 
 export function RecruiterOperationsPage() {
   const { dbMode, scans, user } = useApp();
-  const [data, setData] = useState(() => readInitialState(dbMode));
+  const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
-  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>([]);
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(defaultJobs);
 
   // Modals & Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -145,6 +337,17 @@ export function RecruiterOperationsPage() {
   const [demoteInterviewCandidate, setDemoteInterviewCandidate] = useState<Candidate | null>(null);
   const [demoteInterviewTargetStage, setDemoteInterviewTargetStage] = useState<Stage | null>(null);
   const [hireConfirmCandidate, setHireConfirmCandidate] = useState<Candidate | null>(null);
+
+  // Power-User & QoL States
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [focusedCandidateId, setFocusedCandidateId] = useState<string | null>(null);
+  const lastChangeRef = useRef<{
+    candidateId: string;
+    prevStage: Stage;
+    prevStatusHistory?: StatusHistoryItem[];
+    prevCompensation?: string;
+    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined";
+  } | null>(null);
 
   // Drag and Drop state
   const [draggingCandidateId, setDraggingCandidateId] = useState<string | null>(null);
@@ -162,6 +365,30 @@ export function RecruiterOperationsPage() {
         }
       })
       .catch(() => {});
+  }, []);
+
+  // Enrich candidate avatars from live Supabase /api/candidates query
+  useEffect(() => {
+    let active = true;
+    fetch("/api/candidates?limit=50", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const payload = (await res.json()) as { candidates?: Array<{ id: string; name?: string; avatarUrl?: string }> };
+        if (!active || !payload.candidates) return;
+        const liveMap = new Map(payload.candidates.map((c) => [c.id, c.avatarUrl]));
+        const nameMap = new Map(payload.candidates.map((c) => [c.name, c.avatarUrl]));
+        setData((prev) => ({
+          ...prev,
+          candidates: prev.candidates.map((cand) => {
+            const liveAvatar = liveMap.get(cand.id) || nameMap.get(cand.name) || SUPABASE_AVATARS[cand.id] || SUPABASE_AVATARS[cand.name];
+            return liveAvatar && liveAvatar !== cand.avatarUrl ? { ...cand, avatarUrl: liveAvatar } : cand;
+          }),
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Save to demo storage when not in dbMode, or cache DB records in dbMode
@@ -200,10 +427,21 @@ export function RecruiterOperationsPage() {
       fetch("/api/interviews", { cache: "no-store" }),
       fetch("/api/offers", { cache: "no-store" }),
     ])
-      .then(async ([appRes, , intRes]) => {
+      .then(async ([appRes, candRes, intRes]) => {
         if (!active) return;
         const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
         let mappedCandidates: Candidate[] = [];
+
+        // Parse candidate profiles from Supabase (/api/candidates)
+        type RemoteCand = { id: string; name?: string; role?: string; location?: string; avatarUrl?: string; summary?: string };
+        let remoteCandList: RemoteCand[] = [];
+        if (candRes && candRes.ok) {
+          try {
+            const candPayload = (await candRes.json()) as { candidates?: RemoteCand[] };
+            remoteCandList = candPayload.candidates ?? [];
+          } catch {}
+        }
+        const candidateMap = new Map(remoteCandList.map((c) => [c.id, c]));
 
         if (appRes.ok) {
           type AppRow = {
@@ -213,7 +451,7 @@ export function RecruiterOperationsPage() {
             jobId?: string;
             submittedAt?: string;
             job?: { id?: string; title?: string };
-            candidate?: { name?: string; headline?: string; location?: string };
+            candidate?: { name?: string; headline?: string; location?: string; avatarUrl?: string };
           };
           const appData = (await appRes.json()) as { applications?: AppRow[] };
           if (appData.applications && appData.applications.length > 0) {
@@ -233,12 +471,20 @@ export function RecruiterOperationsPage() {
                   mappedStage = "rejected";
                 }
 
-                return {
+                const candProfile = candidateMap.get(app.candidateProfileId || app.id);
+                const resolvedAvatar =
+                  app.candidate?.avatarUrl ||
+                  candProfile?.avatarUrl ||
+                  (candProfile?.name ? SUPABASE_AVATARS[candProfile.name] : undefined) ||
+                  (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
+                  SUPABASE_AVATARS[app.candidateProfileId || ""];
+
+                const candObj: Candidate = {
                   id: app.candidateProfileId || app.id,
                   applicationId: app.id,
-                  name: app.candidate?.name || `Kandidat #${index + 1}`,
-                  role: app.job?.title || app.candidate?.headline || "Software Engineer",
-                  location: app.candidate?.location || "Indonesia",
+                  name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
+                  role: app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
+                  location: app.candidate?.location || candProfile?.location || "Indonesia",
                   stage: mappedStage,
                   owner: recruiterName,
                   dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
@@ -250,8 +496,38 @@ export function RecruiterOperationsPage() {
                   reason: "",
                   jobId: app.jobId,
                   jobTitle: app.job?.title,
+                  avatarUrl: resolvedAvatar,
                 };
+                candObj.statusHistory = getDefaultStatusHistory(candObj, recruiterName);
+                return candObj;
               });
+          }
+        }
+
+        // Talent Pool: Include scanned candidates from Supabase who don't have an active application yet
+        const existingAppCandIds = new Set(mappedCandidates.map((c) => c.id));
+        for (const cand of remoteCandList) {
+          if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
+            const poolCand: Candidate = {
+              id: cand.id,
+              name: cand.name || "Talent Network Candidate",
+              role: cand.role || "Talent Candidate",
+              location: cand.location || "Indonesia",
+              stage: "screening",
+              owner: recruiterName,
+              dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+              appliedAt: new Date().toISOString().slice(0, 10),
+              score: 4.2,
+              feedback: "",
+              offerStatus: "draft",
+              compensation: "Rp 15.000.000 / bulan",
+              reason: "",
+              jobId: "talent-pool",
+              jobTitle: "Talent Pool",
+              avatarUrl: cand.avatarUrl || (cand.name ? SUPABASE_AVATARS[cand.name] : undefined) || SUPABASE_AVATARS[cand.id],
+            };
+            poolCand.statusHistory = getDefaultStatusHistory(poolCand, recruiterName);
+            mappedCandidates.push(poolCand);
           }
         }
 
@@ -328,10 +604,55 @@ export function RecruiterOperationsPage() {
         searchQuery.trim() === "" ||
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchJob = jobFilter === "all" || candidate.jobId === jobFilter || candidate.role === jobFilter;
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool"
+          : candidate.jobId === jobFilter || candidate.role === jobFilter;
       return matchSearch && matchJob;
     });
   }, [activeCandidates, searchQuery, jobFilter]);
+
+  const handleAssignJob = useCallback(
+    (candidateId: string, jobId: string, jobTitle: string) => {
+      const target = data.candidates.find((c) => c.id === candidateId);
+      const existingHist = target?.statusHistory || (target ? getDefaultStatusHistory(target, recruiterName) : []);
+      const assignItem: StatusHistoryItem = {
+        id: `hist-assign-${candidateId}-${existingHist.length + 1}`,
+        stage: target?.stage || "screening",
+        title:
+          jobId === "talent-pool"
+            ? "Dipindahkan ke Talent Pool"
+            : `Penugasan Posisi: ${jobTitle}`,
+        actionType: "recruiter",
+        timestamp: new Date().toISOString(),
+        actor: recruiterName,
+        actorRole: "Recruiter Lead",
+        notes:
+          jobId === "talent-pool"
+            ? "Kandidat dipindahkan ke Talent Pool umum untuk peluang masa depan."
+            : `Kandidat ditugaskan ke lowongan ${jobTitle} untuk proses evaluasi dan seleksi aktif.`,
+      };
+      const updatedHistory = [...existingHist, assignItem];
+
+      setData((current) => ({
+        ...current,
+        candidates: current.candidates.map((c) =>
+          c.id === candidateId ? { ...c, jobId, jobTitle, statusHistory: updatedHistory } : c
+        ),
+      }));
+      if (selectedCandidate && selectedCandidate.id === candidateId) {
+        setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle, statusHistory: updatedHistory });
+      }
+      toast.success(
+        jobId === "talent-pool"
+          ? "Kandidat dipindahkan ke Talent Pool"
+          : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
+      );
+    },
+    [data.candidates, recruiterName, selectedCandidate]
+  );
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -343,94 +664,318 @@ export function RecruiterOperationsPage() {
     return { total, screening, interview, offer, hired };
   }, [activeCandidates]);
 
-  // Execute stage change with optimistic UI and DB sync
-  const executeStageChange = async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
-    const target = data.candidates.find((c) => c.id === id);
-    if (!target) return;
+  // 5-Second Safety Undo Buffer Handler
+  const handleUndo = useCallback(() => {
+    if (!lastChangeRef.current) return;
+    const { candidateId, prevStage, prevStatusHistory, prevCompensation, prevOfferStatus } =
+      lastChangeRef.current;
+
+    const currentCandidate = data.candidates.find((c) => c.id === candidateId);
+    if (currentCandidate?.stage === "hired") {
+      toast.error("Status kandidat telah Diterima (Hired) dan terkunci secara administratif. Pembatalan otomatis dinonaktifkan.");
+      lastChangeRef.current = null;
+      return;
+    }
 
     setData((current) => ({
       ...current,
       candidates: current.candidates.map((c) =>
-        c.id === id ? { ...c, stage: newStage, ...extraUpdates } : c
+        c.id === candidateId
+          ? {
+              ...c,
+              stage: prevStage,
+              statusHistory: prevStatusHistory,
+              compensation: prevCompensation || c.compensation,
+              offerStatus: prevOfferStatus || c.offerStatus,
+            }
+          : c
       ),
     }));
 
-    if (selectedCandidate && selectedCandidate.id === id) {
-      setSelectedCandidate({ ...selectedCandidate, stage: newStage, ...extraUpdates });
+    if (selectedCandidate && selectedCandidate.id === candidateId) {
+      setSelectedCandidate((curr) =>
+        curr
+          ? {
+              ...curr,
+              stage: prevStage,
+              statusHistory: prevStatusHistory,
+              compensation: prevCompensation || curr.compensation,
+              offerStatus: prevOfferStatus || curr.offerStatus,
+            }
+          : null
+      );
     }
 
-    if (dbMode && target.applicationId) {
-      try {
-        const appStatus =
-          newStage === "screening"
-            ? "screening"
-            : newStage === "interview"
-            ? "interview"
-            : newStage === "offer"
-            ? "offer"
-            : newStage === "hired"
-            ? "hired"
-            : "rejected";
+    if (dbMode) {
+      fetch(`/api/applications/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: prevStage }),
+      }).catch(() => {});
+    }
 
-        await fetch(`/api/applications/${target.applicationId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: appStatus }),
-        });
-      } catch {
-        // Optimistic update
+    lastChangeRef.current = null;
+    toast.info("Perubahan tahap berhasil dibatalkan.");
+  }, [data.candidates, dbMode, selectedCandidate]);
+
+  // Execute stage change with optimistic UI and DB sync
+  const executeStageChange = useCallback(
+    async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
+      const target = data.candidates.find((c) => c.id === id);
+      if (!target) return;
+
+      // Save state for 5-second Undo safety buffer
+      lastChangeRef.current = {
+        candidateId: id,
+        prevStage: target.stage,
+        prevStatusHistory: target.statusHistory,
+        prevCompensation: target.compensation,
+        prevOfferStatus: target.offerStatus,
+      };
+
+      const existingHistory = target.statusHistory || getDefaultStatusHistory(target, recruiterName);
+      let resolvedHistory = extraUpdates?.statusHistory;
+
+      if (!resolvedHistory) {
+        const stageTitles: Record<Stage, string> = {
+          screening: "Screening & Validasi AI",
+          interview: "Dijadwalkan untuk Sesi Interview",
+          offer: "Penerbitan Surat Penawaran (Offer)",
+          hired: "Penawaran Diterima & Bergabung (Hired)",
+          rejected: "Tidak Lolos Seleksi",
+        };
+
+        const stageNotes: Record<Stage, string> = {
+          screening: "Kandidat masuk ke tahap screening untuk evaluasi profil dan verifikasi kompetensi.",
+          interview: "Kandidat lolos seleksi awal dan masuk ke rangkaian wawancara teknis dan keselarasan peran.",
+          offer: `Surat penawaran resmi dengan kompensasi ${extraUpdates?.compensation || target.compensation || "Rp 15.000.000 / bulan"} disiapkan.`,
+          hired: "Kandidat resmi menyetujui surat penawaran dan masuk tahap onboarding.",
+          rejected: extraUpdates?.reason || "Kandidat tidak melanjutkan ke tahap berikutnya pada posisi ini.",
+        };
+
+        const newHistoryItem: StatusHistoryItem = {
+          id: `hist-stage-${id}-${existingHistory.length + 1}`,
+          stage: newStage,
+          title: stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
+          actionType: "recruiter",
+          timestamp: new Date().toISOString(),
+          actor: recruiterName,
+          actorRole: "Recruiter Lead",
+          notes: extraUpdates?.reason || stageNotes[newStage],
+        };
+
+        resolvedHistory = [...existingHistory, newHistoryItem];
       }
-    }
 
-    const stageObj = STAGES.find((s) => s.id === newStage);
-    toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`);
-  };
+      const appliedUpdates: Partial<Candidate> = {
+        ...extraUpdates,
+        stage: newStage,
+        statusHistory: resolvedHistory,
+      };
+
+      setData((current) => ({
+        ...current,
+        candidates: current.candidates.map((c) =>
+          c.id === id ? { ...c, ...appliedUpdates } : c
+        ),
+      }));
+
+      if (selectedCandidate && selectedCandidate.id === id) {
+        setSelectedCandidate({ ...selectedCandidate, ...appliedUpdates });
+      }
+
+      if (dbMode && target.applicationId) {
+        try {
+          const appStatus =
+            newStage === "screening"
+              ? "screening"
+              : newStage === "interview"
+              ? "interview"
+              : newStage === "offer"
+              ? "offer"
+              : newStage === "hired"
+              ? "hired"
+              : "rejected";
+
+          await fetch(`/api/applications/${target.applicationId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: appStatus }),
+          });
+        } catch {
+          // Optimistic update
+        }
+      }
+
+      const stageObj = STAGES.find((s) => s.id === newStage);
+      toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`, {
+        action: {
+          label: "Batalkan (Undo)",
+          onClick: () => handleUndo(),
+        },
+        duration: 5000,
+      });
+    },
+    [data.candidates, dbMode, handleUndo, recruiterName, selectedCandidate]
+  );
 
   // Smart transition handler (validates transitions and opens appropriate modals)
-  const initiateStageChange = (id: string, newStage: Stage) => {
-    const target = data.candidates.find((c) => c.id === id);
-    if (!target || target.stage === newStage) return;
+  const initiateStageChange = useCallback(
+    (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
+      const target = data.candidates.find((c) => c.id === id);
+      if (!target || (target.stage === newStage && !extraUpdates)) return;
 
-    // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
-    if (target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
-      setDrawerOpen(false);
-      setCancelOfferCandidate(target);
-      setCancelOfferTargetStage(newStage);
-      return;
-    }
+      // Validate transition against ATS Guardrails (unless it's an administrative revoke action with statusHistory)
+      const isAdministrativeAction = Boolean(extraUpdates?.statusHistory);
+      const validation = validateCandidateStageTransition(target, newStage, isAdministrativeAction);
+      if (!validation.allowed) {
+        toast.error(validation.reason);
+        return;
+      }
 
-    // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
-    if (target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
-      setDrawerOpen(false);
-      setDemoteInterviewCandidate(target);
-      setDemoteInterviewTargetStage(newStage);
-      return;
-    }
+      // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
+      if (!extraUpdates && target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
+        setDrawerOpen(false);
+        setCancelOfferCandidate(target);
+        setCancelOfferTargetStage(newStage);
+        return;
+      }
 
-    // Trigger 2: Move to Interview from Screening (prepare interview modal)
-    if (newStage === "interview" && target.stage === "screening") {
-      setDrawerOpen(false);
-      setScheduleModalCandidate(target);
-      return;
-    }
+      // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
+      if (!extraUpdates && target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
+        setDrawerOpen(false);
+        setDemoteInterviewCandidate(target);
+        setDemoteInterviewTargetStage(newStage);
+        return;
+      }
 
-    // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
-    if (newStage === "offer") {
-      setDrawerOpen(false);
-      setOfferModalCandidate(target);
-      return;
-    }
+      // Trigger 2: Move to Interview from Screening (prepare interview modal)
+      if (!extraUpdates && newStage === "interview" && target.stage === "screening") {
+        setDrawerOpen(false);
+        setScheduleModalCandidate(target);
+        return;
+      }
 
-    // Trigger 4: Move to Hired (confirmation modal)
-    if (newStage === "hired") {
-      setDrawerOpen(false);
-      setHireConfirmCandidate(target);
-      return;
-    }
+      // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
+      if (!extraUpdates && newStage === "offer") {
+        setDrawerOpen(false);
+        setOfferModalCandidate(target);
+        return;
+      }
 
-    // Default: execute stage change directly
-    void executeStageChange(id, newStage);
-  };
+      // Trigger 4: Move to Hired (confirmation modal)
+      if (!extraUpdates && newStage === "hired") {
+        setDrawerOpen(false);
+        setHireConfirmCandidate(target);
+        return;
+      }
+
+      // Default: execute stage change directly
+      void executeStageChange(id, newStage, extraUpdates);
+    },
+    [data.candidates, executeStageChange]
+  );
+
+  // Keyboard Power-User Navigation (J/K, Enter/Space, 1-5, Esc, ?)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        activeTag === "select" ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        if (shortcutsModalOpen) {
+          setShortcutsModalOpen(false);
+          return;
+        }
+      }
+
+      if (drawerOpen) return;
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+        return;
+      }
+
+      if (filteredCandidates.length === 0) return;
+
+      if (e.key === "j" || e.key === "J" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedCandidateId((currentId) => {
+          if (!currentId) return filteredCandidates[0].id;
+          const currentIndex = filteredCandidates.findIndex((c) => c.id === currentId);
+          if (currentIndex === -1) return filteredCandidates[0].id;
+          const nextIndex = (currentIndex + 1) % filteredCandidates.length;
+          return filteredCandidates[nextIndex].id;
+        });
+        return;
+      }
+
+      if (e.key === "k" || e.key === "K" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedCandidateId((currentId) => {
+          if (!currentId) return filteredCandidates[filteredCandidates.length - 1].id;
+          const currentIndex = filteredCandidates.findIndex((c) => c.id === currentId);
+          if (currentIndex === -1) return filteredCandidates[filteredCandidates.length - 1].id;
+          const prevIndex = (currentIndex - 1 + filteredCandidates.length) % filteredCandidates.length;
+          return filteredCandidates[prevIndex].id;
+        });
+        return;
+      }
+
+      if (e.key === "Enter" || e.key === " ") {
+        if (focusedCandidateId) {
+          e.preventDefault();
+          const target = filteredCandidates.find((c) => c.id === focusedCandidateId);
+          if (target) {
+            setSelectedCandidate(target);
+            setDrawerOpen(true);
+          }
+        }
+        return;
+      }
+
+      if (["1", "2", "3", "4", "5"].includes(e.key)) {
+        if (focusedCandidateId) {
+          e.preventDefault();
+          const target = filteredCandidates.find((c) => c.id === focusedCandidateId);
+          if (!target) return;
+
+          const stageMap: Record<string, Stage> = {
+            "1": "screening",
+            "2": "interview",
+            "3": "offer",
+            "4": "hired",
+            "5": "rejected",
+          };
+          const targetStage = stageMap[e.key];
+          if (!targetStage) return;
+
+          const validation = validateCandidateStageTransition(target, targetStage);
+          if (!validation.allowed) {
+            toast.error(validation.reason);
+            return;
+          }
+
+          initiateStageChange(focusedCandidateId, targetStage);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen, filteredCandidates, focusedCandidateId, initiateStageChange, shortcutsModalOpen]);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, candidateId: string) => {
@@ -465,9 +1010,21 @@ export function RecruiterOperationsPage() {
     if (!candidateId) return;
 
     const candidate = data.candidates.find((c) => c.id === candidateId);
-    if (candidate && candidate.stage !== targetStage) {
-      initiateStageChange(candidateId, targetStage);
+    if (!candidate) return;
+
+    if (candidate.stage === targetStage) {
+      setDraggingCandidateId(null);
+      return;
     }
+
+    const validation = validateCandidateStageTransition(candidate, targetStage);
+    if (!validation.allowed) {
+      toast.error(validation.reason);
+      setDraggingCandidateId(null);
+      return;
+    }
+
+    initiateStageChange(candidateId, targetStage);
     setDraggingCandidateId(null);
   };
 
@@ -660,6 +1217,16 @@ export function RecruiterOperationsPage() {
 
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => setShortcutsModalOpen(true)}
+                  className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                  title="Pintasan Keyboard (Tekan ?)"
+                >
+                  <Keyboard className="size-3.5" /> Pintasan
+                </Button>
+
+                <Button
+                  size="sm"
                   onClick={() => setReportModalOpen(true)}
                   className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
                 >
@@ -726,6 +1293,7 @@ export function RecruiterOperationsPage() {
                     className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
                   >
                     <option value="all">Semua Lowongan</option>
+                    <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
                     {availableJobs.map((j) => (
                       <option key={j.id} value={j.id}>
                         {j.title}
@@ -770,7 +1338,7 @@ export function RecruiterOperationsPage() {
                     className={cn(
                       "flex flex-col rounded-2xl border transition-all duration-200 min-h-[560px] bg-slate-50/60 p-3",
                       stage.border,
-                      isOver ? "bg-purple-50/80 border-dashed border-[#7C3AED] ring-2 ring-purple-300 scale-[1.01] shadow-inner" : "hover:border-slate-300"
+                      isOver ? "bg-purple-50/40 border-dashed border-[#7C3AED]/70 ring-2 ring-purple-200/60 scale-[1.005] shadow-xs" : "hover:border-slate-300/80"
                     )}
                   >
                     {/* Column Header */}
@@ -812,34 +1380,44 @@ export function RecruiterOperationsPage() {
                         stageCandidates.map((candidate, idx) => {
                           const candidateInterviews = data.interviews.filter((i) => i.candidateId === candidate.id);
                           const isDragging = draggingCandidateId === candidate.id;
+                          const isHired = candidate.stage === "hired";
 
                           return (
-                            <div
+                            <CandidateQuickPeek
                               key={candidate.id}
-                              draggable={true}
-                              onDragStart={(e) => handleDragStart(e, candidate.id)}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => {
-                                setSelectedCandidate(candidate);
-                                setDrawerOpen(true);
-                              }}
-                              style={{ animationDelay: `${idx * 50}ms` }}
-                              className={cn(
-                                "group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing animate-in fade-in-50 slide-in-from-bottom-2",
-                                isDragging ? "opacity-30 scale-95 border-[#7C3AED] ring-2 ring-purple-300 shadow-2xl" : ""
-                              )}
+                              candidate={candidate}
+                              disabled={draggingCandidateId !== null || drawerOpen || shortcutsModalOpen}
                             >
-                              {/* Top Bar: Name & Actions */}
+                              <div
+                                draggable={!isHired}
+                                onDragStart={(e) => handleDragStart(e, candidate.id)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => {
+                                  setSelectedCandidate(candidate);
+                                  setDrawerOpen(true);
+                                }}
+                                style={{ animationDelay: `${idx * 50}ms` }}
+                                className={cn(
+                                  "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
+                                  isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+                                  isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : "",
+                                  focusedCandidateId === candidate.id ? "ring-2 ring-[#7C3AED] ring-offset-2 border-purple-300 shadow-md" : ""
+                                )}
+                              >
+                              {/* Top Bar: Avatar, Name & Actions */}
                               <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="size-7 rounded-lg bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-bold text-xs group-hover:scale-105 transition-transform">
-                                    {candidate.name
+                                <div className="flex items-center gap-2.5">
+                                  <CandidateAvatar
+                                    initials={candidate.name
                                       .split(" ")
                                       .map((n) => n[0])
                                       .join("")
                                       .slice(0, 2)
                                       .toUpperCase()}
-                                  </div>
+                                    avatarUrl={candidate.avatarUrl}
+                                    name={candidate.name}
+                                    className="size-8 rounded-xl ring-1 ring-purple-100 group-hover:ring-purple-300 transition-all shrink-0"
+                                  />
                                   <div>
                                     <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#7C3AED] transition-colors line-clamp-1">
                                       {candidate.name}
@@ -851,47 +1429,61 @@ export function RecruiterOperationsPage() {
 
                               {/* Candidate Status Pills */}
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                {/* Visual Differentiator: Screening vs Interview */}
-                                {candidate.stage === "screening" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                                    <Sparkles className="size-2.5 text-blue-600" />
-                                    Review Profil
+                                {isHired ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                    <Lock className="size-2.5 text-emerald-600" />
+                                    Terkunci · Final
                                   </span>
-                                )}
-
-                                {candidate.stage === "interview" && candidateInterviews.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
-                                    <Clock className="size-2.5" />
-                                    Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
-                                      day: "numeric",
-                                      month: "short",
-                                    })}
-                                  </span>
-                                )}
-
-                                {candidate.stage === "interview" && candidateInterviews.length === 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                                    <Calendar className="size-2.5" />
-                                    Belum Terjadwal
-                                  </span>
-                                )}
-
-                                {candidate.offerStatus !== "draft" && (
-                                  <span
-                                    className={cn(
-                                      "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border",
-                                      candidate.offerStatus === "accepted"
-                                        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                        : "text-blue-700 bg-blue-50 border-blue-200"
+                                ) : (
+                                  <>
+                                    {(!candidate.jobId || candidate.jobId === "talent-pool") && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold text-[#7C3AED] bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
+                                        Talent Pool
+                                      </span>
                                     )}
-                                  >
-                                    <DollarSign className="size-2.5" />
-                                    {candidate.offerStatus === "accepted" ? "Offer Disetujui" : "Offer Terkirim"}
-                                  </span>
+
+                                    {candidate.stage === "screening" && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                        <Sparkles className="size-2.5 text-blue-600" />
+                                        Review Profil
+                                      </span>
+                                    )}
+
+                                    {candidate.stage === "interview" && candidateInterviews.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
+                                        <Clock className="size-2.5" />
+                                        Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
+                                          day: "numeric",
+                                          month: "short",
+                                        })}
+                                      </span>
+                                    )}
+
+                                    {candidate.stage === "interview" && candidateInterviews.length === 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                        <Calendar className="size-2.5" />
+                                        Belum Terjadwal
+                                      </span>
+                                    )}
+
+                                    {candidate.offerStatus !== "draft" && (
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                          candidate.offerStatus === "accepted"
+                                            ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                            : "text-blue-700 bg-blue-50 border-blue-200"
+                                        )}
+                                      >
+                                        <DollarSign className="size-2.5" />
+                                        {candidate.offerStatus === "accepted" ? "Offer Disetujui" : "Offer Terkirim"}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
 
-                              {/* Card Footer: Clean Location & Actions (No Dropdown) */}
+                              {/* Card Footer: Clean Location & Actions */}
                               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                                 <span className="text-[10px] flex items-center gap-1 truncate max-w-[130px] text-slate-500">
                                   <MapPin className="size-3 text-slate-400 shrink-0" />
@@ -907,15 +1499,25 @@ export function RecruiterOperationsPage() {
                                     <MessageSquare className="size-3.5" />
                                   </Link>
 
-                                  <div
-                                    className="p-1 text-slate-300 group-hover:text-purple-400 transition-colors cursor-grab"
-                                    title="Tarik kartu untuk memindahkan tahap"
-                                  >
-                                    <GripVertical className="size-3.5" />
-                                  </div>
+                                  {isHired ? (
+                                    <div
+                                      className="p-1 text-slate-300 cursor-not-allowed"
+                                      title="Status Diterima (Hired) terkunci secara administratif"
+                                    >
+                                      <Lock className="size-3 text-emerald-600" />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="p-1 text-slate-300 group-hover:text-purple-400 transition-colors cursor-grab"
+                                      title="Tarik kartu untuk memindahkan tahap"
+                                    >
+                                      <GripVertical className="size-3.5" />
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
+                          </CandidateQuickPeek>
                           );
                         })
                       )}
@@ -954,19 +1556,32 @@ export function RecruiterOperationsPage() {
                             setSelectedCandidate(candidate);
                             setDrawerOpen(true);
                           }}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                          className={cn(
+                            "hover:bg-slate-50/80 transition-colors cursor-pointer",
+                            focusedCandidateId === candidate.id ? "bg-purple-50/70 ring-1 ring-inset ring-purple-300" : ""
+                          )}
                         >
                           <td className="px-5 py-3.5 font-bold text-slate-900">
                             <div className="flex items-center gap-2.5">
-                              <div className="size-8 rounded-lg bg-purple-100 text-[#7C3AED] flex items-center justify-center font-bold text-xs">
-                                {candidate.name
+                              <CandidateAvatar
+                                initials={candidate.name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")
                                   .slice(0, 2)
                                   .toUpperCase()}
+                                avatarUrl={candidate.avatarUrl}
+                                name={candidate.name}
+                                className="size-8 rounded-xl ring-1 ring-purple-100 shrink-0"
+                              />
+                              <div>
+                                <p className="font-bold text-slate-900 leading-tight">{candidate.name}</p>
+                                {(!candidate.jobId || candidate.jobId === "talent-pool") && (
+                                  <span className="inline-flex text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
+                                    Talent Pool
+                                  </span>
+                                )}
                               </div>
-                              <span>{candidate.name}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3.5">
@@ -1042,6 +1657,8 @@ export function RecruiterOperationsPage() {
           onSendInterviewInvitation={handleSendInterviewInvitation}
           onUpdateFeedback={handleUpdateFeedback}
           recruiterName={recruiterName}
+          availableJobs={availableJobs}
+          onAssignJob={handleAssignJob}
         />
 
         {/* Schedule Interview Transition Modal (Screening -> Interview) */}
@@ -1177,6 +1794,12 @@ export function RecruiterOperationsPage() {
           candidates={data.candidates}
           interviews={data.interviews}
           availableJobs={availableJobs}
+        />
+
+        {/* Keyboard Shortcuts Modal */}
+        <KeyboardShortcutsModal
+          open={shortcutsModalOpen}
+          onOpenChange={setShortcutsModalOpen}
         />
       </div>
     </ProtectedRoute>

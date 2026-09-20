@@ -61,8 +61,6 @@ export function HrReportModal({
   open,
   onOpenChange,
   candidates,
-  interviews: _interviews,
-  availableJobs: _availableJobs,
 }: HrReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [reportTimestamp] = useState(() => Date.now());

@@ -646,6 +646,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (name: string, role: UserRole, email: string, password: string, companyName?: string): Promise<AuthResult> => {
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return { error: "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, dan angka." };
+    }
     pendingRole.current = role;
     if (supabaseConfigured) {
       const supabase = createClient();

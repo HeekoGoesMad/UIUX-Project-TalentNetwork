@@ -31,8 +31,17 @@ const applicationSelect = {
   candidateName: schema.profiles.displayName,
   candidateHeadline: schema.candidateProfiles.headline,
   candidateLocation: schema.candidateProfiles.location,
+  candidateAvatarUrl: schema.profiles.avatarUrl,
 };
-type ApplicationRow = { application: typeof schema.applications.$inferSelect; jobTitle: string; organizationName: string; candidateName: string | null; candidateHeadline: string | null; candidateLocation: string | null };
+type ApplicationRow = {
+  application: typeof schema.applications.$inferSelect;
+  jobTitle: string;
+  organizationName: string;
+  candidateName: string | null;
+  candidateHeadline: string | null;
+  candidateLocation: string | null;
+  candidateAvatarUrl: string | null;
+};
 
 export async function GET(request: Request) {
   try {
@@ -145,6 +154,14 @@ function formatApplication(row: ApplicationRow) {
   return {
     ...row.application,
     job: { id: row.application.jobId, title: row.jobTitle, organizationName: row.organizationName },
-    candidate: row.candidateName || row.candidateHeadline ? { name: row.candidateName, headline: row.candidateHeadline, location: row.candidateLocation } : null,
+    candidate:
+      row.candidateName || row.candidateHeadline
+        ? {
+            name: row.candidateName,
+            headline: row.candidateHeadline,
+            location: row.candidateLocation,
+            avatarUrl: row.candidateAvatarUrl,
+          }
+        : null,
   };
 }

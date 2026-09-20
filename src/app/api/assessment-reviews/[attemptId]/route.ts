@@ -115,6 +115,9 @@ function error(message: string, status: number) { return NextResponse.json({ err
 async function notifyCandidateReview(tx: Parameters<Parameters<Current["db"]["transaction"]>[0]>[0], invitationId: string, candidateProfileId: string, attemptId: string, status: "completed" | "disputed") {
   const [candidate] = await tx.select({ userId: schema.candidateProfiles.userId }).from(schema.candidateProfiles).where(eq(schema.candidateProfiles.id, candidateProfileId)).limit(1);
   if (!candidate) return;
-  const label = status === "completed" ? "selesai" : "memerlukan perhatian";
-  await createNotificationWithDeliveries(tx, systemNotification({ userId: candidate.userId, title: `Review assessment ${label}`, body: status === "completed" ? "Review assessment Anda telah selesai." : "Review assessment Anda ditandai untuk ditinjau kembali.", data: notificationData(`assessment-review:${attemptId}:${status}`, `/candidate/assessments/${invitationId}`, { invitationId, attemptId, status }) }));
+  const title = status === "completed" ? "Hasil Evaluasi Asesmen Selesai" : "Catatan Evaluasi Asesmen";
+  const body = status === "completed"
+    ? "Evaluasi asesmen kompetensi Anda telah selesai dinilai oleh peninjau. Buka ringkasan untuk melihat catatan evaluasi."
+    : "Terdapat catatan evaluasi asesmen yang memerlukan peninjauan kembali.";
+  await createNotificationWithDeliveries(tx, systemNotification({ userId: candidate.userId, title, body, data: notificationData(`assessment-review:${attemptId}:${status}`, `/candidate/assessments/${invitationId}`, { invitationId, attemptId, status }) }));
 }
