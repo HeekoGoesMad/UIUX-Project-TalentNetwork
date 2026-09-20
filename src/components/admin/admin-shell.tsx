@@ -12,7 +12,6 @@ import {
   Menu,
   ScrollText,
   Settings,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,19 +102,14 @@ export function AdminShell({
 
           <Link
             href="/admin"
-            className="flex items-center gap-2.5 font-bold text-slate-900 transition-opacity hover:opacity-90"
+            className="flex items-center gap-2 font-bold text-slate-900 transition-opacity hover:opacity-90"
           >
-            <div className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white shadow-xs">
-              <ShieldCheck className="size-4.5" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold tracking-tight text-slate-900">
-                Talent <span className="text-[#7C3AED]">Network</span>
-              </span>
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
-                Konsol Admin
-              </span>
-            </div>
+            <span className="text-sm font-bold tracking-tight text-slate-900">
+              Talent <span className="text-[#7C3AED]">Network</span>
+            </span>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+              Konsol Admin
+            </span>
           </Link>
         </div>
 
@@ -178,12 +172,7 @@ export function AdminShell({
           <div className="space-y-6">
             {/* Mobile Drawer Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
-              <div className="flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
-                  <ShieldCheck className="size-4" />
-                </div>
-                <span className="font-bold text-slate-900 text-sm">Talent Network Admin</span>
-              </div>
+              <span className="font-bold text-slate-900 text-sm">Talent Network Admin</span>
               <Button
                 variant="ghost"
                 size="icon"
