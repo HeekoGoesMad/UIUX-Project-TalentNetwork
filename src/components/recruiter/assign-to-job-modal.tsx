@@ -90,6 +90,88 @@ export function AssignToJobModal({
       }
 
       const selectedJob = jobs.find((j) => j.id === selectedJobId);
+
+      if (!dbMode) {
+        // Sync with candidate applications
+        try {
+          const { saveDemoApplication } = await import("@/components/applications/application-ui");
+          saveDemoApplication({
+            id: `demo-app-${candidate.id}`,
+            jobId: selectedJobId,
+            status: "screening",
+            coverNote: "Profil ditugaskan dari Talent Network ke lowongan aktif.",
+            submittedAt: new Date().toISOString(),
+            withdrawnAt: null,
+            updatedAt: new Date().toISOString(),
+            job: {
+              id: selectedJobId,
+              title: selectedJob?.title || "Lowongan Pekerjaan",
+              organizationName: selectedJob?.organizationName || "Perusahaan Mitra",
+            },
+            candidate: {
+              name: candidate.name,
+              headline: candidate.role,
+              location: candidate.location,
+            },
+          });
+        } catch {
+          // ignore
+        }
+
+        // Sync with recruiter operations
+        try {
+          const opsKey = "proofylink-demo-recruiter-operations";
+          const opsRaw = localStorage.getItem(opsKey);
+          if (opsRaw) {
+            const opsParsed = JSON.parse(opsRaw);
+            if (opsParsed && Array.isArray(opsParsed.candidates)) {
+              const idx = opsParsed.candidates.findIndex((c: { id: string }) => c.id === candidate.id);
+              const newHistItem = {
+                id: `hist-assign-${candidate.id}-${Date.now()}`,
+                stage: "screening",
+                title: `Penugasan Posisi: ${selectedJob?.title || "Lowongan"}`,
+                actionType: "recruiter",
+                timestamp: new Date().toISOString(),
+                actor: "Tim Rekruter",
+                actorRole: "Recruiter Lead",
+                notes: `Kandidat dialokasikan ke lowongan aktif: ${selectedJob?.title || "Lowongan"}.`,
+              };
+              if (idx >= 0) {
+                opsParsed.candidates[idx].jobId = selectedJobId;
+                opsParsed.candidates[idx].jobTitle = selectedJob?.title || "Lowongan";
+                opsParsed.candidates[idx].stage = "screening";
+                opsParsed.candidates[idx].statusHistory = [
+                  ...(opsParsed.candidates[idx].statusHistory || []),
+                  newHistItem,
+                ];
+              } else {
+                opsParsed.candidates.push({
+                  id: candidate.id,
+                  name: candidate.name,
+                  role: candidate.role || "Talent",
+                  location: candidate.location || "Indonesia",
+                  stage: "screening",
+                  jobId: selectedJobId,
+                  jobTitle: selectedJob?.title || "Lowongan",
+                  owner: "Tim Rekruter",
+                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                  appliedAt: new Date().toISOString().slice(0, 10),
+                  score: 4.5,
+                  feedback: "",
+                  offerStatus: "draft",
+                  compensation: "Rp 15.000.000 / bulan",
+                  reason: "",
+                  statusHistory: [newHistItem],
+                });
+              }
+              localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       toast.success(`${candidate.name} berhasil dimasukkan ke pipeline!`, {
         description: `Posisi: ${selectedJob?.title ?? "Lowongan Pekerjaan"}`,
         action: {
