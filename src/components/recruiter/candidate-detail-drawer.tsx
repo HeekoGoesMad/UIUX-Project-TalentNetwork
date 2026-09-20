@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  GitCommit,
   Lock,
   MapPin,
   MessageSquare,
@@ -32,6 +33,11 @@ import {
 } from "@/components/ui/dialog";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateScreeningSummary } from "@/components/recruiter/candidate-screening-summary";
+import {
+  CandidateStatusGitGraph,
+  getDefaultStatusHistory,
+  type StatusHistoryItem,
+} from "@/components/recruiter/candidate-status-git-graph";
 import { cn } from "@/lib/utils";
 
 export type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
@@ -54,6 +60,7 @@ export type Candidate = {
   jobId?: string;
   jobTitle?: string;
   avatarUrl?: string;
+  statusHistory?: StatusHistoryItem[];
 };
 
 export type Interview = {
@@ -74,7 +81,7 @@ interface CandidateDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   interviews: Interview[];
-  onStageChange: (candidateId: string, stage: Stage) => void;
+  onStageChange: (candidateId: string, stage: Stage, extraUpdates?: Partial<Candidate>) => void;
   onOpenOfferModal: (candidate: Candidate) => void;
   onAddInterview: (candidateId: string, interview: Omit<Interview, "id">) => Promise<void>;
   onSendInterviewInvitation: (interview: Interview, cand?: Candidate) => Promise<void>;
@@ -199,8 +206,24 @@ export function CandidateDetailDrawer({
       ? `${candidate.feedback}\n${cancellationLog}`
       : cancellationLog;
 
+    const currentHistory = candidate.statusHistory || getDefaultStatusHistory(candidate, recruiterName);
+    const renegeHistoryItem: StatusHistoryItem = {
+      id: `hist-renege-${Date.now()}`,
+      stage: "renege",
+      title: `Pembatalan Penerimaan (Renege) ke Tahap ${revokeTargetStage}`,
+      actionType: "recruiter",
+      timestamp: new Date().toISOString(),
+      actor: recruiterName,
+      actorRole: "HR & Talent Lead",
+      notes: revokeReason.trim(),
+    };
+    const updatedHistory = [...currentHistory, renegeHistoryItem];
+
     onUpdateFeedback(candidate.id, updatedFeedback);
-    onStageChange(candidate.id, revokeTargetStage);
+    onStageChange(candidate.id, revokeTargetStage, {
+      statusHistory: updatedHistory,
+      reason: revokeReason.trim(),
+    });
     setRevokeModalOpen(false);
     setRevokeReason("");
     toast.info("Status penerimaan kandidat dibatalkan dan dicatat pada riwayat.");
@@ -772,22 +795,21 @@ export function CandidateDetailDrawer({
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 pt-4 space-y-2">
-                  <h4 className="text-xs font-bold text-slate-700">Riwayat Status</h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-slate-500">
-                      <span>Terdaftar pada</span>
-                      <span className="font-medium text-slate-800">{candidate.appliedAt}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-500">
-                      <span>Batas Waktu (SLA)</span>
-                      <span className="font-medium text-slate-800">{candidate.dueDate}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-500">
-                      <span>Tahap saat ini</span>
-                      <span className="font-semibold text-purple-700 capitalize">{candidate.stage}</span>
-                    </div>
+                <div className="border-t border-slate-200 pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <GitCommit className="size-3.5 text-[#7C3AED]" />
+                      Riwayat Status & Milestone
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-medium">Git Timeline View</span>
                   </div>
+
+                  <CandidateStatusGitGraph
+                    history={candidate.statusHistory || getDefaultStatusHistory(candidate, recruiterName)}
+                    appliedAt={candidate.appliedAt}
+                    dueDate={candidate.dueDate}
+                    currentStage={candidate.stage}
+                  />
                 </div>
 
                 {/* Administrative Escape Hatch (Only when Hired) */}

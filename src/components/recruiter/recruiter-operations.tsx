@@ -32,6 +32,10 @@ import {
   ConfirmHireModal,
   DemoteInterviewWarningModal,
 } from "@/components/recruiter/stage-transition-modals";
+import {
+  getDefaultStatusHistory,
+  type StatusHistoryItem,
+} from "@/components/recruiter/candidate-status-git-graph";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +59,7 @@ export type Candidate = {
   jobId?: string;
   jobTitle?: string;
   avatarUrl?: string;
+  statusHistory?: StatusHistoryItem[];
 };
 
 export type Interview = {
@@ -201,16 +206,20 @@ const initialInterviews: Interview[] = [
 
 const DB_CACHE_KEY = "proofylink-ops-db-cache-v1";
 
-function readInitialState(isDb: boolean) {
+function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews: Interview[] } {
   if (isDb) {
     try {
       const cached = typeof window !== "undefined" ? localStorage.getItem(DB_CACHE_KEY) : null;
       if (cached) {
         const parsed = JSON.parse(cached) as { candidates?: Candidate[]; interviews?: Interview[] };
         if (Array.isArray(parsed?.candidates)) {
-          const resolved = parsed.candidates.map((c) => ({
+          const resolved: Candidate[] = parsed.candidates.map((c) => ({
             ...c,
             avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+            statusHistory:
+              c.statusHistory && c.statusHistory.length > 0
+                ? c.statusHistory
+                : getDefaultStatusHistory(c, c.owner || "Adrienne"),
           }));
           return { candidates: resolved, interviews: parsed.interviews ?? [] };
         }
@@ -229,19 +238,29 @@ function readInitialState(isDb: boolean) {
         status: iv.status === "Dibatalkan" ? ("Dibatalkan" as const) : isPast ? ("Selesai" as const) : iv.status,
       };
     });
-    const loadedCandidates = (parsed?.candidates ?? initialCandidates).map((c) => ({
+    const loadedCandidates: Candidate[] = (parsed?.candidates ?? initialCandidates).map((c) => ({
       ...c,
       avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+      statusHistory:
+        c.statusHistory && c.statusHistory.length > 0
+          ? c.statusHistory
+          : getDefaultStatusHistory(c, c.owner || "Adrienne"),
     }));
     return { candidates: loadedCandidates, interviews: loadedInterviews };
   } catch {
-    return { candidates: initialCandidates, interviews: initialInterviews };
+    return {
+      candidates: initialCandidates.map((c) => ({
+        ...c,
+        statusHistory: getDefaultStatusHistory(c, c.owner || "Adrienne"),
+      })),
+      interviews: initialInterviews,
+    };
   }
 }
 
 export function RecruiterOperationsPage() {
   const { dbMode, scans, user } = useApp();
-  const [data, setData] = useState(() => readInitialState(dbMode));
+  const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
@@ -392,7 +411,7 @@ export function RecruiterOperationsPage() {
                   (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
                   SUPABASE_AVATARS[app.candidateProfileId || ""];
 
-                return {
+                const candObj: Candidate = {
                   id: app.candidateProfileId || app.id,
                   applicationId: app.id,
                   name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
@@ -411,6 +430,8 @@ export function RecruiterOperationsPage() {
                   jobTitle: app.job?.title,
                   avatarUrl: resolvedAvatar,
                 };
+                candObj.statusHistory = getDefaultStatusHistory(candObj, recruiterName);
+                return candObj;
               });
           }
         }
@@ -419,7 +440,7 @@ export function RecruiterOperationsPage() {
         const existingAppCandIds = new Set(mappedCandidates.map((c) => c.id));
         for (const cand of remoteCandList) {
           if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
-            mappedCandidates.push({
+            const poolCand: Candidate = {
               id: cand.id,
               name: cand.name || "Talent Network Candidate",
               role: cand.role || "Talent Candidate",
@@ -436,7 +457,9 @@ export function RecruiterOperationsPage() {
               jobId: "talent-pool",
               jobTitle: "Talent Pool",
               avatarUrl: cand.avatarUrl || (cand.name ? SUPABASE_AVATARS[cand.name] : undefined) || SUPABASE_AVATARS[cand.id],
-            });
+            };
+            poolCand.statusHistory = getDefaultStatusHistory(poolCand, recruiterName);
+            mappedCandidates.push(poolCand);
           }
         }
 
@@ -523,22 +546,45 @@ export function RecruiterOperationsPage() {
     });
   }, [activeCandidates, searchQuery, jobFilter]);
 
-  const handleAssignJob = (candidateId: string, jobId: string, jobTitle: string) => {
-    setData((current) => ({
-      ...current,
-      candidates: current.candidates.map((c) =>
-        c.id === candidateId ? { ...c, jobId, jobTitle } : c
-      ),
-    }));
-    if (selectedCandidate && selectedCandidate.id === candidateId) {
-      setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle });
-    }
-    toast.success(
-      jobId === "talent-pool"
-        ? "Kandidat dipindahkan ke Talent Pool"
-        : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
-    );
-  };
+  const handleAssignJob = useCallback(
+    (candidateId: string, jobId: string, jobTitle: string) => {
+      const target = data.candidates.find((c) => c.id === candidateId);
+      const existingHist = target?.statusHistory || (target ? getDefaultStatusHistory(target, recruiterName) : []);
+      const assignItem: StatusHistoryItem = {
+        id: `hist-assign-${candidateId}-${existingHist.length + 1}`,
+        stage: target?.stage || "screening",
+        title:
+          jobId === "talent-pool"
+            ? "Dipindahkan ke Talent Pool"
+            : `Penugasan Posisi: ${jobTitle}`,
+        actionType: "recruiter",
+        timestamp: new Date().toISOString(),
+        actor: recruiterName,
+        actorRole: "Recruiter Lead",
+        notes:
+          jobId === "talent-pool"
+            ? "Kandidat dipindahkan ke Talent Pool umum untuk peluang masa depan."
+            : `Kandidat ditugaskan ke lowongan ${jobTitle} untuk proses evaluasi dan seleksi aktif.`,
+      };
+      const updatedHistory = [...existingHist, assignItem];
+
+      setData((current) => ({
+        ...current,
+        candidates: current.candidates.map((c) =>
+          c.id === candidateId ? { ...c, jobId, jobTitle, statusHistory: updatedHistory } : c
+        ),
+      }));
+      if (selectedCandidate && selectedCandidate.id === candidateId) {
+        setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle, statusHistory: updatedHistory });
+      }
+      toast.success(
+        jobId === "talent-pool"
+          ? "Kandidat dipindahkan ke Talent Pool"
+          : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
+      );
+    },
+    [data.candidates, recruiterName, selectedCandidate]
+  );
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -551,93 +597,139 @@ export function RecruiterOperationsPage() {
   }, [activeCandidates]);
 
   // Execute stage change with optimistic UI and DB sync
-  const executeStageChange = async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
-    const target = data.candidates.find((c) => c.id === id);
-    if (!target) return;
+  const executeStageChange = useCallback(
+    async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
+      const target = data.candidates.find((c) => c.id === id);
+      if (!target) return;
 
-    setData((current) => ({
-      ...current,
-      candidates: current.candidates.map((c) =>
-        c.id === id ? { ...c, stage: newStage, ...extraUpdates } : c
-      ),
-    }));
+      const existingHistory = target.statusHistory || getDefaultStatusHistory(target, recruiterName);
+      let resolvedHistory = extraUpdates?.statusHistory;
 
-    if (selectedCandidate && selectedCandidate.id === id) {
-      setSelectedCandidate({ ...selectedCandidate, stage: newStage, ...extraUpdates });
-    }
+      if (!resolvedHistory) {
+        const stageTitles: Record<Stage, string> = {
+          screening: "Screening & Validasi AI",
+          interview: "Dijadwalkan untuk Sesi Interview",
+          offer: "Penerbitan Surat Penawaran (Offer)",
+          hired: "Penawaran Diterima & Bergabung (Hired)",
+          rejected: "Tidak Lolos Seleksi",
+        };
 
-    if (dbMode && target.applicationId) {
-      try {
-        const appStatus =
-          newStage === "screening"
-            ? "screening"
-            : newStage === "interview"
-            ? "interview"
-            : newStage === "offer"
-            ? "offer"
-            : newStage === "hired"
-            ? "hired"
-            : "rejected";
+        const stageNotes: Record<Stage, string> = {
+          screening: "Kandidat masuk ke tahap screening untuk evaluasi profil dan verifikasi kompetensi.",
+          interview: "Kandidat lolos seleksi awal dan masuk ke rangkaian wawancara teknis dan keselarasan peran.",
+          offer: `Surat penawaran resmi dengan kompensasi ${extraUpdates?.compensation || target.compensation || "Rp 15.000.000 / bulan"} disiapkan.`,
+          hired: "Kandidat resmi menyetujui surat penawaran dan masuk tahap onboarding.",
+          rejected: extraUpdates?.reason || "Kandidat tidak melanjutkan ke tahap berikutnya pada posisi ini.",
+        };
 
-        await fetch(`/api/applications/${target.applicationId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: appStatus }),
-        });
-      } catch {
-        // Optimistic update
+        const newHistoryItem: StatusHistoryItem = {
+          id: `hist-stage-${id}-${existingHistory.length + 1}`,
+          stage: newStage,
+          title: stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
+          actionType: "recruiter",
+          timestamp: new Date().toISOString(),
+          actor: recruiterName,
+          actorRole: "Recruiter Lead",
+          notes: extraUpdates?.reason || stageNotes[newStage],
+        };
+
+        resolvedHistory = [...existingHistory, newHistoryItem];
       }
-    }
 
-    const stageObj = STAGES.find((s) => s.id === newStage);
-    toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`);
-  };
+      const appliedUpdates: Partial<Candidate> = {
+        ...extraUpdates,
+        stage: newStage,
+        statusHistory: resolvedHistory,
+      };
+
+      setData((current) => ({
+        ...current,
+        candidates: current.candidates.map((c) =>
+          c.id === id ? { ...c, ...appliedUpdates } : c
+        ),
+      }));
+
+      if (selectedCandidate && selectedCandidate.id === id) {
+        setSelectedCandidate({ ...selectedCandidate, ...appliedUpdates });
+      }
+
+      if (dbMode && target.applicationId) {
+        try {
+          const appStatus =
+            newStage === "screening"
+              ? "screening"
+              : newStage === "interview"
+              ? "interview"
+              : newStage === "offer"
+              ? "offer"
+              : newStage === "hired"
+              ? "hired"
+              : "rejected";
+
+          await fetch(`/api/applications/${target.applicationId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: appStatus }),
+          });
+        } catch {
+          // Optimistic update
+        }
+      }
+
+      const stageObj = STAGES.find((s) => s.id === newStage);
+      toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`);
+    },
+    [data.candidates, dbMode, recruiterName, selectedCandidate]
+  );
 
   // Smart transition handler (validates transitions and opens appropriate modals)
-  const initiateStageChange = (id: string, newStage: Stage) => {
-    const target = data.candidates.find((c) => c.id === id);
-    if (!target || target.stage === newStage) return;
+  const initiateStageChange = useCallback(
+    (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
+      const target = data.candidates.find((c) => c.id === id);
+      if (!target || (target.stage === newStage && !extraUpdates)) return;
 
-    // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
-    if (target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
-      setDrawerOpen(false);
-      setCancelOfferCandidate(target);
-      setCancelOfferTargetStage(newStage);
-      return;
-    }
+      // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
+      if (!extraUpdates && target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
+        setDrawerOpen(false);
+        setCancelOfferCandidate(target);
+        setCancelOfferTargetStage(newStage);
+        return;
+      }
 
-    // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
-    if (target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
-      setDrawerOpen(false);
-      setDemoteInterviewCandidate(target);
-      setDemoteInterviewTargetStage(newStage);
-      return;
-    }
+      // Trigger 1.5: Interview -> Lower stage (demotion to screening or rejected)
+      if (!extraUpdates && target.stage === "interview" && ["screening", "rejected"].includes(newStage)) {
+        setDrawerOpen(false);
+        setDemoteInterviewCandidate(target);
+        setDemoteInterviewTargetStage(newStage);
+        return;
+      }
 
-    // Trigger 2: Move to Interview from Screening (prepare interview modal)
-    if (newStage === "interview" && target.stage === "screening") {
-      setDrawerOpen(false);
-      setScheduleModalCandidate(target);
-      return;
-    }
+      // Trigger 2: Move to Interview from Screening (prepare interview modal)
+      if (!extraUpdates && newStage === "interview" && target.stage === "screening") {
+        setDrawerOpen(false);
+        setScheduleModalCandidate(target);
+        return;
+      }
 
-    // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
-    if (newStage === "offer") {
-      setDrawerOpen(false);
-      setOfferModalCandidate(target);
-      return;
-    }
+      // Trigger 3: Move to Offer (modal opens first; stage only changes upon confirmed submission)
+      if (!extraUpdates && newStage === "offer") {
+        setDrawerOpen(false);
+        setOfferModalCandidate(target);
+        return;
+      }
 
-    // Trigger 4: Move to Hired (confirmation modal)
-    if (newStage === "hired") {
-      setDrawerOpen(false);
-      setHireConfirmCandidate(target);
-      return;
-    }
+      // Trigger 4: Move to Hired (confirmation modal)
+      if (!extraUpdates && newStage === "hired") {
+        setDrawerOpen(false);
+        setHireConfirmCandidate(target);
+        return;
+      }
 
-    // Default: execute stage change directly
-    void executeStageChange(id, newStage);
-  };
+      // Default: execute stage change directly
+      void executeStageChange(id, newStage, extraUpdates);
+    },
+    [data.candidates, executeStageChange]
+  );
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, candidateId: string) => {
