@@ -53,9 +53,9 @@ export function calculateCandidateReadiness(data?: CandidateStepData | null): Ca
     {
       id: "role",
       label: "Domisili & peran",
-      done: Boolean(data?.location?.trim() && data?.targetRole?.trim()),
+      done: Boolean(data?.location?.trim()),
       anchor: "/candidate/cv#target-role",
-      hint: "Lokasi kerja & ekspektasi peran",
+      hint: "Lokasi kerja & domisili",
     },
     {
       id: "skills",
@@ -136,7 +136,7 @@ export function getFirstIncompleteStep(data?: CandidateStepData | null): number 
   ) {
     return 2;
   }
-  if (!data.location?.trim() || !data.targetRole?.trim()) {
+  if (!data.location?.trim()) {
     return 3;
   }
   if (!data.experience?.some((item) => Boolean(item.company?.trim() || item.role?.trim()))) {
