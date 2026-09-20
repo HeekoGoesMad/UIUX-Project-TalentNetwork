@@ -63,6 +63,8 @@ export async function GET(request: Request) {
         durationMinutes: interview.durationMinutes || 45,
         meetingUrl: interview.meetingUrl,
         status: interview.status,
+        rescheduleMetadata: interview.rescheduleMetadata,
+        cancellationMetadata: interview.cancellationMetadata,
       }));
 
       return NextResponse.json({ interviews });

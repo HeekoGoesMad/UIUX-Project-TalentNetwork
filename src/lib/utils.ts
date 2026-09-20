@@ -28,3 +28,23 @@ export function formatToE164Indonesian(localDigits: string | null | undefined): 
   return digits ? `+62${digits}` : "";
 }
 
+/**
+ * Strips leading currency prefix (Rp, Rp., IDR) and intermediate redundant Rp in ranges from a salary string.
+ * Returns only the value content (e.g. "18.000.000 – 25.000.000 / bln").
+ */
+export function extractSalaryValue(salary: string | null | undefined): string {
+  if (!salary) return "";
+  return salary
+    .replace(/^(?:rp\.?|idr)\s*/i, "")
+    .replace(/(\s*[-–—]\s*)(?:rp\.?|idr)\s*/gi, "$1");
+}
+
+/**
+ * Formats salary value with standard "Rp " prefix.
+ */
+export function formatSalaryValue(val: string | null | undefined): string {
+  if (!val) return "";
+  const cleaned = extractSalaryValue(val);
+  return cleaned.trim() ? `Rp ${cleaned.replace(/^\s+/, "")}` : "";
+}
+

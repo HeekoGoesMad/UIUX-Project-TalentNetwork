@@ -1021,31 +1021,58 @@ function AdminCompaniesContent() {
                       Data Penggunaan (Hanya Baca / Ringkasan Otomatis)
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-lg bg-white border p-2.5 text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Sisa Saldo Token</p>
-                        <p className="text-base font-extrabold text-[#7C3AED] mt-0.5">
-                          {selectedCompany?.usage.tokenBalance ?? 0}
-                        </p>
+                      <div className="rounded-xl bg-white border border-slate-200/80 p-3 text-center flex flex-col justify-between shadow-2xs">
+                        <div className="h-9 flex items-center justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold leading-3.5">
+                            Sisa Saldo Token
+                          </p>
+                        </div>
+                        <div className="h-8 flex items-center justify-center mt-1">
+                          <p className="text-base font-extrabold text-[#7C3AED] tabular-nums">
+                            {selectedCompany?.usage.tokenBalance ?? 0}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-lg bg-white border p-2.5 text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Talent Unlock</p>
-                        <p className="text-base font-extrabold text-slate-900 mt-0.5">
-                          {selectedCompany?.usage.talentUnlockCount ?? 0}
-                        </p>
+
+                      <div className="rounded-xl bg-white border border-slate-200/80 p-3 text-center flex flex-col justify-between shadow-2xs">
+                        <div className="h-9 flex items-center justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold leading-3.5">
+                            Talent Unlock
+                          </p>
+                        </div>
+                        <div className="h-8 flex items-center justify-center mt-1">
+                          <p className="text-base font-extrabold text-slate-900 tabular-nums">
+                            {selectedCompany?.usage.talentUnlockCount ?? 0}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-lg bg-white border p-2.5 text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Screening Finansial</p>
-                        <p className="text-base font-extrabold text-slate-900 mt-0.5">
-                          {selectedCompany?.usage.financialScreeningCount ?? 0}
-                        </p>
+
+                      <div className="rounded-xl bg-white border border-slate-200/80 p-3 text-center flex flex-col justify-between shadow-2xs">
+                        <div className="h-9 flex items-center justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold leading-3.5">
+                            Screening Finansial
+                          </p>
+                        </div>
+                        <div className="h-8 flex items-center justify-center mt-1">
+                          <p className="text-base font-extrabold text-slate-900 tabular-nums">
+                            {selectedCompany?.usage.financialScreeningCount ?? 0}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-lg bg-white border p-2.5 text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Aktivitas Terakhir</p>
-                        <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                          {selectedCompany?.usage.lastActivity
-                            ? new Date(selectedCompany.usage.lastActivity).toLocaleDateString("id-ID")
-                            : "-"}
-                        </p>
+
+                      <div className="rounded-xl bg-white border border-slate-200/80 p-3 text-center flex flex-col justify-between shadow-2xs">
+                        <div className="h-9 flex items-center justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold leading-3.5">
+                            Aktivitas Terakhir
+                          </p>
+                        </div>
+                        <div className="h-8 flex items-center justify-center mt-1">
+                          <p className="text-xs sm:text-[13px] font-bold text-slate-800 tabular-nums truncate">
+                            {selectedCompany?.usage.lastActivity
+                              ? new Date(selectedCompany.usage.lastActivity).toLocaleDateString("id-ID")
+                              : "-"}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>

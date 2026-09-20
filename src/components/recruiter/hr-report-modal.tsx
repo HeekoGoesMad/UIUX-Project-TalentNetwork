@@ -34,7 +34,7 @@ export type ReportCandidate = {
   owner: string;
   dueDate: string;
   appliedAt: string;
-  offerStatus: "draft" | "sent" | "accepted" | "declined";
+  offerStatus: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   compensation: string;
   jobId?: string;
   jobTitle?: string;

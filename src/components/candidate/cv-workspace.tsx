@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
+import { SalaryInput } from "@/components/ui/salary-input";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
@@ -1076,11 +1077,10 @@ export function CvWorkspace() {
                   </Field>
 
                   <Field label="Ekspektasi Gaji Bulanan" hint="Tampil hanya saat rekruter membuka profil" span2>
-                    <input
-                      className={inputCls}
+                    <SalaryInput
                       value={profile.salary ?? ""}
-                      onChange={(e) => update("salary", e.target.value)}
-                      placeholder="Contoh: Rp 18.000.000 – Rp 25.000.000 / bln"
+                      onChange={(val) => update("salary", val)}
+                      placeholder="Contoh: 18.000.000 – 25.000.000 / bln"
                     />
                   </Field>
                 </div>

@@ -12,13 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { createDemoInvitation, getDemoTemplate, listDemoInvitations, listDemoTemplates, type DemoTemplate } from "@/lib/assessment-demo";
 
-type Status = "new" | "shortlisted" | "consent_requested" | "consent_approved" | "screening" | "assessment" | "review" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
+type Status = "new" | "shortlisted" | "screening" | "assessment" | "review" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
 type Application = { id: string; jobId: string; status: Status; coverNote: string | null; submittedAt: string; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
 type History = { id: string; fromStatus: Status | null; toStatus: Status; reason: string | null; createdAt: string };
 type Invitation = { id: string; applicationId: string; templateId: string; templateName: string; status: string; sentAt: string; expiresAt: string | null; attempt?: { id: string; status: string } | null };
 type TemplateOption = Pick<DemoTemplate, "id" | "name" | "description" | "timeLimitMinutes" | "attemptLimit"> & { invitationCount?: number };
 
-const statusLabels: Record<Status, string> = { new: "New", shortlisted: "Shortlisted", consent_requested: "Consent requested", consent_approved: "Consent approved", screening: "Screening", assessment: "Assessment", review: "Review", interview: "Interview", offer: "Offer", hired: "Hired", rejected: "Rejected", withdrawn: "Withdrawn" };
+const statusLabels: Record<Status, string> = { new: "New", shortlisted: "Shortlisted", screening: "Screening", assessment: "Assessment", review: "Review", interview: "Interview", offer: "Offer", hired: "Hired", rejected: "Rejected", withdrawn: "Withdrawn" };
 const invitationLabels: Record<string, string> = { pending: "Menunggu kandidat", started: "Sedang dikerjakan", submitted: "Terkirim", expired: "Kedaluwarsa", revoked: "Dicabut" };
 function date(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "-"; }
 function badge(label: string, tone = "bg-secondary text-secondary-foreground") { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{label}</span>; }

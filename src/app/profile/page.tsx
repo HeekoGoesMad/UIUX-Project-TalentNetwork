@@ -47,7 +47,7 @@ const DEMO = {
   headline: "Senior Product Designer | UX Research | Design Systems",
   targetRole: "Lead Product Designer",
   location: "Jakarta Selatan, DKI Jakarta",
-  salary: "Rp 18.000.000 – Rp 25.000.000 / bln",
+  salary: "Rp 18.000.000 – 25.000.000 / bln",
   personality: {
     type: "ENFJ",
     label: "Protagonis",

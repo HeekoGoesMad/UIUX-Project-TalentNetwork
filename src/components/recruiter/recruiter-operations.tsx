@@ -55,7 +55,7 @@ export type Candidate = {
   appliedAt: string;
   score: number;
   feedback: string;
-  offerStatus: "draft" | "sent" | "accepted" | "declined";
+  offerStatus: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   compensation: string;
   reason: string;
   applicationId?: string;
@@ -72,10 +72,13 @@ export type Interview = {
   timezone: string;
   type: string;
   panel: string[];
-  status: "Terjadwal" | "Selesai" | "Dibatalkan";
+  status: "Terjadwal" | "Selesai" | "Dibatalkan" | "Terjadwal (Terkonfirmasi)" | "Permintaan Reschedule" | "Ditolak Kandidat" | string;
   reminder: boolean;
   meetingUrl?: string;
   sentAt?: string | null;
+  rescheduleProposedDate?: string;
+  rescheduleReason?: string;
+  declineReason?: string;
 };
 
 const storageKey = "proofylink-demo-recruiter-operations";
@@ -346,7 +349,7 @@ export function RecruiterOperationsPage() {
     prevStage: Stage;
     prevStatusHistory?: StatusHistoryItem[];
     prevCompensation?: string;
-    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined";
+    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   } | null>(null);
 
   // Drag and Drop state
@@ -553,25 +556,103 @@ export function RecruiterOperationsPage() {
               const scheduledDate = core.scheduledAt || iv.scheduledAt || new Date().toISOString();
               const isPast = !isNaN(new Date(scheduledDate).getTime()) && new Date(scheduledDate).getTime() < Date.now();
               const rawStatus = core.status || iv.status;
-              const status =
-                rawStatus === "completed" || isPast
-                  ? "Selesai"
-                  : rawStatus === "cancelled"
-                  ? "Dibatalkan"
-                  : "Terjadwal";
+              
+              let status: Interview["status"] = "Terjadwal";
+              if (rawStatus === "reschedule_requested" || rawStatus === "Permintaan Reschedule") {
+                status = "Permintaan Reschedule";
+              } else if (rawStatus === "declined" || rawStatus === "Ditolak Kandidat") {
+                status = "Ditolak Kandidat";
+              } else if (rawStatus === "confirmed" || rawStatus === "Terjadwal (Terkonfirmasi)") {
+                status = "Terjadwal (Terkonfirmasi)";
+              } else if (rawStatus === "completed" || (isPast && !["reschedule_requested", "declined", "confirmed"].includes(rawStatus || ""))) {
+                status = "Selesai";
+              } else if (rawStatus === "cancelled") {
+                status = "Dibatalkan";
+              }
+
+              const reschedMeta = (core as { rescheduleMetadata?: { proposedDate?: string; reason?: string } }).rescheduleMetadata ||
+                (iv as unknown as { rescheduleMetadata?: { proposedDate?: string; reason?: string } }).rescheduleMetadata;
+              const cancelMeta = (core as { cancellationMetadata?: { reason?: string } }).cancellationMetadata ||
+                (iv as unknown as { cancellationMetadata?: { reason?: string } }).cancellationMetadata;
+
+              const resolvedCandId =
+                iv.candidateProfileId ||
+                (core as unknown as { candidateProfileId?: string }).candidateProfileId ||
+                (iv as unknown as { candidateId?: string }).candidateId ||
+                "";
+
+              const effectiveDate =
+                reschedMeta?.proposedDate && !isNaN(new Date(reschedMeta.proposedDate).getTime())
+                  ? new Date(reschedMeta.proposedDate).toISOString()
+                  : scheduledDate;
 
               return {
                 id: core.id || iv.id || `iv-${Date.now()}`,
-                candidateId: iv.candidateProfileId || "",
-                date: scheduledDate,
+                candidateId: resolvedCandId,
+                date: effectiveDate,
                 timezone: core.timezone || iv.timezone || "Asia/Jakarta (WIB)",
                 type: core.title || iv.title || "Wawancara",
                 panel: [recruiterName],
-                status: status as "Terjadwal" | "Selesai" | "Dibatalkan",
+                status,
                 reminder: true,
                 meetingUrl: core.meetingUrl || iv.meetingUrl,
+                rescheduleProposedDate: reschedMeta?.proposedDate,
+                rescheduleReason: reschedMeta?.reason,
+                declineReason: cancelMeta?.reason,
               };
             });
+
+            // Synchronize candidate statusHistory with interview events so drawer and timeline show accurate notes
+            for (const iv of mappedInterviews) {
+              const cand = mappedCandidates.find(
+                (c) => c.id === iv.candidateId || (c.applicationId && c.applicationId === iv.candidateId)
+              );
+              if (cand && Array.isArray(cand.statusHistory)) {
+                if (iv.status === "Permintaan Reschedule") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-reschedule-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-reschedule-${iv.id}`,
+                      stage: "interview",
+                      title: "Permintaan Reschedule Wawancara",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: `Kandidat mengusulkan jadwal baru: ${iv.rescheduleProposedDate || "-"}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`,
+                    });
+                  }
+                } else if (iv.status === "Ditolak Kandidat") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-declined-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-declined-${iv.id}`,
+                      stage: "interview",
+                      title: "Sesi Wawancara Ditolak Kandidat",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: `Kandidat tidak dapat menghadiri sesi ini (${iv.declineReason || "Jadwal bentrok"}). Lamaran tetap aktif.`,
+                    });
+                  }
+                } else if (iv.status === "Terjadwal (Terkonfirmasi)") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-confirmed-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-confirmed-${iv.id}`,
+                      stage: "interview",
+                      title: "Wawancara Terkonfirmasi Hadir",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: "Kandidat telah mengonfirmasi kehadiran untuk sesi wawancara.",
+                    });
+                  }
+                }
+              }
+            }
           }
         }
 
@@ -753,15 +834,24 @@ export function RecruiterOperationsPage() {
           rejected: extraUpdates?.reason || "Kandidat tidak melanjutkan ke tahap berikutnya pada posisi ini.",
         };
 
+        const isRevision =
+          target.stage === "offer" &&
+          newStage === "offer" &&
+          (target.offerStatus === "negotiating" || target.offerStatus === "sent");
+
         const newHistoryItem: StatusHistoryItem = {
           id: `hist-stage-${id}-${existingHistory.length + 1}`,
           stage: newStage,
-          title: stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
+          title: isRevision
+            ? "Revisi Surat Penawaran Diterbitkan"
+            : stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
           actionType: "recruiter",
           timestamp: new Date().toISOString(),
           actor: recruiterName,
           actorRole: "Recruiter Lead",
-          notes: extraUpdates?.reason || stageNotes[newStage],
+          notes: isRevision
+            ? `Rekruter menerbitkan revisi surat penawaran dengan kompensasi ${extraUpdates?.compensation || target.compensation || "Rp 15.000.000 / bulan"}.`
+            : extraUpdates?.reason || stageNotes[newStage],
         };
 
         resolvedHistory = [...existingHistory, newHistoryItem];
@@ -1378,7 +1468,9 @@ export function RecruiterOperationsPage() {
                         </div>
                       ) : (
                         stageCandidates.map((candidate, idx) => {
-                          const candidateInterviews = data.interviews.filter((i) => i.candidateId === candidate.id);
+                          const candidateInterviews = data.interviews.filter(
+                            (i) => i.candidateId === candidate.id || (candidate.applicationId && i.candidateId === candidate.applicationId)
+                          );
                           const isDragging = draggingCandidateId === candidate.id;
                           const isHired = candidate.stage === "hired";
 
@@ -1449,15 +1541,57 @@ export function RecruiterOperationsPage() {
                                       </span>
                                     )}
 
-                                    {candidate.stage === "interview" && candidateInterviews.length > 0 && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
-                                        <Clock className="size-2.5" />
-                                        Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
-                                          day: "numeric",
-                                          month: "short",
-                                        })}
-                                      </span>
-                                    )}
+                                    {candidate.stage === "interview" && candidateInterviews.length > 0 && (() => {
+                                      const primaryIv = candidateInterviews[0];
+                                      const isResched = primaryIv.status === "Permintaan Reschedule" || primaryIv.status === "reschedule_requested";
+                                      const isDeclined = primaryIv.status === "Ditolak Kandidat" || primaryIv.status === "declined";
+                                      const isConfirmed = primaryIv.status === "Terjadwal (Terkonfirmasi)" || primaryIv.status === "confirmed";
+
+                                      if (isResched) {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md">
+                                            <Clock className="size-2.5 text-amber-600" />
+                                            Reschedule: {new Date(primaryIv.date).toLocaleDateString("id-ID", {
+                                              day: "numeric",
+                                              month: "short",
+                                            })} {new Date(primaryIv.date).toLocaleTimeString("id-ID", {
+                                              hour: "2-digit",
+                                              minute: "2-digit",
+                                            })}
+                                          </span>
+                                        );
+                                      }
+
+                                      if (isDeclined) {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-md">
+                                            <Calendar className="size-2.5 text-slate-500" />
+                                            Sesi Ditolak Kandidat
+                                          </span>
+                                        );
+                                      }
+
+                                      return (
+                                        <span
+                                          className={cn(
+                                            "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                            isConfirmed
+                                              ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                              : "text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200"
+                                          )}
+                                        >
+                                          <Clock className="size-2.5" />
+                                          {isConfirmed ? "Hadir: " : "Wawancara: "}
+                                          {new Date(primaryIv.date).toLocaleDateString("id-ID", {
+                                            day: "numeric",
+                                            month: "short",
+                                          })} {new Date(primaryIv.date).toLocaleTimeString("id-ID", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}
+                                        </span>
+                                      );
+                                    })()}
 
                                     {candidate.stage === "interview" && candidateInterviews.length === 0 && (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">

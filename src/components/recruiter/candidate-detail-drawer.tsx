@@ -53,7 +53,7 @@ export type Candidate = {
   appliedAt: string;
   score: number;
   feedback: string;
-  offerStatus: "draft" | "sent" | "accepted" | "declined";
+  offerStatus: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   compensation: string;
   reason: string;
   applicationId?: string;
@@ -70,10 +70,13 @@ export type Interview = {
   timezone: string;
   type: string;
   panel: string[];
-  status: "Terjadwal" | "Selesai" | "Dibatalkan";
+  status: "Terjadwal" | "Selesai" | "Dibatalkan" | "Terjadwal (Terkonfirmasi)" | "Permintaan Reschedule" | "Ditolak Kandidat" | string;
   reminder: boolean;
   meetingUrl?: string;
   sentAt?: string | null;
+  rescheduleProposedDate?: string;
+  rescheduleReason?: string;
+  declineReason?: string;
 };
 
 interface CandidateDetailDrawerProps {
@@ -150,7 +153,12 @@ export function CandidateDetailDrawer({
 
   if (!open || !candidate) return null;
 
-  const candidateInterviews = interviews.filter((i) => i.candidateId === candidate.id);
+  const candidateInterviews = interviews.filter(
+    (i) =>
+      i.candidateId === candidate.id ||
+      (candidate.applicationId &&
+        (i.candidateId === candidate.applicationId || (i as { applicationId?: string }).applicationId === candidate.applicationId))
+  );
   const isHired = candidate.stage === "hired";
   const isOfferOrAbove = candidate.stage === "offer" || candidate.stage === "hired";
 
@@ -620,7 +628,18 @@ export function CandidateDetailDrawer({
                   <div className="space-y-3">
                     {candidateInterviews.map((iv) => {
                       const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
-                      const effectiveStatus = iv.status === "Dibatalkan" ? "Dibatalkan" : isPastDate || iv.status === "Selesai" ? "Selesai" : "Terjadwal";
+                      const effectiveStatus: string =
+                        iv.status === "Dibatalkan"
+                          ? "Dibatalkan"
+                          : iv.status === "Selesai" || (isPastDate && !["Permintaan Reschedule", "Ditolak Kandidat"].includes(iv.status))
+                            ? "Selesai"
+                            : iv.status === "Terjadwal (Terkonfirmasi)" || iv.status === "confirmed"
+                              ? "Terkonfirmasi Hadir"
+                              : iv.status === "Permintaan Reschedule" || iv.status === "reschedule_requested"
+                                ? "Permintaan Reschedule"
+                                : iv.status === "Ditolak Kandidat" || iv.status === "declined"
+                                  ? "Ditolak Kandidat"
+                                  : "Terjadwal";
 
                       return (
                         <Card key={iv.id} className="border-slate-200 shadow-2xs">
@@ -639,6 +658,12 @@ export function CandidateDetailDrawer({
                                   "text-[10px] font-semibold",
                                   effectiveStatus === "Selesai"
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : effectiveStatus === "Terkonfirmasi Hadir"
+                                    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                    : effectiveStatus === "Permintaan Reschedule"
+                                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                                    : effectiveStatus === "Ditolak Kandidat"
+                                    ? "bg-slate-100 text-slate-700 border-slate-300"
                                     : effectiveStatus === "Dibatalkan"
                                     ? "bg-slate-100 text-slate-600 border-slate-200"
                                     : "bg-purple-50 text-[#7C3AED] border-purple-200"
@@ -647,6 +672,54 @@ export function CandidateDetailDrawer({
                                 {effectiveStatus}
                               </Badge>
                             </div>
+
+                            {effectiveStatus === "Permintaan Reschedule" && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-900 space-y-1">
+                                <p className="font-bold flex items-center gap-1.5 text-amber-900">
+                                  <Calendar className="size-3.5 text-amber-700 shrink-0" />
+                                  Kandidat Mengajukan Reschedule
+                                </p>
+                                {(() => {
+                                  const reschedItem = candidate.statusHistory?.slice().reverse().find(
+                                    (h) => h.title.includes("Reschedule") || (h.notes && h.notes.includes("mengusulkan jadwal baru"))
+                                  );
+                                  const formattedProposed = iv.rescheduleProposedDate ? formatInterviewDateTime(iv.rescheduleProposedDate) : "";
+                                  const noteText = formattedProposed
+                                    ? `Kandidat mengusulkan jadwal baru: ${formattedProposed}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`
+                                    : reschedItem?.notes;
+                                  return noteText ? (
+                                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                                      {noteText}
+                                    </p>
+                                  ) : (
+                                    <p className="text-amber-800 text-[11px]">
+                                      Kandidat mengajukan usulan jadwal baru. Buat jadwal pengganti melalui form di bawah.
+                                    </p>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
+                            {effectiveStatus === "Ditolak Kandidat" && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1">
+                                <p className="font-semibold text-slate-800">
+                                  Kandidat tidak dapat menghadiri sesi wawancara ini.
+                                </p>
+                                {(() => {
+                                  const declineItem = candidate.statusHistory?.slice().reverse().find(
+                                    (h) => h.title.includes("Ditolak Kandidat") || (h.notes && h.notes.includes("Kandidat tidak dapat menghadiri"))
+                                  );
+                                  const noteText = iv.declineReason
+                                    ? `Kandidat tidak dapat menghadiri sesi ini (${iv.declineReason}). Lamaran tetap aktif.`
+                                    : declineItem?.notes;
+                                  return noteText ? (
+                                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                                      {noteText}
+                                    </p>
+                                  ) : null;
+                                })()}
+                              </div>
+                            )}
 
                             {iv.meetingUrl && (
                               <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
@@ -760,6 +833,10 @@ export function CandidateDetailDrawer({
                         "capitalize text-[11px]",
                         candidate.offerStatus === "accepted"
                           ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : candidate.offerStatus === "negotiating"
+                          ? "bg-purple-100 text-purple-800 border-purple-300"
+                          : candidate.offerStatus === "declined"
+                          ? "bg-red-100 text-red-800 border-red-300"
                           : candidate.offerStatus === "sent"
                           ? "bg-blue-100 text-blue-800 border-blue-300"
                           : "bg-slate-100 text-slate-700"
@@ -767,11 +844,43 @@ export function CandidateDetailDrawer({
                     >
                       {candidate.offerStatus === "accepted"
                         ? "Diterima oleh Kandidat"
+                        : candidate.offerStatus === "negotiating"
+                        ? "Dalam Negosiasi / Diskusi"
+                        : candidate.offerStatus === "declined"
+                        ? "Ditolak oleh Kandidat"
                         : candidate.offerStatus === "sent"
                         ? "Penawaran Terkirim"
                         : "Draf"}
                     </Badge>
                   </div>
+
+                  {candidate.offerStatus === "negotiating" && (
+                    <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-3.5 space-y-1.5">
+                      <div className="flex items-center gap-2 text-purple-900 font-bold text-xs">
+                        <MessageSquare className="size-4 text-[#7C3AED]" />
+                        <span>Kandidat Mengajukan Pesan Diskusi / Negosiasi</span>
+                      </div>
+                      {(() => {
+                        const latestNegotiationItem = candidate.statusHistory?.slice().reverse().find(
+                          (h) => h.title.includes("Negosiasi") || (h.actionType === "candidate" && h.stage === "offer")
+                        );
+                        return (
+                          <p className="text-xs text-purple-950 bg-white/90 p-2.5 rounded-lg border border-purple-200/70 italic leading-relaxed">
+                            {latestNegotiationItem?.notes || "Kandidat ingin mendiskusikan penyesuaian kompensasi / syarat penawaran."}
+                          </p>
+                        );
+                      })()}
+                      <p className="text-[11px] text-purple-800">
+                        Klik &quot;Revisi Penawaran Kerja&quot; di bawah untuk menerbitkan surat penawaran versi baru.
+                      </p>
+                    </div>
+                  )}
+
+                  {candidate.offerStatus === "declined" && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 font-medium">
+                      Kandidat menolak penawaran kerja ini. Status lamaran dipisahkan menjadi Ditolak (Offer Declined).
+                    </div>
+                  )}
 
                   <div>
                     <span className="text-xs font-semibold text-slate-500 block">Kompensasi Ditawarkan:</span>
@@ -785,7 +894,11 @@ export function CandidateDetailDrawer({
                       onClick={() => onOpenOfferModal(candidate)}
                     >
                       <DollarSign className="size-3.5 mr-1" />
-                      {candidate.offerStatus === "draft" ? "Buat & Terbitkan Penawaran" : "Perbarui Rincian Penawaran"}
+                      {candidate.offerStatus === "draft"
+                        ? "Buat & Terbitkan Penawaran"
+                        : candidate.offerStatus === "negotiating"
+                        ? "Revisi Penawaran Kerja (Kirim v2)"
+                        : "Perbarui Rincian Penawaran"}
                     </Button>
                     {candidate.offerStatus === "sent" && (
                       <Button
