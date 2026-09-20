@@ -55,7 +55,7 @@ export type Candidate = {
   appliedAt: string;
   score: number;
   feedback: string;
-  offerStatus: "draft" | "sent" | "accepted" | "declined";
+  offerStatus: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   compensation: string;
   reason: string;
   applicationId?: string;
@@ -72,7 +72,7 @@ export type Interview = {
   timezone: string;
   type: string;
   panel: string[];
-  status: "Terjadwal" | "Selesai" | "Dibatalkan";
+  status: "Terjadwal" | "Selesai" | "Dibatalkan" | "Terjadwal (Terkonfirmasi)" | "Permintaan Reschedule" | "Ditolak Kandidat" | string;
   reminder: boolean;
   meetingUrl?: string;
   sentAt?: string | null;
@@ -346,7 +346,7 @@ export function RecruiterOperationsPage() {
     prevStage: Stage;
     prevStatusHistory?: StatusHistoryItem[];
     prevCompensation?: string;
-    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined";
+    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined" | "negotiating";
   } | null>(null);
 
   // Drag and Drop state
@@ -753,15 +753,24 @@ export function RecruiterOperationsPage() {
           rejected: extraUpdates?.reason || "Kandidat tidak melanjutkan ke tahap berikutnya pada posisi ini.",
         };
 
+        const isRevision =
+          target.stage === "offer" &&
+          newStage === "offer" &&
+          (target.offerStatus === "negotiating" || target.offerStatus === "sent");
+
         const newHistoryItem: StatusHistoryItem = {
           id: `hist-stage-${id}-${existingHistory.length + 1}`,
           stage: newStage,
-          title: stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
+          title: isRevision
+            ? "Revisi Surat Penawaran Diterbitkan"
+            : stageTitles[newStage] || `Perubahan Tahap: ${newStage}`,
           actionType: "recruiter",
           timestamp: new Date().toISOString(),
           actor: recruiterName,
           actorRole: "Recruiter Lead",
-          notes: extraUpdates?.reason || stageNotes[newStage],
+          notes: isRevision
+            ? `Rekruter menerbitkan revisi surat penawaran dengan kompensasi ${extraUpdates?.compensation || target.compensation || "Rp 15.000.000 / bulan"}.`
+            : extraUpdates?.reason || stageNotes[newStage],
         };
 
         resolvedHistory = [...existingHistory, newHistoryItem];
