@@ -210,10 +210,21 @@ export function RecruiterOperationsPage() {
       fetch("/api/interviews", { cache: "no-store" }),
       fetch("/api/offers", { cache: "no-store" }),
     ])
-      .then(async ([appRes, , intRes]) => {
+      .then(async ([appRes, candRes, intRes]) => {
         if (!active) return;
         const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
         let mappedCandidates: Candidate[] = [];
+
+        // Parse candidate profiles from Supabase (/api/candidates)
+        type RemoteCand = { id: string; name?: string; role?: string; location?: string; avatarUrl?: string; summary?: string };
+        let remoteCandList: RemoteCand[] = [];
+        if (candRes && candRes.ok) {
+          try {
+            const candPayload = (await candRes.json()) as { candidates?: RemoteCand[] };
+            remoteCandList = candPayload.candidates ?? [];
+          } catch {}
+        }
+        const candidateMap = new Map(remoteCandList.map((c) => [c.id, c]));
 
         if (appRes.ok) {
           type AppRow = {
@@ -223,7 +234,7 @@ export function RecruiterOperationsPage() {
             jobId?: string;
             submittedAt?: string;
             job?: { id?: string; title?: string };
-            candidate?: { name?: string; headline?: string; location?: string };
+            candidate?: { name?: string; headline?: string; location?: string; avatarUrl?: string };
           };
           const appData = (await appRes.json()) as { applications?: AppRow[] };
           if (appData.applications && appData.applications.length > 0) {
@@ -243,12 +254,15 @@ export function RecruiterOperationsPage() {
                   mappedStage = "rejected";
                 }
 
+                const candProfile = candidateMap.get(app.candidateProfileId || app.id);
+                const resolvedAvatar = app.candidate?.avatarUrl || candProfile?.avatarUrl;
+
                 return {
                   id: app.candidateProfileId || app.id,
                   applicationId: app.id,
-                  name: app.candidate?.name || `Kandidat #${index + 1}`,
-                  role: app.job?.title || app.candidate?.headline || "Software Engineer",
-                  location: app.candidate?.location || "Indonesia",
+                  name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
+                  role: app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
+                  location: app.candidate?.location || candProfile?.location || "Indonesia",
                   stage: mappedStage,
                   owner: recruiterName,
                   dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
@@ -260,8 +274,34 @@ export function RecruiterOperationsPage() {
                   reason: "",
                   jobId: app.jobId,
                   jobTitle: app.job?.title,
+                  avatarUrl: resolvedAvatar,
                 };
               });
+          }
+        }
+
+        // Talent Pool: Include scanned candidates from Supabase who don't have an active application yet
+        const existingAppCandIds = new Set(mappedCandidates.map((c) => c.id));
+        for (const cand of remoteCandList) {
+          if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
+            mappedCandidates.push({
+              id: cand.id,
+              name: cand.name || "Talent Network Candidate",
+              role: cand.role || "Talent Candidate",
+              location: cand.location || "Indonesia",
+              stage: "screening",
+              owner: recruiterName,
+              dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+              appliedAt: new Date().toISOString().slice(0, 10),
+              score: 4.2,
+              feedback: "",
+              offerStatus: "draft",
+              compensation: "Rp 15.000.000 / bulan",
+              reason: "",
+              jobId: "talent-pool",
+              jobTitle: "Talent Pool",
+              avatarUrl: cand.avatarUrl,
+            });
           }
         }
 
