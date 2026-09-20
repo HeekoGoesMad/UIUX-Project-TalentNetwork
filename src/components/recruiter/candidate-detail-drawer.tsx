@@ -628,20 +628,18 @@ export function CandidateDetailDrawer({
                   <div className="space-y-3">
                     {candidateInterviews.map((iv) => {
                       const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
-                      let effectiveStatus: string = iv.status;
-                      if (iv.status === "Dibatalkan") {
-                        effectiveStatus = "Dibatalkan";
-                      } else if (iv.status === "Selesai" || (isPastDate && !["Permintaan Reschedule", "Ditolak Kandidat"].includes(iv.status))) {
-                        effectiveStatus = "Selesai";
-                      } else if (iv.status === "Terjadwal (Terkonfirmasi)" || iv.status === "confirmed") {
-                        effectiveStatus = "Terkonfirmasi Hadir";
-                      } else if (iv.status === "Permintaan Reschedule" || iv.status === "reschedule_requested") {
-                        effectiveStatus = "Permintaan Reschedule";
-                      } else if (iv.status === "Ditolak Kandidat" || iv.status === "declined") {
-                        effectiveStatus = "Ditolak Kandidat";
-                      } else {
-                        effectiveStatus = "Terjadwal";
-                      }
+                      const effectiveStatus: string =
+                        iv.status === "Dibatalkan"
+                          ? "Dibatalkan"
+                          : iv.status === "Selesai" || (isPastDate && !["Permintaan Reschedule", "Ditolak Kandidat"].includes(iv.status))
+                            ? "Selesai"
+                            : iv.status === "Terjadwal (Terkonfirmasi)" || iv.status === "confirmed"
+                              ? "Terkonfirmasi Hadir"
+                              : iv.status === "Permintaan Reschedule" || iv.status === "reschedule_requested"
+                                ? "Permintaan Reschedule"
+                                : iv.status === "Ditolak Kandidat" || iv.status === "declined"
+                                  ? "Ditolak Kandidat"
+                                  : "Terjadwal";
 
                       return (
                         <Card key={iv.id} className="border-slate-200 shadow-2xs">
