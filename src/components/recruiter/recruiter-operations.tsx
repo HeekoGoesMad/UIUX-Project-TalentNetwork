@@ -10,6 +10,7 @@ import {
   Download,
   GripVertical,
   Kanban,
+  Lock,
   MapPin,
   MessageSquare,
   Search,
@@ -24,6 +25,7 @@ import { useApp } from "@/providers/app-provider";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import { CandidateAvatar } from "@/components/talent/avatar";
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
@@ -52,6 +54,7 @@ export type Candidate = {
   applicationId?: string;
   jobId?: string;
   jobTitle?: string;
+  avatarUrl?: string;
 };
 
 export type Interview = {
@@ -77,13 +80,20 @@ const STAGES: Array<{ id: Stage; label: string; bg: string; border: string; text
   { id: "rejected", label: "Tidak Lolos", bg: "bg-slate-50/70", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-400" },
 ];
 
+const defaultJobs = [
+  { id: "job-1", title: "Senior Product Designer" },
+  { id: "job-2", title: "Frontend Architect" },
+  { id: "job-3", title: "Product Manager" },
+  { id: "job-4", title: "Backend Engineer (Go/Node)" },
+];
 
 const initialCandidates: Candidate[] = [
-  { id: "candidate-1", name: "Nadia Putri Rahayu", role: "Senior Product Designer", location: "Jakarta Selatan", stage: "interview", owner: "Raka Pratama", dueDate: "2026-08-20", appliedAt: "2026-07-28", score: 4.6, feedback: "Portfolio kuat di design system.", offerStatus: "draft", compensation: "Rp 28–32 juta / bulan", reason: "" },
-  { id: "candidate-2", name: "Bima Adinata", role: "Frontend Architect", location: "Bandung", stage: "screening", owner: "Sari Wijaya", dueDate: "2026-08-18", appliedAt: "2026-08-02", score: 4.1, feedback: "Perlu validasi stakeholder management.", offerStatus: "draft", compensation: "Rp 25–29 juta / bulan", reason: "" },
-  { id: "candidate-3", name: "Maya Kusuma", role: "Product Manager", location: "Jakarta Barat", stage: "offer", owner: "Raka Pratama", dueDate: "2026-08-19", appliedAt: "2026-07-22", score: 4.8, feedback: "Sangat kuat di systems thinking dan discovery.", offerStatus: "sent", compensation: "Rp 31 juta / bulan", reason: "" },
-  { id: "candidate-4", name: "Rizky Maulana", role: "Backend Engineer (Go/Node)", location: "Surabaya", stage: "interview", owner: "Dimas Nugroho", dueDate: "2026-08-21", appliedAt: "2026-07-30", score: 3.7, feedback: "", offerStatus: "draft", compensation: "Rp 24–28 juta / bulan", reason: "" },
-  { id: "candidate-5", name: "Tasya Lestari", role: "Data Scientist", location: "Yogyakarta", stage: "hired", owner: "Sari Wijaya", dueDate: "2026-08-04", appliedAt: "2026-07-04", score: 4.9, feedback: "Keahlian modeling sangat relevan.", offerStatus: "accepted", compensation: "Rp 30 juta / bulan", reason: "" },
+  { id: "candidate-adrienne", name: "Adrienne Kayana Wistara Lie", role: "Product Designer", location: "Denpasar Barat, Bali", stage: "hired", owner: "Adrienne", dueDate: "2026-09-25", appliedAt: "2026-09-09", score: 4.8, feedback: "Kandidat ini memenuhi 84% kompetensi inti lowongan.", offerStatus: "accepted", compensation: "Rp 15.000.000 / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", jobId: "talent-pool", jobTitle: "Talent Pool" },
+  { id: "candidate-1", name: "Nadia Putri Rahayu", role: "Senior Product Designer", location: "Jakarta Selatan", stage: "interview", owner: "Raka Pratama", dueDate: "2026-08-20", appliedAt: "2026-07-28", score: 4.6, feedback: "Portfolio kuat di design system.", offerStatus: "draft", compensation: "Rp 28–32 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop", jobId: "job-1", jobTitle: "Senior Product Designer" },
+  { id: "candidate-2", name: "Bima Adinata", role: "Frontend Architect", location: "Bandung", stage: "screening", owner: "Sari Wijaya", dueDate: "2026-08-18", appliedAt: "2026-08-02", score: 4.1, feedback: "Perlu validasi stakeholder management.", offerStatus: "draft", compensation: "Rp 25–29 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop", jobId: "talent-pool", jobTitle: "Talent Pool" },
+  { id: "candidate-3", name: "Maya Kusuma", role: "Product Manager", location: "Jakarta Barat", stage: "offer", owner: "Raka Pratama", dueDate: "2026-08-19", appliedAt: "2026-07-22", score: 4.8, feedback: "Sangat kuat di systems thinking dan discovery.", offerStatus: "sent", compensation: "Rp 31 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400&auto=format&fit=crop", jobId: "job-3", jobTitle: "Product Manager" },
+  { id: "candidate-4", name: "Rizky Maulana", role: "Backend Engineer (Go/Node)", location: "Surabaya", stage: "interview", owner: "Dimas Nugroho", dueDate: "2026-08-21", appliedAt: "2026-07-30", score: 3.7, feedback: "", offerStatus: "draft", compensation: "Rp 24–28 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", jobId: "job-4", jobTitle: "Backend Engineer (Go/Node)" },
+  { id: "candidate-5", name: "Tasya Lestari", role: "Data Scientist", location: "Yogyakarta", stage: "hired", owner: "Sari Wijaya", dueDate: "2026-08-04", appliedAt: "2026-07-04", score: 4.9, feedback: "Keahlian modeling sangat relevan.", offerStatus: "accepted", compensation: "Rp 30 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop", jobId: "job-1", jobTitle: "Senior Product Designer" },
 ];
 
 const initialInterviews: Interview[] = [
@@ -130,7 +140,7 @@ export function RecruiterOperationsPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
-  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>([]);
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(defaultJobs);
 
   // Modals & Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -328,10 +338,32 @@ export function RecruiterOperationsPage() {
         searchQuery.trim() === "" ||
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchJob = jobFilter === "all" || candidate.jobId === jobFilter || candidate.role === jobFilter;
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool"
+          : candidate.jobId === jobFilter || candidate.role === jobFilter;
       return matchSearch && matchJob;
     });
   }, [activeCandidates, searchQuery, jobFilter]);
+
+  const handleAssignJob = (candidateId: string, jobId: string, jobTitle: string) => {
+    setData((current) => ({
+      ...current,
+      candidates: current.candidates.map((c) =>
+        c.id === candidateId ? { ...c, jobId, jobTitle } : c
+      ),
+    }));
+    if (selectedCandidate && selectedCandidate.id === candidateId) {
+      setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle });
+    }
+    toast.success(
+      jobId === "talent-pool"
+        ? "Kandidat dipindahkan ke Talent Pool"
+        : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
+    );
+  };
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -726,6 +758,7 @@ export function RecruiterOperationsPage() {
                     className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
                   >
                     <option value="all">Semua Lowongan</option>
+                    <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
                     {availableJobs.map((j) => (
                       <option key={j.id} value={j.id}>
                         {j.title}
@@ -770,7 +803,7 @@ export function RecruiterOperationsPage() {
                     className={cn(
                       "flex flex-col rounded-2xl border transition-all duration-200 min-h-[560px] bg-slate-50/60 p-3",
                       stage.border,
-                      isOver ? "bg-purple-50/80 border-dashed border-[#7C3AED] ring-2 ring-purple-300 scale-[1.01] shadow-inner" : "hover:border-slate-300"
+                      isOver ? "bg-purple-50/40 border-dashed border-[#7C3AED]/70 ring-2 ring-purple-200/60 scale-[1.005] shadow-xs" : "hover:border-slate-300/80"
                     )}
                   >
                     {/* Column Header */}
@@ -812,11 +845,12 @@ export function RecruiterOperationsPage() {
                         stageCandidates.map((candidate, idx) => {
                           const candidateInterviews = data.interviews.filter((i) => i.candidateId === candidate.id);
                           const isDragging = draggingCandidateId === candidate.id;
+                          const isHired = candidate.stage === "hired";
 
                           return (
                             <div
                               key={candidate.id}
-                              draggable={true}
+                              draggable={!isHired}
                               onDragStart={(e) => handleDragStart(e, candidate.id)}
                               onDragEnd={handleDragEnd}
                               onClick={() => {
@@ -825,21 +859,25 @@ export function RecruiterOperationsPage() {
                               }}
                               style={{ animationDelay: `${idx * 50}ms` }}
                               className={cn(
-                                "group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing animate-in fade-in-50 slide-in-from-bottom-2",
-                                isDragging ? "opacity-30 scale-95 border-[#7C3AED] ring-2 ring-purple-300 shadow-2xl" : ""
+                                "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
+                                isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+                                isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : ""
                               )}
                             >
-                              {/* Top Bar: Name & Actions */}
+                              {/* Top Bar: Avatar, Name & Actions */}
                               <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="size-7 rounded-lg bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-bold text-xs group-hover:scale-105 transition-transform">
-                                    {candidate.name
+                                <div className="flex items-center gap-2.5">
+                                  <CandidateAvatar
+                                    initials={candidate.name
                                       .split(" ")
                                       .map((n) => n[0])
                                       .join("")
                                       .slice(0, 2)
                                       .toUpperCase()}
-                                  </div>
+                                    avatarUrl={candidate.avatarUrl}
+                                    name={candidate.name}
+                                    className="size-8 rounded-xl ring-1 ring-purple-100 group-hover:ring-purple-300 transition-all shrink-0"
+                                  />
                                   <div>
                                     <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#7C3AED] transition-colors line-clamp-1">
                                       {candidate.name}
@@ -851,47 +889,61 @@ export function RecruiterOperationsPage() {
 
                               {/* Candidate Status Pills */}
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                {/* Visual Differentiator: Screening vs Interview */}
-                                {candidate.stage === "screening" && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                                    <Sparkles className="size-2.5 text-blue-600" />
-                                    Review Profil
+                                {isHired ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                    <Lock className="size-2.5 text-emerald-600" />
+                                    Terkunci · Final
                                   </span>
-                                )}
-
-                                {candidate.stage === "interview" && candidateInterviews.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
-                                    <Clock className="size-2.5" />
-                                    Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
-                                      day: "numeric",
-                                      month: "short",
-                                    })}
-                                  </span>
-                                )}
-
-                                {candidate.stage === "interview" && candidateInterviews.length === 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                                    <Calendar className="size-2.5" />
-                                    Belum Terjadwal
-                                  </span>
-                                )}
-
-                                {candidate.offerStatus !== "draft" && (
-                                  <span
-                                    className={cn(
-                                      "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border",
-                                      candidate.offerStatus === "accepted"
-                                        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                        : "text-blue-700 bg-blue-50 border-blue-200"
+                                ) : (
+                                  <>
+                                    {(!candidate.jobId || candidate.jobId === "talent-pool") && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold text-[#7C3AED] bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
+                                        Talent Pool
+                                      </span>
                                     )}
-                                  >
-                                    <DollarSign className="size-2.5" />
-                                    {candidate.offerStatus === "accepted" ? "Offer Disetujui" : "Offer Terkirim"}
-                                  </span>
+
+                                    {candidate.stage === "screening" && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                        <Sparkles className="size-2.5 text-blue-600" />
+                                        Review Profil
+                                      </span>
+                                    )}
+
+                                    {candidate.stage === "interview" && candidateInterviews.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-md">
+                                        <Clock className="size-2.5" />
+                                        Wawancara: {new Date(candidateInterviews[0].date).toLocaleDateString("id-ID", {
+                                          day: "numeric",
+                                          month: "short",
+                                        })}
+                                      </span>
+                                    )}
+
+                                    {candidate.stage === "interview" && candidateInterviews.length === 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                        <Calendar className="size-2.5" />
+                                        Belum Terjadwal
+                                      </span>
+                                    )}
+
+                                    {candidate.offerStatus !== "draft" && (
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                          candidate.offerStatus === "accepted"
+                                            ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                            : "text-blue-700 bg-blue-50 border-blue-200"
+                                        )}
+                                      >
+                                        <DollarSign className="size-2.5" />
+                                        {candidate.offerStatus === "accepted" ? "Offer Disetujui" : "Offer Terkirim"}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
 
-                              {/* Card Footer: Clean Location & Actions (No Dropdown) */}
+                              {/* Card Footer: Clean Location & Actions */}
                               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                                 <span className="text-[10px] flex items-center gap-1 truncate max-w-[130px] text-slate-500">
                                   <MapPin className="size-3 text-slate-400 shrink-0" />
@@ -958,15 +1010,25 @@ export function RecruiterOperationsPage() {
                         >
                           <td className="px-5 py-3.5 font-bold text-slate-900">
                             <div className="flex items-center gap-2.5">
-                              <div className="size-8 rounded-lg bg-purple-100 text-[#7C3AED] flex items-center justify-center font-bold text-xs">
-                                {candidate.name
+                              <CandidateAvatar
+                                initials={candidate.name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")
                                   .slice(0, 2)
                                   .toUpperCase()}
+                                avatarUrl={candidate.avatarUrl}
+                                name={candidate.name}
+                                className="size-8 rounded-xl ring-1 ring-purple-100 shrink-0"
+                              />
+                              <div>
+                                <p className="font-bold text-slate-900 leading-tight">{candidate.name}</p>
+                                {(!candidate.jobId || candidate.jobId === "talent-pool") && (
+                                  <span className="inline-flex text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
+                                    Talent Pool
+                                  </span>
+                                )}
                               </div>
-                              <span>{candidate.name}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3.5">
@@ -1042,6 +1104,8 @@ export function RecruiterOperationsPage() {
           onSendInterviewInvitation={handleSendInterviewInvitation}
           onUpdateFeedback={handleUpdateFeedback}
           recruiterName={recruiterName}
+          availableJobs={availableJobs}
+          onAssignJob={handleAssignJob}
         />
 
         {/* Schedule Interview Transition Modal (Screening -> Interview) */}
