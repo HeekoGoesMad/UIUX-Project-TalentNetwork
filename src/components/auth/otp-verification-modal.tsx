@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Mail, RefreshCw, ShieldCheck, X } from "lucide-react";
-import { toast } from "sonner";
+import { AlertCircle, Check, CheckCircle2, Loader2, Mail, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -28,6 +27,8 @@ export function OtpVerificationModal({
   const [resending, setResending] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [countdown, setCountdown] = useState(60);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const canResend = countdown <= 0 && !resending && !loading && !isVerified;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -51,6 +52,8 @@ export function OtpVerificationModal({
 
   const handleChange = (index: number, value: string) => {
     if (loading || isVerified) return;
+    if (errorMessage) setErrorMessage(null);
+    if (successMessage) setSuccessMessage(null);
     const clean = value.replace(/\D/g, "");
     if (!clean) {
       const nextOtp = [...otp];
@@ -85,6 +88,8 @@ export function OtpVerificationModal({
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     if (loading || isVerified) return;
+    if (errorMessage) setErrorMessage(null);
+    if (successMessage) setSuccessMessage(null);
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (!pasted) return;
@@ -107,11 +112,14 @@ export function OtpVerificationModal({
     if (loading || isVerified) return;
     const code = tokenString || otp.join("");
     if (code.length < 6) {
-      toast.error("Masukkan 6 digit kode OTP secara lengkap.");
+      setErrorMessage("Masukkan 6 digit kode OTP secara lengkap.");
+      setSuccessMessage(null);
       return;
     }
 
     setLoading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       const supabase = createClient();
@@ -131,7 +139,11 @@ export function OtpVerificationModal({
           });
 
           if (fallback.error) {
-            toast.error(fallback.error.message || "Kode OTP tidak valid atau telah kedaluwarsa.");
+            const raw = fallback.error.message || "";
+            const friendly = /expired/i.test(raw)
+              ? "Kode OTP telah kedaluwarsa. Silakan kirim ulang kode baru."
+              : "Kode OTP tidak valid atau salah. Silakan periksa kembali.";
+            setErrorMessage(friendly);
             setLoading(false);
             return;
           }
@@ -140,13 +152,13 @@ export function OtpVerificationModal({
 
       // Success: lock UI immediately and show transition message
       setIsVerified(true);
-      toast.success("Email berhasil diverifikasi! Mengalihkan...");
+      setSuccessMessage("Email berhasil diverifikasi! Mengalihkan ke workspace...");
       await Promise.resolve(onSuccess());
       onClose();
     } catch {
       // Fallback demo validation
       setIsVerified(true);
-      toast.success("Email berhasil diverifikasi! Mengalihkan...");
+      setSuccessMessage("Email berhasil diverifikasi! Mengalihkan ke workspace...");
       await Promise.resolve(onSuccess());
       onClose();
     }
@@ -155,6 +167,8 @@ export function OtpVerificationModal({
   const handleResend = async () => {
     if (!canResend) return;
     setResending(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       const supabase = createClient();
@@ -167,23 +181,23 @@ export function OtpVerificationModal({
         if (error) {
           if (/security purposes.*after (\d+)/i.test(error.message)) {
             const seconds = error.message.match(/after (\d+)/i)?.[1] ?? "beberapa";
-            toast.error(`Mohon tunggu ${seconds} detik sebelum meminta OTP baru lagi.`);
+            setErrorMessage(`Mohon tunggu ${seconds} detik sebelum meminta OTP baru lagi.`);
             const secNum = parseInt(seconds, 10);
             if (!isNaN(secNum) && secNum > 0) {
               setCountdown(secNum);
             }
           } else {
-            toast.error(error.message || "Gagal mengirim ulang kode OTP.");
+            setErrorMessage("Gagal mengirim ulang kode OTP. Silakan coba lagi.");
           }
           setResending(false);
           return;
         }
       }
       setCountdown(60);
-      toast.success(`Kode OTP baru telah dikirimkan ke ${email}`);
+      setSuccessMessage(`Kode OTP baru telah dikirimkan ke ${email}`);
     } catch {
       setCountdown(60);
-      toast.success(`Kode OTP baru telah dikirimkan ke ${email}`);
+      setSuccessMessage(`Kode OTP baru telah dikirimkan ke ${email}`);
     } finally {
       setResending(false);
     }
@@ -217,6 +231,26 @@ export function OtpVerificationModal({
             <span>{email}</span>
           </div>
         </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150 text-left"
+          >
+            <AlertCircle className="size-4 shrink-0 text-red-500" />
+            <span className="leading-snug">{errorMessage}</span>
+          </div>
+        )}
+
+        {successMessage && !errorMessage && (
+          <div
+            role="status"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-700 font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150 text-left"
+          >
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+            <span className="leading-snug">{successMessage}</span>
+          </div>
+        )}
 
         {/* 6 Digit Inputs */}
         <div className="flex justify-center gap-1.5 sm:gap-2.5 py-2">
