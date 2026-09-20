@@ -20,13 +20,19 @@ export async function storeLegalDocument(input: {
   bytes: Uint8Array;
   contentType: string;
 }): Promise<LegalDocStorageResult> {
-  const bucket = process.env.SUPABASE_LEGAL_DOCS_BUCKET?.trim() || "legal-documents";
+  const configuredBucket = process.env.SUPABASE_LEGAL_DOCS_BUCKET?.trim();
+  const bucket = configuredBucket || "legal-documents";
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-  // If Supabase is not configured, fallback gracefully in development mock mode
-  if (!bucket || !url || (!anonKey && !serviceKey)) {
+  // If Supabase is not configured or bucket is missing in local development, fallback gracefully to mock
+  if (
+    !configuredBucket ||
+    !url ||
+    (!anonKey && !serviceKey) ||
+    (process.env.NODE_ENV === "development" && !serviceKey)
+  ) {
     if (process.env.NODE_ENV === "development") {
       void input.bytes;
       void input.contentType;
@@ -50,17 +56,44 @@ export async function storeLegalDocument(input: {
     supabase = await createClient();
   }
 
-  const { error } = await supabase.storage.from(bucket).upload(input.key, input.bytes, {
-    contentType: input.contentType,
-    cacheControl: "3600",
-    upsert: true,
-  });
-  if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);
-  return {
-    provider: "supabase-storage",
-    storagePath: `${bucket}/${input.key}`,
-    status: "stored",
-  };
+  try {
+    const { error } = await supabase.storage.from(bucket).upload(input.key, input.bytes, {
+      contentType: input.contentType,
+      cacheControl: "3600",
+      upsert: true,
+    });
+    if (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          `[legal-docs-storage] Supabase Storage upload failed (${error.message}). Falling back to development-mock.`
+        );
+        return {
+          provider: "development-mock",
+          storagePath: `development-mock/${input.key}`,
+          status: "demo-only",
+        };
+      }
+      throw new Error(`Supabase Storage upload failed: ${error.message}`);
+    }
+    return {
+      provider: "supabase-storage",
+      storagePath: `${bucket}/${input.key}`,
+      status: "stored",
+    };
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        `[legal-docs-storage] Supabase Storage error in development; falling back to development-mock:`,
+        err
+      );
+      return {
+        provider: "development-mock",
+        storagePath: `development-mock/${input.key}`,
+        status: "demo-only",
+      };
+    }
+    throw err;
+  }
 }
 
 /**

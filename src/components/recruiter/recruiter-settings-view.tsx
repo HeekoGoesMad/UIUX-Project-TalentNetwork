@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import {
   Building2,
+  CheckCircle2,
+  ExternalLink,
   FileCheck,
+  FileText,
+  FileUp,
   Loader2,
   Lock,
   Save,
@@ -14,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
@@ -56,6 +61,8 @@ const EMPTY_FORM = {
   city: "",
   nibNumber: "",
   npwpNumber: "",
+  nibDocumentUrl: "",
+  npwpDocumentUrl: "",
   verificationStatus: "",
 };
 
@@ -66,8 +73,73 @@ export function RecruiterSettingsView() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDemo, setIsDemo] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState<"nib" | "npwp" | null>(null);
+  const [openingDoc, setOpeningDoc] = useState<"nib" | "npwp" | null>(null);
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
+
+  const handleOpenDocument = async (type: "nib" | "npwp") => {
+    setOpeningDoc(type);
+    try {
+      const res = await fetch(`/api/recruiter/legal-docs?type=${type}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengambil URL dokumen.");
+      }
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else if (data.isMock) {
+        toast.info(data.message || "Dokumen diunggah dalam mode mock development.");
+      } else {
+        toast.error(data.message || "Dokumen belum diunggah.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal membuka dokumen PDF.";
+      toast.error(msg);
+    } finally {
+      setOpeningDoc(null);
+    }
+  };
+
+  const handleUploadDocument = async (type: "nib" | "npwp", file: File | null) => {
+    if (!file) return;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Format berkas tidak valid. Hanya berkas PDF (.pdf) yang diperbolehkan.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ukuran berkas PDF maksimal 10MB");
+      return;
+    }
+
+    setUploadingDoc(type);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", type);
+
+      const res = await fetch("/api/recruiter/legal-docs", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengunggah berkas PDF");
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        [type === "nib" ? "nibDocumentUrl" : "npwpDocumentUrl"]: data.storagePath,
+      }));
+      toast.success(`Berkas PDF ${file.name} berhasil diunggah!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah berkas PDF.");
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -436,7 +508,7 @@ export function RecruiterSettingsView() {
             </CardContent>
           </Card>
 
-          {/* Bagian 3: Legalitas & NPWP/NIB */}
+          {/* Bagian 3: Legalitas & NPWP/NIB (Khusus PDF) */}
           <Card className="border-border/80 shadow-xs">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
@@ -444,42 +516,122 @@ export function RecruiterSettingsView() {
                   <FileCheck className="size-4" />
                 </div>
                 <div>
-                  <CardTitle className="text-base">Dokumen Legalitas &amp; Perpajakan</CardTitle>
+                  <CardTitle className="text-base">Dokumen Legalitas &amp; Perpajakan Resmi (PDF)</CardTitle>
                   <CardDescription className="text-xs">
-                    Nomor identifikasi izin berusaha dan NPWP yang terdaftar di sistem ProofyLink.
+                    Unggah berkas resmi NIB OSS dan NPWP Badan Usaha dalam format PDF untuk verifikasi kepatuhan hukum oleh tim admin ProofyLink.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label htmlFor="nibNumber" className="text-xs font-semibold text-foreground">Nomor Induk Berusaha (NIB)</label>
-                <Input
-                  id="nibNumber"
-                  type="text"
-                  value={form.nibNumber}
-                  onChange={(e) => setForm({ ...form, nibNumber: e.target.value })}
-                  className={inputClass}
-                  placeholder="Contoh: 9120001234567"
-                />
-                <span className="text-[11px] text-muted-foreground">
-                  NIB terdaftar di Online Single Submission (OSS).
-                </span>
+              {/* NIB OSS Card */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <FileText className="size-4 text-primary" /> Nomor Induk Berusaha (NIB OSS)
+                  </span>
+                  {form.nibDocumentUrl ? (
+                    <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                      <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Tersimpan
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-amber-700 bg-amber-50 border-amber-200">
+                      Belum Diunggah
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Dokumen legalitas izin berusaha OSS berbasis risiko. Format resmi hanya PDF (maks. 10MB).
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {form.nibDocumentUrl && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={openingDoc === "nib"}
+                      onClick={() => handleOpenDocument("nib")}
+                      className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5 font-medium"
+                    >
+                      {openingDoc === "nib" ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="size-3.5" />
+                      )}
+                      Lihat Berkas NIB
+                    </Button>
+                  )}
+                  <label className={`cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-input bg-white px-3 py-1.5 text-xs font-medium text-foreground hover:bg-slate-50 transition-colors shadow-xs ${uploadingDoc === "nib" ? "pointer-events-none opacity-60" : ""}`}>
+                    {uploadingDoc === "nib" ? (
+                      <Loader2 className="size-3.5 animate-spin text-primary" />
+                    ) : (
+                      <FileUp className="size-3.5 text-muted-foreground" />
+                    )}
+                    <span>{uploadingDoc === "nib" ? "Mengunggah..." : form.nibDocumentUrl ? "Ganti Berkas PDF" : "Unggah Berkas NIB (.pdf)"}</span>
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="sr-only"
+                      disabled={uploadingDoc === "nib"}
+                      onChange={(e) => handleUploadDocument("nib", e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="npwpNumber" className="text-xs font-semibold text-foreground">Nomor Pokok Wajib Pajak (NPWP)</label>
-                <Input
-                  id="npwpNumber"
-                  type="text"
-                  value={form.npwpNumber}
-                  onChange={(e) => setForm({ ...form, npwpNumber: e.target.value })}
-                  className={inputClass}
-                  placeholder="01.234.567.8-012.000"
-                />
-                <span className="text-[11px] text-muted-foreground">
-                  NPWP Badan Usaha yang valid.
-                </span>
+              {/* NPWP Badan Usaha Card */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <FileText className="size-4 text-primary" /> NPWP Badan Usaha
+                  </span>
+                  {form.npwpDocumentUrl ? (
+                    <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                      <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Tersimpan
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-amber-700 bg-amber-50 border-amber-200">
+                      Belum Diunggah
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Kartu NPWP Badan atau Surat Keterangan Terdaftar (SKT) Pajak. Format resmi hanya PDF (maks. 10MB).
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {form.npwpDocumentUrl && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={openingDoc === "npwp"}
+                      onClick={() => handleOpenDocument("npwp")}
+                      className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5 font-medium"
+                    >
+                      {openingDoc === "npwp" ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="size-3.5" />
+                      )}
+                      Lihat Berkas NPWP
+                    </Button>
+                  )}
+                  <label className={`cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-input bg-white px-3 py-1.5 text-xs font-medium text-foreground hover:bg-slate-50 transition-colors shadow-xs ${uploadingDoc === "npwp" ? "pointer-events-none opacity-60" : ""}`}>
+                    {uploadingDoc === "npwp" ? (
+                      <Loader2 className="size-3.5 animate-spin text-primary" />
+                    ) : (
+                      <FileUp className="size-3.5 text-muted-foreground" />
+                    )}
+                    <span>{uploadingDoc === "npwp" ? "Mengunggah..." : form.npwpDocumentUrl ? "Ganti Berkas PDF" : "Unggah Berkas NPWP (.pdf)"}</span>
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="sr-only"
+                      disabled={uploadingDoc === "npwp"}
+                      onChange={(e) => handleUploadDocument("npwp", e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
               </div>
             </CardContent>
           </Card>
