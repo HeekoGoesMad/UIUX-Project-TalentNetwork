@@ -1,15 +1,29 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
-import { deleteInterview, getInterviewById, updateInterview } from "@/lib/services/recruiter-hiring";
+import {
+  deleteInterview,
+  getInterviewById,
+  respondToInterviewAsCandidate,
+  updateInterview,
+} from "@/lib/services/recruiter-hiring";
 
 const updateSchema = z.object({
-  status: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).optional(),
+  status: z.enum(["scheduled", "completed", "cancelled", "rescheduled", "confirmed", "reschedule_requested", "declined"]).optional(),
   scheduledAt: z.string().refine((val) => !isNaN(Date.parse(val)), "Format tanggal tidak valid.").optional(),
   durationMinutes: z.number().int().min(15).max(240).optional(),
   timezone: z.string().trim().max(50).optional(),
   meetingUrl: z.string().trim().max(500).optional(),
   reason: z.string().trim().max(1000).optional(),
+});
+
+const candidateActionSchema = z.object({
+  action: z.enum(["confirm", "reschedule", "decline"]).optional(),
+  status: z.enum(["confirmed", "reschedule_requested", "declined"]).optional(),
+  rescheduleProposedDate: z.string().trim().max(100).optional(),
+  rescheduleReason: z.string().trim().max(1000).optional(),
+  declineReason: z.string().trim().max(1000).optional(),
+  cancellationReason: z.string().trim().max(1000).optional(),
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ interviewId: string }> }) {
@@ -43,6 +57,36 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ in
     const { interviewId } = await params;
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    if (current.user.role === "candidate") {
+      const body = await request.json().catch(() => null);
+      const parsed = candidateActionSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message ?? "Aksi wawancara kandidat tidak valid." },
+          { status: 400 }
+        );
+      }
+
+      const action =
+        parsed.data.action ||
+        (parsed.data.status === "confirmed"
+          ? "confirm"
+          : parsed.data.status === "reschedule_requested"
+          ? "reschedule"
+          : "decline");
+
+      const updated = await respondToInterviewAsCandidate(current.db, {
+        interviewId,
+        candidateUserId: current.user.id,
+        action,
+        rescheduleProposedDate: parsed.data.rescheduleProposedDate,
+        rescheduleReason: parsed.data.rescheduleReason,
+        declineReason: parsed.data.declineReason || parsed.data.cancellationReason,
+      });
+
+      return NextResponse.json({ interview: updated });
+    }
 
     const scope = await getRecruiterScope(current.db, current.user);
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });

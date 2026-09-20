@@ -76,6 +76,9 @@ export type Interview = {
   reminder: boolean;
   meetingUrl?: string;
   sentAt?: string | null;
+  rescheduleProposedDate?: string;
+  rescheduleReason?: string;
+  declineReason?: string;
 };
 
 const storageKey = "proofylink-demo-recruiter-operations";
@@ -553,25 +556,98 @@ export function RecruiterOperationsPage() {
               const scheduledDate = core.scheduledAt || iv.scheduledAt || new Date().toISOString();
               const isPast = !isNaN(new Date(scheduledDate).getTime()) && new Date(scheduledDate).getTime() < Date.now();
               const rawStatus = core.status || iv.status;
-              const status =
-                rawStatus === "completed" || isPast
-                  ? "Selesai"
-                  : rawStatus === "cancelled"
-                  ? "Dibatalkan"
-                  : "Terjadwal";
+              
+              let status: Interview["status"] = "Terjadwal";
+              if (rawStatus === "reschedule_requested" || rawStatus === "Permintaan Reschedule") {
+                status = "Permintaan Reschedule";
+              } else if (rawStatus === "declined" || rawStatus === "Ditolak Kandidat") {
+                status = "Ditolak Kandidat";
+              } else if (rawStatus === "confirmed" || rawStatus === "Terjadwal (Terkonfirmasi)") {
+                status = "Terjadwal (Terkonfirmasi)";
+              } else if (rawStatus === "completed" || (isPast && !["reschedule_requested", "declined", "confirmed"].includes(rawStatus || ""))) {
+                status = "Selesai";
+              } else if (rawStatus === "cancelled") {
+                status = "Dibatalkan";
+              }
+
+              const reschedMeta = (core as { rescheduleMetadata?: { proposedDate?: string; reason?: string } }).rescheduleMetadata ||
+                (iv as unknown as { rescheduleMetadata?: { proposedDate?: string; reason?: string } }).rescheduleMetadata;
+              const cancelMeta = (core as { cancellationMetadata?: { reason?: string } }).cancellationMetadata ||
+                (iv as unknown as { cancellationMetadata?: { reason?: string } }).cancellationMetadata;
+
+              const resolvedCandId =
+                iv.candidateProfileId ||
+                (core as unknown as { candidateProfileId?: string }).candidateProfileId ||
+                (iv as unknown as { candidateId?: string }).candidateId ||
+                "";
 
               return {
                 id: core.id || iv.id || `iv-${Date.now()}`,
-                candidateId: iv.candidateProfileId || "",
+                candidateId: resolvedCandId,
                 date: scheduledDate,
                 timezone: core.timezone || iv.timezone || "Asia/Jakarta (WIB)",
                 type: core.title || iv.title || "Wawancara",
                 panel: [recruiterName],
-                status: status as "Terjadwal" | "Selesai" | "Dibatalkan",
+                status,
                 reminder: true,
                 meetingUrl: core.meetingUrl || iv.meetingUrl,
+                rescheduleProposedDate: reschedMeta?.proposedDate,
+                rescheduleReason: reschedMeta?.reason,
+                declineReason: cancelMeta?.reason,
               };
             });
+
+            // Synchronize candidate statusHistory with interview events so drawer and timeline show accurate notes
+            for (const iv of mappedInterviews) {
+              const cand = mappedCandidates.find(
+                (c) => c.id === iv.candidateId || (c.applicationId && c.applicationId === iv.candidateId)
+              );
+              if (cand && Array.isArray(cand.statusHistory)) {
+                if (iv.status === "Permintaan Reschedule") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-reschedule-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-reschedule-${iv.id}`,
+                      stage: "interview",
+                      title: "Permintaan Reschedule Wawancara",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: `Kandidat mengusulkan jadwal baru: ${iv.rescheduleProposedDate || "-"}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`,
+                    });
+                  }
+                } else if (iv.status === "Ditolak Kandidat") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-declined-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-declined-${iv.id}`,
+                      stage: "interview",
+                      title: "Sesi Wawancara Ditolak Kandidat",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: `Kandidat tidak dapat menghadiri sesi ini (${iv.declineReason || "Jadwal bentrok"}). Lamaran tetap aktif.`,
+                    });
+                  }
+                } else if (iv.status === "Terjadwal (Terkonfirmasi)") {
+                  const alreadyHas = cand.statusHistory.some((h) => h.id === `hist-iv-confirmed-${iv.id}`);
+                  if (!alreadyHas) {
+                    cand.statusHistory.push({
+                      id: `hist-iv-confirmed-${iv.id}`,
+                      stage: "interview",
+                      title: "Wawancara Terkonfirmasi Hadir",
+                      actionType: "candidate",
+                      timestamp: iv.date,
+                      actor: cand.name,
+                      actorRole: "Candidate",
+                      notes: "Kandidat telah mengonfirmasi kehadiran untuk sesi wawancara.",
+                    });
+                  }
+                }
+              }
+            }
           }
         }
 

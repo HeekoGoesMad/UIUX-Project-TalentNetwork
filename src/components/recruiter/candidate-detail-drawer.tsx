@@ -74,6 +74,9 @@ export type Interview = {
   reminder: boolean;
   meetingUrl?: string;
   sentAt?: string | null;
+  rescheduleProposedDate?: string;
+  rescheduleReason?: string;
+  declineReason?: string;
 };
 
 interface CandidateDetailDrawerProps {
@@ -150,7 +153,12 @@ export function CandidateDetailDrawer({
 
   if (!open || !candidate) return null;
 
-  const candidateInterviews = interviews.filter((i) => i.candidateId === candidate.id);
+  const candidateInterviews = interviews.filter(
+    (i) =>
+      i.candidateId === candidate.id ||
+      (candidate.applicationId &&
+        (i.candidateId === candidate.applicationId || (i as { applicationId?: string }).applicationId === candidate.applicationId))
+  );
   const isHired = candidate.stage === "hired";
   const isOfferOrAbove = candidate.stage === "offer" || candidate.stage === "hired";
 
@@ -677,9 +685,12 @@ export function CandidateDetailDrawer({
                                   const reschedItem = candidate.statusHistory?.slice().reverse().find(
                                     (h) => h.title.includes("Reschedule") || (h.notes && h.notes.includes("mengusulkan jadwal baru"))
                                   );
-                                  return reschedItem ? (
+                                  const noteText = iv.rescheduleProposedDate
+                                    ? `Kandidat mengusulkan jadwal baru: ${iv.rescheduleProposedDate}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`
+                                    : reschedItem?.notes;
+                                  return noteText ? (
                                     <p className="text-amber-800 text-[11px] leading-relaxed">
-                                      {reschedItem.notes}
+                                      {noteText}
                                     </p>
                                   ) : (
                                     <p className="text-amber-800 text-[11px]">
@@ -699,9 +710,12 @@ export function CandidateDetailDrawer({
                                   const declineItem = candidate.statusHistory?.slice().reverse().find(
                                     (h) => h.title.includes("Ditolak Kandidat") || (h.notes && h.notes.includes("Kandidat tidak dapat menghadiri"))
                                   );
-                                  return declineItem ? (
+                                  const noteText = iv.declineReason
+                                    ? `Kandidat tidak dapat menghadiri sesi ini (${iv.declineReason}). Lamaran tetap aktif.`
+                                    : declineItem?.notes;
+                                  return noteText ? (
                                     <p className="text-slate-600 text-[11px] leading-relaxed">
-                                      {declineItem.notes}
+                                      {noteText}
                                     </p>
                                   ) : null;
                                 })()}

@@ -25,12 +25,21 @@ export type UpdateInterviewInput = {
   interviewId: string;
   organizationId: string;
   actorUserId: string;
-  status?: "scheduled" | "completed" | "cancelled" | "rescheduled";
+  status?: "scheduled" | "completed" | "cancelled" | "rescheduled" | "confirmed" | "reschedule_requested" | "declined";
   scheduledAt?: Date;
   durationMinutes?: number;
   timezone?: string;
   meetingUrl?: string;
   reason?: string;
+};
+
+export type CandidateInterviewResponseInput = {
+  interviewId: string;
+  candidateUserId: string;
+  action: "confirm" | "reschedule" | "decline";
+  rescheduleProposedDate?: string;
+  rescheduleReason?: string;
+  declineReason?: string;
 };
 
 export type SubmitInterviewFeedbackInput = {
@@ -711,6 +720,127 @@ export async function updateInterview(db: Database, input: UpdateInterviewInput)
           })
         );
       }
+    }
+
+    return updated;
+  });
+}
+
+export async function respondToInterviewAsCandidate(db: Database, input: CandidateInterviewResponseInput) {
+  const [row] = await db
+    .select({
+      interview: schema.interviews,
+      applicationId: schema.applications.id,
+      candidateProfileId: schema.candidateProfiles.id,
+      candidateUserId: schema.candidateProfiles.userId,
+      candidateName: schema.profiles.displayName,
+      organizationId: schema.interviews.organizationId,
+      jobTitle: schema.jobs.title,
+      createdBy: schema.interviews.createdBy,
+    })
+    .from(schema.interviews)
+    .innerJoin(schema.applications, eq(schema.applications.id, schema.interviews.applicationId))
+    .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
+    .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
+    .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+    .where(eq(schema.interviews.id, input.interviewId))
+    .limit(1);
+
+  if (!row || row.candidateUserId !== input.candidateUserId) {
+    throw new Error("Wawancara tidak ditemukan atau Anda tidak memiliki akses.");
+  }
+
+  return await db.transaction(async (tx) => {
+    let nextStatus: "confirmed" | "reschedule_requested" | "declined";
+    let eventType: "confirmed" | "reschedule_requested" | "declined";
+    let notifTitle: string;
+    let notifBody: string;
+    const updatePayload: Partial<typeof schema.interviews.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (input.action === "confirm") {
+      nextStatus = "confirmed";
+      eventType = "confirmed";
+      updatePayload.status = "confirmed";
+      notifTitle = `Wawancara Dikonfirmasi: ${row.jobTitle}`;
+      notifBody = `${row.candidateName || "Kandidat"} telah mengonfirmasi kehadiran untuk sesi wawancara.`;
+    } else if (input.action === "reschedule") {
+      nextStatus = "reschedule_requested";
+      eventType = "reschedule_requested";
+      updatePayload.status = "reschedule_requested";
+      updatePayload.rescheduleMetadata = {
+        proposedDate: input.rescheduleProposedDate,
+        reason: input.rescheduleReason || "Tidak ada alasan spesifik.",
+        requestedAt: new Date().toISOString(),
+        requestedBy: input.candidateUserId,
+      };
+      notifTitle = `Permintaan Reschedule: ${row.jobTitle}`;
+      notifBody = `${row.candidateName || "Kandidat"} mengusulkan jadwal baru: ${input.rescheduleProposedDate || "-"}. Alasan: ${input.rescheduleReason || "Tidak ada alasan spesifik."}`;
+    } else {
+      nextStatus = "declined";
+      eventType = "declined";
+      updatePayload.status = "declined";
+      updatePayload.cancellationMetadata = {
+        reason: input.declineReason || "Jadwal bentrok",
+        declinedAt: new Date().toISOString(),
+        declinedBy: "candidate",
+      };
+      notifTitle = `Sesi Wawancara Ditolak: ${row.jobTitle}`;
+      notifBody = `${row.candidateName || "Kandidat"} tidak dapat menghadiri sesi wawancara ini (${input.declineReason || "Jadwal bentrok"}). Lamaran tetap aktif.`;
+    }
+
+    const [updated] = await tx
+      .update(schema.interviews)
+      .set(updatePayload)
+      .where(eq(schema.interviews.id, input.interviewId))
+      .returning();
+
+    // Insert interview event
+    await tx.insert(schema.interviewEvents).values({
+      interviewId: input.interviewId,
+      actorUserId: input.candidateUserId,
+      type: eventType,
+      metadata: {
+        action: input.action,
+        status: nextStatus,
+        rescheduleProposedDate: input.rescheduleProposedDate,
+        rescheduleReason: input.rescheduleReason,
+        declineReason: input.declineReason,
+      },
+    });
+
+    // Write audit log
+    await writeAuditLog({
+      db: tx,
+      actorUserId: input.candidateUserId,
+      organizationId: row.organizationId,
+      action: `interview.${eventType}_by_candidate`,
+      entityType: "interview",
+      entityId: input.interviewId,
+      metadata: {
+        applicationId: row.applicationId,
+        rescheduleProposedDate: input.rescheduleProposedDate,
+        rescheduleReason: input.rescheduleReason,
+        declineReason: input.declineReason,
+      },
+    });
+
+    // Notify recruiter / creator
+    if (row.createdBy) {
+      await createNotificationWithDeliveries(
+        tx,
+        systemNotification({
+          userId: row.createdBy,
+          title: notifTitle,
+          body: notifBody,
+          data: notificationData(
+            `interview:${input.interviewId}:${eventType}:${Date.now()}`,
+            `/recruiter/operations`,
+            { interviewId: input.interviewId, applicationId: row.applicationId, eventType }
+          ),
+        })
+      );
     }
 
     return updated;

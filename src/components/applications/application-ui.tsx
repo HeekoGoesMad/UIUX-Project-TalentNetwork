@@ -66,7 +66,7 @@ export const applicationStatuses = [
   "withdrawn",
 ] as const;
 export type ApplicationStatus = (typeof applicationStatuses)[number];
-export type Application = { id: string; jobId: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
+export type Application = { id: string; jobId: string; candidateProfileId?: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
 type History = { id: string; fromStatus: ApplicationStatus | null; toStatus: ApplicationStatus; reason: string | null; changedBy: string; createdAt: string };
 const labels: Record<ApplicationStatus, string> = {
   new: "Baru",
@@ -1447,6 +1447,16 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   const handleConfirmInterview = useCallback(
     async (interviewId: string) => {
       try {
+        if (dbMode) {
+          const res = await fetch(`/api/interviews/${interviewId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "confirm", status: "confirmed" }),
+          });
+          const data = (await res.json()) as { error?: string };
+          if (!res.ok) throw new Error(data.error ?? "Gagal mengonfirmasi kehadiran.");
+        }
+
         setInterviews((prev) =>
           prev.map((i) => (i.id === interviewId ? { ...i, status: "confirmed" } : i))
         );
@@ -1465,7 +1475,13 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               }
             }
             if (opsParsed && Array.isArray(opsParsed.candidates)) {
-              const cand = opsParsed.candidates[0];
+              const cand = opsParsed.candidates.find(
+                (c: { id: string; name?: string }) =>
+                  c.id === application?.candidateProfileId ||
+                  c.name === application?.candidate?.name ||
+                  c.id === "candidate-adrienne" ||
+                  c.name === "Adrienne Kayana Wistara Lie"
+              ) || opsParsed.candidates[0];
               if (cand) {
                 const now = new Date().toISOString();
                 cand.statusHistory = [
@@ -1488,21 +1504,43 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
         } catch {
           // ignore
         }
-      } catch {
-        toast.error("Gagal mengonfirmasi kehadiran.");
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Gagal mengonfirmasi kehadiran.");
       }
     },
-    [application]
+    [application, dbMode]
   );
 
   const handleRescheduleSubmit = useCallback(async () => {
     if (!rescheduleTargetId) return;
     setSubmittingReschedule(true);
     try {
+      if (dbMode) {
+        const res = await fetch(`/api/interviews/${rescheduleTargetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reschedule",
+            status: "reschedule_requested",
+            rescheduleProposedDate,
+            rescheduleReason,
+          }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Gagal mengajukan permintaan reschedule.");
+      }
+
       setInterviews((prev) =>
         prev.map((i) =>
           i.id === rescheduleTargetId
-            ? { ...i, status: "reschedule_requested" }
+            ? {
+                ...i,
+                status: "reschedule_requested",
+                rescheduleMetadata: {
+                  proposedDate: rescheduleProposedDate,
+                  reason: rescheduleReason,
+                },
+              }
             : i
         )
       );
@@ -1518,10 +1556,18 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === rescheduleTargetId);
             if (ivIdx >= 0) {
               opsParsed.interviews[ivIdx].status = "Permintaan Reschedule";
+              opsParsed.interviews[ivIdx].rescheduleProposedDate = rescheduleProposedDate;
+              opsParsed.interviews[ivIdx].rescheduleReason = rescheduleReason;
             }
           }
           if (opsParsed && Array.isArray(opsParsed.candidates)) {
-            const cand = opsParsed.candidates[0];
+            const cand = opsParsed.candidates.find(
+              (c: { id: string; name?: string }) =>
+                c.id === application?.candidateProfileId ||
+                c.name === application?.candidate?.name ||
+                c.id === "candidate-adrienne" ||
+                c.name === "Adrienne Kayana Wistara Lie"
+            ) || opsParsed.candidates[0];
             if (cand) {
               const now = new Date().toISOString();
               cand.statusHistory = [
@@ -1546,18 +1592,40 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
       }
       setRescheduleOpen(false);
       setRescheduleReason("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengajukan permintaan reschedule.");
     } finally {
       setSubmittingReschedule(false);
     }
-  }, [application, rescheduleProposedDate, rescheduleReason, rescheduleTargetId]);
+  }, [application, dbMode, rescheduleProposedDate, rescheduleReason, rescheduleTargetId]);
 
   const handleDeclineInterviewSubmit = useCallback(async () => {
     if (!declineTargetInterviewId) return;
     try {
+      if (dbMode) {
+        const res = await fetch(`/api/interviews/${declineTargetInterviewId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "decline",
+            status: "declined",
+            declineReason: declineInterviewReason,
+          }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Gagal menolak sesi wawancara.");
+      }
+
       setInterviews((prev) =>
         prev.map((i) =>
           i.id === declineTargetInterviewId
-            ? { ...i, status: "declined" }
+            ? {
+                ...i,
+                status: "declined",
+                cancellationMetadata: {
+                  reason: declineInterviewReason,
+                },
+              }
             : i
         )
       );
@@ -1573,10 +1641,17 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === declineTargetInterviewId);
             if (ivIdx >= 0) {
               opsParsed.interviews[ivIdx].status = "Ditolak Kandidat";
+              opsParsed.interviews[ivIdx].declineReason = declineInterviewReason;
             }
           }
           if (opsParsed && Array.isArray(opsParsed.candidates)) {
-            const cand = opsParsed.candidates[0];
+            const cand = opsParsed.candidates.find(
+              (c: { id: string; name?: string }) =>
+                c.id === application?.candidateProfileId ||
+                c.name === application?.candidate?.name ||
+                c.id === "candidate-adrienne" ||
+                c.name === "Adrienne Kayana Wistara Lie"
+            ) || opsParsed.candidates[0];
             if (cand) {
               const now = new Date().toISOString();
               cand.statusHistory = [
@@ -1601,10 +1676,10 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
       }
       setDeclineInterviewOpen(false);
       setDeclineInterviewReason("");
-    } catch {
-      toast.error("Gagal memperbarui status wawancara.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui status wawancara.");
     }
-  }, [application, declineInterviewReason, declineTargetInterviewId]);
+  }, [application, dbMode, declineInterviewReason, declineTargetInterviewId]);
 
   // Modern human-centric pipeline milestones for candidate visualization
   const PIPELINE_PHASES = [
