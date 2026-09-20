@@ -159,6 +159,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
   const handleGoogleClick = () => {
     setErrorMessage(null);
+    if (mode === "login") {
+      void executeGoogleSignIn();
+      return;
+    }
+
+    if (consentAgreed) {
+      void executeGoogleSignIn();
+      return;
+    }
+
     setPendingGoogleAuth(true);
     setConsentModalOpen(true);
   };
@@ -556,7 +566,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <ConsentModal
         isOpen={consentModalOpen}
-        actionTitle={pendingGoogleAuth ? "Lanjutkan dengan Google" : undefined}
+        actionTitle={pendingGoogleAuth ? "Daftar dengan Google" : undefined}
         onClose={() => {
           setConsentModalOpen(false);
           setPendingGoogleAuth(false);
