@@ -26,6 +26,7 @@ import {
   TalentCategory,
   Candidate,
 } from "@/types";
+import { SECTOR_TAXONOMY, candidateMatchesSector } from "@/config/sectors";
 import { getProvinceFromLocation, matchesLocationProvince } from "@/lib/locations";
 
 const pageSize = 12;
@@ -234,9 +235,9 @@ function FilterPanel({
       </FilterSection>
 
       {/* ── INDUSTRI ── */}
-      <FilterSection label="Industri">
-        {(Object.keys(INDUSTRY_CATEGORY_CONFIG) as IndustryCategory[]).map((key) => {
-          const cfg = INDUSTRY_CATEGORY_CONFIG[key];
+      <FilterSection label="Industri / Bidang Peran">
+        {(Object.keys(SECTOR_TAXONOMY) as IndustryCategory[]).map((key) => {
+          const cfg = SECTOR_TAXONOMY[key];
           const active = filters.industries.includes(key);
           return (
             <CheckRow
@@ -244,7 +245,14 @@ function FilterPanel({
               id={`ind-${key}`}
               checked={active}
               onChange={() => set({ industries: toggle(filters.industries, key) })}
-              label={cfg.label}
+              label={
+                <div className="flex flex-col">
+                  <span className="font-medium text-foreground">{cfg.label}</span>
+                  <span className="text-[11px] text-muted-foreground/80 leading-snug">
+                    {cfg.subRolePreview}
+                  </span>
+                </div>
+              }
             />
           );
         })}
@@ -308,14 +316,14 @@ function CheckRow({
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm transition-colors hover:bg-slate-50"
+      className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 text-sm transition-colors hover:bg-slate-50"
     >
       <input
         id={id}
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="size-4 rounded accent-primary"
+        className="mt-0.5 size-4 shrink-0 rounded accent-primary"
       />
       <span className="text-sm text-foreground">{label}</span>
     </label>
@@ -428,7 +436,7 @@ function SearchPageContent() {
         const qMatch = !query || (candidateSearchTextMap.get(c.id) ?? "").includes(query);
         const catMatch = !filters.talentCategories.length || filters.talentCategories.includes(c.talentCategory);
         const statusMatch = !filters.careerStatuses.length || (c.careerStatus && filters.careerStatuses.includes(c.careerStatus));
-        const indMatch = !filters.industries.length || filters.industries.includes(c.industry);
+        const indMatch = !filters.industries.length || filters.industries.some((ind) => candidateMatchesSector(c, ind));
         const expMatch = matchesExperience(c.experience, filters.experienceBands);
         const locMatch = !filters.locations.length || matchesLocationProvince(c.location, filters.locations);
         const campusMatch = !filters.campusVerifiedOnly || Boolean(

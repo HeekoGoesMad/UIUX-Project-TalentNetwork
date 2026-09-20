@@ -2,7 +2,20 @@ import { PERSONALITY_TYPES } from "@/config/personality";
 import { Candidate, CareerStatus, IndustryCategory, TalentCategory } from "@/types";
 
 const names = ["Nadia Putri","Rizky Pratama","Clara Wijaya","Bima Santoso","Maya Kusuma","Aditya Ramadhan","Salsabila Noor","Kevin Hartono","Dewi Lestari","Fajar Nugroho","Sarah Tan","Dimas Haryanto","Anisa Rahma","Bagas Permana","Citra Anggraini","Yoga Saputra","Larasati Dewi","Rafi Maulana","Intan Sari","Gilang Wibowo","Mei Chen","Arif Setiawan","Nina Kurnia","Rendra Wijaya","Vania Putri","Teguh Adi","Alya Prameswari","Raka Putra","Wulan Sari","Hendra Gunawan"];
-const roles = ["Senior Product Designer","Frontend Engineer","Growth Marketing Lead","Data Scientist","Product Manager","UX Researcher","Backend Engineer","Brand Strategist"];
+const roles = [
+  "Senior Product Designer",
+  "Frontend Engineer",
+  "Growth Marketing Lead",
+  "Data Scientist",
+  "Product Manager",
+  "Talent Acquisition Specialist",
+  "Backend Engineer",
+  "Business Development Lead",
+  "UX Researcher",
+  "HR Generalist",
+  "DevOps Engineer",
+  "Account Executive",
+];
 const cities = [
   "Jakarta Selatan, DKI Jakarta",
   "Bandung, Jawa Barat",
@@ -17,7 +30,23 @@ const cities = [
   "Malang, Jawa Timur",
   "Bantul, D.I. Yogyakarta",
 ];
-const skills = ["Figma","React","TypeScript","SQL","Product strategy","Research","Python","Go","Brand systems","Analytics"];
+const skills = [
+  "Figma",
+  "React",
+  "TypeScript",
+  "SQL",
+  "Product strategy",
+  "User Research",
+  "Python",
+  "Go",
+  "Brand systems",
+  "Analytics",
+  "Recruitment",
+  "B2B Sales",
+  "Docker",
+  "HRIS",
+  "Performance Marketing",
+];
 
 const careerStatuses: CareerStatus[] = ["open-to-work","open-for-opportunities","freelance-available","internship-available","not-available"];
 
@@ -33,14 +62,18 @@ const talentCategories: TalentCategory[] = [
 
 // Map roles to industries
 const industries: IndustryCategory[] = [
-  "product-design",    // Senior Product Designer
-  "technology-software",// Frontend Engineer
-  "marketing-digital", // Growth Marketing Lead
-  "data-analytics",    // Data Scientist
-  "product-design",    // Product Manager
-  "human-capital",     // UX Researcher
-  "technology-software",// Backend Engineer
-  "sales-bizdev",      // Brand Strategist
+  "product-design",       // Senior Product Designer
+  "technology-software",  // Frontend Engineer
+  "marketing-digital",    // Growth Marketing Lead
+  "data-analytics",       // Data Scientist
+  "product-design",       // Product Manager
+  "human-capital",        // Talent Acquisition Specialist
+  "technology-software",  // Backend Engineer
+  "sales-bizdev",         // Business Development Lead
+  "product-design",       // UX Researcher
+  "human-capital",        // HR Generalist
+  "technology-software",  // DevOps Engineer
+  "sales-bizdev",         // Account Executive
 ];
 
 const toolsList = ["Figma", "Excel", "Notion", "Looker Studio", "Jira", "Meta Ads", "Google Workspace", "HRIS"];
