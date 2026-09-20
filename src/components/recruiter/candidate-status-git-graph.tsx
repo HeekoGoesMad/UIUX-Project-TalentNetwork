@@ -163,7 +163,7 @@ export function getDefaultStatusHistory(candidate: {
       timestamp: `${appliedDate}T09:18:00.000Z`,
       actor: "AI Screening Engine",
       actorRole: "Model Evaluasi v2.4",
-      notes: `Skor keselarasan role-fit: ${Math.round((candidate.score || 4.5) * 20)}% (Sangat Sesuai). Kualifikasi teknis memenuhi standar peran.`,
+      notes: "Keselarasan role-fit: Sangat Sesuai. Kualifikasi teknis memenuhi standar peran.",
     },
   ];
 

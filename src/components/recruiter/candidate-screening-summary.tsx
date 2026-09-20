@@ -23,17 +23,12 @@ export function CandidateScreeningSummary({
   const { screeningResults } = useApp();
   const savedResult = screeningResults[candidateId];
 
-  // Hitung persentase kecocokan
-  const fitPercentage = savedResult?.insight?.score
-    ? Math.round(savedResult.insight.score)
-    : Math.min(96, Math.max(72, Math.round(score * 20)));
+  // Kualifikasi kecocokan kualitatif murni tanpa angka skor
+  const isHighFit = savedResult?.insight?.score
+    ? savedResult.insight.score >= 80
+    : score >= 4.0;
 
-  const fitLabel =
-    fitPercentage >= 85
-      ? "Sangat Sesuai"
-      : fitPercentage >= 75
-      ? "Sesuai Standar"
-      : "Perlu Peninjauan";
+  const fitLabel = isHighFit ? "Sangat Sesuai" : "Terverifikasi AI";
 
   const summaryText =
     savedResult?.summary?.summary ||
@@ -61,25 +56,22 @@ export function CandidateScreeningSummary({
   return (
     <Card className="border-slate-200 bg-white shadow-2xs overflow-hidden">
       <CardContent className="p-4 space-y-3.5">
-        {/* Header: Label & Score */}
+        {/* Header: Label Status Kualitatif */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
             <Sparkles className="size-3.5 text-[#7C3AED]" />
             <span>Hasil AI Screening</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#7C3AED]">{fitPercentage}% Fit</span>
-            <Badge
-              variant="outline"
-              className={
-                fitPercentage >= 85
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold py-0 px-2"
-                  : "bg-purple-50 text-[#7C3AED] border-purple-200 text-[10px] font-semibold py-0 px-2"
-              }
-            >
-              {fitLabel}
-            </Badge>
-          </div>
+          <Badge
+            variant="outline"
+            className={
+              isHighFit
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold py-0.5 px-2.5"
+                : "bg-purple-50 text-[#7C3AED] border-purple-200 text-[10px] font-semibold py-0.5 px-2.5"
+            }
+          >
+            {fitLabel}
+          </Badge>
         </div>
 
         {/* AI Summary Text */}

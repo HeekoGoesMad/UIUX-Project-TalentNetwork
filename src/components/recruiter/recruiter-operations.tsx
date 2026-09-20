@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -10,6 +10,7 @@ import {
   Download,
   GripVertical,
   Kanban,
+  Keyboard,
   Lock,
   MapPin,
   MessageSquare,
@@ -26,6 +27,8 @@ import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
 import { CandidateAvatar } from "@/components/talent/avatar";
+import { CandidateQuickPeek } from "@/components/recruiter/candidate-quick-peek";
+import { KeyboardShortcutsModal } from "@/components/recruiter/keyboard-shortcuts-modal";
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
@@ -117,7 +120,7 @@ const initialCandidates: Candidate[] = [
     dueDate: "2026-09-25",
     appliedAt: "2026-09-09",
     score: 4.8,
-    feedback: "Kandidat ini memenuhi 84% kompetensi inti lowongan.",
+    feedback: "Kandidat ini memenuhi kompetensi inti lowongan dan selaras dengan standar peran.",
     offerStatus: "accepted",
     compensation: "Rp 15.000.000 / bulan",
     reason: "",
@@ -280,6 +283,17 @@ export function RecruiterOperationsPage() {
   const [demoteInterviewCandidate, setDemoteInterviewCandidate] = useState<Candidate | null>(null);
   const [demoteInterviewTargetStage, setDemoteInterviewTargetStage] = useState<Stage | null>(null);
   const [hireConfirmCandidate, setHireConfirmCandidate] = useState<Candidate | null>(null);
+
+  // Power-User & QoL States
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [focusedCandidateId, setFocusedCandidateId] = useState<string | null>(null);
+  const lastChangeRef = useRef<{
+    candidateId: string;
+    prevStage: Stage;
+    prevStatusHistory?: StatusHistoryItem[];
+    prevCompensation?: string;
+    prevOfferStatus?: "draft" | "sent" | "accepted" | "declined";
+  } | null>(null);
 
   // Drag and Drop state
   const [draggingCandidateId, setDraggingCandidateId] = useState<string | null>(null);
@@ -596,11 +610,67 @@ export function RecruiterOperationsPage() {
     return { total, screening, interview, offer, hired };
   }, [activeCandidates]);
 
+  // 5-Second Safety Undo Buffer Handler
+  const handleUndo = useCallback(() => {
+    if (!lastChangeRef.current) return;
+    const { candidateId, prevStage, prevStatusHistory, prevCompensation, prevOfferStatus } =
+      lastChangeRef.current;
+
+    setData((current) => ({
+      ...current,
+      candidates: current.candidates.map((c) =>
+        c.id === candidateId
+          ? {
+              ...c,
+              stage: prevStage,
+              statusHistory: prevStatusHistory,
+              compensation: prevCompensation || c.compensation,
+              offerStatus: prevOfferStatus || c.offerStatus,
+            }
+          : c
+      ),
+    }));
+
+    if (selectedCandidate && selectedCandidate.id === candidateId) {
+      setSelectedCandidate((curr) =>
+        curr
+          ? {
+              ...curr,
+              stage: prevStage,
+              statusHistory: prevStatusHistory,
+              compensation: prevCompensation || curr.compensation,
+              offerStatus: prevOfferStatus || curr.offerStatus,
+            }
+          : null
+      );
+    }
+
+    if (dbMode) {
+      fetch(`/api/applications/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: prevStage }),
+      }).catch(() => {});
+    }
+
+    lastChangeRef.current = null;
+    toast.info("Perubahan tahap berhasil dibatalkan.");
+  }, [dbMode, selectedCandidate]);
+
   // Execute stage change with optimistic UI and DB sync
   const executeStageChange = useCallback(
     async (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
       const target = data.candidates.find((c) => c.id === id);
       if (!target) return;
+
+      // Save state for 5-second Undo safety buffer
+      lastChangeRef.current = {
+        candidateId: id,
+        prevStage: target.stage,
+        prevStatusHistory: target.statusHistory,
+        prevCompensation: target.compensation,
+        prevOfferStatus: target.offerStatus,
+      };
 
       const existingHistory = target.statusHistory || getDefaultStatusHistory(target, recruiterName);
       let resolvedHistory = extraUpdates?.statusHistory;
@@ -677,9 +747,15 @@ export function RecruiterOperationsPage() {
       }
 
       const stageObj = STAGES.find((s) => s.id === newStage);
-      toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`);
+      toast.success(`Kandidat dipindahkan ke tahap ${stageObj?.label || newStage}`, {
+        action: {
+          label: "Batalkan (Undo)",
+          onClick: () => handleUndo(),
+        },
+        duration: 5000,
+      });
     },
-    [data.candidates, dbMode, recruiterName, selectedCandidate]
+    [data.candidates, dbMode, handleUndo, recruiterName, selectedCandidate]
   );
 
   // Smart transition handler (validates transitions and opens appropriate modals)
@@ -730,6 +806,98 @@ export function RecruiterOperationsPage() {
     },
     [data.candidates, executeStageChange]
   );
+
+  // Keyboard Power-User Navigation (J/K, Enter/Space, 1-5, Esc, ?)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        activeTag === "select" ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        if (shortcutsModalOpen) {
+          setShortcutsModalOpen(false);
+          return;
+        }
+      }
+
+      if (drawerOpen) return;
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+        return;
+      }
+
+      if (filteredCandidates.length === 0) return;
+
+      if (e.key === "j" || e.key === "J" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedCandidateId((currentId) => {
+          if (!currentId) return filteredCandidates[0].id;
+          const currentIndex = filteredCandidates.findIndex((c) => c.id === currentId);
+          if (currentIndex === -1) return filteredCandidates[0].id;
+          const nextIndex = (currentIndex + 1) % filteredCandidates.length;
+          return filteredCandidates[nextIndex].id;
+        });
+        return;
+      }
+
+      if (e.key === "k" || e.key === "K" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedCandidateId((currentId) => {
+          if (!currentId) return filteredCandidates[filteredCandidates.length - 1].id;
+          const currentIndex = filteredCandidates.findIndex((c) => c.id === currentId);
+          if (currentIndex === -1) return filteredCandidates[filteredCandidates.length - 1].id;
+          const prevIndex = (currentIndex - 1 + filteredCandidates.length) % filteredCandidates.length;
+          return filteredCandidates[prevIndex].id;
+        });
+        return;
+      }
+
+      if (e.key === "Enter" || e.key === " ") {
+        if (focusedCandidateId) {
+          e.preventDefault();
+          const target = filteredCandidates.find((c) => c.id === focusedCandidateId);
+          if (target) {
+            setSelectedCandidate(target);
+            setDrawerOpen(true);
+          }
+        }
+        return;
+      }
+
+      if (["1", "2", "3", "4", "5"].includes(e.key)) {
+        if (focusedCandidateId) {
+          e.preventDefault();
+          const stageMap: Record<string, Stage> = {
+            "1": "screening",
+            "2": "interview",
+            "3": "offer",
+            "4": "hired",
+            "5": "rejected",
+          };
+          const targetStage = stageMap[e.key];
+          if (targetStage) {
+            initiateStageChange(focusedCandidateId, targetStage);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen, filteredCandidates, focusedCandidateId, initiateStageChange, shortcutsModalOpen]);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, candidateId: string) => {
@@ -959,6 +1127,16 @@ export function RecruiterOperationsPage() {
 
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => setShortcutsModalOpen(true)}
+                  className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                  title="Pintasan Keyboard (Tekan ?)"
+                >
+                  <Keyboard className="size-3.5" /> Pintasan
+                </Button>
+
+                <Button
+                  size="sm"
                   onClick={() => setReportModalOpen(true)}
                   className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
                 >
@@ -1115,22 +1293,27 @@ export function RecruiterOperationsPage() {
                           const isHired = candidate.stage === "hired";
 
                           return (
-                            <div
+                            <CandidateQuickPeek
                               key={candidate.id}
-                              draggable={!isHired}
-                              onDragStart={(e) => handleDragStart(e, candidate.id)}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => {
-                                setSelectedCandidate(candidate);
-                                setDrawerOpen(true);
-                              }}
-                              style={{ animationDelay: `${idx * 50}ms` }}
-                              className={cn(
-                                "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
-                                isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
-                                isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : ""
-                              )}
+                              candidate={candidate}
+                              disabled={draggingCandidateId !== null || drawerOpen || shortcutsModalOpen}
                             >
+                              <div
+                                draggable={!isHired}
+                                onDragStart={(e) => handleDragStart(e, candidate.id)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => {
+                                  setSelectedCandidate(candidate);
+                                  setDrawerOpen(true);
+                                }}
+                                style={{ animationDelay: `${idx * 50}ms` }}
+                                className={cn(
+                                  "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
+                                  isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+                                  isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : "",
+                                  focusedCandidateId === candidate.id ? "ring-2 ring-[#7C3AED] ring-offset-2 border-purple-300 shadow-md" : ""
+                                )}
+                              >
                               {/* Top Bar: Avatar, Name & Actions */}
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2.5">
@@ -1235,6 +1418,7 @@ export function RecruiterOperationsPage() {
                                 </div>
                               </div>
                             </div>
+                          </CandidateQuickPeek>
                           );
                         })
                       )}
@@ -1273,7 +1457,10 @@ export function RecruiterOperationsPage() {
                             setSelectedCandidate(candidate);
                             setDrawerOpen(true);
                           }}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                          className={cn(
+                            "hover:bg-slate-50/80 transition-colors cursor-pointer",
+                            focusedCandidateId === candidate.id ? "bg-purple-50/70 ring-1 ring-inset ring-purple-300" : ""
+                          )}
                         >
                           <td className="px-5 py-3.5 font-bold text-slate-900">
                             <div className="flex items-center gap-2.5">
@@ -1508,6 +1695,12 @@ export function RecruiterOperationsPage() {
           candidates={data.candidates}
           interviews={data.interviews}
           availableJobs={availableJobs}
+        />
+
+        {/* Keyboard Shortcuts Modal */}
+        <KeyboardShortcutsModal
+          open={shortcutsModalOpen}
+          onOpenChange={setShortcutsModalOpen}
         />
       </div>
     </ProtectedRoute>
