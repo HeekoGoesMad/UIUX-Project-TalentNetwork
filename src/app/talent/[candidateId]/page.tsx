@@ -318,7 +318,7 @@ function ScreeningResults({
             Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-             Insight berbasis role fit dan kualitas data, ditampilkan setelah screening run selesai. Consent tetap disimpan untuk pemeriksaan finansial atau credit di masa depan.
+            Evaluasi keselarasan peran dan kompetensi teknis berbasis profil terverifikasi ProofyLink Talent Network (Kandidat Opt-In: Open to Work).
           </p>
         </div>
         {completed && (
@@ -601,7 +601,7 @@ export default function TalentProfile() {
     } catch {
       // Balance check is best-effort; fall through to the generic message.
     }
-    return "Screening belum dapat dijalankan (consent bersifat opsional, bukan penyebabnya). Coba lagi.";
+    return "Screening belum dapat dijalankan saat ini. Silakan coba beberapa saat lagi.";
   };
 
   const startScan = () => {
@@ -1083,21 +1083,18 @@ export default function TalentProfile() {
                   <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
                     <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
-                  {completed ? (
-                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
-                      <Link href="/recruiter/operations">
-                        <ShieldCheck className="mr-1.5 size-3.5" /> Buka Pipeline Rekrutmen
-                      </Link>
-                    </Button>
-                  ) : screeningError ? (
-                    <Button size="sm" variant="outline" className="border-amber-200 bg-amber-50 text-amber-800" disabled>
-                      Retry Screening
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]" disabled>
-                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening...
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs"
+                    onClick={() => setAssignModalOpen(true)}
+                  >
+                    <Briefcase className="mr-1.5 size-3.5" /> Tugaskan ke Lowongan
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" asChild>
+                    <Link href="/recruiter/operations">
+                      <ShieldCheck className="mr-1.5 size-3.5 text-[#7C3AED]" /> Buka Operations Hub
+                    </Link>
+                  </Button>
                 </div>
 
                 {candidate.portfolio.length > 0 && (
