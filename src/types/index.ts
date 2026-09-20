@@ -213,10 +213,10 @@ export type RecruiterOnboardingData = {
   officeAddress: string;
   city: string;
   // Step 3: Legal Documents (NIB & NPWP)
-  nibNumber: string;
+  nibNumber?: string;
   nibFileName?: string;
   nibDocumentUrl?: string;
-  npwpNumber: string;
+  npwpNumber?: string;
   npwpFileName?: string;
   npwpDocumentUrl?: string;
   aktaFileName?: string;

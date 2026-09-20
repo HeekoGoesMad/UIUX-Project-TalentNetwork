@@ -53,8 +53,10 @@ const updateProfileSchema = z
     ),
     officeAddress: z.string().trim().max(500).optional(),
     city: z.string().trim().max(120).optional(),
-    nibNumber: z.string().trim().max(32).optional(),
-    npwpNumber: z.string().trim().max(32).optional(),
+    nibNumber: z.string().trim().max(32).optional().nullable(),
+    npwpNumber: z.string().trim().max(32).optional().nullable(),
+    nibDocumentUrl: z.string().trim().optional().nullable(),
+    npwpDocumentUrl: z.string().trim().optional().nullable(),
     picEmail: z.string().optional().nullable(),
     verificationStatus: z.string().optional().nullable(),
   })
@@ -75,6 +77,8 @@ const ORG_WRITE_KEYS = [
   "officeAddress",
   "nibNumber",
   "npwpNumber",
+  "nibDocumentUrl",
+  "npwpDocumentUrl",
 ] as const;
 
 function emptyProfileData() {
@@ -93,6 +97,8 @@ function emptyProfileData() {
     city: null,
     nibNumber: null,
     npwpNumber: null,
+    nibDocumentUrl: null,
+    npwpDocumentUrl: null,
     verificationStatus: null,
   };
 }
@@ -145,6 +151,8 @@ export async function GET() {
         city: org?.city ?? null,
         nibNumber: org?.nib ?? null,
         npwpNumber: org?.npwp ?? null,
+        nibDocumentUrl: org?.nibDocumentUrl ?? null,
+        npwpDocumentUrl: org?.npwpDocumentUrl ?? null,
         verificationStatus: org?.verificationStatus ?? null,
       },
       isDemo: false,
@@ -211,7 +219,8 @@ export async function PATCH(request: Request) {
       }
 
       if (wantsOrgWrite) {
-        const nullIfBlank = (v: string) => (v.trim() === "" ? null : v);
+        const nullIfBlank = (v: string | null | undefined) =>
+          !v || v.trim() === "" ? null : v;
         const orgSet: Partial<typeof schema.organizations.$inferInsert> = {
           updatedAt: new Date(),
         };
@@ -226,6 +235,10 @@ export async function PATCH(request: Request) {
           orgSet.officeAddress = nullIfBlank(data.officeAddress);
         if (data.nibNumber !== undefined) orgSet.nib = nullIfBlank(data.nibNumber);
         if (data.npwpNumber !== undefined) orgSet.npwp = nullIfBlank(data.npwpNumber);
+        if (data.nibDocumentUrl !== undefined)
+          orgSet.nibDocumentUrl = nullIfBlank(data.nibDocumentUrl);
+        if (data.npwpDocumentUrl !== undefined)
+          orgSet.npwpDocumentUrl = nullIfBlank(data.npwpDocumentUrl);
         await tx
           .update(schema.organizations)
           .set(orgSet)

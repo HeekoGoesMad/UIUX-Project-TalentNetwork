@@ -31,7 +31,7 @@ import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { extractIndonesianLocalPhone } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
-import { POPULAR_LOCATION_SUGGESTIONS } from "@/lib/locations";
+import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   CAREER_STATUS_CONFIG,
   TALENT_CATEGORY_CONFIG,
@@ -440,6 +440,11 @@ export function CandidateOnboarding() {
         const digits = extractIndonesianLocalPhone(text);
         if (!digits) found[field] = "Nomor telepon wajib diisi.";
         else if (digits.length < 8) found[field] = "Nomor telepon minimal 8 digit angka.";
+      } else if (field === "location") {
+        const locCheck = isValidLocationFormat(text);
+        if (!locCheck.isValid) {
+          found[field] = locCheck.error;
+        }
       }
     }
     setErrors(found);
@@ -492,7 +497,7 @@ export function CandidateOnboarding() {
       fullName: form.fullName.trim(),
       headline: form.headline.trim(),
       about: form.about.trim(),
-      location: form.location.trim(),
+      location: normalizeLocation(form.location.trim()) || form.location.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
       skills: form.skills,
@@ -991,6 +996,7 @@ function LocationStep({
           label="Domisili saat ini (Kabupaten/Kota, Provinsi)"
           required
           id="location"
+          hint="Wajib pisahkan dengan koma: [Kabupaten/Kota], [Provinsi]. Contoh: Sleman, D.I. Yogyakarta"
           error={errors.location}
         >
           <input
@@ -999,7 +1005,7 @@ function LocationStep({
             className={inputClass}
             value={form.location}
             onChange={(event) => setValue("location", event.target.value)}
-            placeholder="Sleman, D.I. Yogyakarta"
+            placeholder="Contoh: Sleman, D.I. Yogyakarta atau Jakarta Selatan, DKI Jakarta"
             list="onboarding-locations-list"
           />
           <datalist id="onboarding-locations-list">

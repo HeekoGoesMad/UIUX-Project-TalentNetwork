@@ -8,7 +8,7 @@ import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
-import { POPULAR_LOCATION_SUGGESTIONS } from "@/lib/locations";
+import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   BriefcaseBusiness,
   Camera,
@@ -76,12 +76,14 @@ function Field({
   children,
   span2,
   required,
+  error,
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
   span2?: boolean;
   required?: boolean;
+  error?: string;
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", span2 && "md:col-span-2")}>
@@ -92,6 +94,7 @@ function Field({
         {hint && <span className="text-[11px] text-muted-foreground/80">{hint}</span>}
       </div>
       {children}
+      {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
     </div>
   );
 }
@@ -649,10 +652,26 @@ export function CvWorkspace() {
 
   async function handleSave() {
     if (saving) return;
+
+    if (profile.location?.trim()) {
+      const locCheck = isValidLocationFormat(profile.location);
+      if (!locCheck.isValid) {
+        toast.error("Format domisili belum sesuai", {
+          description: locCheck.error ?? "Gunakan format: Kabupaten/Kota, Provinsi (contoh: Sleman, D.I. Yogyakarta)",
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      await saveCvProfile(profile);
-      setSavedSnapshot(serializeCvData(profile));
+      const normalizedProfile = {
+        ...profile,
+        location: normalizeLocation(profile.location) || profile.location,
+      };
+      await saveCvProfile(normalizedProfile);
+      setProfile(normalizedProfile);
+      setSavedSnapshot(serializeCvData(normalizedProfile));
       setShaking(false);
       setMessage("Profil berhasil disimpan dan disinkronkan.");
       toast.success("Profil berhasil disimpan!");
@@ -1012,12 +1031,20 @@ export function CvWorkspace() {
                     />
                   </Field>
 
-                  <Field label="Lokasi Domisili">
+                  <Field
+                    label="Lokasi Domisili"
+                    hint="Format: Kabupaten/Kota, Provinsi (contoh: Sleman, D.I. Yogyakarta)"
+                    error={
+                      profile.location?.trim() && !isValidLocationFormat(profile.location).isValid
+                        ? isValidLocationFormat(profile.location).error
+                        : undefined
+                    }
+                  >
                     <input
                       className={inputCls}
                       value={profile.location}
                       onChange={(e) => update("location", e.target.value)}
-                      placeholder="Contoh: Jakarta Selatan, DKI Jakarta"
+                      placeholder="Contoh: Jakarta Selatan, DKI Jakarta atau Sleman, D.I. Yogyakarta"
                       list="cv-locations-list"
                     />
                     <datalist id="cv-locations-list">

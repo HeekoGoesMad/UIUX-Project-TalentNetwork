@@ -1,3 +1,4 @@
+
 export interface CandidateStepData {
   fullName?: string | null;
   email?: string | null;

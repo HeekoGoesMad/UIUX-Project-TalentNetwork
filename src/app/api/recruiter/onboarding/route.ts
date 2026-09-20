@@ -68,10 +68,10 @@ const onboardingSchema = z.object({
   linkedinUrl: z.string().trim().optional(),
   nibNumber: z.string().trim().optional(),
   nibFileName: z.string().trim().optional(),
-  nibDocumentUrl: z.string().trim().optional(),
+  nibDocumentUrl: z.string().trim().min(1, "Dokumen NIB (PDF) wajib diunggah."),
   npwpNumber: z.string().trim().optional(),
   npwpFileName: z.string().trim().optional(),
-  npwpDocumentUrl: z.string().trim().optional(),
+  npwpDocumentUrl: z.string().trim().min(1, "Dokumen NPWP (PDF) wajib diunggah."),
   aktaFileName: z.string().trim().optional(),
   ktpFileName: z.string().trim().optional(),
 });
@@ -84,7 +84,8 @@ export async function POST(request: Request) {
 
   const parsed = onboardingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Data onboarding rekruter tidak valid." }, { status: 400 });
+    const errorMsg = parsed.error.issues?.[0]?.message || "Data onboarding rekruter tidak valid.";
+    return NextResponse.json({ error: errorMsg }, { status: 400 });
   }
 
   const { data } = parsed;

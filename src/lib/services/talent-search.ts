@@ -7,9 +7,9 @@ import {
   type CampusVerification,
   type Candidate,
   type CandidatePersonality,
-  type IndustryCategory,
   type TalentCategory,
 } from "@/types";
+import { inferSectorFromRole } from "@/config/sectors";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -142,7 +142,7 @@ export function serializeCandidate(
     })),
     careerStatus: status,
     talentCategory,
-    industry: "technology-software" as IndustryCategory,
+    industry: inferSectorFromRole(row.targetRole || row.role),
   };
 }
 

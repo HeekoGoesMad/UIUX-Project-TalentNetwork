@@ -267,12 +267,6 @@ function AdminCompaniesContent() {
   const handleSaveCompany = async () => {
     if (!selectedCompany) return;
 
-    // Validasi NIB (13 digit jika diisi)
-    if (formNib && formNib.replace(/\D/g, "").length !== 13) {
-      toast.warning("Nomor Induk Berusaha (NIB) harus 13 digit.");
-      return;
-    }
-
     setUpdating(true);
     try {
       const res = await fetch(new URL(`/api/admin/companies/${selectedCompany.id}`, window.location.origin), {
@@ -528,9 +522,29 @@ function AdminCompaniesContent() {
                               {c.industry || "Sektor belum dipilih"}
                             </p>
                           </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
-                            <div>NIB: <span className="font-semibold text-slate-800">{c.nib || "-"}</span></div>
-                            <div>NPWP: <span className="font-semibold text-slate-800">{c.npwp || "-"}</span></div>
+                          <td className="py-3.5 px-4 text-[11px]">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-600">NIB:</span>
+                                {c.nibDocumentUrl ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF Ada
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px] italic">-</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-600">NPWP:</span>
+                                {c.npwpDocumentUrl ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF Ada
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px] italic">-</span>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
                             <div className="font-medium text-slate-800">{c.companyScale || "-"}</div>
@@ -810,30 +824,30 @@ function AdminCompaniesContent() {
                     </div>
                   </div>
 
-                  {/* Bagian 3: Dokumen Legalitas & Perpajakan */}
+                  {/* Bagian 3: Dokumen Legalitas & Perpajakan (PDF) */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-xs">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                       <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
                         <FileCheck className="size-4" />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan</p>
+                        <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan Resmi (PDF)</p>
                         <p className="text-[11px] text-muted-foreground">
-                          Nomor identifikasi izin berusaha dan NPWP beserta berkas dokumen resmi yang diunggah.
+                          Verifikasi keabsahan berkas resmi NIB dan NPWP yang diunggah oleh perusahaan.
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       {/* NIB Card */}
-                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 space-y-2.5">
+                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-3">
                         <div className="flex items-center justify-between">
-                          <label className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <FileText className="size-3.5 text-slate-500" />
-                            Nomor Induk Berusaha (NIB)
-                          </label>
+                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                            <FileText className="size-3.5 text-primary" />
+                            Dokumen NIB OSS (PDF)
+                          </span>
                           {selectedCompany?.nibDocumentUrl ? (
                             <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> Dokumen Ada
+                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Terlampir
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200">
@@ -841,46 +855,43 @@ function AdminCompaniesContent() {
                             </Badge>
                           )}
                         </div>
-                        <Input
-                          value={formNib}
-                          onChange={(e) => setFormNib(e.target.value)}
-                          placeholder="Contoh: 9120001234567"
-                          className="h-8 text-xs bg-white"
-                        />
-                        <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <span className="text-[10px] text-muted-foreground">
-                            NIB terdaftar OSS.
-                          </span>
+                        <p className="text-[11px] text-muted-foreground">
+                          Nomor Induk Berusaha resmi yang diterbitkan OSS untuk legalitas operasional bisnis.
+                        </p>
+                        <div className="pt-1">
                           {selectedCompany?.nibDocumentUrl ? (
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
                               disabled={openingDoc === "nib"}
                               onClick={() => handleOpenDocument("nib")}
-                              className="h-7 text-[11px] gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50 font-medium"
+                              className="w-full h-8 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium cursor-pointer shadow-xs"
                             >
                               {openingDoc === "nib" ? (
-                                <Loader2 className="size-3 animate-spin" />
+                                <Loader2 className="size-3.5 animate-spin" />
                               ) : (
-                                <ExternalLink className="size-3" />
+                                <ExternalLink className="size-3.5" />
                               )}
-                              Buka Berkas NIB
+                              Buka &amp; Periksa Berkas NIB (PDF)
                             </Button>
-                          ) : null}
+                          ) : (
+                            <div className="rounded-md border border-dashed border-slate-300 bg-white/60 p-2 text-center text-[11px] text-slate-400 italic">
+                              Perusahaan belum melampirkan berkas NIB
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* NPWP Card */}
-                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 space-y-2.5">
+                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-3">
                         <div className="flex items-center justify-between">
-                          <label className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <FileText className="size-3.5 text-slate-500" />
-                            Nomor Pokok Wajib Pajak (NPWP)
-                          </label>
+                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                            <FileText className="size-3.5 text-primary" />
+                            Dokumen NPWP Badan (PDF)
+                          </span>
                           {selectedCompany?.npwpDocumentUrl ? (
                             <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> Dokumen Ada
+                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Terlampir
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200">
@@ -888,33 +899,30 @@ function AdminCompaniesContent() {
                             </Badge>
                           )}
                         </div>
-                        <Input
-                          value={formNpwp}
-                          onChange={(e) => setFormNpwp(e.target.value)}
-                          placeholder="01.234.567.8–012.000"
-                          className="h-8 text-xs bg-white"
-                        />
-                        <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <span className="text-[10px] text-muted-foreground">
-                            NPWP Badan Usaha.
-                          </span>
+                        <p className="text-[11px] text-muted-foreground">
+                          Salinan dokumen NPWP Badan Usaha atau SKT resmi Ditjen Pajak untuk kepatuhan fiskal.
+                        </p>
+                        <div className="pt-1">
                           {selectedCompany?.npwpDocumentUrl ? (
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
                               disabled={openingDoc === "npwp"}
                               onClick={() => handleOpenDocument("npwp")}
-                              className="h-7 text-[11px] gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50 font-medium"
+                              className="w-full h-8 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium cursor-pointer shadow-xs"
                             >
                               {openingDoc === "npwp" ? (
-                                <Loader2 className="size-3 animate-spin" />
+                                <Loader2 className="size-3.5 animate-spin" />
                               ) : (
-                                <ExternalLink className="size-3" />
+                                <ExternalLink className="size-3.5" />
                               )}
-                              Buka Berkas NPWP
+                              Buka &amp; Periksa Berkas NPWP (PDF)
                             </Button>
-                          ) : null}
+                          ) : (
+                            <div className="rounded-md border border-dashed border-slate-300 bg-white/60 p-2 text-center text-[11px] text-slate-400 italic">
+                              Perusahaan belum melampirkan berkas NPWP
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
