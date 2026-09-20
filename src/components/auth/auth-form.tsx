@@ -37,6 +37,27 @@ function GoogleLogo({ className = "size-4.5" }: { className?: string }) {
   );
 }
 
+export interface PasswordRequirements {
+  hasMinLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasNumber: boolean;
+}
+
+export function checkPasswordRequirements(password: string): PasswordRequirements {
+  return {
+    hasMinLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+  };
+}
+
+export function isPasswordValid(password: string): boolean {
+  const req = checkPasswordRequirements(password);
+  return req.hasMinLength && req.hasUppercase && req.hasLowercase && req.hasNumber;
+}
+
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { user, hydrated, login, register, loginAsDemoCandidate, loginAsFreshCandidate, loginAsDemoPartner } = useApp();
@@ -52,6 +73,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setRole(validRoleParam);
     }
   }
+  const [passwordValue, setPasswordValue] = useState("");
+  const passwordCriteria = checkPasswordRequirements(passwordValue);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -125,6 +148,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     if (mode === "register" && !consentAgreed) {
       setConsentModalOpen(true);
       setErrorMessage("Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.");
+      return;
+    }
+
+    if (mode === "register" && !isPasswordValid(password)) {
+      setErrorMessage("Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.");
       return;
     }
 
@@ -328,12 +356,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Input
             id="password"
             name="password"
+            value={passwordValue}
+            onChange={(e) => setPasswordValue(e.target.value)}
             className="pl-10 pr-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
             required
-            minLength={6}
+            minLength={mode === "register" ? 8 : 6}
             type={showPassword ? "text" : "password"}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder="Minimal 6 karakter"
+            placeholder={mode === "register" ? "Minimal 8 karakter" : "Masukkan kata sandi"}
           />
           <button
             type="button"
@@ -345,6 +375,35 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
+
+        {mode === "register" && (
+          <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-600 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-700">Kriteria Kata Sandi:</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {[passwordCriteria.hasMinLength, passwordCriteria.hasUppercase, passwordCriteria.hasLowercase, passwordCriteria.hasNumber].filter(Boolean).length}/4 terpenuhi
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasMinLength ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasMinLength ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Minimal 8 karakter</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasUppercase ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasUppercase ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Huruf besar (A-Z)</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasLowercase ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasLowercase ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Huruf kecil (a-z)</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasNumber ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasNumber ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Minimal 1 angka (0-9)</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {mode === "register" && (
