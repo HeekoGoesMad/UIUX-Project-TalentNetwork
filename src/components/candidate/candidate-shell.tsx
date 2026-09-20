@@ -9,7 +9,6 @@ import {
   FileText,
   GraduationCap,
   LayoutDashboard,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -85,10 +84,6 @@ export function CandidateShell({ children }: { children: React.ReactNode }) {
                 <p className="truncate text-lg font-bold tracking-tight text-foreground sm:text-xl" suppressHydrationWarning>
                   {candidateName}
                 </p>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  <ShieldCheck className="size-3.5 text-emerald-600" />
-                  Terverifikasi
-                </span>
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" suppressHydrationWarning>
                 <span className="font-medium text-foreground/90" suppressHydrationWarning>{candidateRole}</span>
