@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileCheck2,
+  FileText,
   Mail,
   Save,
   Settings2,
@@ -56,6 +57,89 @@ function parseTab(value: string | null): NotificationCategory {
   if (value === "recruitment") return "recruitment";
   if (value === "system") return "system";
   return "all";
+}
+
+function getNotificationVisualMeta(title: string, type: string) {
+  const t = title.toLowerCase();
+  if (type === "screening_ready" || t.includes("wawancara") || t.includes("interview")) {
+    return {
+      label: "Wawancara",
+      badgeClass: "bg-primary/10 text-primary border-primary/20",
+      iconBg: "bg-primary/10 text-primary",
+      Icon: Calendar,
+      actionText: "Buka Wawancara",
+    };
+  }
+  if (t.includes("penawaran") || t.includes("offer")) {
+    return {
+      label: "Penawaran",
+      badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+      iconBg: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      Icon: FileCheck2,
+      actionText: "Tinjau Penawaran",
+    };
+  }
+  if (t.includes("diterima") || t.includes("penerimaan") || t.includes("hired")) {
+    return {
+      label: "Penerimaan",
+      badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+      iconBg: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      Icon: ShieldCheck,
+      actionText: "Buka Lamaran",
+    };
+  }
+  if (t.includes("asesmen") || t.includes("assessment")) {
+    return {
+      label: "Asesmen",
+      badgeClass: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
+      iconBg: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+      Icon: FileText,
+      actionText: "Buka Asesmen",
+    };
+  }
+  if (t.includes("izin") || t.includes("consent") || t.includes("kontak")) {
+    return {
+      label: "Izin Akses",
+      badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+      iconBg: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+      Icon: ShieldCheck,
+      actionText: "Tanggapi Izin",
+    };
+  }
+  if (t.includes("profil") || t.includes("dilihat")) {
+    return {
+      label: "Profil",
+      badgeClass: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+      iconBg: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+      Icon: UserRound,
+      actionText: "Buka Lamaran",
+    };
+  }
+  if (type === "message_received" || t.includes("pesan")) {
+    return {
+      label: "Pesan",
+      badgeClass: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
+      iconBg: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      Icon: Mail,
+      actionText: "Buka Pesan",
+    };
+  }
+  if (t.includes("skrining") || t.includes("screening") || t.includes("peninjauan") || t.includes("unggulan")) {
+    return {
+      label: "Rekrutmen",
+      badgeClass: "bg-primary/10 text-primary border-primary/20",
+      iconBg: "bg-primary/10 text-primary",
+      Icon: FileCheck2,
+      actionText: "Buka Lamaran",
+    };
+  }
+  return {
+    label: "Sistem",
+    badgeClass: "bg-muted text-muted-foreground border-border/60",
+    iconBg: "bg-muted text-muted-foreground",
+    Icon: Bell,
+    actionText: "Lihat Detail",
+  };
 }
 
 export default function NotificationsPage() {
@@ -517,11 +601,11 @@ export default function NotificationsPage() {
           paginatedNotifications.map((notif) => {
             const unread = !notif.readAt;
             const notifData = (notif.data && typeof notif.data === "object" ? notif.data : {}) as { href?: string; url?: string };
-            const isInterview = notif.type === "screening_ready" || notif.title.toLowerCase().includes("wawancara") || notif.title.toLowerCase().includes("interview");
-            const isOffer = notif.title.toLowerCase().includes("penawaran") || notif.title.toLowerCase().includes("offer");
-            const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (isInterview ? "/messages" : undefined);
+            const meta = getNotificationVisualMeta(notif.title, notif.type);
+            const IconComponent = meta.Icon;
+            const href = "href" in notif ? (notif as { href?: string }).href : notifData.href || notifData.url || (meta.label === "Wawancara" ? "/messages" : undefined);
             const displayBody = notif.body
-              ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan meeting telah dikirimkan ke pesan chat Anda.")
+              ? notif.body.replace(/(?:[\.\s]+)?(?:Link|Tautan)(?:\s*(?:meeting|meet|interview))?:\s*https?:\/\/[^\s]+/gi, ". Tautan pertemuan dapat diakses melalui ruang obrolan.")
               : "";
 
             return (
@@ -530,58 +614,45 @@ export default function NotificationsPage() {
                 className={cn(
                   "border transition-all duration-150 hover:shadow-xs",
                   unread
-                    ? "border-primary/30 bg-primary/[0.02]"
+                    ? "border-primary/25 bg-primary/[0.02]"
                     : "border-border/70 bg-card"
                 )}
               >
                 <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 mt-0.5">
                     <span
                       className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-xl",
-                        isInterview
-                          ? "bg-primary/10 text-primary"
-                          : isOffer
-                          ? "bg-emerald-50 text-emerald-700"
-                          : unread
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                        meta.iconBg
                       )}
                     >
-                      {isInterview ? (
-                        <Calendar className="size-4" />
-                      ) : isOffer ? (
-                        <FileCheck2 className="size-4" />
-                      ) : (
-                        <Bell className="size-4" />
-                      )}
+                      <IconComponent className="size-4" />
                     </span>
                     {unread && (
                       <span
-                        className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-background"
+                        className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary ring-2 ring-background"
                         aria-hidden="true"
                       />
                     )}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
-                      <h3 className={cn("text-sm", unread ? "font-bold text-foreground" : "font-medium text-foreground/85")}>
-                        {href ? (
-                          <Link
-                            href={href}
-                            onClick={() => {
-                              if (unread) void markNotificationRead(notif.id);
-                            }}
-                            className="hover:text-primary transition-colors inline-flex items-center gap-1.5"
-                          >
-                            <span>{notif.title}</span>
-                            <ChevronRight className="size-3 text-muted-foreground" />
-                          </Link>
-                        ) : (
-                          notif.title
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase font-mono",
+                            meta.badgeClass
+                          )}
+                        >
+                          {meta.label}
+                        </span>
+                        {unread && (
+                          <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            Baru
+                          </span>
                         )}
-                      </h3>
+                      </div>
                       <time className="shrink-0 text-[11px] text-muted-foreground font-mono">
                         {new Date(notif.createdAt).toLocaleDateString("id-ID", {
                           day: "numeric",
@@ -592,19 +663,54 @@ export default function NotificationsPage() {
                       </time>
                     </div>
 
+                    <h3 className={cn("mt-1.5 text-sm tracking-tight", unread ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
+                      {href ? (
+                        <Link
+                          href={href}
+                          onClick={() => {
+                            if (unread) void markNotificationRead(notif.id);
+                          }}
+                          className="hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
+                        >
+                          <span>{notif.title}</span>
+                          <ChevronRight className="size-3 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                      ) : (
+                        notif.title
+                      )}
+                    </h3>
+
                     {displayBody && (
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{displayBody}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground/90">{displayBody}</p>
                     )}
 
-                    {unread && (
-                      <button
-                        onClick={() => void handleMarkRead(notif.id)}
-                        className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
-                      >
-                        <Check className="size-3" />
-                        <span>Tandai dibaca</span>
-                      </button>
-                    )}
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/40 pt-2.5">
+                      {unread ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleMarkRead(notif.id)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <Check className="size-3 text-primary" />
+                          <span>Tandai dibaca</span>
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground/60">Sudah dibaca</span>
+                      )}
+
+                      {href && (
+                        <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-primary hover:text-primary px-2">
+                          <Link
+                            href={href}
+                            onClick={() => {
+                              if (unread) void markNotificationRead(notif.id);
+                            }}
+                          >
+                            {meta.actionText} <ChevronRight className="ml-1 size-3" />
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

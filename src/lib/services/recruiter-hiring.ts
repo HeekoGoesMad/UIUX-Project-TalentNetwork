@@ -323,8 +323,8 @@ async function ensureProfileViewedNotification(
     db,
     systemNotification({
       userId: params.userId,
-      title: `Profil kamu dibuka oleh ${params.orgName} ✨`,
-      body: `${params.orgName} baru saja membuka profil lengkapmu dan sedang meninjau kualifikasimu.`,
+      title: `Profil Dilihat: ${params.orgName}`,
+      body: `${params.orgName} baru saja membuka profil lengkap dan sedang meninjau kualifikasi Anda.`,
       data: notificationData(
         `application:${params.applicationId}:review`,
         `/candidate/applications`,
@@ -506,7 +506,7 @@ export async function scheduleInterview(db: Database, input: ScheduleInterviewIn
         systemNotification({
           userId: appRow.candidateUserId,
           title: `Undangan Wawancara: ${appRow.jobTitle}`,
-          body: `Wawancara dijadwalkan pada ${formattedDate} (${input.timezone ?? "WIB"}). Tautan meeting telah dikirimkan ke pesan chat Anda.`,
+          body: `Wawancara dijadwalkan pada ${formattedDate} (${input.timezone ?? "WIB"}). Tautan pertemuan dapat diakses melalui ruang obrolan.`,
           data: notificationData(
             `interview:${interview.id}:scheduled`,
             `/messages`,
@@ -588,7 +588,7 @@ export async function sendInterviewInvitation(
       systemNotification({
         userId: row.candidateUserId,
         title: `Undangan Wawancara: ${row.jobTitle}`,
-        body: `Wawancara dijadwalkan pada ${formattedDate} (${row.interview.timezone}). Tautan meeting telah dikirimkan ke pesan chat Anda.`,
+        body: `Wawancara dijadwalkan pada ${formattedDate} (${row.interview.timezone}). Tautan pertemuan dapat diakses melalui ruang obrolan.`,
         data: notificationData(
           `interview:${row.interview.id}:invitation`,
           `/messages`,
@@ -938,7 +938,7 @@ export async function createOffer(db: Database, input: CreateOfferInput) {
         systemNotification({
           userId: appRow.candidateUserId,
           title: `Surat Penawaran Kerja: ${appRow.jobTitle}`,
-          body: `Selamat! Anda menerima penawaran kerja resmi untuk posisi ${appRow.jobTitle}. Silakan tinjau dan konfirmasi penawaran ini.`,
+          body: `Perusahaan telah menerbitkan surat penawaran kerja resmi untuk posisi ${appRow.jobTitle}. Silakan periksa rincian dan konfirmasi penawaran ini.`,
           data: notificationData(
             `offer:${offer.id}:sent`,
             `/candidate/applications/${targetAppId}`,
@@ -952,7 +952,7 @@ export async function createOffer(db: Database, input: CreateOfferInput) {
         organizationId: input.organizationId,
         recruiterUserId: input.recruiterUserId,
         candidateUserId: appRow.candidateUserId,
-        body: `🎉 Surat Penawaran Kerja: ${appRow.jobTitle}\nKompensasi: ${input.terms.salary}\nBatas Konfirmasi: ${input.expiresAt ? input.expiresAt.toISOString().slice(0, 10) : "7 hari ke depan"}\n\nSelamat! Kami telah menerbitkan Surat Penawaran Kerja resmi untuk Anda. Silakan tinjau rincian benefit dan konfirmasi penerimaan (Accept Offer) pada aplikasi Anda.`,
+        body: `Surat Penawaran Kerja: ${appRow.jobTitle}\nKompensasi: ${input.terms.salary}\nBatas Konfirmasi: ${input.expiresAt ? input.expiresAt.toISOString().slice(0, 10) : "7 hari ke depan"}\n\nKami telah menerbitkan Surat Penawaran Kerja resmi untuk Anda. Silakan tinjau rincian benefit dan konfirmasi penerimaan (Accept Offer) pada aplikasi Anda.`,
       });
     }
 
@@ -1047,8 +1047,8 @@ export async function respondToOffer(db: Database, input: RespondToOfferInput) {
           tx,
           systemNotification({
             userId: offer.offer.createdBy,
-            title: `Kandidat Menerima Penawaran! 🎉`,
-            body: `${offer.candidateName ?? "Kandidat"} resmi menerima penawaran kerja untuk ${offer.jobTitle}. Status lamaran: HIRED.`,
+            title: `Penawaran Kerja Diterima: ${offer.jobTitle}`,
+            body: `${offer.candidateName ?? "Kandidat"} telah menyetujui surat penawaran kerja untuk posisi ${offer.jobTitle}. Status lamaran kini resmi diterima.`,
             data: notificationData(
               `offer:${offer.offer.id}:accepted:${Date.now()}`,
               `/recruiter/applications/${offer.offer.applicationId}`,
@@ -1147,8 +1147,8 @@ export async function markApplicationHired(
       tx,
       systemNotification({
         userId: appRow.candidateUserId,
-        title: `Selamat! Anda Diterima Bekerja 🎉`,
-        body: `Lamaran Anda untuk posisi ${appRow.jobTitle} telah resmi diterima (Hired). Selamat bergabung!`,
+        title: `Penerimaan Kerja: ${appRow.jobTitle}`,
+        body: `Lamaran Anda untuk posisi ${appRow.jobTitle} telah resmi diterima. Silakan periksa detail penugasan dan langkah selanjutnya.`,
         data: notificationData(
           `application:${applicationId}:hired`,
           `/candidate/applications/${applicationId}`,

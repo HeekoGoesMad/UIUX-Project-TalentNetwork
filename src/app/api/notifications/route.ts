@@ -5,6 +5,8 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 
+import { distillNotificationContent } from "@/lib/notifications/candidate-formatter";
+
 export async function GET(request: Request) {
   try {
     const current = await getCurrentAppUser();
@@ -18,7 +20,34 @@ export async function GET(request: Request) {
       current.db.select({ value: count() }).from(schema.notifications)
         .where(and(eq(schema.notifications.userId, current.user.id), isNull(schema.notifications.readAt))),
     ]);
-    return NextResponse.json({ notifications, unreadCount: unread?.value ?? 0 });
+
+    const toUpdate: Array<{ id: string; title: string; body: string }> = [];
+    const distilledList = notifications.map((notif) => {
+      const distilled = distillNotificationContent({
+        title: notif.title,
+        body: notif.body,
+        type: notif.type,
+        data: notif.data,
+      });
+      if (distilled.changed) {
+        toUpdate.push({ id: notif.id, title: distilled.title, body: distilled.body });
+        return { ...notif, title: distilled.title, body: distilled.body };
+      }
+      return notif;
+    });
+
+    if (toUpdate.length > 0) {
+      void Promise.all(
+        toUpdate.map((item) =>
+          current.db
+            .update(schema.notifications)
+            .set({ title: item.title, body: item.body })
+            .where(eq(schema.notifications.id, item.id))
+        )
+      ).catch((err) => console.error("Auto-update notifications in DB failed:", err));
+    }
+
+    return NextResponse.json({ notifications: distilledList, unreadCount: unread?.value ?? 0 });
   } catch {
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
