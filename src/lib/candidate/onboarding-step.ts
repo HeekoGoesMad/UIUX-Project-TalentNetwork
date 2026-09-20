@@ -1,3 +1,5 @@
+import { isValidLocationFormat } from "@/lib/locations";
+
 export interface CandidateStepData {
   fullName?: string | null;
   email?: string | null;
@@ -53,9 +55,13 @@ export function calculateCandidateReadiness(data?: CandidateStepData | null): Ca
     {
       id: "role",
       label: "Domisili & peran",
-      done: Boolean(data?.location?.trim() && data?.targetRole?.trim()),
+      done: Boolean(
+        data?.location?.trim() &&
+        isValidLocationFormat(data.location).isValid &&
+        data?.targetRole?.trim()
+      ),
       anchor: "/candidate/cv#target-role",
-      hint: "Lokasi kerja & ekspektasi peran",
+      hint: "Lokasi kerja (Kab/Kota, Provinsi) & ekspektasi peran",
     },
     {
       id: "skills",
@@ -136,7 +142,11 @@ export function getFirstIncompleteStep(data?: CandidateStepData | null): number 
   ) {
     return 2;
   }
-  if (!data.location?.trim() || !data.targetRole?.trim()) {
+  if (
+    !data.location?.trim() ||
+    !isValidLocationFormat(data.location).isValid ||
+    !data.targetRole?.trim()
+  ) {
     return 3;
   }
   if (!data.experience?.some((item) => Boolean(item.company?.trim() || item.role?.trim()))) {

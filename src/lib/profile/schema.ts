@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeLocation } from "@/lib/locations";
 
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
 
@@ -8,7 +9,7 @@ export const candidateProfileSyncSchema = z.object({
   phone: optionalText(40),
   headline: optionalText(160),
   targetRole: optionalText(120),
-  location: optionalText(120),
+  location: optionalText(120).transform((val) => (val ? normalizeLocation(val) || val : val)),
   summary: optionalText(4000),
   isPublished: z.boolean().optional(),
   completeness: z.number().int().min(0).max(100).optional(),
