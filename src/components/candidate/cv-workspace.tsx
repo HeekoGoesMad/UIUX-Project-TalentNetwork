@@ -7,7 +7,7 @@ import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
-import { PARTNER_CAMPUSES, type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
+import { type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   BriefcaseBusiness,
@@ -1424,14 +1424,6 @@ export function CvWorkspace() {
                 ) : (
                   <div className="space-y-4">
                     {profile.education.map((edu, i) => {
-                      const partnerMatch = PARTNER_CAMPUSES.find(
-                        (c) =>
-                          edu.school.toLowerCase().includes(c.toLowerCase()) ||
-                          c.toLowerCase().includes(edu.school.toLowerCase())
-                      );
-                      const isVerified =
-                        profile.campusVerification?.institution === partnerMatch &&
-                        profile.campusVerification?.status === "verified";
                       const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
 
                       return (
@@ -1560,19 +1552,6 @@ export function CvWorkspace() {
                               Saya masih aktif menempuh studi di sini
                             </label>
                           </div>
-
-                          {/* Campus Partner Verification Banner */}
-                          {partnerMatch && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-background p-3 text-xs">
-                              <span className="flex items-center gap-1.5 text-foreground font-medium">
-                                <GraduationCap className="size-4 text-primary" />
-                                Terhubung ke {partnerMatch} Career Network
-                              </span>
-                              <Badge variant={isVerified ? "default" : "secondary"} className="text-[11px]">
-                                {isVerified ? "Terverifikasi Kampus" : "Mitra Kampus"}
-                              </Badge>
-                            </div>
-                          )}
                         </div>
                       );
                     })}
