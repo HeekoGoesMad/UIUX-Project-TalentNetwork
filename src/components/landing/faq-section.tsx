@@ -6,20 +6,20 @@ import { cn } from "@/lib/utils";
 
 const FAQS = [
   {
-    q: "Bagaimana sistem token di ProofyLink bekerja?",
-    a: "Pencarian dan eksplorasi profil sinyal kandidat 100% gratis tanpa batas. Anda hanya menggunakan 1 token saat ingin membuka kontak langsung (WhatsApp & email) dan dossier portofolio lengkap dari kandidat yang Anda pilih.",
+    q: "Gimana cara kerja sistem token di Talent Network?",
+    a: "Kamu bisa bebas cari dan lihat sinyal kompetensi semua kandidat secara gratis tanpa batas. Token cuma dipakai (1 token) waktu kamu mau buka kontak langsung (WhatsApp & email) dan dossier lengkap dari kandidat yang kamu pilih.",
   },
   {
-    q: "Bagaimana ProofyLink melindungi privasi kandidat?",
-    a: "Secara default, profil kandidat ditampilkan dalam bentuk data sinyal anonim (Kandidat Privat). Nama lengkap dan kontak hanya dapat diakses setelah recruiter mengonfirmasi penggunaan token dan kandidat memberikan persetujuan dua arah.",
+    q: "Gimana Talent Network melindungi privasi kandidat?",
+    a: "Secara default, profil kandidat ditampilkan dalam mode proteksi tanpa memunculkan kontak pribadi atau identitas sensitif (Private Mode). Karena kandidat telah memberikan izin akses data resmi saat registrasi akun, kontak langsung (WhatsApp & email) akan langsung terbuka seketika saat kamu mengonfirmasi penggunaan 1 token, tanpa perlu menunggu proses approval tambahan.",
   },
   {
-    q: "Apa yang membedakan ProofyLink dari platform pencarian kerja biasa?",
-    a: "Platform konvensional bertumpu pada klaim resume teks yang belum tentu akurat dan menghasilkan banyak spam inbox. ProofyLink mengevaluasi bukti konkret (audit commit, studi kasus produksi, validasi rekan kerja) dengan rubrik 5 pilar objektif.",
+    q: "Apa bedanya Talent Network dengan job portal biasa?",
+    a: "Job portal biasa umumnya cuma mengandalkan teks resume yang rawan dilebih-lebihkan dan sering bikin spam inbox. Di Talent Network, kami mengevaluasi bukti nyata (audit commit, studi kasus produksi, dan validasi rekan kerja) dengan 5 pilar kompetensi yang terukur.",
   },
   {
-    q: "Apakah kandidat dikenakan biaya untuk menggunakan ProofyLink?",
-    a: "Kandidat bebas biaya selamanya untuk bergabung ke direktori, membangun profil sinyal kompetensi, dan menerima tawaran diskusi kerja yang relevan.",
+    q: "Apakah kandidat dikenakan biaya untuk bergabung?",
+    a: "Sama sekali nggak ada biaya untuk kandidat. Kandidat bisa bergabung, melengkapi profil sinyal kompetensi, dan menerima tawaran diskusi karier yang relevan secara 100% gratis selamanya.",
   },
 ];
 
@@ -31,10 +31,10 @@ export function FaqSection() {
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-balance">
-            Pertanyaan yang Sering Diajukan
+            Pertanyaan yang Sering Ditanyakan
           </h2>
           <p className="mt-3 text-base text-slate-600">
-            Hal mendasar mengenai sinyal verifikasi, privasi kandidat, dan penggunaan token.
+            Hal-hal penting seputar verifikasi sinyal, privasi kandidat, dan penggunaan token.
           </p>
         </div>
 

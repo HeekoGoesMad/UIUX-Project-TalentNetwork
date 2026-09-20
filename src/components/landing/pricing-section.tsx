@@ -8,10 +8,10 @@ export function PricingSection() {
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="max-w-2xl">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl text-balance">
-            Ekonomi Token Transparan Tanpa Langganan
+            Sistem Token Transparan, Tanpa Subscription Bulanan
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
-            Hanya bayar saat Anda menemukan kandidat yang benar-benar cocok. Token tidak pernah kedaluwarsa dan dapat digunakan kapan saja sesuai kebutuhan tim.
+            Hanya bayar token saat kamu menemukan talent yang pas. Token nggak ada masa kedaluwarsanya dan bisa dipakai kapan saja sesuai kebutuhan tim kamu.
           </p>
         </div>
 
@@ -27,7 +27,7 @@ export function PricingSection() {
                 Rp 250.000
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Rp 25.000 per pembukaan kontak kandidat
+                Rp 25.000 per unlock kontak kandidat
               </p>
 
               <div className="mt-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
@@ -41,11 +41,11 @@ export function PricingSection() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Pencarian dan filter direktori tanpa batas</span>
+                  <span>Search &amp; filter direktori tanpa batas</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Token aktif selamanya tanpa kedaluwarsa</span>
+                  <span>Token aktif selamanya tanpa expired date</span>
                 </div>
               </div>
             </div>
@@ -71,7 +71,7 @@ export function PricingSection() {
                 Rp 990.000
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Rp 19.800 per pembukaan kontak kandidat
+                Rp 19.800 per unlock kontak kandidat
               </p>
 
               <div className="mt-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
@@ -85,17 +85,17 @@ export function PricingSection() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Akses asisten penyusun pertanyaan wawancara AI</span>
+                  <span>Akses AI Interview Assistant untuk persiapan interview</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Dukungan teknis prioritas via tim ProofyLink</span>
+                  <span>Dukungan prioritas dari tim Talent Network</span>
                 </div>
               </div>
             </div>
 
             <Button className="mt-8 rounded-xl w-full bg-slate-900 hover:bg-slate-800 text-white shadow-sm" asChild>
-              <Link href="/login">Beli Paket Growth</Link>
+              <Link href="/login">Pilih Paket Growth</Link>
             </Button>
           </div>
 
@@ -103,28 +103,28 @@ export function PricingSection() {
           <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-7 shadow-xs">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Kebutuhan Korporasi
+                Kebutuhan Custom
               </span>
               <h3 className="mt-2 text-xl font-bold text-slate-900">Enterprise Custom</h3>
               <p className="mt-4 font-mono text-3xl font-bold text-slate-900">
-                Sesuai Skala
+                Sesuai Kebutuhan
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Untuk tim HR dan departemen rekrutmen volume tinggi
+                Cocok untuk tim HR dan hiring volume tinggi
               </p>
 
               <div className="mt-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Paket alokasi token fleksibel dengan invoice korporat</span>
+                  <span>Alokasi token fleksibel dengan invoice resmi perusahaan</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Multi-seat account untuk seluruh recruiter tim</span>
+                  <span>Multi-seat account untuk seluruh recruiter di tim kamu</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
-                  <span>Integrasi sistem ATS internal via API</span>
+                  <span>Integrasi ATS internal via API</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Check className="size-4 text-[#7C3AED] shrink-0" />
@@ -134,7 +134,7 @@ export function PricingSection() {
             </div>
 
             <Button className="mt-8 rounded-xl w-full border-slate-200 text-slate-700 hover:bg-slate-50" variant="outline" asChild>
-              <Link href="/login">Hubungi Tim Korporasi</Link>
+              <Link href="/login">Hubungi Tim Kami</Link>
             </Button>
           </div>
         </div>
