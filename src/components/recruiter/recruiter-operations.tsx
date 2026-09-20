@@ -125,8 +125,8 @@ const initialCandidates: Candidate[] = [
     compensation: "Rp 15.000.000 / bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
-    jobId: "talent-pool",
-    jobTitle: "Talent Pool",
+    jobId: "job-1",
+    jobTitle: "Product Management Intern",
   },
   {
     id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
@@ -259,6 +259,60 @@ function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews:
       interviews: initialInterviews,
     };
   }
+}
+
+export type TransitionValidationResult =
+  | { allowed: true }
+  | { allowed: false; reason: string };
+
+export function validateCandidateStageTransition(
+  candidate: Candidate,
+  targetStage: Stage,
+  isAdministrativeAction = false
+): TransitionValidationResult {
+  // Disallow moving to the exact same stage
+  if (candidate.stage === targetStage) {
+    return { allowed: false, reason: "Kandidat sudah berada di tahap ini." };
+  }
+
+  // 1. Strict lock on 'hired' candidates (only HR Administrative Renege can bypass)
+  if (candidate.stage === "hired" && !isAdministrativeAction) {
+    return {
+      allowed: false,
+      reason:
+        "Status kandidat telah Diterima (Hired) dan terkunci secara administratif. Gunakan menu 'Batalkan Penerimaan (Renege)' pada detail kandidat jika memerlukan tindakan administratif khusus.",
+    };
+  }
+
+  // 2. Talent Pool Guardrail: Candidates without an assigned active job cannot advance to interview, offer, or hired
+  const isTalentPool = !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+  if (isTalentPool && (targetStage === "interview" || targetStage === "offer" || targetStage === "hired")) {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat masih berstatus Talent Pool dan belum memiliki lowongan aktif. Harap tugaskan kandidat ke salah satu lowongan kerja aktif terlebih dahulu sebelum melanjutkan ke tahap wawancara atau penawaran.",
+    };
+  }
+
+  // 3. Hired Prerequisite Guardrail: Can only be reached from 'offer'
+  if (targetStage === "hired" && candidate.stage !== "offer") {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat harus melalui tahap Penawaran (Offer) terlebih dahulu sebelum dapat diresmikan sebagai Hired.",
+    };
+  }
+
+  // 4. Rejected Candidate Guardrail: Must be re-activated to 'screening' first before active pipeline
+  if (candidate.stage === "rejected" && (targetStage === "interview" || targetStage === "offer" || targetStage === "hired")) {
+    return {
+      allowed: false,
+      reason:
+        "Kandidat telah berstatus Tidak Lolos. Harap aktifkan kembali kandidat ke tahap Screening (Tekan 1) terlebih dahulu jika ingin meninjau ulang profil sebelum melanjutkan proses seleksi.",
+    };
+  }
+
+  return { allowed: true };
 }
 
 export function RecruiterOperationsPage() {
@@ -616,6 +670,13 @@ export function RecruiterOperationsPage() {
     const { candidateId, prevStage, prevStatusHistory, prevCompensation, prevOfferStatus } =
       lastChangeRef.current;
 
+    const currentCandidate = data.candidates.find((c) => c.id === candidateId);
+    if (currentCandidate?.stage === "hired") {
+      toast.error("Status kandidat telah Diterima (Hired) dan terkunci secara administratif. Pembatalan otomatis dinonaktifkan.");
+      lastChangeRef.current = null;
+      return;
+    }
+
     setData((current) => ({
       ...current,
       candidates: current.candidates.map((c) =>
@@ -655,7 +716,7 @@ export function RecruiterOperationsPage() {
 
     lastChangeRef.current = null;
     toast.info("Perubahan tahap berhasil dibatalkan.");
-  }, [dbMode, selectedCandidate]);
+  }, [data.candidates, dbMode, selectedCandidate]);
 
   // Execute stage change with optimistic UI and DB sync
   const executeStageChange = useCallback(
@@ -763,6 +824,14 @@ export function RecruiterOperationsPage() {
     (id: string, newStage: Stage, extraUpdates?: Partial<Candidate>) => {
       const target = data.candidates.find((c) => c.id === id);
       if (!target || (target.stage === newStage && !extraUpdates)) return;
+
+      // Validate transition against ATS Guardrails (unless it's an administrative revoke action with statusHistory)
+      const isAdministrativeAction = Boolean(extraUpdates?.statusHistory);
+      const validation = validateCandidateStageTransition(target, newStage, isAdministrativeAction);
+      if (!validation.allowed) {
+        toast.error(validation.reason);
+        return;
+      }
 
       // Trigger 1: Offer -> Lower stage (demotion / cancel offer warning)
       if (!extraUpdates && target.stage === "offer" && ["screening", "interview", "rejected"].includes(newStage)) {
@@ -880,6 +949,9 @@ export function RecruiterOperationsPage() {
       if (["1", "2", "3", "4", "5"].includes(e.key)) {
         if (focusedCandidateId) {
           e.preventDefault();
+          const target = filteredCandidates.find((c) => c.id === focusedCandidateId);
+          if (!target) return;
+
           const stageMap: Record<string, Stage> = {
             "1": "screening",
             "2": "interview",
@@ -888,9 +960,15 @@ export function RecruiterOperationsPage() {
             "5": "rejected",
           };
           const targetStage = stageMap[e.key];
-          if (targetStage) {
-            initiateStageChange(focusedCandidateId, targetStage);
+          if (!targetStage) return;
+
+          const validation = validateCandidateStageTransition(target, targetStage);
+          if (!validation.allowed) {
+            toast.error(validation.reason);
+            return;
           }
+
+          initiateStageChange(focusedCandidateId, targetStage);
         }
       }
     };
@@ -932,9 +1010,21 @@ export function RecruiterOperationsPage() {
     if (!candidateId) return;
 
     const candidate = data.candidates.find((c) => c.id === candidateId);
-    if (candidate && candidate.stage !== targetStage) {
-      initiateStageChange(candidateId, targetStage);
+    if (!candidate) return;
+
+    if (candidate.stage === targetStage) {
+      setDraggingCandidateId(null);
+      return;
     }
+
+    const validation = validateCandidateStageTransition(candidate, targetStage);
+    if (!validation.allowed) {
+      toast.error(validation.reason);
+      setDraggingCandidateId(null);
+      return;
+    }
+
+    initiateStageChange(candidateId, targetStage);
     setDraggingCandidateId(null);
   };
 
@@ -1409,12 +1499,21 @@ export function RecruiterOperationsPage() {
                                     <MessageSquare className="size-3.5" />
                                   </Link>
 
-                                  <div
-                                    className="p-1 text-slate-300 group-hover:text-purple-400 transition-colors cursor-grab"
-                                    title="Tarik kartu untuk memindahkan tahap"
-                                  >
-                                    <GripVertical className="size-3.5" />
-                                  </div>
+                                  {isHired ? (
+                                    <div
+                                      className="p-1 text-slate-300 cursor-not-allowed"
+                                      title="Status Diterima (Hired) terkunci secara administratif"
+                                    >
+                                      <Lock className="size-3 text-emerald-600" />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="p-1 text-slate-300 group-hover:text-purple-400 transition-colors cursor-grab"
+                                      title="Tarik kartu untuk memindahkan tahap"
+                                    >
+                                      <GripVertical className="size-3.5" />
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

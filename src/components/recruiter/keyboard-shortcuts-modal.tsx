@@ -1,6 +1,6 @@
 "use client";
 
-import { Command, Keyboard } from "lucide-react";
+import { Command, Keyboard, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +85,22 @@ export function KeyboardShortcutsModal({
               </div>
             </div>
           ))}
+        </div>
+
+        {/* ATS Guardrails Notice */}
+        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3 text-xs space-y-1.5">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900">
+            <ShieldCheck className="size-3.5 text-[#7C3AED]" />
+            <span>Proteksi Integritas Status (ATS Guardrails)</span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Pintasan tahap tunduk pada aturan alur seleksi rekrutmen:
+          </p>
+          <ul className="text-[11px] text-slate-600 space-y-0.5 list-disc list-inside">
+            <li><strong className="text-slate-800">Diterima (Hired):</strong> Terkunci secara administratif (hanya via menu Batalkan Penerimaan HRD).</li>
+            <li><strong className="text-slate-800">Talent Pool:</strong> Wajib ditugaskan ke lowongan sebelum tahap Wawancara atau Penawaran.</li>
+            <li><strong className="text-slate-800">Tahap Hired:</strong> Hanya dapat diakses dari tahap Penawaran (Offer).</li>
+          </ul>
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">

@@ -293,11 +293,38 @@ export function CandidateDetailDrawer({
                     onChange={(e) => onStageChange(candidate.id, e.target.value as Stage)}
                     className="text-xs font-semibold rounded-lg px-2.5 py-1.5 border border-slate-300 bg-white shadow-2xs focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden cursor-pointer"
                   >
-                    {STAGE_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
+                    {STAGE_OPTIONS.map((opt) => {
+                      const isTalentPool =
+                        !candidate.jobId ||
+                        candidate.jobId === "talent-pool" ||
+                        candidate.jobTitle === "Talent Pool";
+                      let isDisabled = false;
+                      let labelSuffix = "";
+
+                      if (
+                        isTalentPool &&
+                        (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
+                      ) {
+                        isDisabled = true;
+                        labelSuffix = " (Perlu Lowongan)";
+                      } else if (opt.id === "hired" && candidate.stage !== "offer") {
+                        isDisabled = true;
+                        labelSuffix = " (Melalui Offer)";
+                      } else if (
+                        candidate.stage === "rejected" &&
+                        (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
+                      ) {
+                        isDisabled = true;
+                        labelSuffix = " (Aktifkan ke Screening)";
+                      }
+
+                      return (
+                        <option key={opt.id} value={opt.id} disabled={isDisabled}>
+                          {opt.label}
+                          {labelSuffix}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
               </div>
@@ -487,25 +514,31 @@ export function CandidateDetailDrawer({
                   {candidate.stage === "screening" && (
                     <>
                       <p className="text-xs text-slate-500">
-                        Kandidat memenuhi kualifikasi awal. Lanjutkan ke tahap wawancara untuk evaluasi teknis dan budaya.
+                        {!candidate.jobId || candidate.jobId === "talent-pool"
+                          ? "Kandidat berada di Talent Pool. Tugaskan ke salah satu lowongan aktif terlebih dahulu untuk memulai tahapan seleksi."
+                          : "Kandidat memenuhi kualifikasi awal. Lanjutkan ke sesi wawancara atau terbitkan surat penawaran."}
                       </p>
                       <div className="pt-2 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-8 font-medium bg-white"
-                          onClick={() => setActiveTab("interview")}
-                        >
-                          <Calendar className="size-3.5 mr-1" /> Atur Sesi Wawancara
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-8 font-medium bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                          onClick={() => onStageChange(candidate.id, "hired")}
-                        >
-                          <CheckCircle2 className="size-3.5 mr-1 text-emerald-600" /> Langsung Tandai Hired
-                        </Button>
+                        {candidate.jobId && candidate.jobId !== "talent-pool" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 font-medium bg-white text-slate-700"
+                              onClick={() => setActiveTab("interview")}
+                            >
+                              <Calendar className="size-3.5 mr-1 text-purple-600" /> Atur Sesi Wawancara
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 font-medium bg-white text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                              onClick={() => onOpenOfferModal(candidate)}
+                            >
+                              <DollarSign className="size-3.5 mr-1" /> Terbitkan Penawaran
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </>
                   )}

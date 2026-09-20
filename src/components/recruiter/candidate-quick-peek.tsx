@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { CandidateAvatar } from "@/components/talent/avatar";
-import { CheckCircle2, Clock, MapPin, Sparkles } from "lucide-react";
+import { CheckCircle2, Clock, Lock, MapPin, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type QuickPeekCandidate = {
@@ -132,17 +132,27 @@ export function CandidateQuickPeek({
               </div>
             </div>
 
-            <Badge
-              variant="outline"
-              className={cn(
-                "shrink-0 text-[9px] font-semibold py-0.2 px-1.5 rounded-md",
-                isHighFit
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-purple-50 text-[#7C3AED] border-purple-200"
-              )}
-            >
-              {isHighFit ? "Sangat Sesuai" : "Terverifikasi AI"}
-            </Badge>
+            {candidate.stage === "hired" ? (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-[9px] font-semibold py-0.2 px-1.5 rounded-md bg-emerald-50 text-emerald-800 border-emerald-300 flex items-center gap-1"
+              >
+                <Lock className="size-2.5 text-emerald-600" />
+                Terkunci · Final
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "shrink-0 text-[9px] font-semibold py-0.2 px-1.5 rounded-md",
+                  isHighFit
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-purple-50 text-[#7C3AED] border-purple-200"
+                )}
+              >
+                {isHighFit ? "Sangat Sesuai" : "Terverifikasi AI"}
+              </Badge>
+            )}
           </div>
 
           {/* Top Competencies / Strengths */}
