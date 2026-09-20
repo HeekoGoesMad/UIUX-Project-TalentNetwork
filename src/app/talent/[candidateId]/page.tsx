@@ -622,29 +622,19 @@ export default function TalentProfile() {
       }
       setConfirmOpen(false);
 
-      if (dbMode) {
-        try {
-          await fetch("/api/applications", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ candidateProfileId: candidate.id }),
-          });
-        } catch (appError) {
-          console.error("Failed to link application on unlock", appError);
-        }
-      } else {
+      {
         const orgName = user?.companyName || "Perusahaan Mitra";
         saveDemoApplication({
           id: `demo-app-${candidate.id}`,
-          jobId: `job-demo-${candidate.id}`,
+          jobId: "talent-pool",
           status: "screening",
           coverNote: "Profil dibuka dan sedang dalam tahap screening awal melalui Talent Network.",
           submittedAt: new Date().toISOString(),
           withdrawnAt: null,
           updatedAt: new Date().toISOString(),
           job: {
-            id: `job-demo-${candidate.id}`,
-            title: `Talent Sourcing · ${candidate.role || "Talent Network"}`,
+            id: "talent-pool",
+            title: "Talent Pool",
             organizationName: orgName,
           },
           candidate: {
@@ -654,7 +644,7 @@ export default function TalentProfile() {
           },
         });
 
-        // Ensure operations pipeline records candidate in screening stage
+        // Ensure operations pipeline records candidate in Talent Pool (screening stage)
         try {
           const opsKey = "proofylink-demo-recruiter-operations";
           const opsRaw = localStorage.getItem(opsKey);
@@ -663,9 +653,14 @@ export default function TalentProfile() {
             if (opsParsed && Array.isArray(opsParsed.candidates)) {
               const existingIdx = opsParsed.candidates.findIndex((c: { id: string }) => c.id === candidate.id);
               if (existingIdx >= 0) {
-                // Keep in screening stage if currently in review/interview without an actual scheduled interview
+                // Keep in screening stage if currently in review/interview without actual scheduled interview
                 if (opsParsed.candidates[existingIdx].stage === "interview") {
                   opsParsed.candidates[existingIdx].stage = "screening";
+                }
+                // Reset jobId to talent-pool if not yet assigned to a real job
+                if (!opsParsed.candidates[existingIdx].jobId || opsParsed.candidates[existingIdx].jobId.startsWith("job-demo-")) {
+                  opsParsed.candidates[existingIdx].jobId = "talent-pool";
+                  opsParsed.candidates[existingIdx].jobTitle = "Talent Pool";
                 }
               } else {
                 opsParsed.candidates.push({
@@ -674,6 +669,8 @@ export default function TalentProfile() {
                   role: candidate.role || "Talent",
                   location: candidate.location || "Indonesia",
                   stage: "screening",
+                  jobId: "talent-pool",
+                  jobTitle: "Talent Pool",
                   owner: user?.name || "Tim Rekruter",
                   dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
                   appliedAt: new Date().toISOString().slice(0, 10),
@@ -682,7 +679,6 @@ export default function TalentProfile() {
                   offerStatus: "draft",
                   compensation: "Rp 15.000.000 / bulan",
                   reason: "",
-                  jobTitle: `Talent Sourcing · ${candidate.role || "Talent Network"}`,
                 });
               }
               localStorage.setItem(opsKey, JSON.stringify(opsParsed));
