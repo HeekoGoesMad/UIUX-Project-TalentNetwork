@@ -87,18 +87,116 @@ const defaultJobs = [
   { id: "job-4", title: "Backend Engineer (Go/Node)" },
 ];
 
+export const SUPABASE_AVATARS: Record<string, string> = {
+  "candidate-adrienne": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "Adrienne Kayana Wistara Lie": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "cd6ec533-5d1c-4f87-842c-888de3e825ec": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
+  "Alga Ramandika Praba": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/c168acf4-0e8c-4a9f-bcea-36afe5bc9e80/5d11592b-e5ee-485e-8644-df3147cbbae0-FOTO_LinkedIn_MaterialBlack.jpg.webp",
+  "b082c226-1a6e-42a6-80e0-150ce5f01745": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/c168acf4-0e8c-4a9f-bcea-36afe5bc9e80/5d11592b-e5ee-485e-8644-df3147cbbae0-FOTO_LinkedIn_MaterialBlack.jpg.webp",
+  "Ariel Oka": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/58069525-3b98-4de5-82e2-5aea635cda3f/eaeb085e-daf7-4e8c-8c7b-fd2f7d2d5293-byredo%20mojave.jpg.webp",
+  "1b1c3dcd-4251-44cb-a594-2fc57ee00533": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/58069525-3b98-4de5-82e2-5aea635cda3f/eaeb085e-daf7-4e8c-8c7b-fd2f7d2d5293-byredo%20mojave.jpg.webp",
+  "Hasyim Kipuw": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/7703ba04-6939-49f7-bdc4-ea28bb81327f/76d940fe-a608-4500-881d-585f9da91779-Lv%20imagination.jpg.webp",
+  "383de31e-01c2-4d02-b3e4-b563af72ab32": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/7703ba04-6939-49f7-bdc4-ea28bb81327f/76d940fe-a608-4500-881d-585f9da91779-Lv%20imagination.jpg.webp",
+  "Muhammad Adi Firmansyahah": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/423c7744-0fbd-4b30-91ca-cd05d5c3223e/208e3174-b077-445a-b9cd-76d9e59c3108-1000150213.jpg.webp",
+  "64781ee2-f82f-40c0-9178-4a76860b6f56": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/423c7744-0fbd-4b30-91ca-cd05d5c3223e/208e3174-b077-445a-b9cd-76d9e59c3108-1000150213.jpg.webp",
+};
+
 const initialCandidates: Candidate[] = [
-  { id: "candidate-adrienne", name: "Adrienne Kayana Wistara Lie", role: "Product Designer", location: "Denpasar Barat, Bali", stage: "hired", owner: "Adrienne", dueDate: "2026-09-25", appliedAt: "2026-09-09", score: 4.8, feedback: "Kandidat ini memenuhi 84% kompetensi inti lowongan.", offerStatus: "accepted", compensation: "Rp 15.000.000 / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", jobId: "talent-pool", jobTitle: "Talent Pool" },
-  { id: "candidate-1", name: "Nadia Putri Rahayu", role: "Senior Product Designer", location: "Jakarta Selatan", stage: "interview", owner: "Raka Pratama", dueDate: "2026-08-20", appliedAt: "2026-07-28", score: 4.6, feedback: "Portfolio kuat di design system.", offerStatus: "draft", compensation: "Rp 28–32 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop", jobId: "job-1", jobTitle: "Senior Product Designer" },
-  { id: "candidate-2", name: "Bima Adinata", role: "Frontend Architect", location: "Bandung", stage: "screening", owner: "Sari Wijaya", dueDate: "2026-08-18", appliedAt: "2026-08-02", score: 4.1, feedback: "Perlu validasi stakeholder management.", offerStatus: "draft", compensation: "Rp 25–29 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop", jobId: "talent-pool", jobTitle: "Talent Pool" },
-  { id: "candidate-3", name: "Maya Kusuma", role: "Product Manager", location: "Jakarta Barat", stage: "offer", owner: "Raka Pratama", dueDate: "2026-08-19", appliedAt: "2026-07-22", score: 4.8, feedback: "Sangat kuat di systems thinking dan discovery.", offerStatus: "sent", compensation: "Rp 31 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400&auto=format&fit=crop", jobId: "job-3", jobTitle: "Product Manager" },
-  { id: "candidate-4", name: "Rizky Maulana", role: "Backend Engineer (Go/Node)", location: "Surabaya", stage: "interview", owner: "Dimas Nugroho", dueDate: "2026-08-21", appliedAt: "2026-07-30", score: 3.7, feedback: "", offerStatus: "draft", compensation: "Rp 24–28 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", jobId: "job-4", jobTitle: "Backend Engineer (Go/Node)" },
-  { id: "candidate-5", name: "Tasya Lestari", role: "Data Scientist", location: "Yogyakarta", stage: "hired", owner: "Sari Wijaya", dueDate: "2026-08-04", appliedAt: "2026-07-04", score: 4.9, feedback: "Keahlian modeling sangat relevan.", offerStatus: "accepted", compensation: "Rp 30 juta / bulan", reason: "", avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop", jobId: "job-1", jobTitle: "Senior Product Designer" },
+  {
+    id: "cd6ec533-5d1c-4f87-842c-888de3e825ec",
+    name: "Adrienne Kayana Wistara Lie",
+    role: "Product Management Intern",
+    location: "Denpasar Barat, Bali",
+    stage: "hired",
+    owner: "Adrienne",
+    dueDate: "2026-09-25",
+    appliedAt: "2026-09-09",
+    score: 4.8,
+    feedback: "Kandidat ini memenuhi 84% kompetensi inti lowongan.",
+    offerStatus: "accepted",
+    compensation: "Rp 15.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
+  },
+  {
+    id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
+    name: "Alga Ramandika Praba",
+    role: "Software Engineer",
+    location: "Gianyar, Bali",
+    stage: "interview",
+    owner: "Raka Pratama",
+    dueDate: "2026-08-20",
+    appliedAt: "2026-07-28",
+    score: 4.6,
+    feedback: "Portfolio kuat di backend engineering & database architecture.",
+    offerStatus: "draft",
+    compensation: "Rp 25.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Alga Ramandika Praba"],
+    jobId: "job-2",
+    jobTitle: "Frontend Architect",
+  },
+  {
+    id: "1b1c3dcd-4251-44cb-a594-2fc57ee00533",
+    name: "Ariel Oka",
+    role: "Software Engineer",
+    location: "Bali, Denpasar",
+    stage: "screening",
+    owner: "Sari Wijaya",
+    dueDate: "2026-08-18",
+    appliedAt: "2026-08-02",
+    score: 4.1,
+    feedback: "Perlu validasi stakeholder management.",
+    offerStatus: "draft",
+    compensation: "Rp 22.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Ariel Oka"],
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
+  },
+  {
+    id: "383de31e-01c2-4d02-b3e4-b563af72ab32",
+    name: "Hasyim Kipuw",
+    role: "Senior Software Engineer",
+    location: "Bali, Denpasar",
+    stage: "offer",
+    owner: "Raka Pratama",
+    dueDate: "2026-08-19",
+    appliedAt: "2026-07-22",
+    score: 4.8,
+    feedback: "Sangat kuat di systems architecture dan high concurrency.",
+    offerStatus: "sent",
+    compensation: "Rp 31.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Hasyim Kipuw"],
+    jobId: "job-4",
+    jobTitle: "Backend Engineer (Go/Node)",
+  },
+  {
+    id: "64781ee2-f82f-40c0-9178-4a76860b6f56",
+    name: "Muhammad Adi Firmansyahah",
+    role: "Human Capital Specialist",
+    location: "Bali",
+    stage: "interview",
+    owner: "Dimas Nugroho",
+    dueDate: "2026-08-21",
+    appliedAt: "2026-07-30",
+    score: 4.5,
+    feedback: "Pengalaman solid di talent acquisition & HR operations.",
+    offerStatus: "draft",
+    compensation: "Rp 18.000.000 / bulan",
+    reason: "",
+    avatarUrl: SUPABASE_AVATARS["Muhammad Adi Firmansyahah"],
+    jobId: "job-1",
+    jobTitle: "Senior Product Designer",
+  },
 ];
 
 const initialInterviews: Interview[] = [
-  { id: "interview-1", candidateId: "candidate-1", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Portfolio Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
-  { id: "interview-2", candidateId: "candidate-4", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "System Design & Culture", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
+  { id: "interview-1", candidateId: "b082c226-1a6e-42a6-80e0-150ce5f01745", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Architecture Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
+  { id: "interview-2", candidateId: "64781ee2-f82f-40c0-9178-4a76860b6f56", date: "2026-08-21T14:00", timezone: "Asia/Jakarta (WIB)", type: "HR & Culture Leadership", panel: ["Dimas Nugroho"], status: "Selesai", reminder: false, meetingUrl: "https://meet.google.com/klm-nopq-rst" },
 ];
 
 const DB_CACHE_KEY = "proofylink-ops-db-cache-v1";
@@ -110,7 +208,11 @@ function readInitialState(isDb: boolean) {
       if (cached) {
         const parsed = JSON.parse(cached) as { candidates?: Candidate[]; interviews?: Interview[] };
         if (Array.isArray(parsed?.candidates)) {
-          return { candidates: parsed.candidates, interviews: parsed.interviews ?? [] };
+          const resolved = parsed.candidates.map((c) => ({
+            ...c,
+            avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+          }));
+          return { candidates: resolved, interviews: parsed.interviews ?? [] };
         }
       }
     } catch {}
@@ -127,7 +229,11 @@ function readInitialState(isDb: boolean) {
         status: iv.status === "Dibatalkan" ? ("Dibatalkan" as const) : isPast ? ("Selesai" as const) : iv.status,
       };
     });
-    return { candidates: parsed?.candidates ?? initialCandidates, interviews: loadedInterviews };
+    const loadedCandidates = (parsed?.candidates ?? initialCandidates).map((c) => ({
+      ...c,
+      avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+    }));
+    return { candidates: loadedCandidates, interviews: loadedInterviews };
   } catch {
     return { candidates: initialCandidates, interviews: initialInterviews };
   }
@@ -172,6 +278,30 @@ export function RecruiterOperationsPage() {
         }
       })
       .catch(() => {});
+  }, []);
+
+  // Enrich candidate avatars from live Supabase /api/candidates query
+  useEffect(() => {
+    let active = true;
+    fetch("/api/candidates?limit=50", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const payload = (await res.json()) as { candidates?: Array<{ id: string; name?: string; avatarUrl?: string }> };
+        if (!active || !payload.candidates) return;
+        const liveMap = new Map(payload.candidates.map((c) => [c.id, c.avatarUrl]));
+        const nameMap = new Map(payload.candidates.map((c) => [c.name, c.avatarUrl]));
+        setData((prev) => ({
+          ...prev,
+          candidates: prev.candidates.map((cand) => {
+            const liveAvatar = liveMap.get(cand.id) || nameMap.get(cand.name) || SUPABASE_AVATARS[cand.id] || SUPABASE_AVATARS[cand.name];
+            return liveAvatar && liveAvatar !== cand.avatarUrl ? { ...cand, avatarUrl: liveAvatar } : cand;
+          }),
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Save to demo storage when not in dbMode, or cache DB records in dbMode
@@ -255,7 +385,12 @@ export function RecruiterOperationsPage() {
                 }
 
                 const candProfile = candidateMap.get(app.candidateProfileId || app.id);
-                const resolvedAvatar = app.candidate?.avatarUrl || candProfile?.avatarUrl;
+                const resolvedAvatar =
+                  app.candidate?.avatarUrl ||
+                  candProfile?.avatarUrl ||
+                  (candProfile?.name ? SUPABASE_AVATARS[candProfile.name] : undefined) ||
+                  (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
+                  SUPABASE_AVATARS[app.candidateProfileId || ""];
 
                 return {
                   id: app.candidateProfileId || app.id,
@@ -300,7 +435,7 @@ export function RecruiterOperationsPage() {
               reason: "",
               jobId: "talent-pool",
               jobTitle: "Talent Pool",
-              avatarUrl: cand.avatarUrl,
+              avatarUrl: cand.avatarUrl || (cand.name ? SUPABASE_AVATARS[cand.name] : undefined) || SUPABASE_AVATARS[cand.id],
             });
           }
         }
