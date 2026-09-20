@@ -6,13 +6,11 @@ import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
-  CheckCircle2,
   Clock,
   Edit3,
   FileText,
   Lock,
   Save,
-  Shield,
   Sliders,
   Trash2,
   User,
@@ -88,7 +86,7 @@ const NAV_ITEMS = [
   {
     id: "overview" as const,
     label: "Profil & Akun",
-    description: "Ringkasan data & visibilitas",
+    description: "Ringkasan data profil",
     icon: User,
   },
   {
@@ -301,7 +299,6 @@ export function CandidateSettingsView({
     cvProfile?.location ||
     profileData?.candidateProfile?.location ||
     "Indonesia";
-  const isPublished = profileData?.candidateProfile?.isPublished ?? false;
 
   return (
     <div className="space-y-6 pb-12">
@@ -312,7 +309,7 @@ export function CandidateSettingsView({
             Pengaturan Akun
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Kelola preferensi akun, privasi visibilitas, saluran notifikasi, dan keamanan login.
+            Kelola preferensi akun, saluran notifikasi, dan keamanan login.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -510,62 +507,6 @@ export function CandidateSettingsView({
                       <dd className="text-sm text-foreground leading-relaxed">{headline}</dd>
                     </div>
                   </dl>
-                </CardContent>
-              </Card>
-
-              {/* Card 2: Kebijakan Visibilitas & Privasi */}
-              <Card className="border-border/80 bg-card shadow-xs">
-                <CardHeader className="border-b border-border/60 pb-4">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Shield className="size-4 text-primary" />
-                    Kebijakan Visibilitas &amp; Privasi
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Pengaturan bagaimana profil Anda ditemukan oleh rekruter mitra ProofyLink.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-border/60">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Status Publikasi Direktori</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5">
-                        {isPublished ? "Aktif di Pencarian Rekruter" : "Draft (Tersimpan Privat)"}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium w-fit",
-                        isPublished
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {isPublished ? <CheckCircle2 className="size-3.5 text-emerald-600" /> : null}
-                      {isPublished ? "Terpublikasi di Direktori" : "Privat & Aman"}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-border/60">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Peran &amp; Hak Akses Akun</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">
-                        {user?.role || "Kandidat"}
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary w-fit">
-                      Talent Network Member
-                    </span>
-                  </div>
-
-                  <div className="rounded-xl border border-border/80 bg-muted/40 p-4 space-y-1.5">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <Shield className="size-4 text-emerald-600 shrink-0" />
-                      <span>Screening Berbasis Izin (Consent-First)</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Data pribadi dan dokumen CV lengkap Anda tidak pernah dibuka secara otomatis. Rekruter wajib mengajukan permintaan persetujuan screening resmi, dan Anda memiliki wewenang penuh untuk menyetujui atau menolak.
-                    </p>
-                  </div>
                 </CardContent>
               </Card>
             </div>
