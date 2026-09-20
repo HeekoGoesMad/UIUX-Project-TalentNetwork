@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,6 +33,14 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { downloadIcsFile } from "@/lib/calendar";
 import { DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -44,13 +52,49 @@ import {
 } from "@/lib/recruiter-activity";
 import { useApp } from "@/providers/app-provider";
 
-export const applicationStatuses = ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer", "hired", "rejected", "withdrawn"] as const;
+export const applicationStatuses = [
+  "new",
+  "shortlisted",
+  "screening",
+  "assessment",
+  "review",
+  "interview",
+  "offer",
+  "hired",
+  "rejected",
+  "offer_declined",
+  "withdrawn",
+] as const;
 export type ApplicationStatus = (typeof applicationStatuses)[number];
 export type Application = { id: string; jobId: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
 type History = { id: string; fromStatus: ApplicationStatus | null; toStatus: ApplicationStatus; reason: string | null; changedBy: string; createdAt: string };
-const labels: Record<ApplicationStatus, string> = { new: "Baru", shortlisted: "Shortlist", consent_requested: "Menunggu izin", consent_approved: "Izin disetujui", screening: "Skrining", assessment: "Asesmen", review: "Ditinjau", interview: "Wawancara", offer: "Penawaran", hired: "Diterima", rejected: "Ditolak", withdrawn: "Ditarik" };
+const labels: Record<ApplicationStatus, string> = {
+  new: "Baru",
+  shortlisted: "Shortlist",
+  screening: "Peninjauan Berkas",
+  assessment: "Asesmen",
+  review: "Ditinjau",
+  interview: "Wawancara",
+  offer: "Penawaran Kerja",
+  hired: "Diterima (Hired)",
+  rejected: "Tidak Lolos",
+  offer_declined: "Tawaran Ditolak",
+  withdrawn: "Ditarik",
+};
 const activeStatuses = applicationStatuses.filter((status) => status !== "withdrawn");
-const stageColors: Record<ApplicationStatus, string> = { new: "bg-muted text-muted-foreground", shortlisted: "bg-muted text-muted-foreground", consent_requested: "bg-muted text-muted-foreground", consent_approved: "bg-muted text-muted-foreground", screening: "bg-muted text-muted-foreground", assessment: "bg-muted text-muted-foreground", review: "bg-muted text-muted-foreground", interview: "bg-primary/10 text-primary", offer: "bg-emerald-50 text-emerald-700", hired: "bg-emerald-50 text-emerald-700", rejected: "bg-red-50 text-red-700", withdrawn: "bg-muted text-muted-foreground" };
+const stageColors: Record<ApplicationStatus, string> = {
+  new: "bg-muted text-muted-foreground",
+  shortlisted: "bg-muted text-muted-foreground",
+  screening: "bg-blue-50 text-blue-700",
+  assessment: "bg-muted text-muted-foreground",
+  review: "bg-blue-50 text-blue-700",
+  interview: "bg-primary/10 text-primary",
+  offer: "bg-amber-50 text-amber-700",
+  hired: "bg-emerald-50 text-emerald-700",
+  rejected: "bg-red-50 text-red-700",
+  offer_declined: "bg-red-50 text-red-700",
+  withdrawn: "bg-muted text-muted-foreground",
+};
 
 export const storageKey = "proofylink-demo-applications";
 
@@ -348,10 +392,10 @@ export function CandidateApplicationsPage() {
 
   const appCounts = useMemo(() => ({
     all: applications.length,
-    active: applications.filter((a) => ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(a.status)).length,
+    active: applications.filter((a) => ["new", "shortlisted", "screening", "assessment", "review"].includes(a.status)).length,
     interview: applications.filter((a) => a.status === "interview").length,
     offer: applications.filter((a) => a.status === "offer" || a.status === "hired").length,
-    rejected: applications.filter((a) => a.status === "rejected" || a.status === "withdrawn").length,
+    rejected: applications.filter((a) => a.status === "rejected" || a.status === "offer_declined" || a.status === "withdrawn").length,
   }), [applications]);
 
   const invCounts = useMemo(() => ({
@@ -369,10 +413,10 @@ export function CandidateApplicationsPage() {
 
   const filteredApps = useMemo(() => applications.filter((item) => {
     if (appFilter === "all") return true;
-    if (appFilter === "active") return ["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review"].includes(item.status);
+    if (appFilter === "active") return ["new", "shortlisted", "screening", "assessment", "review"].includes(item.status);
     if (appFilter === "interview") return item.status === "interview";
     if (appFilter === "offer") return item.status === "offer" || item.status === "hired";
-    return item.status === "rejected" || item.status === "withdrawn";
+    return item.status === "rejected" || item.status === "offer_declined" || item.status === "withdrawn";
   }), [applications, appFilter]);
 
   const totalAppPages = Math.ceil(filteredApps.length / ITEMS_PER_PAGE) || 1;
@@ -1112,6 +1156,8 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   const [offers, setOffers] = useState<Array<{ id: string; salary: number; currency: string; startDate: string; expirationDate: string; benefits: string | null; notes: string | null; status: string }>>([]);
   const [actingOfferId, setActingOfferId] = useState<string | null>(null);
   const [offerNotice, setOfferNotice] = useState<string | null>(null);
+  const [currentTimestamp] = useState(() => Date.now());
+  const activeOffer = offers.length > 0 ? offers[offers.length - 1] : null;
 
   useEffect(() => {
     if (!dbMode) {
@@ -1210,52 +1256,389 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
     }
   };
 
-  const handleOfferAction = async (offerId: string, status: "accepted" | "declined") => {
-    setActingOfferId(offerId);
-    setOfferNotice(null);
-    try {
-      if (dbMode) {
-        const res = await fetch(`/api/offers/${offerId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
-        });
-        const data = (await res.json()) as { error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Gagal memproses keputusan penawaran.");
-      }
-      setOffers((prev) => prev.map((o) => (o.id === offerId ? { ...o, status } : o)));
-      if (status === "accepted") {
-        setApplication((prev) => (prev ? { ...prev, status: "hired" } : prev));
-        setOfferNotice("Penawaran diterima — status lamaran menjadi Hired.");
-        toast.success("Penawaran diterima — selamat!");
-      } else {
-        setOfferNotice("Penawaran ditolak.");
-        toast.success("Penawaran ditolak.");
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Terjadi kesalahan.";
-      setOfferNotice(message);
-      toast.error(message);
-    } finally {
-      setActingOfferId(null);
-    }
-  };
+  // Two-way interaction states
+  const [negotiationOpen, setNegotiationOpen] = useState(false);
+  const [negotiationMsg, setNegotiationMsg] = useState("");
+  const [submittingNegotiation, setSubmittingNegotiation] = useState(false);
 
-  // Pipeline phases for candidate visualization
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleTargetId, setRescheduleTargetId] = useState<string | null>(null);
+  const [rescheduleProposedDate, setRescheduleProposedDate] = useState(() => {
+    const d = new Date(Date.now() + 3 * 86400000);
+    d.setHours(10, 0, 0, 0);
+    return d.toISOString().slice(0, 16);
+  });
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [submittingReschedule, setSubmittingReschedule] = useState(false);
+
+  const [declineInterviewOpen, setDeclineInterviewOpen] = useState(false);
+  const [declineTargetInterviewId, setDeclineTargetInterviewId] = useState<string | null>(null);
+  const [declineInterviewReason, setDeclineInterviewReason] = useState("");
+
+  const handleOfferAction = useCallback(
+    async (
+      offerId: string,
+      status: "accepted" | "declined" | "in_negotiation",
+      negotiationText?: string
+    ) => {
+      setActingOfferId(offerId);
+      setOfferNotice(null);
+      try {
+        if (dbMode) {
+          const res = await fetch(`/api/offers/${offerId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: status === "in_negotiation" ? "pending" : status,
+              notes: negotiationText,
+            }),
+          });
+          const data = (await res.json()) as { error?: string };
+          if (!res.ok) throw new Error(data.error ?? "Gagal memproses keputusan penawaran.");
+        }
+
+        setOffers((prev) =>
+          prev.map((o) =>
+            o.id === offerId
+              ? {
+                  ...o,
+                  status,
+                  notes: negotiationText ? `Pesan Negosiasi Anda: "${negotiationText}"` : o.notes,
+                }
+              : o
+          )
+        );
+
+        const now = new Date().toISOString();
+
+        if (status === "accepted") {
+          setApplication((prev) => (prev ? { ...prev, status: "hired", updatedAt: now } : prev));
+          setOfferNotice("Penawaran resmi diterima — status lamaran menjadi Hired!");
+          toast.success("Selamat! Anda resmi menerima penawaran kerja.");
+
+          // Sync with demo recruiter operations
+          try {
+            const opsKey = "proofylink-demo-recruiter-operations";
+            const opsRaw = localStorage.getItem(opsKey);
+            if (opsRaw) {
+              const opsParsed = JSON.parse(opsRaw);
+              if (opsParsed && Array.isArray(opsParsed.candidates)) {
+                const candIdx = opsParsed.candidates.findIndex(
+                  (c: { id: string; name?: string }) =>
+                    c.id === application?.candidate?.name ||
+                    c.name === application?.candidate?.name ||
+                    c.id.includes("candidate")
+                );
+                if (candIdx >= 0) {
+                  opsParsed.candidates[candIdx].stage = "hired";
+                  opsParsed.candidates[candIdx].offerStatus = "accepted";
+                  opsParsed.candidates[candIdx].statusHistory = [
+                    ...(opsParsed.candidates[candIdx].statusHistory || []),
+                    {
+                      id: `hist-offer-accepted-${now}`,
+                      stage: "hired",
+                      title: "Penawaran Kerja Diterima (Hired)",
+                      actionType: "candidate",
+                      timestamp: now,
+                      actor: application?.candidate?.name || "Kandidat",
+                      actorRole: "Candidate",
+                      notes: "Kandidat telah menyetujui surat penawaran kerja.",
+                    },
+                  ];
+                  localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+        } else if (status === "declined") {
+          setApplication((prev) => (prev ? { ...prev, status: "offer_declined", updatedAt: now } : prev));
+          setOfferNotice("Penawaran telah ditolak.");
+          toast.info("Anda telah menolak surat penawaran kerja.");
+
+          // Sync with demo recruiter operations
+          try {
+            const opsKey = "proofylink-demo-recruiter-operations";
+            const opsRaw = localStorage.getItem(opsKey);
+            if (opsRaw) {
+              const opsParsed = JSON.parse(opsRaw);
+              if (opsParsed && Array.isArray(opsParsed.candidates)) {
+                const candIdx = opsParsed.candidates.findIndex(
+                  (c: { id: string; name?: string }) =>
+                    c.id === application?.candidate?.name ||
+                    c.name === application?.candidate?.name ||
+                    c.id.includes("candidate")
+                );
+                if (candIdx >= 0) {
+                  opsParsed.candidates[candIdx].offerStatus = "declined";
+                  opsParsed.candidates[candIdx].stage = "rejected";
+                  opsParsed.candidates[candIdx].statusHistory = [
+                    ...(opsParsed.candidates[candIdx].statusHistory || []),
+                    {
+                      id: `hist-offer-declined-${now}`,
+                      stage: "rejected",
+                      title: "Penawaran Kerja Ditolak Kandidat",
+                      actionType: "candidate",
+                      timestamp: now,
+                      actor: application?.candidate?.name || "Kandidat",
+                      actorRole: "Candidate",
+                      notes: "Kandidat menolak surat penawaran kerja.",
+                    },
+                  ];
+                  localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+        } else if (status === "in_negotiation") {
+          setOfferNotice("Pesan negosiasi telah terkirim ke tim rekruter. Menunggu tanggapan.");
+          toast.success("Pesan negosiasi berhasil dikirim ke rekruter!");
+
+          // Sync with demo recruiter operations
+          try {
+            const opsKey = "proofylink-demo-recruiter-operations";
+            const opsRaw = localStorage.getItem(opsKey);
+            if (opsRaw) {
+              const opsParsed = JSON.parse(opsRaw);
+              if (opsParsed && Array.isArray(opsParsed.candidates)) {
+                const candIdx = opsParsed.candidates.findIndex(
+                  (c: { id: string; name?: string }) =>
+                    c.id === application?.candidate?.name ||
+                    c.name === application?.candidate?.name ||
+                    c.id.includes("candidate")
+                );
+                if (candIdx >= 0) {
+                  opsParsed.candidates[candIdx].offerStatus = "negotiating";
+                  opsParsed.candidates[candIdx].statusHistory = [
+                    ...(opsParsed.candidates[candIdx].statusHistory || []),
+                    {
+                      id: `hist-offer-neg-${now}`,
+                      stage: "offer",
+                      title: "Pesan Negosiasi dari Kandidat",
+                      actionType: "candidate",
+                      timestamp: now,
+                      actor: application?.candidate?.name || "Kandidat",
+                      actorRole: "Candidate",
+                      notes: `Catatan negosiasi: "${negotiationText}"`,
+                    },
+                  ];
+                  localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Terjadi kesalahan.";
+        setOfferNotice(message);
+        toast.error(message);
+      } finally {
+        setActingOfferId(null);
+      }
+    },
+    [application, dbMode]
+  );
+
+  const handleConfirmInterview = useCallback(
+    async (interviewId: string) => {
+      try {
+        setInterviews((prev) =>
+          prev.map((i) => (i.id === interviewId ? { ...i, status: "confirmed" } : i))
+        );
+        toast.success("Kehadiran wawancara berhasil dikonfirmasi!");
+
+        // Sync with demo recruiter operations
+        try {
+          const opsKey = "proofylink-demo-recruiter-operations";
+          const opsRaw = localStorage.getItem(opsKey);
+          if (opsRaw) {
+            const opsParsed = JSON.parse(opsRaw);
+            if (opsParsed && Array.isArray(opsParsed.interviews)) {
+              const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === interviewId);
+              if (ivIdx >= 0) {
+                opsParsed.interviews[ivIdx].status = "Terjadwal (Terkonfirmasi)";
+              }
+            }
+            if (opsParsed && Array.isArray(opsParsed.candidates)) {
+              const cand = opsParsed.candidates[0];
+              if (cand) {
+                const now = new Date().toISOString();
+                cand.statusHistory = [
+                  ...(cand.statusHistory || []),
+                  {
+                    id: `hist-iv-confirmed-${now}`,
+                    stage: "interview",
+                    title: "Wawancara Terkonfirmasi Hadir",
+                    actionType: "candidate",
+                    timestamp: now,
+                    actor: application?.candidate?.name || "Kandidat",
+                    actorRole: "Candidate",
+                    notes: "Kandidat telah mengonfirmasi kehadiran untuk sesi wawancara.",
+                  },
+                ];
+              }
+            }
+            localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+          }
+        } catch {
+          // ignore
+        }
+      } catch {
+        toast.error("Gagal mengonfirmasi kehadiran.");
+      }
+    },
+    [application]
+  );
+
+  const handleRescheduleSubmit = useCallback(async () => {
+    if (!rescheduleTargetId) return;
+    setSubmittingReschedule(true);
+    try {
+      setInterviews((prev) =>
+        prev.map((i) =>
+          i.id === rescheduleTargetId
+            ? { ...i, status: "reschedule_requested" }
+            : i
+        )
+      );
+      toast.success("Permintaan reschedule berhasil diajukan ke rekruter!");
+
+      // Sync with demo recruiter operations
+      try {
+        const opsKey = "proofylink-demo-recruiter-operations";
+        const opsRaw = localStorage.getItem(opsKey);
+        if (opsRaw) {
+          const opsParsed = JSON.parse(opsRaw);
+          if (opsParsed && Array.isArray(opsParsed.interviews)) {
+            const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === rescheduleTargetId);
+            if (ivIdx >= 0) {
+              opsParsed.interviews[ivIdx].status = "Permintaan Reschedule";
+            }
+          }
+          if (opsParsed && Array.isArray(opsParsed.candidates)) {
+            const cand = opsParsed.candidates[0];
+            if (cand) {
+              const now = new Date().toISOString();
+              cand.statusHistory = [
+                ...(cand.statusHistory || []),
+                {
+                  id: `hist-iv-reschedule-${now}`,
+                  stage: "interview",
+                  title: "Permintaan Reschedule Wawancara",
+                  actionType: "candidate",
+                  timestamp: now,
+                  actor: application?.candidate?.name || "Kandidat",
+                  actorRole: "Candidate",
+                  notes: `Kandidat mengusulkan jadwal baru: ${rescheduleProposedDate}. Alasan: ${rescheduleReason || "Tidak ada alasan spesifik."}`,
+                },
+              ];
+            }
+          }
+          localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+        }
+      } catch {
+        // ignore
+      }
+      setRescheduleOpen(false);
+      setRescheduleReason("");
+    } finally {
+      setSubmittingReschedule(false);
+    }
+  }, [application, rescheduleProposedDate, rescheduleReason, rescheduleTargetId]);
+
+  const handleDeclineInterviewSubmit = useCallback(async () => {
+    if (!declineTargetInterviewId) return;
+    try {
+      setInterviews((prev) =>
+        prev.map((i) =>
+          i.id === declineTargetInterviewId
+            ? { ...i, status: "declined" }
+            : i
+        )
+      );
+      toast.info("Jadwal sesi wawancara ini ditolak. Lamaran Anda tetap aktif.");
+
+      // Sync with demo recruiter operations
+      try {
+        const opsKey = "proofylink-demo-recruiter-operations";
+        const opsRaw = localStorage.getItem(opsKey);
+        if (opsRaw) {
+          const opsParsed = JSON.parse(opsRaw);
+          if (opsParsed && Array.isArray(opsParsed.interviews)) {
+            const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === declineTargetInterviewId);
+            if (ivIdx >= 0) {
+              opsParsed.interviews[ivIdx].status = "Ditolak Kandidat";
+            }
+          }
+          if (opsParsed && Array.isArray(opsParsed.candidates)) {
+            const cand = opsParsed.candidates[0];
+            if (cand) {
+              const now = new Date().toISOString();
+              cand.statusHistory = [
+                ...(cand.statusHistory || []),
+                {
+                  id: `hist-iv-declined-${now}`,
+                  stage: "interview",
+                  title: "Sesi Wawancara Ditolak Kandidat",
+                  actionType: "candidate",
+                  timestamp: now,
+                  actor: application?.candidate?.name || "Kandidat",
+                  actorRole: "Candidate",
+                  notes: `Kandidat tidak dapat menghadiri sesi ini (${declineInterviewReason || "Jadwal bentrok"}). Lamaran tetap aktif.`,
+                },
+              ];
+            }
+          }
+          localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+        }
+      } catch {
+        // ignore
+      }
+      setDeclineInterviewOpen(false);
+      setDeclineInterviewReason("");
+    } catch {
+      toast.error("Gagal memperbarui status wawancara.");
+    }
+  }, [application, declineInterviewReason, declineTargetInterviewId]);
+
+  // Modern human-centric pipeline milestones for candidate visualization
   const PIPELINE_PHASES = [
-    { key: "applied", label: "Lamaran terkirim", desc: "Berkas diterima sistem", statuses: ["new", "shortlisted"] },
-    { key: "screening", label: "Skrining profil", desc: "Verifikasi atas izin Anda", statuses: ["consent_requested", "consent_approved", "screening"] },
-    { key: "assessment", label: "Asesmen", desc: "Uji keahlian", statuses: ["assessment", "review"] },
-    { key: "interview", label: "Wawancara", desc: "Sesi temu tim", statuses: ["interview"] },
-    { key: "decision", label: "Keputusan", desc: "Penawaran atau hasil akhir", statuses: ["offer", "hired", "rejected"] },
+    {
+      key: "review",
+      label: "Peninjauan Berkas",
+      desc: "Profil & portofolio ditinjau oleh tim rekruter",
+      statuses: ["new", "shortlisted", "screening", "review", "assessment"],
+    },
+    {
+      key: "interview",
+      label: "Sesi Wawancara",
+      desc: "Diskusi kompetensi peran dan keselarasan tim",
+      statuses: ["interview"],
+    },
+    {
+      key: "offer",
+      label: "Surat Penawaran",
+      desc: "Pembahasan rincian kompensasi & kesepakatan",
+      statuses: ["offer"],
+    },
+    {
+      key: "decision",
+      label: "Keputusan Akhir",
+      desc: "Hasil akhir proses seleksi resmi",
+      statuses: ["hired", "rejected", "offer_declined", "withdrawn"],
+    },
   ];
 
   const currentPhaseIndex = useMemo(() => {
     if (!application) return 0;
-    if (["offer", "hired", "rejected"].includes(application.status)) return 4;
-    if (application.status === "interview") return 3;
-    if (["assessment", "review"].includes(application.status)) return 2;
-    if (["consent_requested", "consent_approved", "screening"].includes(application.status)) return 1;
+    if (["hired", "rejected", "offer_declined", "withdrawn"].includes(application.status)) return 3;
+    if (application.status === "offer") return 2;
+    if (application.status === "interview") return 1;
     return 0;
   }, [application]);
 
@@ -1375,19 +1758,27 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
-            {/* Visual hiring pipeline */}
-            <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Tahapan seleksi
-                  </h2>
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    Tahap {currentPhaseIndex + 1} dari 5
-                  </span>
+            {/* Modern Candidate Journey Tracker */}
+            <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6 overflow-hidden">
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
+                      <Sparkles className="size-4 text-primary" /> Alur Proses Seleksi
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Perjalanan tahapan rekrutmen Anda bersama {application.job?.organizationName || "perusahaan mitra"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">Status Terkini:</span>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${stageColors[application.status]}`}>
+                      {labels[application.status]}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-5">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
                   {PIPELINE_PHASES.map((phase, idx) => {
                     const isPassed = idx < currentPhaseIndex;
                     const isCurrent = idx === currentPhaseIndex;
@@ -1395,29 +1786,41 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                       <div
                         key={phase.key}
                         aria-current={isCurrent ? "step" : undefined}
-                        className={`relative flex flex-col rounded-xl border p-3.5 ${
+                        className={`relative flex flex-col rounded-xl border p-4 transition-all ${
                           isCurrent
-                            ? "border-primary/40 bg-primary/5"
+                            ? "border-primary/50 bg-primary/5 shadow-2xs ring-1 ring-primary/20"
                             : isPassed
-                            ? "border-border/70 bg-muted/30"
-                            : "border-border/60 bg-muted/20 text-muted-foreground"
+                            ? "border-emerald-200/80 bg-emerald-50/20 dark:border-emerald-900/40"
+                            : "border-border/50 bg-muted/10 opacity-70"
                         }`}
                       >
-                        <div className="mb-1.5 flex items-center justify-between gap-1">
-                          <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums ${
-                            isCurrent
-                              ? "bg-primary text-primary-foreground"
-                              : isPassed
-                              ? "bg-emerald-600 text-white"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
+                        <div className="mb-2 flex items-center justify-between">
+                          <span
+                            className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                              isCurrent
+                                ? "bg-primary text-primary-foreground shadow-xs animate-pulse"
+                                : isPassed
+                                ? "bg-emerald-600 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
                             {isPassed ? <Check className="size-3.5" /> : idx + 1}
                           </span>
+                          {isCurrent && (
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded-md">
+                              Tahap Aktif
+                            </span>
+                          )}
+                          {isPassed && (
+                            <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                              Selesai
+                            </span>
+                          )}
                         </div>
-                        <p className={`truncate text-xs font-semibold ${isCurrent ? "text-primary" : "text-foreground"}`}>
+                        <p className={`text-xs font-bold ${isCurrent ? "text-primary" : "text-foreground"}`}>
                           {phase.label}
                         </p>
-                        <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
                           {phase.desc}
                         </p>
                       </div>
@@ -1427,90 +1830,168 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </div>
             </Card>
 
-            {/* Offer letter */}
-            {offers.length > 0 && (
-              <div className="space-y-4">
-                {offers.map((offer) => (
-                  <Card key={offer.id} className="border-border/80 bg-card shadow-xs">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
-                          <Award className="size-5 text-amber-600" />
-                          Surat penawaran kerja
-                        </CardTitle>
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          offer.status === "accepted"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : offer.status === "declined"
-                            ? "bg-red-50 text-red-700"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {offer.status === "accepted" ? "Diterima (Hired)" : offer.status === "declined" ? "Ditolak" : "Menunggu Keputusan Anda"}
+            {/* 1-Panel Interactive Offer Hub */}
+            {(() => {
+              if (!activeOffer) return null;
+
+              const isExpired =
+                activeOffer.status === "pending" &&
+                activeOffer.expirationDate &&
+                !isNaN(new Date(activeOffer.expirationDate).getTime()) &&
+                new Date(activeOffer.expirationDate).getTime() < currentTimestamp;
+
+              return (
+                <Card className="border-border/80 bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border/70 bg-gradient-to-r from-amber-500/10 via-purple-500/5 to-transparent pb-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 shadow-2xs">
+                          <Award className="size-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-bold text-foreground">
+                            Surat Penawaran Kerja {offers.length > 1 ? `(Revisi v${offers.length})` : ""}
+                          </CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Diterbitkan resmi oleh {application.job?.organizationName || "Tim Rekruter"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                            activeOffer.status === "accepted"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              : activeOffer.status === "declined"
+                              ? "bg-red-50 text-red-700 border border-red-200"
+                              : activeOffer.status === "in_negotiation"
+                              ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : isExpired
+                              ? "bg-slate-100 text-slate-700 border border-slate-300"
+                              : "bg-amber-100 text-amber-800 border border-amber-200"
+                          }`}
+                        >
+                          {activeOffer.status === "accepted"
+                            ? "Diterima (Resmi Bergabung / Hired)"
+                            : activeOffer.status === "declined"
+                            ? "Ditolak (Offer Declined)"
+                            : activeOffer.status === "in_negotiation"
+                            ? "Dalam Diskusi / Negosiasi"
+                            : isExpired
+                            ? "Kedaluwarsa (Expired)"
+                            : "Menunggu Keputusan Anda"}
                         </span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4 text-sm">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-emerald-200/80 bg-white p-4 shadow-2xs">
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Kompensasi / Gaji Ditawarkan</p>
-                          <p className="mt-1 font-bold text-lg text-foreground font-mono">
-                            {offer.currency} {Number(offer.salary).toLocaleString("id-ID")} <span className="text-xs font-normal text-muted-foreground font-sans">/ bulan</span>
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Mulai Bekerja</p>
-                          <p className="mt-1 font-semibold text-foreground">{formatDate(offer.startDate)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Batas Konfirmasi Penawaran</p>
-                          <p className="mt-1 font-semibold text-amber-700">{offer.expirationDate ? formatDate(offer.expirationDate) : "Sesuai kesepakatan"}</p>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4 p-5 text-sm sm:p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/20 p-4 shadow-2xs">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Kompensasi / Gaji Pokok
+                        </p>
+                        <p className="mt-1 font-bold text-xl text-foreground font-mono text-emerald-950 dark:text-emerald-300">
+                          {activeOffer.currency} {Number(activeOffer.salary).toLocaleString("id-ID")}{" "}
+                          <span className="text-xs font-normal text-muted-foreground font-sans">/ bulan</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Mulai Bekerja
+                        </p>
+                        <p className="mt-1 font-bold text-foreground">{formatDate(activeOffer.startDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Batas Konfirmasi Penawaran
+                        </p>
+                        <p className={`mt-1 font-bold ${isExpired ? "text-red-600" : "text-amber-700"}`}>
+                          {activeOffer.expirationDate ? formatDate(activeOffer.expirationDate) : "Sesuai kesepakatan"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {activeOffer.benefits && (
+                      <div>
+                        <p className="text-xs font-bold text-foreground uppercase tracking-wider">
+                          Fasilitas &amp; Tunjangan:
+                        </p>
+                        <p className="mt-1.5 whitespace-pre-wrap rounded-xl bg-card border border-border/80 p-3.5 text-xs text-foreground leading-relaxed">
+                          {activeOffer.benefits}
+                        </p>
+                      </div>
+                    )}
+
+                    {activeOffer.notes && (
+                      <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5">
+                        <p className="text-xs font-bold text-foreground">Catatan / Sambutan Tim Rekruter:</p>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{activeOffer.notes}</p>
+                      </div>
+                    )}
+
+                    {activeOffer.status === "in_negotiation" && (
+                      <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4">
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="size-4 text-purple-700 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-bold text-purple-900">
+                              Pesan Negosiasi Anda Sedang Ditinjau Tim Rekruter
+                            </p>
+                            <p className="text-xs text-purple-800/80 mt-0.5 leading-relaxed">
+                              Rekruter akan meninjau pesan tanggapan Anda dan dapat menerbitkan pembaruan penawaran (v{offers.length + 1}) atau menghubungi Anda secara langsung.
+                            </p>
+                          </div>
                         </div>
                       </div>
+                    )}
 
-                      {offer.benefits && (
-                        <div>
-                          <p className="text-xs font-bold text-foreground">Fasilitas &amp; Tunjangan:</p>
-                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-white border border-border/80 p-3 text-xs text-foreground leading-relaxed">
-                            {offer.benefits}
-                          </p>
-                        </div>
-                      )}
+                    {(activeOffer.status === "pending" || activeOffer.status === "in_negotiation") && !isExpired && (
+                      <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-border/80">
+                        <Button
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+                          disabled={actingOfferId === activeOffer.id}
+                          onClick={() => void handleOfferAction(activeOffer.id, "accepted")}
+                        >
+                          <Check className="mr-1.5 size-4" />
+                          {actingOfferId === activeOffer.id ? "Memproses..." : "Terima Tawaran Kerja (Accept Offer)"}
+                        </Button>
 
-                      {offer.notes && (
-                        <div>
-                          <p className="text-xs font-bold text-foreground">Pesan dari Tim Rekruter:</p>
-                          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{offer.notes}</p>
-                        </div>
-                      )}
+                        <Button
+                          variant="outline"
+                          className="border-purple-200 text-[#7C3AED] hover:bg-purple-50 text-xs font-semibold"
+                          onClick={() => setNegotiationOpen(true)}
+                        >
+                          <MessageSquare className="mr-1.5 size-4" />
+                          Beri Pesan / Ajukan Diskusi
+                        </Button>
 
-                      {offer.status === "pending" && (
-                        <div className="flex flex-wrap gap-2.5 pt-3 border-t border-emerald-200">
-                          <Button
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
-                            disabled={actingOfferId === offer.id}
-                            onClick={() => void handleOfferAction(offer.id, "accepted")}
-                          >
-                            <Check className="mr-1.5 size-4" />
-                            {actingOfferId === offer.id ? "Memproses..." : "Terima Tawaran Kerja (Accept Offer)"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="text-xs text-red-700 border-red-200 hover:bg-red-50"
-                            disabled={actingOfferId === offer.id}
-                            onClick={() => void handleOfferAction(offer.id, "declined")}
-                          >
-                            Tolak Tawaran
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-                {offerNotice && <p role="status" className="text-xs text-muted-foreground">{offerNotice}</p>}
-              </div>
-            )}
+                        <Button
+                          variant="outline"
+                          className="text-xs text-red-700 border-red-200 hover:bg-red-50 ml-auto"
+                          disabled={actingOfferId === activeOffer.id}
+                          onClick={() => void handleOfferAction(activeOffer.id, "declined")}
+                        >
+                          Tolak Tawaran
+                        </Button>
+                      </div>
+                    )}
 
-            {/* Scheduled Interviews Panel */}
+                    {activeOffer.status === "accepted" && (
+                      <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-800 font-medium">
+                        <Check className="size-4 text-emerald-600 shrink-0" />
+                        <span>Selamat! Anda telah menerima penawaran ini. Tim rekruter akan segera mengarahkan ke proses Onboarding.</span>
+                      </div>
+                    )}
+
+                    {offerNotice && <p role="status" className="text-xs text-muted-foreground mt-2">{offerNotice}</p>}
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
+            {/* Scheduled Interviews Panel with Two-Way Actions */}
             {interviews.length > 0 && (
               <Card className="border-border/80 bg-card shadow-xs">
                 <CardHeader className="pb-3">
@@ -1519,48 +2000,115 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {interviews.map((interview) => (
-                    <div key={interview.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
-                      <div className="min-w-0">
-                        <p className="font-bold text-foreground text-sm">{interview.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-                          <Calendar className="size-3.5 text-muted-foreground" />
-                          <span>{formatDate(interview.scheduledAt)} ({interview.durationMinutes} menit) · {interview.timezone}</span>
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 text-xs font-medium"
-                          onClick={() => {
-                            downloadIcsFile(
-                              {
-                                title: `Interview: ${interview.title} - ${application.job?.title || "Posisi"}`,
-                                description: `Wawancara dengan ${application.job?.organizationName || "Perusahaan"}.\nTautan meeting: ${interview.meetingUrl || "Google Meet"}`,
-                                location: interview.meetingUrl || "Google Meet",
-                                start: interview.scheduledAt,
-                                timezone: interview.timezone,
-                                organizerName: application.job?.organizationName || "Tim Rekruter",
-                              },
-                              `interview-${application.job?.title ? application.job.title.toLowerCase().replace(/\s+/g, "-") : "job"}.ics`
-                            );
-                          }}
-                        >
-                          <Calendar className="size-3.5" />
-                          Simpan ke Kalender (.ics)
-                        </Button>
-                        {interview.meetingUrl && (
-                          <Button size="sm" asChild className="text-xs font-semibold">
-                            <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="size-3.5 mr-1" />
-                              Buka Ruang Temu
-                            </a>
-                          </Button>
+                  {interviews.map((interview) => {
+                    const isConfirmed = interview.status === "confirmed";
+                    const isRescheduleRequested = interview.status === "reschedule_requested";
+                    const isDeclined = interview.status === "declined";
+
+                    return (
+                      <div key={interview.id} className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-foreground text-sm">{interview.title}</p>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  isConfirmed
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : isRescheduleRequested
+                                    ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                    : isDeclined
+                                    ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                    : "bg-purple-100 text-[#7C3AED] border border-purple-200"
+                                }`}
+                              >
+                                {isConfirmed
+                                  ? "Terkonfirmasi Hadir"
+                                  : isRescheduleRequested
+                                  ? "Menunggu Respon Reschedule"
+                                  : isDeclined
+                                  ? "Jadwal Sesi Ditolak"
+                                  : "Menunggu Konfirmasi Kehadiran"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                              <Calendar className="size-3.5 text-muted-foreground" />
+                              <span>
+                                {formatDate(interview.scheduledAt)} ({interview.durationMinutes} menit) · {interview.timezone}
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-xs font-medium"
+                              onClick={() => {
+                                downloadIcsFile(
+                                  {
+                                    title: `Interview: ${interview.title} - ${application.job?.title || "Posisi"}`,
+                                    description: `Wawancara dengan ${application.job?.organizationName || "Perusahaan"}.\nTautan meeting: ${interview.meetingUrl || "Google Meet"}`,
+                                    location: interview.meetingUrl || "Google Meet",
+                                    start: interview.scheduledAt,
+                                    timezone: interview.timezone,
+                                    organizerName: application.job?.organizationName || "Tim Rekruter",
+                                  },
+                                  `interview-${application.job?.title ? application.job.title.toLowerCase().replace(/\s+/g, "-") : "job"}.ics`
+                                );
+                              }}
+                            >
+                              <Calendar className="size-3.5" />
+                              Simpan ke Kalender (.ics)
+                            </Button>
+                            {interview.meetingUrl && (
+                              <Button size="sm" asChild className="text-xs font-semibold">
+                                <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="size-3.5 mr-1" />
+                                  Buka Ruang Temu
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Two-Way Actions for Candidate */}
+                        {!isConfirmed && !isDeclined && (
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8"
+                              onClick={() => void handleConfirmInterview(interview.id)}
+                            >
+                              <Check className="size-3.5 mr-1" /> Konfirmasi Hadir
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-slate-300 text-slate-700 hover:bg-slate-50 h-8"
+                              onClick={() => {
+                                setRescheduleTargetId(interview.id);
+                                setRescheduleOpen(true);
+                              }}
+                            >
+                              <CalendarClock className="size-3.5 mr-1 text-purple-600" /> Ajukan Reschedule
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs text-red-600 hover:bg-red-50 hover:text-red-700 h-8 ml-auto"
+                              onClick={() => {
+                                setDeclineTargetInterviewId(interview.id);
+                                setDeclineInterviewOpen(true);
+                              }}
+                            >
+                              Tolak Sesi Ini
+                            </Button>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
             )}
@@ -1683,6 +2231,180 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                 </p>
               </CardContent>
             </Card>
+
+            {/* Modal Negosiasi / Pesan Bebas untuk Offer */}
+            <Dialog open={negotiationOpen} onOpenChange={setNegotiationOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageSquare className="size-5 text-[#7C3AED]" />
+                    Beri Pesan / Ajukan Diskusi Penawaran
+                  </DialogTitle>
+                  <DialogDescription>
+                    Tuliskan pertanyaan, aspirasi kompensasi, penyesuaian tanggal mulai kerja, atau poin benefit yang ingin Anda diskusikan secara terbuka dengan tim rekruter.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="candidate-negotiation-msg" className="text-xs font-semibold text-foreground">
+                      Pesan / Tanggapan Anda
+                    </label>
+                    <textarea
+                      id="candidate-negotiation-msg"
+                      value={negotiationMsg}
+                      onChange={(e) => setNegotiationMsg(e.target.value)}
+                      placeholder="Contoh: Terima kasih atas penawarannya. Apakah ada fleksibilitas untuk penyesuaian gaji pokok ke Rp26.000.000 atau opsi kerja hybrid 2 hari/minggu?"
+                      rows={4}
+                      className="field min-h-24 w-full py-2.5 text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Pesan ini akan langsung diteruskan ke catatan rekruter di Operations Hub. Penawaran tidak akan dibatalkan, melainkan statusnya beralih ke masa negosiasi.
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setNegotiationOpen(false)}
+                    disabled={submittingNegotiation}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                    disabled={submittingNegotiation || !negotiationMsg.trim()}
+                    onClick={async () => {
+                      if (!activeOffer) return;
+                      setSubmittingNegotiation(true);
+                      try {
+                        await handleOfferAction(activeOffer.id, "in_negotiation", negotiationMsg.trim());
+                        setNegotiationOpen(false);
+                        setNegotiationMsg("");
+                      } finally {
+                        setSubmittingNegotiation(false);
+                      }
+                    }}
+                  >
+                    {submittingNegotiation ? "Mengirim..." : "Kirim Pesan Diskusi"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Modal Ajukan Reschedule Wawancara */}
+            <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <CalendarClock className="size-5 text-[#7C3AED]" />
+                    Ajukan Jadwal Wawancara Pengganti
+                  </DialogTitle>
+                  <DialogDescription>
+                    Usulkan waktu baru yang lebih sesuai dengan ketersediaan Anda beserta alasan singkat untuk tim rekruter.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3.5 py-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="candidate-reschedule-date" className="text-xs font-semibold text-foreground">
+                      Usulan Tanggal &amp; Waktu Baru
+                    </label>
+                    <input
+                      id="candidate-reschedule-date"
+                      type="datetime-local"
+                      value={rescheduleProposedDate}
+                      onChange={(e) => setRescheduleProposedDate(e.target.value)}
+                      className="field h-10 w-full text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="candidate-reschedule-reason" className="text-xs font-semibold text-foreground">
+                      Alasan Pengajuan Reschedule
+                    </label>
+                    <textarea
+                      id="candidate-reschedule-reason"
+                      value={rescheduleReason}
+                      onChange={(e) => setRescheduleReason(e.target.value)}
+                      placeholder="Contoh: Ada agenda proyek penting mendesak di kantor saat ini yang tidak dapat ditinggalkan pada jam tersebut..."
+                      rows={3}
+                      className="field min-h-20 w-full py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRescheduleOpen(false)}
+                    disabled={submittingReschedule}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                    disabled={submittingReschedule || !rescheduleProposedDate}
+                    onClick={() => void handleRescheduleSubmit()}
+                  >
+                    {submittingReschedule ? "Mengajukan..." : "Ajukan Jadwal Baru"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Modal Konfirmasi Tolak Sesi Wawancara */}
+            <Dialog open={declineInterviewOpen} onOpenChange={setDeclineInterviewOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-red-600">
+                    <X className="size-5" />
+                    Tolak Sesi Wawancara Ini?
+                  </DialogTitle>
+                  <DialogDescription>
+                    Apakah Anda yakin tidak dapat menghadiri sesi wawancara ini? Penolakan ini hanya membatalkan sesi pertemuan tertentu, lamaran kerja Anda tetap aktif di sistem.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3 py-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="candidate-decline-iv-reason" className="text-xs font-semibold text-foreground">
+                      Alasan Penolakan (Opsional)
+                    </label>
+                    <textarea
+                      id="candidate-decline-iv-reason"
+                      value={declineInterviewReason}
+                      onChange={(e) => setDeclineInterviewReason(e.target.value)}
+                      placeholder="Contoh: Maaf, saya sedang berhalangan hadir di luar kota pada tanggal tersebut..."
+                      rows={3}
+                      className="field min-h-20 w-full py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDeclineInterviewOpen(false)}
+                  >
+                    Kembali
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => void handleDeclineInterviewSubmit()}
+                  >
+                    Ya, Tolak Sesi Wawancara
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
