@@ -1530,12 +1530,18 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
         if (!res.ok) throw new Error(data.error ?? "Gagal mengajukan permintaan reschedule.");
       }
 
+      const resolvedNewDate =
+        rescheduleProposedDate && !isNaN(new Date(rescheduleProposedDate).getTime())
+          ? new Date(rescheduleProposedDate).toISOString()
+          : undefined;
+
       setInterviews((prev) =>
         prev.map((i) =>
           i.id === rescheduleTargetId
             ? {
                 ...i,
                 status: "reschedule_requested",
+                scheduledAt: resolvedNewDate || i.scheduledAt,
                 rescheduleMetadata: {
                   proposedDate: rescheduleProposedDate,
                   reason: rescheduleReason,
@@ -1544,7 +1550,7 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             : i
         )
       );
-      toast.success("Permintaan reschedule berhasil diajukan ke rekruter!");
+      toast.success("Permintaan reschedule berhasil diajukan dan jadwal diperbarui!");
 
       // Sync with demo recruiter operations
       try {
@@ -1556,6 +1562,9 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             const ivIdx = opsParsed.interviews.findIndex((i: { id: string }) => i.id === rescheduleTargetId);
             if (ivIdx >= 0) {
               opsParsed.interviews[ivIdx].status = "Permintaan Reschedule";
+              if (resolvedNewDate) {
+                opsParsed.interviews[ivIdx].date = resolvedNewDate;
+              }
               opsParsed.interviews[ivIdx].rescheduleProposedDate = rescheduleProposedDate;
               opsParsed.interviews[ivIdx].rescheduleReason = rescheduleReason;
             }

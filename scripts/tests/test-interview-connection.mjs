@@ -122,6 +122,8 @@ async function runTest() {
     console.log(`✓ Recruiter API sees status: ${reschedStatus}`);
     console.log(`✓ Recruiter API sees reschedule proposedDate: ${reschedMeta?.proposedDate}`);
     console.log(`✓ Recruiter API sees reschedule reason: ${reschedMeta?.reason}`);
+    const scheduledAtInDb = recCheck2Data?.interview?.interview?.scheduledAt || recCheck2Data?.interview?.scheduledAt;
+    console.log(`✓ Database scheduledAt updated to: ${scheduledAtInDb}`);
     if (reschedStatus !== "reschedule_requested") {
       throw new Error(`Expected 'reschedule_requested', got ${reschedStatus}`);
     }

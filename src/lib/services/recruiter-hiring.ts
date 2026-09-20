@@ -769,6 +769,12 @@ export async function respondToInterviewAsCandidate(db: Database, input: Candida
       nextStatus = "reschedule_requested";
       eventType = "reschedule_requested";
       updatePayload.status = "reschedule_requested";
+      if (input.rescheduleProposedDate) {
+        const parsedDate = new Date(input.rescheduleProposedDate);
+        if (!isNaN(parsedDate.getTime())) {
+          updatePayload.scheduledAt = parsedDate;
+        }
+      }
       updatePayload.rescheduleMetadata = {
         proposedDate: input.rescheduleProposedDate,
         reason: input.rescheduleReason || "Tidak ada alasan spesifik.",

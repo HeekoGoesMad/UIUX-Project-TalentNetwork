@@ -685,8 +685,9 @@ export function CandidateDetailDrawer({
                                   const reschedItem = candidate.statusHistory?.slice().reverse().find(
                                     (h) => h.title.includes("Reschedule") || (h.notes && h.notes.includes("mengusulkan jadwal baru"))
                                   );
-                                  const noteText = iv.rescheduleProposedDate
-                                    ? `Kandidat mengusulkan jadwal baru: ${iv.rescheduleProposedDate}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`
+                                  const formattedProposed = iv.rescheduleProposedDate ? formatInterviewDateTime(iv.rescheduleProposedDate) : "";
+                                  const noteText = formattedProposed
+                                    ? `Kandidat mengusulkan jadwal baru: ${formattedProposed}. Alasan: ${iv.rescheduleReason || "Tidak ada alasan spesifik."}`
                                     : reschedItem?.notes;
                                   return noteText ? (
                                     <p className="text-amber-800 text-[11px] leading-relaxed">
