@@ -169,8 +169,8 @@ export class ConsentService {
         candidates.map((candidate) => ({
           userId: candidate.userId,
           type: "consent_requested" as const,
-          title: "Permintaan consent baru",
-          body: params.message ?? `Recruiter meminta consent untuk: ${params.purpose}`,
+          title: "Permintaan Izin Akses Kontak",
+          body: params.message ?? `Rekruter mengajukan permohonan akses data kontak dan profil untuk: ${params.purpose}.`,
           data: { batchId: batch.id, candidateProfileId: candidate.id },
         }))
       );
@@ -250,8 +250,8 @@ export class ConsentService {
       await tx.insert(schema.notifications).values({
         userId: item.requestedBy,
         type: "consent_updated",
-        title: "Respons consent diterima",
-        body: `Candidate ${params.decision === "approved" ? "menyetujui" : "menolak"} permintaan consent Anda.`,
+        title: "Tanggapan Izin Akses Kontak",
+        body: `Kandidat ${params.decision === "approved" ? "menyetujui" : "menolak"} permohonan akses data profil Anda.`,
         data: { consentRequestItemId: updated.id, status: updated.status },
       });
 
