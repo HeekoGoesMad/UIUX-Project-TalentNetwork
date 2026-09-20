@@ -51,7 +51,7 @@ export function TalentPreviewSection() {
               Direktori Talent Terkurasi
             </h2>
             <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
-              Pratinjau profil anonim dari profesional yang telah diverifikasi portofolio dan riwayat kontribusinya. Buka kontak lengkap dengan 1 token saat Anda siap berdiskusi.
+              Pratinjau profil dari para profesional tech yang portfolio dan riwayat kerjanya sudah terverifikasi. Buka kontak lengkap dengan 1 token saat tim kamu siap interview.
             </p>
           </div>
 
@@ -135,7 +135,7 @@ export function TalentPreviewSection() {
                     asChild
                   >
                     <Link href={`/talent/${c.id}`}>
-                      Periksa Sinyal <ChevronRight className="ml-1 size-3.5" />
+                      Lihat Sinyal <ChevronRight className="ml-1 size-3.5" />
                     </Link>
                   </Button>
                 </div>
@@ -151,7 +151,7 @@ export function TalentPreviewSection() {
             asChild
           >
             <Link href="/search">
-              Eksplorasi Seluruh 30+ Talent Terkurasi <ArrowRight className="ml-2 size-4" />
+              Jelajahi Semua 30+ Talent Terkurasi <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         </div>

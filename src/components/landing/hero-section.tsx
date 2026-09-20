@@ -1,208 +1,103 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Lock, Move, ShieldCheck, Unlock, WalletCards } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Lock,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { HeroAmbientSignals } from "@/components/landing/hero-ambient-signals";
 
-interface CandidatePreview {
+interface HeroTalentMatch {
   id: string;
-  code: string;
+  initials: string;
+  category: "tech" | "design" | "growth";
   role: string;
-  shortRole: string;
-  level: string;
+  seniority: string;
   location: string;
-  availability: string;
-  matchScore: number;
-  pillars: { name: string; score: number; proof: string }[];
-  verifiedSkills: string[];
-  contactEmail: string;
-  contactPhone: string;
+  keySignal: string;
+  skills: string[];
 }
 
-const CANDIDATES: CandidatePreview[] = [
+const TALENT_MATCHES: HeroTalentMatch[] = [
   {
-    id: "cand-1",
-    code: "TL-8842",
+    id: "match-1",
+    initials: "NP",
+    category: "tech",
     role: "Staff Platform Engineer",
-    shortRole: "Platform Lead",
-    level: "Staff / Principal",
-    location: "Jakarta (Remote / Hybrid)",
-    availability: "Siap dalam 30 hari",
-    matchScore: 96.4,
-    pillars: [
-      { name: "Arsitektur Sistem Terdistribusi", score: 98, proof: "Audit sistem 100K QPS lolos" },
-      { name: "Code Quality & Automated Testing", score: 94, proof: "Top 3% PR produksi terverifikasi" },
-      { name: "Production Incident Management", score: 96, proof: "Zero critical incident track record" },
-    ],
-    verifiedSkills: ["Go", "Kubernetes", "PostgreSQL", "Kafka"],
-    contactEmail: "nur.pratama@engineer.id",
-    contactPhone: "+62 812-8821-9821",
-  },
-  {
-    id: "cand-2",
-    code: "TL-7219",
-    role: "Principal Product Designer",
-    shortRole: "Product Designer",
-    level: "Staff / Lead",
-    location: "Bandung (Full Remote)",
-    availability: "Tersedia segera",
-    matchScore: 94.8,
-    pillars: [
-      { name: "Design System Architecture", score: 97, proof: "Figma token system terverifikasi" },
-      { name: "Product Strategy & Discovery", score: 95, proof: "Reduksi drop-off checkout 42%" },
-      { name: "Quantitative Usability Research", score: 92, proof: "Validated usability benchmarks" },
-    ],
-    verifiedSkills: ["Figma", "Design Tokens", "UX Metrics", "DesignOps"],
-    contactEmail: "rian.saputra@outlook.com",
-    contactPhone: "+62 811-9012-4432",
-  },
-  {
-    id: "cand-3",
-    code: "TL-5503",
-    role: "Head of Growth & Operations",
-    shortRole: "Growth Lead",
-    level: "Lead / Director",
+    seniority: "Staff / Principal",
     location: "Jakarta (Hybrid)",
-    availability: "Notice 45 hari",
-    matchScore: 93.1,
-    pillars: [
-      { name: "CAC:LTV Optimization Modeling", score: 96, proof: "Audit pipeline B2B $2M+ valid" },
-      { name: "Attribution & Data Pipeline Rigor", score: 94, proof: "BigQuery attribution model valid" },
-      { name: "B2B SaaS Sales Cycle Acceleration", score: 92, proof: "Cycle time reduced by 28%" },
-    ],
-    verifiedSkills: ["Growth Loops", "BigQuery", "Attribution", "SQL"],
-    contactEmail: "chandra.w@growth.id",
-    contactPhone: "+62 813-2201-1190",
+    keySignal: "Audit arsitektur sistem 100K QPS & PR repo lolos",
+    skills: ["Go", "Kubernetes", "PostgreSQL"],
+  },
+  {
+    id: "match-2",
+    initials: "RS",
+    category: "design",
+    role: "Principal Product Designer",
+    seniority: "Staff / Lead",
+    location: "Bandung (Remote)",
+    keySignal: "Design system token & reduksi drop-off 42%",
+    skills: ["Design System", "UX Research", "Figma"],
+  },
+  {
+    id: "match-3",
+    initials: "CW",
+    category: "growth",
+    role: "Head of Growth & Operations",
+    seniority: "Lead / Director",
+    location: "Jakarta (Hybrid)",
+    keySignal: "Audit pipeline analitik $2M+ & model atribusi valid",
+    skills: ["Growth Loops", "BigQuery", "SQL"],
   },
 ];
 
 export function HeroSection() {
-  const [selectedCandidate, setSelectedCandidate] = useState<CandidatePreview>(CANDIDATES[0]);
-  const [unlocked, setUnlocked] = useState<boolean>(false);
+  const [activeCategory, setActiveCategory] = useState<"tech" | "design" | "growth">("tech");
+  const [isHighlightingProof, setIsHighlightingProof] = useState<boolean>(false);
+  const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Artificial Cursor Demonstration (runs once on web visit after load)
-  const [cursorStage, setCursorStage] = useState<"idle" | "visible" | "exiting" | "done">("idle");
-  const [isArtificialHovered, setIsArtificialHovered] = useState<boolean>(false);
-  const [isArtificialClicking, setIsArtificialClicking] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
+  const triggerHighlight = () => {
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
     }
-
-    // Phase 1: Wait for everything to load first (1500ms)
-    const enterTimer = setTimeout(() => {
-      setCursorStage("visible");
-    }, 1500);
-
-    // Phase 2: Arrives at text (2300ms) -> trigger click tap and active hover
-    const clickTimer = setTimeout(() => {
-      setIsArtificialClicking(true);
-      setIsArtificialHovered(true);
-    }, 2300);
-
-    // Phase 2b: Release click tap (2450ms), stay hovered
-    const releaseClickTimer = setTimeout(() => {
-      setIsArtificialClicking(false);
-    }, 2450);
-
-    // Phase 3: Hold highlight statement for 1.4s, then exit (3750ms)
-    const exitTimer = setTimeout(() => {
-      setIsArtificialHovered(false);
-      setCursorStage("exiting");
-    }, 3750);
-
-    // Phase 4: Finish fade-out and unmount completely (4400ms)
-    const doneTimer = setTimeout(() => {
-      setCursorStage("done");
-    }, 4400);
-
-    return () => {
-      clearTimeout(enterTimer);
-      clearTimeout(clickTimer);
-      clearTimeout(releaseClickTimer);
-      clearTimeout(exitTimer);
-      clearTimeout(doneTimer);
-    };
-  }, []);
-
-  // Drag physics state
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [isSnapping, setIsSnapping] = useState<boolean>(false);
-  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const snapTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    // Ignore drag start if user is clicking button controls or links
-    if ((e.target as HTMLElement).closest("button, a")) return;
-
-    if (snapTimerRef.current) {
-      clearTimeout(snapTimerRef.current);
-      snapTimerRef.current = null;
-    }
-
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragStartRef.current = { x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y };
-    setIsDragging(true);
-    setIsSnapping(false);
+    setIsHighlightingProof(true);
+    highlightTimerRef.current = setTimeout(() => {
+      setIsHighlightingProof(false);
+    }, 2800);
   };
 
-  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    const rawX = e.clientX - dragStartRef.current.x;
-    const rawY = e.clientY - dragStartRef.current.y;
-
-    // Boundary damping keeps card centered near original placement
-    const dampedX = rawX * 0.85;
-    const dampedY = rawY * 0.85;
-
-    setDragOffset({ x: dampedX, y: dampedY });
-  };
-
-  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    setIsDragging(false);
-    setIsSnapping(true);
-    setDragOffset({ x: 0, y: 0 });
-
-    snapTimerRef.current = setTimeout(() => {
-      setIsSnapping(false);
-    }, 500);
-  };
-
-  // Compute smooth transform styles
-  const cardTransform = isDragging
-    ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.035}deg)`
-    : isSnapping
-    ? "translate3d(0, 0, 0) rotate(0deg)"
-    : undefined;
+  // Reorder matches so the active category match appears on top
+  const displayedMatches = [
+    ...TALENT_MATCHES.filter((m) => m.category === activeCategory),
+    ...TALENT_MATCHES.filter((m) => m.category !== activeCategory),
+  ].slice(0, 2);
 
   return (
-    <section className="relative bg-white pt-32 sm:pt-40 lg:pt-44 pb-16 lg:pb-24 border-b border-slate-200/80">
-      <div className="container mx-auto px-4 max-w-6xl">
-        {/* Strict fixed-width right column [minmax(0,1fr)_440px] locks left column width permanently */}
+    <section className="relative bg-white pt-32 sm:pt-40 lg:pt-44 pb-16 lg:pb-24 border-b border-slate-200/80 overflow-hidden">
+      <HeroAmbientSignals />
+      <div className="container relative z-10 mx-auto px-4 max-w-6xl">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_440px] items-start">
-          {/* Left Column: Completely Independent & Stable */}
+          {/* Left Column: Heading & Value Proposition */}
           <div className="min-w-0 max-w-2xl">
-            <h1 className="text-4xl sm:text-6xl lg:text-[4rem] font-extrabold tracking-tight text-slate-900 leading-[1.06] text-balance">
-              Rekrut talent kredibel dari{" "}
-              <span className="relative inline-block group cursor-pointer select-none">
-                <span
-                  className={cn(
-                    "relative z-10 text-slate-950 transition-colors duration-200 group-hover:text-[#5B21B6]",
-                    isArtificialHovered && "text-[#5B21B6]"
-                  )}
-                >
-                  sinyal nyata
+            <h1 className="text-3xl sm:text-5xl lg:text-[3.25rem] xl:text-[3.5rem] font-extrabold tracking-tight text-slate-900 leading-[1.16]">
+              Temukan talent tepat dari{" "}
+              <button
+                type="button"
+                onClick={triggerHighlight}
+                title="Klik untuk menyorot bukti kerja nyata di panel samping"
+                className={cn(
+                  "group relative inline-block cursor-pointer select-none text-[#5B21B6] whitespace-nowrap transition-transform duration-150 active:scale-[0.98] outline-none rounded-sm align-baseline",
+                  isHighlightingProof && "text-[#4C1D95]"
+                )}
+              >
+                <span className="relative z-10 transition-colors duration-200 group-hover:text-[#4C1D95]">
+                  bukti kerja nyata
                 </span>
                 <span
                   aria-hidden="true"
@@ -211,75 +106,35 @@ export function HeroSection() {
                   <span
                     className={cn(
                       "hero-underline-bar block w-full h-full rounded-full shadow-[0_1px_4px_rgba(124,58,237,0.25)]",
-                      isArtificialHovered && "hero-underline-bar-active"
+                      isHighlightingProof && "hero-underline-bar-active"
                     )}
                   />
                   <span className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
-                    <span
-                      className={cn(
-                        "block w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full transition-transform duration-700 ease-out",
-                        (isArtificialHovered || "group-hover:translate-x-full"),
-                        isArtificialHovered && "translate-x-full"
-                      )}
-                    />
+                    <span className="block w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-full" />
                   </span>
                 </span>
-
-                {/* Artificial Cursor (Visit Highlight Motion) */}
-                {cursorStage !== "idle" && cursorStage !== "done" && (
-                  <div
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute -bottom-7 right-2 sm:-bottom-8 sm:right-4 z-30 pointer-events-none select-none",
-                      cursorStage === "visible" && "animate-cursor-enter",
-                      cursorStage === "exiting" && "animate-cursor-exit"
-                    )}
-                  >
-                    <div className="relative flex items-center gap-1.5 scale-110 origin-top-left">
-                      {isArtificialClicking && (
-                        <span className="absolute -top-1 -left-1 size-6 rounded-full bg-[#7C3AED]/40 animate-ping" />
-                      )}
-                      <svg
-                        className={cn(
-                          "size-5 sm:size-5.5 text-slate-900 drop-shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition-transform duration-150",
-                          isArtificialClicking ? "scale-90 -rotate-3" : "scale-100"
-                        )}
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path
-                          d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.54.35-.85L5.85 2.86a.5.5 0 0 0-.35.35Z"
-                          className="fill-slate-900 stroke-white stroke-[1.5]"
-                        />
-                      </svg>
-                      <span className="rounded-md bg-[#7C3AED] px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-xs tracking-tight whitespace-nowrap">
-                        Recruiter
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </span>
-              , bukan klaim resume
+              </button>,{" "}
+              <span className="inline-block whitespace-nowrap">bukan sekadar isi resume</span>
             </h1>
 
             <p className="mt-6 text-base sm:text-lg leading-relaxed text-slate-600 max-w-xl text-pretty">
-              ProofyLink menghubungkan hiring team dengan profesional teknologi terverifikasi di Indonesia melalui evaluasi portofolio objektif, privasi berizin (consent-first), dan model 1 token transparan tanpa biaya langganan.
+              Talent Network bantu tim kamu ketemu langsung sama profesional tech yang skill-nya sudah terbukti. Lebih transparan, tanpa biaya langganan bulanan, dan privasi kandidat tetap terjaga aman.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
               <Button
                 size="lg"
-                className="h-12 px-7 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold text-sm sm:text-base justify-center transition-all shadow-sm hover:shadow-md"
+                className="h-12 px-7 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold text-sm sm:text-base justify-center transition-all shadow-sm hover:shadow-md cursor-pointer"
                 asChild
               >
                 <Link href="/search">
-                  Eksplorasi Direktori Talent <ArrowRight className="ml-2 size-4" />
+                  Jelajahi Talent <ArrowRight className="ml-2 size-4" />
                 </Link>
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="h-12 px-6 rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:text-slate-900 font-semibold text-sm sm:text-base justify-center transition-colors"
+                className="h-12 px-6 rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:text-slate-900 font-semibold text-sm sm:text-base justify-center transition-colors cursor-pointer"
                 asChild
               >
                 <Link href="/login">Masuk ke Workspace</Link>
@@ -290,196 +145,133 @@ export function HeroSection() {
             <div className="mt-10 flex flex-wrap items-center gap-6 text-xs sm:text-sm text-slate-600 font-medium pt-8 border-t border-slate-200">
               <span className="flex items-center gap-2">
                 <ShieldCheck className="size-4 text-[#7C3AED] shrink-0" />
-                <span><strong className="text-slate-900 font-semibold">30+ Profil</strong> Terverifikasi</span>
+                <span><strong className="text-slate-900 font-semibold">30+ Talent</strong> Terverifikasi</span>
               </span>
               <span className="flex items-center gap-2">
                 <Lock className="size-4 text-[#7C3AED] shrink-0" />
-                <span><strong className="text-slate-900 font-semibold">Consent-First</strong> Berizin</span>
+                <span><strong className="text-slate-900 font-semibold">Privasi Aman</strong> &amp; Berizin</span>
               </span>
               <span className="flex items-center gap-2">
                 <WalletCards className="size-4 text-[#7C3AED] shrink-0" />
-                <span><strong className="text-slate-900 font-semibold">1 Token</strong> per Profil</span>
+                <span><strong className="text-slate-900 font-semibold">Cuma 1 Token</strong> per Profil</span>
               </span>
             </div>
           </div>
 
-          {/* Right Column: Fixed 440px width container permanently prevents pushing into left column */}
+          {/* Right Column: Distilled Talent Specimen Card */}
           <div className="relative w-full max-w-[440px] mx-auto lg:mx-0 lg:w-[440px] shrink-0">
-            <div
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-              style={{
-                transform: cardTransform,
-                transition: isSnapping ? "transform 500ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms ease" : isDragging ? "none" : undefined,
-                willChange: isDragging || isSnapping ? "transform" : "auto",
-              }}
-              className={`rounded-2xl border border-slate-200/90 bg-white select-none transition-shadow ${
-                isDragging
-                  ? "shadow-2xl shadow-slate-900/15 cursor-grabbing"
-                  : isSnapping
-                  ? "shadow-xl shadow-slate-900/5 cursor-grab"
-                  : "shadow-xl shadow-slate-900/5 cursor-grab animate-hero-float"
-              }`}
-            >
-              {/* Dossier Header: Clean Geser kartu affordance + Candidate Switcher */}
-              <div className="border-b border-slate-200/80 bg-slate-50/70 p-3.5 sm:px-5 flex items-center justify-between gap-3 rounded-t-2xl">
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <Move className="size-3.5 text-slate-400" />
-                  <span className="font-mono text-xs font-medium tracking-tight text-slate-600">
-                    Geser kartu
-                  </span>
-                </div>
-
-                {/* Candidate Switcher */}
-                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
-                  {CANDIDATES.map((cand) => {
-                    const isActive = cand.id === selectedCandidate.id;
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              {/* Category Filter Pills */}
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  {(
+                    [
+                      { id: "tech", label: "Engineering" },
+                      { id: "design", label: "Design" },
+                      { id: "growth", label: "Growth" },
+                    ] as const
+                  ).map((cat) => {
+                    const isActive = activeCategory === cat.id;
                     return (
                       <button
-                        key={cand.id}
+                        key={cat.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedCandidate(cand);
-                          setUnlocked(false);
-                        }}
-                        className={`px-2.5 py-0.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
+                        onClick={() => setActiveCategory(cat.id)}
+                        className={cn(
+                          "px-3 py-1.5 text-xs rounded-lg font-medium transition-colors cursor-pointer",
                           isActive
-                            ? "bg-slate-900 text-white shadow-xs font-semibold"
-                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                        }`}
+                            ? "bg-slate-900 text-white font-semibold"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        )}
                       >
-                        {cand.shortRole}
+                        {cat.label}
                       </button>
                     );
                   })}
                 </div>
+                <span className="text-[11px] text-slate-400 font-medium">Pratinjau Profil</span>
               </div>
 
-              {/* Dossier Body - Sizing locked to eliminate layout shift */}
-              <div className="p-5 sm:p-6 space-y-4">
-                {/* Candidate Header & Score */}
-                <div className="flex items-start justify-between gap-4 pb-3 border-b border-slate-100">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                        {selectedCandidate.code}
-                      </span>
-                      <span className="text-xs text-emerald-800 bg-emerald-50 font-semibold px-2 py-0.5 rounded border border-emerald-200/60">
-                        Terverifikasi
-                      </span>
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1.5 truncate">
-                      {selectedCandidate.role}
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
-                      {selectedCandidate.level} · {selectedCandidate.location} · {selectedCandidate.availability}
-                    </p>
-                  </div>
-
-                  <div className="bg-purple-50/80 border border-purple-200/70 rounded-xl px-3 py-1.5 text-right shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-[#7C3AED] block tracking-wider">
-                      AI Match
-                    </span>
-                    <span className="font-mono text-xl sm:text-2xl font-extrabold text-[#7C3AED] tabular-nums">
-                      {selectedCandidate.matchScore}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3 Distilled Pillar Benchmarks */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                    <span>Bukti Sinyal Kompetensi</span>
-                    <span className="font-mono">Skala 100</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {selectedCandidate.pillars.map((pillar) => (
-                      <div key={pillar.name} className="p-2 rounded-lg bg-slate-50/80 border border-slate-200/70 space-y-0.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-800 font-medium truncate pr-2">{pillar.name}</span>
-                          <span className="font-mono text-slate-900 font-bold tabular-nums shrink-0">{pillar.score}/100</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
-                          <CheckCircle2 className="size-3 text-emerald-600 shrink-0" />
-                          <span className="truncate">{pillar.proof}</span>
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Verified Skill Stack */}
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedCandidate.verifiedSkills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-md bg-white border border-slate-200 px-2.5 py-0.5 font-mono text-[11px] font-medium text-slate-700 shadow-2xs"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Distilled 1-Token Unlock Bar with Constant Height Container */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                      {unlocked ? (
-                        <Unlock className="size-3.5 text-emerald-600" />
-                      ) : (
-                        <Lock className="size-3.5 text-slate-500" />
+              {/* Profiles List (Clean, Flat, Editorial) */}
+              <div className="divide-y divide-slate-100">
+                {displayedMatches.map((item, idx) => {
+                  const isTop = idx === 0;
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "py-3.5 first:pt-1 last:pb-1 space-y-2.5 transition-opacity",
+                        !isTop && "opacity-85"
                       )}
-                      <span>
-                        {unlocked ? "Kontak Resmi Terbuka" : "Identitas Terenkripsi"}
-                      </span>
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 border border-slate-200/80 font-mono text-xs font-semibold text-slate-700">
+                            {item.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 text-sm truncate">
+                              {item.role}
+                            </h3>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {item.seniority} · {item.location}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="shrink-0 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+                          Terverifikasi
+                        </span>
+                      </div>
+
+                      {/* Clean Evidence Note */}
+                      <p
+                        className={cn(
+                          "text-xs flex items-start gap-1.5 leading-relaxed rounded-lg px-2 py-1 -mx-2 transition-all duration-300",
+                          isHighlightingProof
+                            ? "bg-purple-100/90 text-purple-950 font-medium ring-1 ring-purple-300/80 shadow-xs"
+                            : "text-slate-600 bg-transparent"
+                        )}
+                      >
+                        <CheckCircle2
+                          className={cn(
+                            "size-3.5 shrink-0 mt-0.5 transition-colors",
+                            isHighlightingProof ? "text-[#7C3AED]" : "text-emerald-600"
+                          )}
+                        />
+                        <span>{item.keySignal}</span>
+                      </p>
+
+                      {/* Stack Pills & Token Value */}
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <div className="flex flex-wrap gap-1">
+                          {item.skills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[11px] text-slate-500 shrink-0">
+                          Buka kontak · <strong className="text-slate-800 font-semibold">1 Token</strong>
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-mono text-[11px] font-semibold text-[#7C3AED]">
-                      1 Token
-                    </span>
-                  </div>
+                  );
+                })}
+              </div>
 
-                  {/* Constant 42px container guarantees zero height difference */}
-                  <div className="h-[42px] flex flex-col justify-center bg-white px-3 py-1 rounded-lg border border-slate-200/80">
-                    {unlocked ? (
-                      <div className="space-y-0.5 text-xs font-mono">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">WhatsApp:</span>
-                          <span className="font-semibold text-slate-900">{selectedCandidate.contactPhone}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Email:</span>
-                          <span className="font-semibold text-slate-900">{selectedCandidate.contactEmail}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5 text-xs font-mono text-slate-400">
-                        <div className="flex justify-between">
-                          <span>WhatsApp:</span>
-                          <span className="tracking-wider text-slate-500 font-sans text-[11px]">• • • •  • • • •  • • • •</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Email:</span>
-                          <span className="tracking-wider text-slate-500 font-sans text-[11px]">••••••••••@••••••.id</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setUnlocked(!unlocked)}
-                    className={`w-full h-8.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                      unlocked
-                        ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                        : "bg-slate-900 text-white hover:bg-slate-800"
-                    }`}
-                  >
-                    {unlocked ? "Sembunyikan Kontak" : "Simulasikan Buka Kontak (1 Token)"}
-                  </Button>
-                </div>
+              {/* Bottom Clean Link */}
+              <div className="pt-2 border-t border-slate-100">
+                <Link
+                  href="/search"
+                  className="flex items-center justify-between text-xs font-semibold text-slate-700 hover:text-primary transition-colors py-1 group cursor-pointer"
+                >
+                  <span>Lihat semua talent di direktori</span>
+                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
             </div>
           </div>

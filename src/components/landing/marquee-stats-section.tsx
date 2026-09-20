@@ -3,22 +3,22 @@ export function MarqueeStatsSection() {
     {
       value: "30+",
       label: "Talent Aktif Terkurasi",
-      detail: "Portofolio & rekam jejak terverifikasi",
+      detail: "Portofolio & rekam jejak verified",
     },
     {
       value: "96.4%",
-      label: "Akurasi Sinyal AI Match",
-      detail: "Evaluasi 5 pilar kompetensi teknis",
+      label: "Akurasi AI Match",
+      detail: "Berdasarkan 5 pilar kompetensi teknis",
     },
     {
       value: "1 Token",
-      label: "Biaya Transparan per Unlock",
-      detail: "Tanpa biaya langganan bulanan",
+      label: "Model Pay-per-Unlock",
+      detail: "Fleksibel tanpa komitmen langganan",
     },
     {
       value: "< 48 Jam",
-      label: "Waktu Respons Rata-Rata",
-      detail: "3x lebih cepat dibanding cold outreach",
+      label: "Average Response Time",
+      detail: "Jauh lebih cepat dari cold outreach biasa",
     },
   ];
 

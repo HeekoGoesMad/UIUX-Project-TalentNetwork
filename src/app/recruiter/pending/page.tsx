@@ -188,12 +188,9 @@ export default function RecruiterPendingPage() {
       <div className="container mx-auto max-w-3xl space-y-6">
         {/* Clean Top Header Bar */}
         <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-xs">
-              <ShieldCheck className="size-4.5" />
-            </span>
+          <Link href="/" className="flex items-center font-bold tracking-tight transition-opacity hover:opacity-90">
             <span className="text-base font-bold text-foreground">
-              Proofy<span className="text-primary">Link</span>
+              Talent<span className="text-primary"> Network</span>
             </span>
           </Link>
 

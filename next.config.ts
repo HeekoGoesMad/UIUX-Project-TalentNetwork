@@ -26,6 +26,14 @@ if (isDeploymentProduction) {
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cms.solusisakti.id",
+      },
+    ],
+  },
   async redirects() {
     return [
       {

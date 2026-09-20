@@ -14,7 +14,6 @@ import {
   Menu,
   Search,
   Settings,
-  ShieldCheck,
   UserPlus,
   UserRound,
   WalletCards,
@@ -162,8 +161,8 @@ export function SiteHeader() {
         ]
       : isPublicHeader
       ? [
-          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
           { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
+          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
           { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
           { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
         ]
@@ -200,7 +199,7 @@ export function SiteHeader() {
             : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-foreground"
         )}
       >
-        {/* Logo */}
+        {/* Brand Text Logo */}
         <Link
           href={
             visibleUser
@@ -211,11 +210,8 @@ export function SiteHeader() {
                 : "/dashboard"
               : "/"
           }
-          className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
+          className="flex shrink-0 items-center font-bold tracking-tight transition-opacity hover:opacity-90"
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
-            <ShieldCheck className="size-5" />
-          </span>
           <span className="text-lg font-bold whitespace-nowrap text-foreground">
             Talent<span className="text-primary"> Network</span>
           </span>

@@ -1,33 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, MessageSquare, ShieldCheck, Sparkles, WalletCards } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Filter, MessageSquare, ShieldCheck, WalletCards } from "lucide-react";
 
 const STEPS = [
   {
     id: "step-1",
-    index: "01",
-    title: "Filter Berdasarkan Sinyal Konkret",
-    summary: "Tetapkan parameter peran, senioritas, ekspektasi kompensasi, dan stack teknis tervalidasi tanpa harus membaca puluhan resume mentah.",
+    index: "1",
+    title: "Filter Berdasarkan Bukti Sinyal Nyata",
+    summary: "Tentukan peran, seniority, dan tech stack yang sudah tervalidasi. Nggak perlu buang waktu menyortir tumpukan resume mentah.",
     icon: Filter,
-    previewTitle: "Pencarian Sinyal & Parameter Terverifikasi",
+    previewTitle: "Pencarian Berdasarkan Sinyal Kerja",
   },
   {
     id: "step-2",
-    index: "02",
-    title: "Buka Profil dengan 1 Token Berizin",
-    summary: "Saat menemukan profil yang sesuai kriteria, gunakan 1 token untuk membuka kontak lengkap. Privasi kandidat terlindungi dengan sistem persetujuan dua arah.",
+    index: "2",
+    title: "Buka Profil dengan 1 Token",
+    summary: "Saat menemukan profil yang cocok, gunakan 1 token untuk membuka kontak lengkap. Privasi kandidat tetap terlindungi karena identitas awal disamarkan, dan kontak langsung terbuka seketika berdasarkan izin resmi yang sudah diberikan kandidat sejak awal registrasi.",
     icon: WalletCards,
-    previewTitle: "Protokol Pembukaan Profil Berbasis Token",
+    previewTitle: "Model Token & Privasi Transparan",
   },
   {
     id: "step-3",
-    index: "03",
-    title: "Percakapan Berkualitas Tinggi Tanpa Noise",
-    summary: "Hubungi kandidat melalui email atau WhatsApp resmi yang telah terverifikasi. Kandidat aktif memberikan respons rata-rata di bawah 48 jam.",
+    index: "3",
+    title: "Ngobrol Langsung Tanpa Perantara",
+    summary: "Hubungi kandidat langsung via WhatsApp atau email resmi. Kandidat di sini aktif dan rata-rata merespons dalam waktu di bawah 48 jam.",
     icon: MessageSquare,
-    previewTitle: "Kanal Komunikasi Terkurasi & Langsung",
+    previewTitle: "Kontak Langsung & Konteks Wawancara",
   },
 ];
 
@@ -40,17 +39,17 @@ export function HowItWorksSection() {
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="max-w-2xl">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl text-balance">
-            Bagaimana ProofyLink Memangkas Siklus Skrining
+            Cara Kerja Talent Network: Rekrut Cepat, Tanpa Ribet
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
-            Alur kerja berbasis sinyal objektif menghilangkan estimasi spekulatif dari resume tradisional, mempertemukan recruiter dengan kandidat yang siap wawancara.
+            Nggak perlu pusing sortir ratusan resume yang isinya belum tentu sesuai. Mulai dari filter kriteria teknis sampai ngobrol langsung dengan kandidat, semuanya transparan dan nyaman.
           </p>
         </div>
 
-        {/* Editorial Split-Screen Workflow */}
+        {/* Distilled Editorial Split-Screen Workflow */}
         <div className="mt-14 grid gap-10 lg:grid-cols-[1.1fr_1fr] items-start">
-          {/* Left Column: Interactive Steps Navigator */}
-          <div className="space-y-4">
+          {/* Left Column: Quiet Steps Navigator */}
+          <div className="space-y-3.5">
             {STEPS.map((step) => {
               const isActive = step.id === activeStepId;
               const Icon = step.icon;
@@ -60,30 +59,28 @@ export function HowItWorksSection() {
                   key={step.id}
                   type="button"
                   onClick={() => setActiveStepId(step.id)}
-                  className={`w-full text-left p-6 rounded-2xl border transition-all duration-200 ${
+                  className={`w-full text-left p-5 sm:p-6 rounded-2xl border transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? "border-[#7C3AED] bg-purple-50/20 shadow-sm"
-                      : "border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                      ? "border-slate-800 bg-white shadow-xs"
+                      : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/40"
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <div
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold transition-colors ${
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-colors ${
                         isActive
-                          ? "bg-[#7C3AED] text-white"
+                          ? "bg-slate-900 text-white"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
                       <Icon className="size-4" />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-slate-400">
-                          Langkah {step.index}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-bold text-slate-900">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Langkah {step.index}
+                      </span>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900">
                         {step.title}
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -96,119 +93,131 @@ export function HowItWorksSection() {
             })}
           </div>
 
-          {/* Right Column: Dynamic Live Preview Display */}
-          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-6 sm:p-7 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-5">
-              <span className="text-xs font-semibold text-slate-800">
+          {/* Right Column: Distilled Specimen Panel */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-6 sm:p-7 shadow-xs space-y-4">
+            <div className="border-b border-slate-200/80 pb-3">
+              <span className="text-xs font-semibold text-slate-700">
                 {activeStep.previewTitle}
-              </span>
-              <span className="font-mono text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                Interaktif
               </span>
             </div>
 
             {activeStepId === "step-1" && (
               <div className="space-y-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-500">Filter Parameter Sinyal</span>
-                    <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
-                      4 Kandidat Terverifikasi
-                    </span>
-                  </div>
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Parameter yang Dipilih
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                      Role: Staff Platform Engineer
+                    <span className="rounded-md bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-800">
+                      Peran: Staff Platform Engineer
                     </span>
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                    <span className="rounded-md bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-800">
                       Lokasi: Jabodetabek (Hybrid)
                     </span>
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                    <span className="rounded-md bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-800">
                       Gaji: Rp 30M – 45M/bln
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-mono text-xs font-bold text-slate-500">Kandidat ID: TL-8842</p>
-                      <p className="font-bold text-slate-900 text-sm mt-0.5">Staff Platform & Distributed Eng</p>
+                <div className="pt-3 border-t border-slate-200/70 space-y-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Contoh Hasil Sinyal Terverifikasi
+                  </span>
+                  <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900 text-sm">Staff Platform Engineer</p>
+                        <p className="text-[11px] text-slate-500">Kandidat TL-8842 · Pengalaman 8+ tahun</p>
+                      </div>
+                      <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded">
+                        Terverifikasi
+                      </span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-[#7C3AED] bg-purple-50 px-2.5 py-1 rounded">
-                      96.4% Match
-                    </span>
+                    <p className="text-xs text-slate-600 leading-relaxed pt-0.5">
+                      Lolos audit arsitektur sistem skala 100K QPS dan pull request repository produksi terkonfirmasi tim teknis.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-600">
-                    Sinyal: Lolos audit arsitektur sistem skala 100K QPS dan validasi PR repository produksi.
-                  </p>
                 </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Pencarian langsung memfilter bukti kompetensi konkret, tanpa tebak-tebakan dari resume.
+                </p>
               </div>
             )}
 
             {activeStepId === "step-2" && (
               <div className="space-y-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
-                  <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-                    <ShieldCheck className="size-4 text-[#7C3AED]" />
-                    <span>Konfirmasi Pembukaan Profil Kandidat</span>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Model Akses yang Adil &amp; Transparan
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Token hanya terpakai saat kamu memutuskan ingin membuka kontak kandidat yang cocok.
+                  </p>
+                </div>
 
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/80 space-y-1.5 text-xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Kandidat Dipilih:</span>
-                      <span className="font-medium text-slate-900">TL-8842 (Staff Platform Eng)</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Tarif Pembukaan:</span>
-                      <span className="font-mono font-bold text-[#7C3AED]">1 Token</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Status Izin Privasi:</span>
-                      <span className="text-emerald-700 font-medium">Kandidat Memberi Akses Kontak</span>
-                    </div>
+                <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Biaya Akses Kontak</span>
+                    <span className="font-semibold text-slate-900">1 Token per kandidat</span>
                   </div>
-
-                  <div className="text-[11px] text-slate-500 leading-normal">
-                    Setelah konfirmasi, nomor WhatsApp dan email pribadi kandidat langsung terbuka pada workspace Anda.
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Biaya Langganan Bulanan</span>
+                    <span className="font-semibold text-emerald-700">Rp 0 (Tanpa langganan)</span>
                   </div>
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Izin Akses Data</span>
+                    <span className="font-semibold text-slate-900">Disetujui di awal registrasi</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-600">Garansi Respons</span>
+                    <span className="font-semibold text-slate-900">Token kembali jika tak ada respons</span>
+                  </div>
+                </div>
 
-                  <Button className="w-full h-9 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-lg">
-                    Buka Profil Sekarang (Potong 1 Token)
-                  </Button>
+                <div className="flex items-start gap-2 text-xs text-slate-600 bg-white border border-slate-200 p-3 rounded-xl">
+                  <ShieldCheck className="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-relaxed">
+                    Identitas awal kandidat disamarkan secara aman hingga kamu resmi membuka kontak dengan 1 token.
+                  </span>
                 </div>
               </div>
             )}
 
             {activeStepId === "step-3" && (
               <div className="space-y-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">Akses Langsung Terbuka</span>
-                    <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
-                      Aktif Siap Dihubungi
-                    </span>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Terhubung Langsung dengan Konteks Siap Pakai
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Hubungi kandidat langsung tanpa perantara pihak ketiga.
+                  </p>
+                </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/70">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">WhatsApp Direct</span>
-                      <span className="font-mono font-medium text-slate-900 text-xs">+62 812-8821-9821</span>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/70">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Email Resmi</span>
-                      <span className="font-mono font-medium text-slate-900 text-xs">nur.pratama@engineer.id</span>
-                    </div>
+                <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">WhatsApp Resmi</span>
+                    <span className="font-mono font-medium text-slate-900">+62 812-8821-9821</span>
                   </div>
+                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Email Kontak</span>
+                    <span className="font-mono font-medium text-slate-900">nur.pratama@engineer.id</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-500">Rata-rata Waktu Respons</span>
+                    <span className="font-semibold text-emerald-700">&lt; 48 jam</span>
+                  </div>
+                </div>
 
-                  <div className="rounded-lg bg-purple-50/60 p-3 border border-purple-100 text-xs text-purple-950 space-y-1">
-                    <div className="flex items-center gap-1.5 font-semibold text-[#7C3AED]">
-                      <Sparkles className="size-3.5" /> Konteks Rekrutmen Siap Pakai
-                    </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Laporan 5 pilar sinyal kompetensi kandidat disertakan otomatis, memudahkan tim teknis Anda menyusun pertanyaan wawancara terarah.
-                    </p>
-                  </div>
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 space-y-1">
+                  <span className="font-semibold text-slate-900 block">
+                    Konteks Diskusi Teknis Langsung Siap
+                  </span>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    Ringkasan pilar kompetensi yang sudah tervalidasi memudahkan tim teknis kamu menyusun pertanyaan wawancara mendalam tanpa perlu tes awal yang berulang.
+                  </p>
                 </div>
               </div>
             )}

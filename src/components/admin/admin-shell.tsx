@@ -12,7 +12,6 @@ import {
   Menu,
   ScrollText,
   Settings,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -86,11 +85,8 @@ export function AdminShell({
 
           <Link
             href="/admin"
-            className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
+            className="flex shrink-0 items-center gap-2 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.01]"
           >
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
-              <ShieldCheck className="size-5" />
-            </span>
             <span className="text-lg font-bold whitespace-nowrap text-slate-900">
               Talent<span className="text-primary"> Network</span>
             </span>
@@ -149,12 +145,12 @@ export function AdminShell({
           <div className="space-y-6">
             {/* Mobile Drawer Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-xs">
-                  <ShieldCheck className="size-4.5" />
-                </span>
+              <div className="flex items-center gap-2">
                 <span className="text-base font-bold text-slate-900">
                   Talent<span className="text-primary"> Network</span>
+                </span>
+                <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary border border-purple-200/80">
+                  Admin
                 </span>
               </div>
               <Button
