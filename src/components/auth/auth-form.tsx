@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus, UserRole } from "@/types";
-import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
+import { ArrowRight, AlertCircle, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { ConsentModal } from "./consent-modal";
 import { OtpVerificationModal } from "./otp-verification-modal";
 import { RoleSelector } from "./role-selector";
@@ -58,6 +57,90 @@ export function isPasswordValid(password: string): boolean {
   return req.hasMinLength && req.hasUppercase && req.hasLowercase && req.hasNumber;
 }
 
+export interface FieldErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  terms?: string;
+}
+
+export function mapAuthErrorMessage(rawError: string, mode: "login" | "register"): {
+  formError?: string;
+  fieldErrors?: FieldErrors;
+} {
+  const lower = rawError.toLowerCase();
+
+  // Role mismatch (keep intact as it offers role-switching buttons)
+  if (rawError.includes("Talent / Candidate") || rawError.includes("Recruiter / Hiring") || rawError.includes("Partnership")) {
+    return { formError: rawError };
+  }
+
+  // Invalid login credentials
+  if (lower.includes("invalid login credentials") || lower.includes("invalid credential") || lower.includes("invalid password")) {
+    return {
+      formError: "Email atau kata sandi tidak sesuai. Silakan periksa kembali kredensial Anda.",
+      fieldErrors: {
+        password: "Kata sandi salah atau tidak sesuai.",
+      },
+    };
+  }
+
+  // User already registered
+  if (lower.includes("user already registered") || lower.includes("already registered") || lower.includes("already exists")) {
+    return {
+      fieldErrors: {
+        email: "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan verifikasi OTP di bawah.",
+      },
+      formError: "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan verifikasi OTP.",
+    };
+  }
+
+  // Email not confirmed
+  if (lower.includes("email not confirmed")) {
+    return {
+      formError: "Alamat email belum diverifikasi. Silakan masukkan 6 digit kode OTP untuk mengaktifkan akun Anda.",
+    };
+  }
+
+  // Password criteria error from backend
+  if (lower.includes("password should be at least") || lower.includes("password is too short") || lower.includes("weak password")) {
+    return {
+      fieldErrors: {
+        password: "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.",
+      },
+    };
+  }
+
+  // Invalid email format from backend
+  if (lower.includes("invalid format") || lower.includes("invalid email") || lower.includes("valid email")) {
+    return {
+      fieldErrors: {
+        email: "Format alamat email tidak valid (contoh: nama@perusahaan.com).",
+      },
+    };
+  }
+
+  // Rate limiting / security timeout
+  if (lower.includes("security purposes") || lower.includes("too many requests") || lower.includes("rate limit")) {
+    const match = rawError.match(/after (\d+)/i);
+    const seconds = match ? match[1] : "beberapa";
+    return {
+      formError: `Terlalu banyak percobaan. Demi keamanan, silakan tunggu ${seconds} detik sebelum mencoba kembali.`,
+    };
+  }
+
+  // Network or connection timeout
+  if (lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout") || lower.includes("abort")) {
+    return {
+      formError: "Koneksi internet terputus atau server tidak merespons. Silakan periksa koneksi internet Anda.",
+    };
+  }
+
+  return {
+    formError: `Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${rawError}`,
+  };
+}
+
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { user, hydrated, login, register, loginAsDemoCandidate, loginAsFreshCandidate, loginAsDemoPartner } = useApp();
@@ -73,8 +156,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setRole(validRoleParam);
     }
   }
+  const [nameValue, setNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
   const passwordCriteria = checkPasswordRequirements(passwordValue);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -89,6 +175,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     destinationPath: string;
     name?: string;
     companyName?: string;
+    emailResent?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -138,29 +225,66 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     event.preventDefault();
     setErrorMessage(null);
 
-    const form = new FormData(event.currentTarget);
-    const rawName = String(form.get("name") ?? "").trim();
-    const email = String(form.get("email") ?? "").trim();
-    const password = String(form.get("password") ?? "");
-    const companyName = role === "recruiter" || role === "partner" ? rawName : String(form.get("companyName") ?? "").trim();
+    const newFieldErrors: FieldErrors = {};
+    const rawName = nameValue.trim();
+    const email = emailValue.trim();
+    const password = passwordValue;
+    const companyName = role === "recruiter" || role === "partner" ? rawName : undefined;
     const name = rawName;
 
+    if (mode === "register") {
+      if (!rawName) {
+        newFieldErrors.name =
+          role === "recruiter"
+            ? "Nama perusahaan wajib diisi."
+            : role === "partner"
+            ? "Nama lembaga / kampus wajib diisi."
+            : "Nama lengkap wajib diisi.";
+      } else if (rawName.length < 2) {
+        newFieldErrors.name = "Nama minimal 2 karakter.";
+      }
+    }
+
+    if (!email) {
+      newFieldErrors.email = "Alamat email wajib diisi.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newFieldErrors.email = "Format alamat email tidak valid (contoh: nama@perusahaan.com).";
+    }
+
+    if (!password) {
+      newFieldErrors.password = "Kata sandi wajib diisi.";
+    } else if (mode === "login" && password.length < 6) {
+      newFieldErrors.password = "Kata sandi minimal 6 karakter.";
+    } else if (mode === "register" && !isPasswordValid(password)) {
+      newFieldErrors.password = "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.";
+    }
+
     if (mode === "register" && !consentAgreed) {
-      setConsentModalOpen(true);
-      setErrorMessage("Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.");
+      newFieldErrors.terms = "Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.";
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      if (newFieldErrors.name) document.getElementById("full-name")?.focus();
+      else if (newFieldErrors.email) document.getElementById("email")?.focus();
+      else if (newFieldErrors.password) document.getElementById("password")?.focus();
+      else if (newFieldErrors.terms) setConsentModalOpen(true);
       return;
     }
 
-    if (mode === "register" && !isPasswordValid(password)) {
-      setErrorMessage("Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.");
-      return;
-    }
-
+    setFieldErrors({});
     setLoading(true);
+
     const result = mode === "login" ? await login(role, email, password) : await register(name, role, email, password, companyName);
     if (result.error) {
       setLoading(false);
-      setErrorMessage(`Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${result.error}`);
+      const mapped = mapAuthErrorMessage(result.error, mode);
+      if (mapped.fieldErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...mapped.fieldErrors }));
+      }
+      if (mapped.formError) {
+        setErrorMessage(mapped.formError);
+      }
       return;
     }
     
@@ -169,8 +293,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setLoading(false);
       const chosenRole = result.role ?? role;
       const dest = registrationDest(chosenRole);
-      if (result.emailResent) toast.info("Akun sudah terdaftar — masukkan kode OTP dari email Anda.");
-      setPendingRegistration({ email, role: chosenRole, destinationPath: dest, name, companyName });
+      setPendingRegistration({
+        email,
+        role: chosenRole,
+        destinationPath: dest,
+        name,
+        companyName,
+        emailResent: result.emailResent,
+      });
       setOtpModalOpen(true);
       return;
     }
@@ -313,8 +443,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <Input
               id="full-name"
               name="name"
-              className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-              required
+              value={nameValue}
+              onChange={(e) => {
+                setNameValue(e.target.value);
+                if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "full-name-error" : undefined}
+              className={`pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+                fieldErrors.name
+                  ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                  : ""
+              }`}
               autoComplete={role === "recruiter" || role === "partner" ? "organization" : "name"}
               placeholder={
                 role === "recruiter"
@@ -325,6 +465,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               }
             />
           </div>
+          {fieldErrors.name && (
+            <p id="full-name-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+              <span>{fieldErrors.name}</span>
+            </p>
+          )}
         </div>
       )}
 
@@ -337,14 +483,30 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Input
             id="email"
             name="email"
-            className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-            required
+            value={emailValue}
+            onChange={(e) => {
+              setEmailValue(e.target.value);
+              if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
+            className={`pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+              fieldErrors.email
+                ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                : ""
+            }`}
             type="email"
             autoComplete="email"
             spellCheck={false}
             placeholder={emailPlaceholder}
           />
         </div>
+        {fieldErrors.email && (
+          <p id="email-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+            <span>{fieldErrors.email}</span>
+          </p>
+        )}
       </div>
 
       <div>
@@ -357,10 +519,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             id="password"
             name="password"
             value={passwordValue}
-            onChange={(e) => setPasswordValue(e.target.value)}
-            className="pl-10 pr-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-            required
-            minLength={mode === "register" ? 8 : 6}
+            onChange={(e) => {
+              setPasswordValue(e.target.value);
+              if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.password)}
+            aria-describedby={fieldErrors.password ? "password-error" : undefined}
+            className={`pl-10 pr-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+              fieldErrors.password
+                ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                : ""
+            }`}
             type={showPassword ? "text" : "password"}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             placeholder={mode === "register" ? "Minimal 8 karakter" : "Masukkan kata sandi"}
@@ -375,6 +544,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
+
+        {fieldErrors.password && (
+          <p id="password-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+            <span>{fieldErrors.password}</span>
+          </p>
+        )}
 
         {mode === "register" && (
           <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-600 transition-all">
@@ -407,7 +583,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </div>
 
       {mode === "register" && (
-        <div className="space-y-1.5 py-1">
+        <div className={`space-y-1.5 py-1 rounded-xl transition-colors ${fieldErrors.terms ? "p-2 bg-red-50/40 border border-red-200/70" : ""}`}>
           <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer select-none">
             <input
               id="terms"
@@ -415,6 +591,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               type="checkbox"
               checked={consentAgreed}
               onChange={(e) => {
+                if (fieldErrors.terms) setFieldErrors((prev) => ({ ...prev, terms: undefined }));
                 if (!consentAgreed) {
                   setConsentModalOpen(true);
                 } else {
@@ -455,6 +632,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               <span>Ketentuan &amp; akses data telah disetujui</span>
             </div>
           )}
+          {fieldErrors.terms && (
+            <p id="terms-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium pl-6.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+              <span>{fieldErrors.terms}</span>
+            </p>
+          )}
         </div>
       )}
 
@@ -488,9 +671,21 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             type="button"
             className="text-xs font-medium text-slate-500 hover:text-[#7C3AED] transition-colors cursor-pointer"
             onClick={() => {
-              const typedEmail = (document.getElementById("email") as HTMLInputElement | null)?.value?.trim();
+              const typedEmail = emailValue.trim();
               if (!typedEmail) {
-                toast.error("Masukkan email Anda terlebih dahulu.");
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  email: "Masukkan alamat email Anda terlebih dahulu untuk verifikasi OTP.",
+                }));
+                document.getElementById("email")?.focus();
+                return;
+              }
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typedEmail)) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  email: "Format alamat email tidak valid (contoh: nama@perusahaan.com).",
+                }));
+                document.getElementById("email")?.focus();
                 return;
               }
               setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
@@ -619,7 +814,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             window.location.href = pendingRegistration.destinationPath;
           }}
           title="Verifikasi Akun Baru"
-          description="Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
+          description={
+            pendingRegistration.emailResent
+              ? "Akun Anda sudah terdaftar sebelumnya. Masukkan 6 digit kode OTP yang telah dikirimkan ke email Anda untuk mengaktifkan akun."
+              : "Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
+          }
         />
       )}
 
@@ -632,6 +831,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         }}
         onAccept={() => {
           setConsentAgreed(true);
+          setFieldErrors((prev) => ({ ...prev, terms: undefined }));
           setErrorMessage(null);
           if (pendingGoogleAuth) {
             setPendingGoogleAuth(false);
