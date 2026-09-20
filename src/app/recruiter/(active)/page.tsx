@@ -45,8 +45,8 @@ export default function Page() {
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Button asChild>
-            <Link href="/recruiter/screenings/new">
-              <FileText className="size-4" /> Buat permintaan screening
+            <Link href="/recruiter/operations">
+              <FileText className="size-4" /> Buka Pipeline Rekrutmen
             </Link>
           </Button>
           <Button variant="outline" asChild>

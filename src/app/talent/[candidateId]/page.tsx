@@ -1089,8 +1089,8 @@ export default function TalentProfile() {
                   </Button>
                   {completed ? (
                     <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
-                      <Link href={`/recruiter/screenings/${candidate.id}`}>
-                        <ShieldCheck className="mr-1.5 size-3.5" /> Lihat Screening Selesai
+                      <Link href="/recruiter/operations">
+                        <ShieldCheck className="mr-1.5 size-3.5" /> Buka Pipeline Rekrutmen
                       </Link>
                     </Button>
                   ) : screeningError ? (

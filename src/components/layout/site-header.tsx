@@ -113,7 +113,7 @@ export function SiteHeader() {
     {
       href: "/recruiter/operations",
       label: "Pipeline Rekrutmen",
-      desc: "Jadwal wawancara & status penawaran",
+      desc: "Operasi rekrutmen, screening AI & penawaran",
       icon: GitBranch,
     },
     {
@@ -121,12 +121,6 @@ export function SiteHeader() {
       label: "Lowongan Kerja",
       desc: "Kelola posting lowongan & pelamar masuk",
       icon: Briefcase,
-    },
-    {
-      href: "/recruiter/screenings",
-      label: "AI Screening",
-      desc: "Hasil analisis kesesuaian role-fit & skor",
-      icon: ShieldCheck,
     },
     {
       href: "/shortlist",
