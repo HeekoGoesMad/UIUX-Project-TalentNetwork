@@ -5,7 +5,6 @@ import { schema, type Database } from "@/db";
 import { writeAuditLog } from "@/lib/audit";
 import type { AppUser } from "@/lib/api/auth";
 import { TokenLedgerService } from "./token-ledger";
-import { findOrCreateApplicationForCandidate } from "./recruiter-hiring";
 import { screening, summary } from "@/lib/ai/provider";
 
 export class ScreeningService {
@@ -135,12 +134,6 @@ export class ScreeningService {
           },
         });
 
-        await findOrCreateApplicationForCandidate(tx, {
-          candidateProfileId: params.candidateProfileId,
-          organizationId: scope.membership.organizationId,
-          recruiterUserId: user.id,
-        });
-
         return {
           runId: existingRun?.id ?? existingRunId,
           runStatus: existingRun?.status ?? ("in_progress" as const),
@@ -175,13 +168,6 @@ export class ScreeningService {
           consentRequestItemId,
           idempotent: false,
         },
-      });
-
-      // Pastikan aplikasi tercatat di lamaran kandidat (status: review) & notifikasi terkirim
-      await findOrCreateApplicationForCandidate(tx, {
-        candidateProfileId: params.candidateProfileId,
-        organizationId: scope.membership.organizationId,
-        recruiterUserId: user.id,
       });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };

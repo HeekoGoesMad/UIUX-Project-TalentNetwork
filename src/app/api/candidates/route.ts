@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getDb } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { TalentSearchService } from "@/lib/services/talent-search";
 
@@ -15,7 +16,7 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const current = await getCurrentAppUser();
-    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = "error" in current ? getDb() : current.db;
 
     const parsed = querySchema.safeParse({
       q: request.nextUrl.searchParams.get("q") ?? undefined,
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     const { q, page, limit, sort, locations } = parsed.data;
 
-    const result = await TalentSearchService.search(current.db, {
+    const result = await TalentSearchService.search(db, {
       q,
       page,
       limit,
