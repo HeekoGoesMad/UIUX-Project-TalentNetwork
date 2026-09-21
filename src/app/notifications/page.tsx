@@ -256,8 +256,20 @@ export default function NotificationsPage() {
       }));
   }, [user, dbMode, consentRequests, screeningConsents, contactRequests]);
 
+  const visibleNotifications = useMemo(() => {
+    if (user?.role === "recruiter") {
+      return notifications.filter((n) => {
+        if (n.id.startsWith("notif-scan-")) return false;
+        const titleLower = n.title.toLowerCase();
+        if (titleLower.includes("profil kamu sedang ditinjau") || titleLower.startsWith("profil dilihat:")) return false;
+        return true;
+      });
+    }
+    return notifications;
+  }, [notifications, user?.role]);
+
   const pendingRequestsCount = formattedRequests.filter((r) => r.state === "pending-candidate-consent").length;
-  const unreadNotificationsCount = notifications.filter((n) => !n.readAt).length;
+  const unreadNotificationsCount = visibleNotifications.filter((n) => !n.readAt).length;
 
   if (!hydrated || !user) return <StateMessage text="Menyiapkan notifikasi..." />;
   if (dbMode && !bootstrapped) return <StateMessage text="Memuat notifikasi..." />;
@@ -313,7 +325,7 @@ export default function NotificationsPage() {
   };
 
   // Filtered notifications — tabs filter
-  const filteredNotifications = notifications.filter((n) => {
+  const filteredNotifications = visibleNotifications.filter((n) => {
     if (activeTab === "all") return true;
     if (activeTab === "requests") {
       return n.type === "consent_request" || n.type === "contact_request" || n.title.toLowerCase().includes("kontak") || n.title.toLowerCase().includes("izin");
@@ -327,10 +339,10 @@ export default function NotificationsPage() {
     return true;
   });
 
-  const recruitmentCount = notifications.filter(
+  const recruitmentCount = visibleNotifications.filter(
     (n) => !n.readAt && (n.type === "application_status_changed" || n.type === "screening_ready" || n.type === "message_received")
   ).length;
-  const systemCount = notifications.filter(
+  const systemCount = visibleNotifications.filter(
     (n) => !n.readAt && (n.type === "system" || n.type === "verification_result")
   ).length;
 
