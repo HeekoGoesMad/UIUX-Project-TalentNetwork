@@ -10,6 +10,7 @@ import { candidates } from "@/data/candidates";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
+const candidateDemoNotificationsKey = "proofylink-candidate-demo-notifications-v1";
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([
@@ -506,6 +507,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return false;
     }
     setNotifications((current) => current.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item));
+    try {
+      const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      if (candidateDemoNotifs.some((item) => item.id === id)) {
+        localStorage.setItem(
+          candidateDemoNotificationsKey,
+          JSON.stringify(candidateDemoNotifs.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
+        );
+      }
+    } catch {}
     return true;
   };
 
@@ -519,6 +529,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return false;
     }
     setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+    try {
+      const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      if (candidateDemoNotifs.length) {
+        localStorage.setItem(
+          candidateDemoNotificationsKey,
+          JSON.stringify(candidateDemoNotifs.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })))
+        );
+      }
+    } catch {}
     return true;
   };
 
@@ -735,7 +754,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       readAt: null,
       createdAt: new Date().toISOString(),
     };
-    setNotifications((prev) => [notifItem, ...prev]);
+
+    // Candidate notification is stored exclusively for candidate demo storage, NOT for the recruiter
+    try {
+      const storedCandidateNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      localStorage.setItem(
+        candidateDemoNotificationsKey,
+        JSON.stringify([notifItem, ...storedCandidateNotifs.filter((item) => item.data?.candidateProfileId !== id)])
+      );
+    } catch {}
+
+    // Record candidate recruiter activity so candidate's dashboard/timeline reflects the profile view
+    try {
+      const activitiesKey = "proofylink-candidate-recruiter-activities-v1";
+      const storedActivities = JSON.parse(localStorage.getItem(activitiesKey) ?? "[]") as Array<Record<string, unknown>>;
+      const newActivity = {
+        id: `act-scan-${id}-${Date.now()}`,
+        type: "profile_viewed",
+        companyName,
+        companyInitial: companyName.slice(0, 3).toUpperCase(),
+        companyIndustry: "Perusahaan Mitra",
+        recruiterName: user?.name || "Tim Rekruter",
+        recruiterRole: "Talent Acquisition",
+        title: "Profil lengkap Anda telah dilihat",
+        snippet: `Tim rekruter di ${companyName} baru saja membuka profil lengkap dan sedang meninjau kualifikasi Anda.`,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        actionUrl: "/notifications",
+      };
+      localStorage.setItem(activitiesKey, JSON.stringify([newActivity, ...storedActivities]));
+    } catch {}
 
     setState((current) => ({
       ...current,
@@ -1172,6 +1220,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProvisioningStatus: (status: ProvisioningStatus, reason?: string | null) => actionsRef.current.setProvisioningStatus(status, reason),
   }), []);
 
+  const resolvedNotifications = useMemo<BootstrapNotification[]>(() => {
+    let list = notifications;
+    if (!supabaseConfigured) {
+      if (user?.role === "candidate") {
+        try {
+          const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+          list = [...candidateDemoNotifs, ...(notifications.length ? notifications : demoNotifications)];
+        } catch {
+          list = notifications.length ? notifications : demoNotifications;
+        }
+      } else {
+        list = notifications.length ? notifications : demoNotifications;
+      }
+    }
+
+    if (user?.role === "recruiter") {
+      // Recruiter must NEVER see candidate notifications ("Profil kamu sedang ditinjau", etc.)
+      return list.filter((n) => {
+        if (n.id.startsWith("notif-scan-")) return false;
+        const titleLower = n.title.toLowerCase();
+        if (titleLower.includes("profil kamu sedang ditinjau") || titleLower.startsWith("profil dilihat:")) return false;
+        return true;
+      });
+    }
+
+    return list;
+  }, [supabaseConfigured, notifications, user?.role]);
+
   const contextValue = useMemo<Context>(() => ({
     ...state,
     hydrated,
@@ -1182,7 +1258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     tokenAccount,
     screeningRunStatuses,
-    notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications),
+    notifications: resolvedNotifications,
     shortlists,
     consentRequests,
     databaseError,
@@ -1199,7 +1275,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     tokenAccount,
     screeningRunStatuses,
-    notifications,
+    resolvedNotifications,
     shortlists,
     consentRequests,
     databaseError,

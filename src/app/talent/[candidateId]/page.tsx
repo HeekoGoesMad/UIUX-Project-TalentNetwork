@@ -689,6 +689,15 @@ export default function TalentProfile() {
         }
       }
 
+      if (dbMode && UUID_RE.test(candidate.id)) {
+        // In dbMode, notify candidate in DB by creating/updating application review status
+        void fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateProfileId: candidate.id }),
+        }).catch(() => null);
+      }
+
       const started = await startScreening(candidate.id);
       if (dbMode && started) setRemoteScreeningCompleted(true);
       if (!started) setScreeningError(await describeScreeningFailure());
