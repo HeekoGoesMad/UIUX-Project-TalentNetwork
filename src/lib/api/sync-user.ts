@@ -62,10 +62,18 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       displayName: schema.profiles.displayName,
     }).from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
 
-    const providedName = input.name?.trim();
-    const resolvedName = existingProfile?.displayName?.trim()
-      ? existingProfile.displayName
-      : (providedName || (typeof authUser.user_metadata?.name === "string" ? authUser.user_metadata.name : authEmail.split("@")[0]));
+    const isRecruiterCompanyInput = role === "recruiter" && Boolean(input.companyName);
+    const providedName = isRecruiterCompanyInput ? undefined : input.name?.trim();
+    const resolvedName =
+      existingProfile?.displayName?.trim() && existingProfile.displayName !== input.companyName
+        ? existingProfile.displayName
+        : providedName ||
+          (role === "recruiter"
+            ? null
+            : typeof authUser.user_metadata?.name === "string" &&
+              authUser.user_metadata.name !== input.companyName
+            ? authUser.user_metadata.name
+            : authEmail.split("@")[0]);
 
     await tx.insert(schema.profiles).values({
       userId: user.id,
@@ -73,7 +81,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     }).onConflictDoUpdate({
       target: schema.profiles.userId,
       set: {
-        displayName: resolvedName,
+        ...(resolvedName !== undefined ? { displayName: resolvedName } : {}),
         updatedAt: new Date(),
       },
     });
@@ -121,6 +129,27 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       if (organizationId && user.recruiterProvisioningStatus === "active") {
         await ShortlistService.ensureDefault(tx, organizationId, user.id);
       }
+
+      let hasSubmittedOnboarding = false;
+      if (organizationId) {
+        const [org] = await tx
+          .select({
+            nibDocumentUrl: schema.organizations.nibDocumentUrl,
+            npwpDocumentUrl: schema.organizations.npwpDocumentUrl,
+          })
+          .from(schema.organizations)
+          .where(eq(schema.organizations.id, organizationId))
+          .limit(1);
+        hasSubmittedOnboarding = Boolean(org?.nibDocumentUrl && org?.npwpDocumentUrl);
+      }
+
+      return {
+        userId: user.id,
+        role: user.role,
+        provisioningStatus: user.recruiterProvisioningStatus,
+        hasSubmittedOnboarding,
+        isNew: !existing,
+      };
     }
 
     if (role === "partner") {

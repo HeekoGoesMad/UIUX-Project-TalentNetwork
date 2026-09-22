@@ -3,6 +3,101 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET() {
+  const current = await getCurrentAppUser({ allowPending: true });
+  if ("error" in current) {
+    return NextResponse.json({ error: current.error }, { status: current.status });
+  }
+
+  const { db, user } = current;
+
+  // 1. Get profile
+  const [profile] = await db
+    .select()
+    .from(schema.profiles)
+    .where(eq(schema.profiles.userId, user.id))
+    .limit(1);
+
+  // 2. Get organization membership & organization
+  const [membership] = await db
+    .select({ organizationId: schema.organizationMembers.organizationId })
+    .from(schema.organizationMembers)
+    .where(eq(schema.organizationMembers.userId, user.id))
+    .limit(1);
+
+  let org = null;
+  if (membership?.organizationId) {
+    const [found] = await db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, membership.organizationId))
+      .limit(1);
+    org = found ?? null;
+  }
+  if (!org) {
+    const [foundByCreator] = await db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.createdBy, user.id))
+      .limit(1);
+    org = foundByCreator ?? null;
+  }
+
+  // 3. Supabase user metadata for picTitle
+  let picTitle = "";
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    picTitle =
+      (typeof data.user?.user_metadata?.picTitle === "string" ? data.user.user_metadata.picTitle : "") ||
+      (typeof data.user?.user_metadata?.picPosition === "string" ? data.user.user_metadata.picPosition : "") ||
+      "";
+  } catch {}
+
+  const hasSubmittedOnboarding = Boolean(org?.nibDocumentUrl && org?.npwpDocumentUrl);
+  const isRevision = user.recruiterProvisioningStatus === "revision_required";
+  const revisionReason = user.recruiterRejectionReason || null;
+
+  const orgName = org?.name || "";
+  const rawPicName = profile?.displayName?.trim() || "";
+  const picName =
+    (orgName && rawPicName.toLowerCase() === orgName.toLowerCase()) ||
+    (user.email && rawPicName.toLowerCase() === user.email.split("@")[0].toLowerCase())
+      ? ""
+      : rawPicName;
+
+  const form = {
+    picName,
+    picTitle: picTitle || "",
+    picPhone: profile?.phone || "",
+    picEmail: org?.companyEmail || user.email || "",
+    companyName: orgName,
+    industry: org?.industry || "",
+    companySize: org?.companyScale || "",
+    description: org?.description || "",
+    websiteUrl: org?.website || "",
+    linkedinUrl: org?.linkedinUrl || "",
+    officeAddress: org?.officeAddress || "",
+    city: org?.city || "",
+    nibNumber: org?.nib || "",
+    nibFileName: org?.nibDocumentUrl ? (org.nibDocumentUrl.split("/").pop() || "NIB_Document.pdf") : "",
+    nibDocumentUrl: org?.nibDocumentUrl || "",
+    npwpNumber: org?.npwp || "",
+    npwpFileName: org?.npwpDocumentUrl ? (org.npwpDocumentUrl.split("/").pop() || "NPWP_Document.pdf") : "",
+    npwpDocumentUrl: org?.npwpDocumentUrl || "",
+    verificationStatus: isRevision ? "needs_revision" : hasSubmittedOnboarding ? "pending_review" : "draft",
+  };
+
+  return NextResponse.json({
+    form,
+    hasSubmittedOnboarding,
+    isRevision,
+    revisionReason,
+    provisioningStatus: user.recruiterProvisioningStatus,
+  });
+}
 
 type IndustrySector = typeof schema.industrySector.enumValues[number];
 type CompanyScale = typeof schema.companyScale.enumValues[number];
@@ -192,6 +287,19 @@ export async function POST(request: Request) {
 
       return { success: true, organizationId: orgId };
     });
+
+    if (data.picTitle || data.picPosition) {
+      try {
+        const supabase = await createClient();
+        await supabase.auth.updateUser({
+          data: {
+            picTitle: data.picTitle || data.picPosition,
+          },
+        });
+      } catch (err) {
+        console.error("Gagal memperbarui picTitle ke Supabase auth metadata:", err);
+      }
+    }
 
     return NextResponse.json(result);
   } catch (error) {

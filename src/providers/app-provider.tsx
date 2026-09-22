@@ -61,7 +61,7 @@ type BootstrapTokenAccount = { accountId: string | null; balance: number; update
 type BootstrapNotification = { id: string; type: string; title: string; body: string | null; data: Record<string, unknown>; readAt: string | null; createdAt: string };
 type BootstrapShortlist = { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; items: Array<{ id: string; candidateProfileId: string; status: string; notes: string | null; createdAt: string; candidate?: { name: string | null; role: string | null; location: string | null } }> };
 type BootstrapSection = { type: string; content: Record<string, unknown> };
-type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus; emailResent?: boolean };
+type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus; emailResent?: boolean; hasSubmittedOnboarding?: boolean };
 
 type Context = AppState & {
   hydrated: boolean;
@@ -328,7 +328,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null };
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null; hasSubmittedOnboarding?: boolean };
         profile?: BootstrapProfile | null;
         organization?: { id: string; name: string } | null;
         partnership?: { id: string; name: string } | null;
@@ -361,6 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
           companyName: resolvedCompanyName ?? current?.companyName,
+          hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
         }));
       }
 
@@ -597,7 +598,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus };
+        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus; hasSubmittedOnboarding?: boolean };
         const actualRole = synced.role ?? role;
         const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" ? "active" : "pending");
         dbIdentity.current = { role: actualRole, provisioningStatus };
@@ -616,11 +617,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           email,
           name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
           companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : (actualRole === "partner" ? institutionName : undefined),
+          hasSubmittedOnboarding: synced.hasSubmittedOnboarding,
         });
         isLoggingIn.current = false;
         bootstrapUserKey.current = data.user.id;
         void loadBootstrap();
-        return { role: actualRole, provisioningStatus };
+        return { role: actualRole, provisioningStatus, hasSubmittedOnboarding: synced.hasSubmittedOnboarding };
       } catch (e) {
         isLoggingIn.current = false;
         return { error: e instanceof Error ? e.message : "Gagal masuk." };
@@ -696,15 +698,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
+        const effectiveCompanyName = role === "recruiter" ? (companyName || name) : companyName;
+        const effectiveDisplayName = role === "recruiter" ? effectiveCompanyName : name;
+
         const { data, error } = await withTimeout(
           supabase.auth.signUp({
             email,
             password,
             options: {
               data: {
-                name,
+                name: effectiveDisplayName,
+                full_name: effectiveDisplayName,
                 role,
-                companyName,
+                companyName: effectiveCompanyName,
                 provisioningStatus: role === "candidate" ? "active" : "pending",
               },
             },
@@ -729,7 +735,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return { error: msg };
         }
         if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending" };
-        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name, companyName });
+        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name: effectiveDisplayName || email.split("@")[0], companyName: effectiveCompanyName });
         return { role, provisioningStatus: role === "candidate" ? "active" : "pending" };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Gagal mendaftar." };

@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         ? (result.isNew ? "/candidate/onboarding" : "/candidate")
         : result.role === "partner"
         ? (result.isNew ? "/partner/onboarding" : result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
-        : (result.isNew ? "/recruiter/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
+        : (result.isNew || result.hasSubmittedOnboarding === false ? "/recruiter/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
     const destination = safeNext(next, fallback);
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({
