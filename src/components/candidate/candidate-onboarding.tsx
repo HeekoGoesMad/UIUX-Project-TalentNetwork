@@ -219,6 +219,7 @@ function isMeaningfulDraft(value: FormState) {
       value.phone.trim() ||
       value.skills.length ||
       value.tools.length ||
+      value.softSkills.length ||
       value.experience.some((item) => item.company.trim() || item.role.trim() || item.dates?.trim() || item.description?.trim() || item.achievements?.some((entry) => entry.trim())) ||
       value.education.some((item) => item.school.trim() || item.program.trim() || item.dates?.trim() || item.gpa?.trim()),
   );
@@ -230,13 +231,63 @@ function isValidDraftPayload(value: unknown): value is { form: FormState; step: 
   return typeof candidate.form?.fullName === "string" && typeof candidate.form.email === "string" && typeof candidate.step === "number";
 }
 
+function getSavedDraft(): { form: FormState; step: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(draftKey);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (isValidDraftPayload(parsed) && isMeaningfulDraft(parsed.form)) {
+      if (
+        parsed.form.fullName?.includes("Nadia Utami") ||
+        parsed.form.email?.includes("nadia.utami@example.com")
+      ) {
+        window.localStorage.removeItem(draftKey);
+        return null;
+      }
+      return {
+        form: parsed.form,
+        step: typeof parsed.step === "number" ? Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1) : 0,
+      };
+    }
+  } catch {
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+  return null;
+}
+
 export function CandidateOnboarding() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
-  const [step, setStep] = useState(0);
+
+  const savedDraft = useRef<{ form: FormState; step: number } | null | undefined>(undefined);
+  if (savedDraft.current === undefined) {
+    savedDraft.current = getSavedDraft();
+  }
+
+  const [step, setStep] = useState<number>(() => {
+    const rawParam = typeof window !== "undefined" ? searchParams?.get("step") : null;
+    const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
+    if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
+      return paramStep;
+    }
+    if (savedDraft.current) {
+      return savedDraft.current.step;
+    }
+    return 0;
+  });
+
   const [isPublishing, setIsPublishing] = useState(false);
   const [form, setForm] = useState<FormState>(() => {
+    if (savedDraft.current) {
+      return savedDraft.current.form;
+    }
     const isDemo = isDemoCandidateProfile(cvProfile);
     const profile = isDemo ? null : (cvProfile ?? null);
     const userIsDemo = user?.name === "Nadia Utami" || user?.email === "nadia.utami@example.com";
@@ -256,113 +307,130 @@ export function CandidateOnboarding() {
   const [educationError, setEducationError] = useState<string | null>(null);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [edits, setEdits] = useState(0);
-  const restoredRef = useRef(false);
-  const draftAppliedRef = useRef(false);
+
+  const formRef = useRef(form);
+  formRef.current = form;
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
+  const hasEditsRef = useRef(Boolean(savedDraft.current));
+  const initializedRef = useRef(Boolean(savedDraft.current));
   const publishedRef = useRef(false);
 
   const goToStep = (targetStep: number) => {
     if (targetStep < 0 || targetStep >= steps.length) return;
     setStep(targetStep);
+    stepRef.current = targetStep;
     setStepError(null);
     setEducationError(null);
     setSkillsError(null);
     try {
-      window.localStorage.setItem(draftKey, JSON.stringify({ form, step: targetStep }));
+      window.localStorage.setItem(draftKey, JSON.stringify({ form: formRef.current, step: targetStep }));
     } catch {
       // ignore
     }
   };
 
+  // Initial populate from remote profile / user IF no local draft and user has not typed
   useEffect(() => {
-    if (!bootstrapped || !user || restoredRef.current) return;
-    restoredRef.current = true;
+    if (!bootstrapped || !user || initializedRef.current || hasEditsRef.current) return;
 
-    const rawParam = searchParams?.get("step");
-    const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
-    const hasValidParamStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length;
-
-    const timer = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem(draftKey);
-        if (raw) {
-          const parsed: unknown = JSON.parse(raw);
-          if (isValidDraftPayload(parsed) && isMeaningfulDraft(parsed.form)) {
-            if (
-              parsed.form.fullName?.includes("Nadia Utami") ||
-              parsed.form.email?.includes("nadia.utami@example.com")
-            ) {
-              window.localStorage.removeItem(draftKey);
-            } else {
-              draftAppliedRef.current = true;
-              setForm(parsed.form);
-              const restoredStep = hasValidParamStep
-                ? paramStep
-                : Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1);
-              setStep(restoredStep);
-              setEdits((current) => current + 1);
-              return;
-            }
-          }
-        }
-      } catch {
-        window.localStorage.removeItem(draftKey);
-      }
-
-      if (hasValidParamStep) {
-        setStep(paramStep);
-      } else if (cvProfile && !isDemoCandidateProfile(cvProfile)) {
-        setStep(getFirstIncompleteStep(form));
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [bootstrapped, user, searchParams, cvProfile, form]);
-
-  useEffect(() => {
-    if (!user || !bootstrapped || !cvProfile || draftAppliedRef.current) return;
-    if (isDemoCandidateProfile(cvProfile)) return;
-    const timer = window.setTimeout(() => {
-      if (draftAppliedRef.current) return;
-      const initial = initialForm(cvProfile, careerStatus, user.email);
-      setForm(initial);
+    // Check again in case draft was written right before bootstrap completed
+    const freshDraft = getSavedDraft();
+    if (freshDraft) {
+      initializedRef.current = true;
+      hasEditsRef.current = true;
+      setForm(freshDraft.form);
+      formRef.current = freshDraft.form;
       const rawParam = searchParams?.get("step");
       const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
       if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
         setStep(paramStep);
+        stepRef.current = paramStep;
       } else {
-        setStep(getFirstIncompleteStep(initial));
+        setStep(freshDraft.step);
+        stepRef.current = freshDraft.step;
       }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [bootstrapped, careerStatus, cvProfile, user, searchParams]);
+      return;
+    }
 
-  useEffect(() => {
-    if (!user || !bootstrapped || cvProfile || draftAppliedRef.current) return;
-    const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
-    const timer = window.setTimeout(() => {
-      if (draftAppliedRef.current) return;
-      setForm((current) => ({
-        ...current,
-        fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
-        email: current.email || (isDemo ? "" : user.email),
-      }));
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [bootstrapped, cvProfile, user]);
+    initializedRef.current = true;
+    if (cvProfile && !isDemoCandidateProfile(cvProfile)) {
+      const initial = initialForm(cvProfile, careerStatus, user.email);
+      setForm(initial);
+      formRef.current = initial;
+      const rawParam = searchParams?.get("step");
+      const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
+      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
+        setStep(paramStep);
+        stepRef.current = paramStep;
+      } else {
+        const firstIncomplete = getFirstIncompleteStep(initial);
+        setStep(firstIncomplete);
+        stepRef.current = firstIncomplete;
+      }
+    } else {
+      const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
+      setForm((current) => {
+        const next = {
+          ...current,
+          fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
+          email: current.email || (isDemo ? "" : user.email),
+        };
+        formRef.current = next;
+        return next;
+      });
+    }
+  }, [bootstrapped, user, cvProfile, careerStatus, searchParams]);
 
+  // Synchronous immediate draft flush on tab switch, window blur, pagehide, and beforeunload
   useEffect(() => {
-    if (!restoredRef.current || publishedRef.current || !edits) return;
+    const saveImmediately = () => {
+      if (publishedRef.current) return;
+      const currentForm = formRef.current;
+      const currentStep = stepRef.current;
+      if (hasEditsRef.current || isMeaningfulDraft(currentForm)) {
+        try {
+          window.localStorage.setItem(draftKey, JSON.stringify({ form: currentForm, step: currentStep }));
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveImmediately();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveImmediately);
+    window.addEventListener("beforeunload", saveImmediately);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveImmediately);
+      window.removeEventListener("beforeunload", saveImmediately);
+    };
+  }, []);
+
+  // Debounced draft autosave while typing
+  useEffect(() => {
+    if (publishedRef.current || (!hasEditsRef.current && !isMeaningfulDraft(form))) return;
     const timer = window.setTimeout(() => {
       try {
         window.localStorage.setItem(draftKey, JSON.stringify({ form, step }));
       } catch {
         return;
       }
-    }, 400);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [form, step, edits]);
 
+  // Unsaved changes prompt before closing window
   useEffect(() => {
-    if (!edits || publishedRef.current) return;
+    if (!hasEditsRef.current || publishedRef.current) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
@@ -372,7 +440,13 @@ export function CandidateOnboarding() {
   }, [edits]);
 
   const setValue = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    hasEditsRef.current = true;
+    initializedRef.current = true;
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      formRef.current = next;
+      return next;
+    });
     setEdits((current) => current + 1);
     if (key in requiredLabels) setErrors((current) => ({ ...current, [key as TextField]: undefined }));
     setStepError(null);
