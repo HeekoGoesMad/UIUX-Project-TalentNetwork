@@ -54,7 +54,12 @@ export function checkPasswordRequirements(password: string): PasswordRequirement
 
 export function isPasswordValid(password: string): boolean {
   const req = checkPasswordRequirements(password);
-  return req.hasMinLength && req.hasUppercase && req.hasLowercase && req.hasNumber;
+  return (
+    req.hasMinLength &&
+    req.hasUppercase &&
+    req.hasLowercase &&
+    req.hasNumber
+  );
 }
 
 export interface FieldErrors {
@@ -310,7 +315,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       result.role ?? role,
       getNext(),
       false,
-      result.provisioningStatus
+      result.provisioningStatus,
+      result.hasSubmittedOnboarding
     );
     window.location.href = dest;
   };
@@ -550,6 +556,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <AlertCircle className="size-3.5 shrink-0 text-red-500" />
             <span>{fieldErrors.password}</span>
           </p>
+        )}
+
+        {mode === "login" && (
+          <div className="flex justify-end mt-2">
+            <Link
+              href={`/reset-password${emailValue.trim() ? `?email=${encodeURIComponent(emailValue.trim())}` : ""}${role ? `${emailValue.trim() ? "&" : "?"}role=${role}` : ""}`}
+              className="text-xs font-medium text-[#7C3AED] hover:text-[#6D28D9] hover:underline transition-colors"
+            >
+              Lupa Kata Sandi?
+            </Link>
+          </div>
         )}
 
         {mode === "register" && (
@@ -805,7 +822,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   role: pendingRegistration.role,
-                  name: pendingRegistration.name || pendingRegistration.email.split("@")[0],
+                  name: pendingRegistration.companyName || pendingRegistration.name || undefined,
                   companyName: pendingRegistration.companyName || undefined,
                 }),
               }).catch(() => null);
@@ -845,7 +862,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
 const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus) {
+function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus, hasSubmittedOnboarding?: boolean) {
   if (role === "candidate") {
     if (next?.startsWith("/candidate") || next?.startsWith("/jobs") || (next !== null && ["/profile", "/messages"].includes(next))) return next;
     return isRegistration ? "/candidate/onboarding" : "/candidate";
@@ -857,7 +874,7 @@ function destination(role: UserRole, next: string | null, isRegistration = false
     return "/partner";
   }
   if (role === "recruiter") {
-    if (isRegistration) return "/recruiter/onboarding";
+    if (isRegistration || hasSubmittedOnboarding === false) return "/recruiter/onboarding";
     if (provisioningStatus !== "active") return "/recruiter/pending";
     if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
     return "/dashboard";
