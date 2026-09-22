@@ -266,27 +266,24 @@ export function CandidateOnboarding() {
   const searchParams = useSearchParams();
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
 
-  const savedDraft = useRef<{ form: FormState; step: number } | null | undefined>(undefined);
-  if (savedDraft.current === undefined) {
-    savedDraft.current = getSavedDraft();
-  }
-
   const [step, setStep] = useState<number>(() => {
     const rawParam = typeof window !== "undefined" ? searchParams?.get("step") : null;
     const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
     if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
       return paramStep;
     }
-    if (savedDraft.current) {
-      return savedDraft.current.step;
+    const draft = getSavedDraft();
+    if (draft) {
+      return draft.step;
     }
     return 0;
   });
 
   const [isPublishing, setIsPublishing] = useState(false);
   const [form, setForm] = useState<FormState>(() => {
-    if (savedDraft.current) {
-      return savedDraft.current.form;
+    const draft = getSavedDraft();
+    if (draft) {
+      return draft.form;
     }
     const isDemo = isDemoCandidateProfile(cvProfile);
     const profile = isDemo ? null : (cvProfile ?? null);
@@ -309,13 +306,15 @@ export function CandidateOnboarding() {
   const [edits, setEdits] = useState(0);
 
   const formRef = useRef(form);
-  formRef.current = form;
   const stepRef = useRef(step);
-  stepRef.current = step;
-
-  const hasEditsRef = useRef(Boolean(savedDraft.current));
-  const initializedRef = useRef(Boolean(savedDraft.current));
+  const hasEditsRef = useRef(false);
+  const initializedRef = useRef(false);
   const publishedRef = useRef(false);
+
+  useEffect(() => {
+    formRef.current = form;
+    stepRef.current = step;
+  }, [form, step]);
 
   const goToStep = (targetStep: number) => {
     if (targetStep < 0 || targetStep >= steps.length) return;
@@ -340,45 +339,43 @@ export function CandidateOnboarding() {
     if (freshDraft) {
       initializedRef.current = true;
       hasEditsRef.current = true;
-      setForm(freshDraft.form);
-      formRef.current = freshDraft.form;
+      const draftForm = freshDraft.form;
+      formRef.current = draftForm;
       const rawParam = searchParams?.get("step");
       const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
-      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
-        setStep(paramStep);
-        stepRef.current = paramStep;
-      } else {
-        setStep(freshDraft.step);
-        stepRef.current = freshDraft.step;
-      }
+      const targetStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length ? paramStep : freshDraft.step;
+      stepRef.current = targetStep;
+      queueMicrotask(() => {
+        setForm(draftForm);
+        setStep(targetStep);
+      });
       return;
     }
 
     initializedRef.current = true;
     if (cvProfile && !isDemoCandidateProfile(cvProfile)) {
       const initial = initialForm(cvProfile, careerStatus, user.email);
-      setForm(initial);
       formRef.current = initial;
       const rawParam = searchParams?.get("step");
       const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
-      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
-        setStep(paramStep);
-        stepRef.current = paramStep;
-      } else {
-        const firstIncomplete = getFirstIncompleteStep(initial);
-        setStep(firstIncomplete);
-        stepRef.current = firstIncomplete;
-      }
+      const targetStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length ? paramStep : getFirstIncompleteStep(initial);
+      stepRef.current = targetStep;
+      queueMicrotask(() => {
+        setForm(initial);
+        setStep(targetStep);
+      });
     } else {
       const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
-      setForm((current) => {
-        const next = {
-          ...current,
-          fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
-          email: current.email || (isDemo ? "" : user.email),
-        };
-        formRef.current = next;
-        return next;
+      queueMicrotask(() => {
+        setForm((current) => {
+          const next = {
+            ...current,
+            fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
+            email: current.email || (isDemo ? "" : user.email),
+          };
+          formRef.current = next;
+          return next;
+        });
       });
     }
   }, [bootstrapped, user, cvProfile, careerStatus, searchParams]);
@@ -567,7 +564,7 @@ export function CandidateOnboarding() {
 
     const profile: CvProfile = {
       ...cvProfile,
-      id: cvProfile?.id ?? `cv-${Date.now()}`,
+      id: cvProfile?.id ?? "cv-profile",
       fullName: form.fullName.trim(),
       headline: form.headline.trim(),
       about: form.about.trim(),
