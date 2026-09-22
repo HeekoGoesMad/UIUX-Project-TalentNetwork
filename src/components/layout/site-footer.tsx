@@ -9,7 +9,7 @@ export function SiteFooter() {
   const pathname = usePathname();
   const { user, hydrated } = useApp();
   const visibleUser = hydrated ? user : null;
-  const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isAuthPage = pathname === "/login" || pathname === "/register" || pathname === "/reset-password";
   const isAdmin = pathname?.startsWith("/admin");
 
   if (isAuthPage || isAdmin) {

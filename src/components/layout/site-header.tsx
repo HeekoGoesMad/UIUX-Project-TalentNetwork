@@ -180,7 +180,8 @@ export function SiteHeader() {
       : visibleUser?.role === "recruiter"
         ? "/recruiter/settings"
         : null;
-  if (isOnboarding || isAdmin || isPending) {
+  const isResetPassword = pathname?.startsWith("/reset-password");
+  if (isOnboarding || isAdmin || isPending || isResetPassword) {
     return null;
   }
 

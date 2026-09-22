@@ -6,7 +6,7 @@ Conventions: `requireAdmin` = admin role only. `getCurrentAppUser` = any authent
 
 ## Admin (`requireAdmin` on all)
 
-- `GET /api/admin/audit-log` — query: `search?`, `action?` (filtered in memory, max 300 rows). Errors: 503.
+- `GET /api/admin/audit-log` — query: `search?`, `action?`, `page?`, `limit?` (server-side pagination, default 50 rows per page). Errors: 503.
 - `GET /api/admin/companies` — query: `search?`, `status?` (verification status; filtered in memory). Errors: 503.
 - `PATCH /api/admin/companies/:companyId` — body: `verificationStatus?` (pending|approved|need_revision|rejected|suspended), `verificationNotes?`, `nib?`, `npwp?`, `industry?`, `companyScale?`, `province?`, `city?`, `companyEmail?`, `website?`, `linkedinUrl?`, `subscriptionTier?`, `subscriptionStatus?` (strict). Errors: 400/404.
 - `GET /api/admin/dashboard` — no params; aggregate counts (companies by status, token balances, unlocks, screenings). Errors: 503.

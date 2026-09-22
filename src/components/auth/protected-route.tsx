@@ -19,6 +19,12 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
       return;
     }
     if (user.role === "recruiter" && user.provisioningStatus !== "active") {
+      if (user.hasSubmittedOnboarding === false) {
+        if (pathname !== "/recruiter/onboarding") {
+          router.replace("/recruiter/onboarding");
+        }
+        return;
+      }
       // Allow recruiter to access onboarding to fill company data, or stay at pending page
       if (pathname !== "/recruiter/pending" && pathname !== "/recruiter/onboarding") {
         router.replace("/recruiter/pending");

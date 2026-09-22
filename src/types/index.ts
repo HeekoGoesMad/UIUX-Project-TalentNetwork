@@ -121,6 +121,7 @@ export type DemoUser = {
   provisioningStatus?: ProvisioningStatus;
   provisioningReason?: string | null;
   companyName?: string;
+  hasSubmittedOnboarding?: boolean;
 };
 
 export type EducationLevel = "SMA/SMK" | "Diploma" | "S1" | "S2" | "S3";
