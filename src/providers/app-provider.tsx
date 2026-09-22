@@ -282,15 +282,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const existingCustomName =
         current?.name && current.name !== current.email?.split("@")[0] ? current.name : null;
 
+      const nextName =
+        existingCustomName ||
+        (typeof metadata.name === "string" && metadata.name.trim()
+          ? metadata.name
+          : authUser.email?.split("@")[0] ?? "Pengguna");
+
+      const nextCompanyName =
+        typeof metadata.companyName === "string" && metadata.companyName.trim()
+          ? metadata.companyName
+          : current?.companyName;
+
+      const nextEmail = authUser.email ?? "";
+      const nextReason = dbIdentity.current.provisioningReason ?? current?.provisioningReason ?? null;
+
+      if (
+        current &&
+        current.role === role &&
+        current.provisioningStatus === provisioningStatus &&
+        current.provisioningReason === nextReason &&
+        current.email === nextEmail &&
+        current.name === nextName &&
+        current.companyName === nextCompanyName
+      ) {
+        return current;
+      }
+
       return {
         role,
         provisioningStatus,
-        provisioningReason: dbIdentity.current.provisioningReason ?? current?.provisioningReason ?? null,
-        email: authUser.email ?? "",
-        name: existingCustomName || (typeof metadata.name === "string" && metadata.name.trim()
-          ? metadata.name
-          : authUser.email?.split("@")[0] ?? "Pengguna"),
-        companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
+        provisioningReason: nextReason,
+        email: nextEmail,
+        name: nextName,
+        companyName: nextCompanyName,
       };
     });
     if (typeof metadata.companyName === "string" && metadata.companyName.trim()) {
