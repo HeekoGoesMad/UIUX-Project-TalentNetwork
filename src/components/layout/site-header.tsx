@@ -14,7 +14,6 @@ import {
   Menu,
   Search,
   Settings,
-  ShieldCheck,
   UserPlus,
   UserRound,
   WalletCards,
@@ -84,7 +83,6 @@ export function SiteHeader() {
   const isOnboarding = pathname?.includes("/onboarding");
   const visibleUser = hydrated && !isAuth ? user : null;
   const isPublicHeader = isLanding || isAuth || !visibleUser;
-  const isOverDarkHeader = isLanding && !scrolled && !visibleUser;
 
   useEffect(() => {
     let ticking = false;
@@ -113,8 +111,8 @@ export function SiteHeader() {
   const recruiterFeatures = [
     {
       href: "/recruiter/operations",
-      label: "Pipeline & Operasi",
-      desc: "Alur Dover, jadwal wawancara & status offer",
+      label: "Pipeline Rekrutmen",
+      desc: "Operasi rekrutmen, screening AI & penawaran",
       icon: GitBranch,
     },
     {
@@ -122,12 +120,6 @@ export function SiteHeader() {
       label: "Lowongan Kerja",
       desc: "Kelola posting lowongan & pelamar masuk",
       icon: Briefcase,
-    },
-    {
-      href: "/recruiter/screenings",
-      label: "AI Screening",
-      desc: "Hasil analisis kesesuaian role-fit & skor",
-      icon: ShieldCheck,
     },
     {
       href: "/shortlist",
@@ -144,6 +136,14 @@ export function SiteHeader() {
   const isPartnerSection = pathname?.startsWith("/partner");
   const isCandidateSection = pathname?.startsWith("/candidate");
 
+  const isLinkActive = (href: string) => {
+    if (href === "/candidate") return pathname === href || pathname?.startsWith("/candidate");
+    if (href === "/jobs") return pathname === href || pathname?.startsWith("/jobs");
+    if (href === "/messages")
+      return pathname === href || pathname?.startsWith(`${href}/`) || pathname?.endsWith("/messages");
+    return pathname === href || pathname?.startsWith(`${href}/`);
+  };
+
   // Top-level direct navigation links
   const links =
     isPartnerSection || visibleUser?.role === "partner"
@@ -156,15 +156,13 @@ export function SiteHeader() {
       : isCandidateSection || visibleUser?.role === "candidate"
       ? [
           { href: "/candidate", label: "Workspace" },
-          { href: "/candidate/applications", label: "Lamaran Saya" },
-          { href: "/candidate/cv", label: "CV & Profil" },
-          { href: "/candidate/career-advisor", label: "Career Advisor" },
+          { href: "/jobs", label: "Lowongan Kerja" },
           { href: "/messages", label: "Pesan" },
         ]
       : isPublicHeader
       ? [
-          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
           { href: isLanding ? "#how-it-works" : "/#how-it-works", label: "Cara Kerja" },
+          { href: isLanding ? "#features" : "/#features", label: "Fitur Unggulan" },
           { href: isLanding ? "#pricing" : "/#pricing", label: "Harga & Token" },
           { href: isLanding ? "#faq" : "/#faq", label: "FAQ" },
         ]
@@ -198,12 +196,10 @@ export function SiteHeader() {
           "mx-auto flex h-14 items-center justify-between transition-all duration-300 ease-out pointer-events-auto",
           scrolled
             ? "max-w-5xl xl:max-w-6xl rounded-full px-4 sm:px-6 liquid-glass-scrolled shadow-[0_14px_44px_rgba(10,22,40,0.18)]"
-            : isOverDarkHeader
-            ? "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-dark-top text-white"
             : "max-w-7xl rounded-full px-4 sm:px-6 liquid-glass-top text-foreground"
         )}
       >
-        {/* Logo */}
+        {/* Brand Text Logo */}
         <Link
           href={
             visibleUser
@@ -214,13 +210,10 @@ export function SiteHeader() {
                 : "/dashboard"
               : "/"
           }
-          className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.02]"
+          className="flex shrink-0 items-center font-bold tracking-tight transition-opacity hover:opacity-90"
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-primary text-white shadow-sm transition-transform duration-300 group-hover:rotate-3">
-            <ShieldCheck className="size-5" />
-          </span>
-          <span className={cn("text-lg font-bold whitespace-nowrap", isOverDarkHeader ? "text-white" : "text-foreground")}>
-            Proofy<span className="text-primary">Link</span>
+          <span className="text-lg font-bold whitespace-nowrap text-foreground">
+            Talent<span className="text-primary"> Network</span>
           </span>
         </Link>
 
@@ -232,12 +225,7 @@ export function SiteHeader() {
               <a
                 key={link.href}
                 href={link.href}
-                className={cn(
-                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
-                  isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
-                )}
+                className="rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 text-muted-foreground hover:bg-slate-100 hover:text-foreground"
               >
                 {link.label}
               </a>
@@ -246,11 +234,8 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200",
-                  isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-foreground"
-                    : "text-muted-foreground hover:bg-slate-100 hover:text-foreground",
-                  pathname === link.href && (isOverDarkHeader ? "bg-white/15 font-semibold text-white" : "bg-slate-900 text-white font-semibold")
+                  "rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 text-muted-foreground hover:bg-slate-100 hover:text-foreground",
+                  isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
                 )}
               >
                 {link.label}
@@ -266,8 +251,6 @@ export function SiteHeader() {
                   "flex items-center gap-1.5 rounded-full px-3 py-1.5 lg:px-4 lg:py-2 whitespace-nowrap shrink-0 transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   isRecruiterFeatureActive
                     ? "bg-[#7C3AED] text-white font-semibold shadow-xs"
-                    : isOverDarkHeader
-                    ? "text-slate-300 hover:bg-white/10 hover:text-white"
                     : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
                 )}
               >
@@ -302,13 +285,11 @@ export function SiteHeader() {
 
         {/* Right Actions */}
         <div className="flex shrink-0 items-center gap-2">
-          {!isPublicHeader && !isPartnerSection && visibleUser?.role !== "partner" && (
+          {!isPublicHeader && !isPartnerSection && visibleUser?.role === "recruiter" && (
             <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
-              <Link href={visibleUser?.role === "candidate" ? "/jobs" : "/search"} className="flex items-center gap-1.5">
+              <Link href="/search" className="flex items-center gap-1.5">
                 <Search className="size-3.5" />
-                <span className="hidden xl:inline text-xs">
-                  {visibleUser?.role === "candidate" ? "Eksplorasi lowongan" : "Cari talent"}
-                </span>
+                <span className="hidden xl:inline text-xs">Cari talent</span>
               </Link>
             </Button>
           )}
@@ -337,7 +318,7 @@ export function SiteHeader() {
           {visibleUser && (() => {
             const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href="/notifications" className="relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50" aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+              <Link href="/notifications" className={cn("relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50", pathname?.startsWith("/notifications") && "border-primary bg-primary/10 text-primary")} aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
                 <Bell className="size-4" />
                 {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
@@ -349,8 +330,7 @@ export function SiteHeader() {
               href={settingsHref}
               className={cn(
                 "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
-                pathname === settingsHref && "border-primary bg-primary/10 text-primary",
-                isOverDarkHeader && "text-white bg-white/10 hover:bg-white/20 border-white/20"
+                pathname === settingsHref && "border-primary bg-primary/10 text-primary"
               )}
               aria-label="Pengaturan Akun"
               title="Pengaturan Akun"
@@ -363,7 +343,7 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn("rounded-full shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+              className="rounded-full shrink-0 text-foreground hover:bg-slate-100"
               aria-label="Keluar dari akun"
               onClick={logout}
             >
@@ -375,7 +355,7 @@ export function SiteHeader() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full font-medium transition-all border-white/20 bg-white/10 text-slate-800 hover:bg-slate-100 px-4 whitespace-nowrap"
+                  className="rounded-full font-medium transition-all border-slate-200 bg-white text-slate-800 hover:bg-slate-50 px-4 whitespace-nowrap"
                   asChild
                 >
                   <Link href="/register">
@@ -404,7 +384,7 @@ export function SiteHeader() {
             ref={menuButtonRef}
             variant="ghost"
             size="icon"
-            className={cn("rounded-full md:hidden shrink-0", isOverDarkHeader && "text-white hover:bg-white/10")}
+            className="rounded-full md:hidden shrink-0 text-foreground hover:bg-slate-100"
             aria-label={open ? "Tutup menu" : "Buka menu"}
             aria-expanded={open}
             aria-controls="mobile-menu"
@@ -441,7 +421,10 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted"
+                  className={cn(
+                    "rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                    isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
+                  )}
                   onClick={() => setOpen(false)}
                 >
                   {link.label}
@@ -453,7 +436,7 @@ export function SiteHeader() {
             {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
               <div className="mt-2 border-t border-slate-100 pt-2">
                 <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Alur Rekrutmen Dover
+                  Pipeline Rekrutmen
                 </p>
                 {recruiterFeatures.map((feat) => {
                   const Icon = feat.icon;

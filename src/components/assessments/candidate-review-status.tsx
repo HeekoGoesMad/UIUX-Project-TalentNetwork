@@ -48,10 +48,10 @@ export function CandidateReviewStatus({
 
   if (!review) return <p className="text-sm text-muted-foreground">Belum ada hasil review manusia.</p>;
   return (
-    <Card className={compact ? "border-primary/20" : "mt-6 border-primary/20"}>
+    <Card className={compact ? undefined : "mt-6"}>
       <CardContent className="p-5">
         <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <div>
             <p className="font-semibold">Status review manusia</p>
             <p className="mt-1 text-sm text-muted-foreground">{labels[review.status]}</p>

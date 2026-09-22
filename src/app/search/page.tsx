@@ -26,6 +26,8 @@ import {
   TalentCategory,
   Candidate,
 } from "@/types";
+import { SECTOR_TAXONOMY, candidateMatchesSector } from "@/config/sectors";
+import { getProvinceFromLocation, matchesLocationProvince } from "@/lib/locations";
 
 const pageSize = 12;
 
@@ -233,9 +235,9 @@ function FilterPanel({
       </FilterSection>
 
       {/* ── INDUSTRI ── */}
-      <FilterSection label="Industri">
-        {(Object.keys(INDUSTRY_CATEGORY_CONFIG) as IndustryCategory[]).map((key) => {
-          const cfg = INDUSTRY_CATEGORY_CONFIG[key];
+      <FilterSection label="Industri / Bidang Peran">
+        {(Object.keys(SECTOR_TAXONOMY) as IndustryCategory[]).map((key) => {
+          const cfg = SECTOR_TAXONOMY[key];
           const active = filters.industries.includes(key);
           return (
             <CheckRow
@@ -243,7 +245,14 @@ function FilterPanel({
               id={`ind-${key}`}
               checked={active}
               onChange={() => set({ industries: toggle(filters.industries, key) })}
-              label={cfg.label}
+              label={
+                <div className="flex flex-col">
+                  <span className="font-medium text-foreground">{cfg.label}</span>
+                  <span className="text-[11px] text-muted-foreground/80 leading-snug">
+                    {cfg.subRolePreview}
+                  </span>
+                </div>
+              }
             />
           );
         })}
@@ -265,8 +274,8 @@ function FilterPanel({
         })}
       </FilterSection>
 
-      {/* ── LOKASI ── */}
-      <FilterSection label="Lokasi">
+      {/* ── PROVINSI ── */}
+      <FilterSection label="Provinsi">
         {locations.map((loc) => {
           const active = filters.locations.includes(loc);
           return (
@@ -307,14 +316,14 @@ function CheckRow({
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm transition-colors hover:bg-slate-50"
+      className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 text-sm transition-colors hover:bg-slate-50"
     >
       <input
         id={id}
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="size-4 rounded accent-primary"
+        className="mt-0.5 size-4 shrink-0 rounded accent-primary"
       />
       <span className="text-sm text-foreground">{label}</span>
     </label>
@@ -396,13 +405,25 @@ function SearchPageContent() {
   }, [urlQuery]);
 
   const source = dbMode ? remoteCandidates : candidates;
-  const allLocations = useMemo(() => [...new Set(source.map((candidate) => candidate.location))].sort(), [source]);
+  // Ekstrak semua provinsi unik dari kandidat untuk filter berbasis provinsi
+  const allProvinces = useMemo(() => {
+    const set = new Set<string>();
+    for (const candidate of source) {
+      const prov = getProvinceFromLocation(candidate.location);
+      if (prov) set.add(prov);
+    }
+    return [...set].sort();
+  }, [source]);
 
   // Pre-index lowercase search strings for each candidate once when the source array changes
   const candidateSearchTextMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of source) {
-      map.set(c.id, `${c.name} ${c.role} ${c.location} ${c.skills.join(" ")} ${c.education}`.toLowerCase());
+      const prov = getProvinceFromLocation(c.location);
+      map.set(
+        c.id,
+        `${c.name} ${c.role} ${c.targetRole ?? ""} ${c.location} ${prov} ${c.skills.join(" ")} ${c.education}`.toLowerCase()
+      );
     }
     return map;
   }, [source]);
@@ -415,9 +436,9 @@ function SearchPageContent() {
         const qMatch = !query || (candidateSearchTextMap.get(c.id) ?? "").includes(query);
         const catMatch = !filters.talentCategories.length || filters.talentCategories.includes(c.talentCategory);
         const statusMatch = !filters.careerStatuses.length || (c.careerStatus && filters.careerStatuses.includes(c.careerStatus));
-        const indMatch = !filters.industries.length || filters.industries.includes(c.industry);
+        const indMatch = !filters.industries.length || filters.industries.some((ind) => candidateMatchesSector(c, ind));
         const expMatch = matchesExperience(c.experience, filters.experienceBands);
-        const locMatch = !filters.locations.length || filters.locations.includes(c.location);
+        const locMatch = !filters.locations.length || matchesLocationProvince(c.location, filters.locations);
         const campusMatch = !filters.campusVerifiedOnly || Boolean(
           (partnerVerifications?.[c.id] ?? c.campusVerification)?.status === "verified"
         );
@@ -551,7 +572,23 @@ function SearchPageContent() {
       {/* Active filter chips */}
       {activeFilterCount > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">{activeFilterCount} filter aktif</span>
+          <span className="text-xs text-muted-foreground">{activeFilterCount} filter aktif:</span>
+          {filters.locations.map((loc) => (
+            <span
+              key={loc}
+              className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-xs font-medium text-purple-700"
+            >
+              📍 {loc}
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, locations: f.locations.filter((l) => l !== loc), page: 1 }))}
+                className="hover:text-purple-900"
+                aria-label={`Hapus filter provinsi ${loc}`}
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
           <button
             className="inline-flex items-center gap-1 text-xs text-[#7C3AED] hover:underline"
             onClick={resetFilters}
@@ -570,7 +607,7 @@ function SearchPageContent() {
               filters={filters}
               onChange={setFilters}
               onReset={resetFilters}
-              locations={allLocations}
+              locations={allProvinces}
             />
           </div>
         </aside>
@@ -684,7 +721,7 @@ function SearchPageContent() {
             filters={filters}
             onChange={(f) => { setFilters(f); }}
             onReset={() => { resetFilters(); setMobileOpen(false); }}
-            locations={allLocations}
+            locations={allProvinces}
           />
           <Button className="mt-2 w-full" onClick={() => setMobileOpen(false)}>
             Lihat {filtered.length} kandidat

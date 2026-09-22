@@ -26,9 +26,9 @@ export function RoleSelector({
             aria-pressed={active}
             onClick={() => onChange(value)}
             className={cn(
-              "relative flex flex-col justify-between rounded-xl border p-2 sm:p-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+              "relative flex flex-col justify-between rounded-xl border p-2 sm:p-2.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]/50",
               active
-                ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary"
+                ? "border-[#7C3AED] bg-purple-50/70 shadow-2xs ring-1 ring-[#7C3AED]"
                 : "border-slate-200 bg-slate-50/50 hover:bg-slate-100/80 hover:border-slate-300"
             )}
           >
@@ -36,14 +36,14 @@ export function RoleSelector({
               <div
                 className={cn(
                   "flex size-6 sm:size-7 items-center justify-center rounded-lg transition-colors",
-                  active ? "bg-primary text-primary-foreground" : "bg-slate-200/80 text-slate-600"
+                  active ? "bg-[#7C3AED] text-white" : "bg-slate-200/80 text-slate-600"
                 )}
               >
                 <Icon className="size-3 sm:size-3.5" aria-hidden="true" />
               </div>
             </div>
             <div className="mt-1.5">
-              <span className={cn("block text-[11px] sm:text-xs font-bold truncate", active ? "text-primary" : "text-slate-800")}>
+              <span className={cn("block text-[11px] sm:text-xs font-bold truncate", active ? "text-[#7C3AED]" : "text-slate-800")}>
                 <span className="sm:hidden">{shortLabel}</span>
                 <span className="hidden sm:inline">{fullLabel}</span>
               </span>

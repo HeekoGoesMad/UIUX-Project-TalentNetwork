@@ -7,9 +7,9 @@ import {
   type CampusVerification,
   type Candidate,
   type CandidatePersonality,
-  type IndustryCategory,
   type TalentCategory,
 } from "@/types";
+import { inferSectorFromRole } from "@/config/sectors";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -23,6 +23,7 @@ export function serializeCandidate(
     id: string;
     name: string | null;
     role: string | null;
+    targetRole?: string | null;
     location: string | null;
     summary: string | null;
     email?: string | null;
@@ -83,6 +84,7 @@ export function serializeCandidate(
       .join("")
       .slice(0, 3),
     role: row.role?.trim() || "Role belum tersedia",
+    targetRole: row.targetRole?.trim() || undefined,
     location: row.location?.trim() || "Lokasi belum tersedia",
     experience: experience.length,
     availability: status === "not-available" ? "Tidak tersedia" : "Terbuka untuk peluang",
@@ -140,7 +142,7 @@ export function serializeCandidate(
     })),
     careerStatus: status,
     talentCategory,
-    industry: "technology-software" as IndustryCategory,
+    industry: inferSectorFromRole(row.targetRole || row.role),
   };
 }
 
@@ -166,6 +168,7 @@ export class TalentSearchService {
         or(
           ilike(schema.profiles.displayName, searchPattern),
           ilike(schema.candidateProfiles.headline, searchPattern),
+          ilike(schema.candidateProfiles.targetRole, searchPattern),
           ilike(schema.candidateProfiles.location, searchPattern),
           ilike(schema.candidateProfiles.summary, searchPattern)
         )!
@@ -173,7 +176,14 @@ export class TalentSearchService {
     }
 
     if (params?.locations && params.locations.length > 0) {
-      conditions.push(inArray(schema.candidateProfiles.location, params.locations));
+      const locConditions = params.locations.map((loc) => {
+        const cleanLoc = loc.replace(/[\\%_]/g, "\\$&");
+        return or(
+          ilike(schema.candidateProfiles.location, `%${cleanLoc}%`),
+          eq(schema.candidateProfiles.location, loc)
+        )!;
+      });
+      conditions.push(or(...locConditions)!);
     }
 
     const whereClause = and(...conditions);
@@ -204,6 +214,7 @@ export class TalentSearchService {
         id: schema.candidateProfiles.id,
         name: schema.profiles.displayName,
         role: schema.candidateProfiles.headline,
+        targetRole: schema.candidateProfiles.targetRole,
         location: schema.candidateProfiles.location,
         summary: schema.candidateProfiles.summary,
         email: schema.users.email,

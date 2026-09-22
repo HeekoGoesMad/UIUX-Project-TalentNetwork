@@ -116,6 +116,7 @@ export const DELETE = withAuth(
         ok: true,
         message: result.message,
         deletedFilesCount: result.deletedFilesCount,
+        deletedConversationsCount: result.deletedConversationsCount,
       });
     } catch (error) {
       console.error("[api/candidate/account] Gagal menghapus akun kandidat:", error);

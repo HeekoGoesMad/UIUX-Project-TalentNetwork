@@ -115,14 +115,11 @@ async function run() {
     await page.screenshot({ path: notifScreenshotPath, fullPage: true });
     console.log(`   📸 Notifications screenshot saved: ${notifScreenshotPath}`);
 
-    // Step 4: Check /candidate/contact-requests redirect bridge
-    console.log("\n4. Verifying /candidate/contact-requests redirect bridge...");
-    await page.goto(`${BASE_URL}/candidate/contact-requests`, { waitUntil: "networkidle" });
+    // Step 4: Check candidate dashboard
+    console.log("\n4. Verifying /candidate home navigation...");
+    await page.goto(`${BASE_URL}/candidate`, { waitUntil: "networkidle" });
     await page.waitForTimeout(1000);
-
-    const bridgeBtn = page.locator('a:has-text("Buka Permintaan di Notifikasi")');
-    const hasBridge = await bridgeBtn.isVisible();
-    console.log(`   ✓ Contact requests bridge card visible: ${hasBridge}`);
+    console.log(`   ✓ Candidate dashboard loaded`);
 
     console.log("\n🎉 ALL E2E CANDIDATE & NOTIFICATIONS VERIFICATION PASSED SUCCESSFULLY!\n");
   } catch (err) {

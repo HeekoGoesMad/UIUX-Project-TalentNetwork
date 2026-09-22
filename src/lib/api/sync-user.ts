@@ -56,15 +56,15 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           recruiterProvisioningStatus: role === "candidate" ? "active" : "pending",
         }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
 
-    // Ensure displayName is NOT overwritten with an email prefix if an existing profile already has a name
+    // Ensure displayName is NOT overwritten if an existing profile already has one set
+    // (e.g. Google OAuth name should never overwrite a name the user chose during onboarding)
     const [existingProfile] = await tx.select({
       displayName: schema.profiles.displayName,
     }).from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
 
     const providedName = input.name?.trim();
-    const isDefaultFallback = !providedName || providedName === authEmail.split("@")[0];
     const resolvedName = existingProfile?.displayName?.trim()
-      ? (isDefaultFallback ? existingProfile.displayName : providedName)
+      ? existingProfile.displayName
       : (providedName || (typeof authUser.user_metadata?.name === "string" ? authUser.user_metadata.name : authEmail.split("@")[0]));
 
     await tx.insert(schema.profiles).values({
@@ -78,25 +78,49 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       },
     });
 
-    if (role === "recruiter" && user.recruiterProvisioningStatus === "active") {
+    if (role === "recruiter") {
       const membership = await tx.select({ organizationId: schema.organizationMembers.organizationId })
         .from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, user.id)).limit(1);
       let organizationId = membership[0]?.organizationId;
       if (membership.length === 0) {
-        const slug = `org-${authUser.id}`;
-        const [organization] = await tx.insert(schema.organizations).values({
-          name: input.companyName?.trim() || `${input.name?.trim() || authEmail.split("@")[0]} Recruiter`,
-          slug,
-          createdBy: user.id,
-        }).onConflictDoUpdate({
-          target: schema.organizations.slug,
-          set: { updatedAt: new Date() },
-        }).returning({ id: schema.organizations.id });
-        organizationId = organization.id;
-        await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
-        await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
+        const existingOrg = await tx.select({ id: schema.organizations.id })
+          .from(schema.organizations).where(eq(schema.organizations.createdBy, user.id)).limit(1);
+        if (existingOrg.length > 0) {
+          organizationId = existingOrg[0].id;
+          await tx.insert(schema.organizationMembers).values({ organizationId, userId: user.id, role: "owner" }).onConflictDoNothing();
+        } else if (input.companyName?.trim() || (typeof authUser.user_metadata?.companyName === "string" && authUser.user_metadata.companyName.trim())) {
+          const orgName = input.companyName?.trim() || (authUser.user_metadata?.companyName as string).trim();
+          const slug = `org-${authUser.id}`;
+          const [organization] = await tx.insert(schema.organizations).values({
+            name: orgName,
+            slug,
+            createdBy: user.id,
+            verificationStatus: "pending",
+          }).onConflictDoUpdate({
+            target: schema.organizations.slug,
+            set: { name: orgName, updatedAt: new Date() },
+          }).returning({ id: schema.organizations.id });
+          organizationId = organization.id;
+          await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
+          await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
+        } else if (user.recruiterProvisioningStatus === "active") {
+          const slug = `org-${authUser.id}`;
+          const [organization] = await tx.insert(schema.organizations).values({
+            name: input.companyName?.trim() || `${input.name?.trim() || authEmail.split("@")[0]} Recruiter`,
+            slug,
+            createdBy: user.id,
+          }).onConflictDoUpdate({
+            target: schema.organizations.slug,
+            set: { updatedAt: new Date() },
+          }).returning({ id: schema.organizations.id });
+          organizationId = organization.id;
+          await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
+          await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
+        }
       }
-      if (organizationId) await ShortlistService.ensureDefault(tx, organizationId, user.id);
+      if (organizationId && user.recruiterProvisioningStatus === "active") {
+        await ShortlistService.ensureDefault(tx, organizationId, user.id);
+      }
     }
 
     if (role === "partner") {
@@ -126,9 +150,9 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           ? ("rejected" as const)
           : ("pending" as const);
 
-      return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus };
+      return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus, isNew: !existing };
     }
 
-    return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus };
+    return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus, isNew: !existing };
   });
 }

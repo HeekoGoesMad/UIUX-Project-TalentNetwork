@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
-import { schema } from "@/db";
+import { getDb, schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { serializeCandidate } from "@/lib/services/talent-search";
 
@@ -9,14 +9,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
   const { candidateId } = await params;
   try {
     const current = await getCurrentAppUser();
-    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+    const db = "error" in current ? getDb() : current.db;
 
     const [[row], sections] = await Promise.all([
-      current.db
+      db
         .select({
           id: schema.candidateProfiles.id,
           name: schema.profiles.displayName,
           role: schema.candidateProfiles.headline,
+          targetRole: schema.candidateProfiles.targetRole,
           location: schema.candidateProfiles.location,
           summary: schema.candidateProfiles.summary,
           isPublished: schema.candidateProfiles.isPublished,
@@ -29,7 +30,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
         .leftJoin(schema.users, eq(schema.users.id, schema.candidateProfiles.userId))
         .where(and(eq(schema.candidateProfiles.id, candidateId), eq(schema.candidateProfiles.isPublished, true)))
         .limit(1),
-      current.db
+      db
         .select({
           candidateProfileId: schema.candidateProfileSections.candidateProfileId,
           type: schema.candidateProfileSections.type,

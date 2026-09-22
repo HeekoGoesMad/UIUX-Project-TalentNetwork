@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
+import { formatApplicationStageNotification } from "@/lib/notifications/candidate-formatter";
 import { writeAuditLog } from "@/lib/audit";
 type CurrentUser = Exclude<Awaited<ReturnType<typeof getCurrentAppUser>>, { error: string; status: number }>;
 type ParticipantRow = { application: typeof schema.applications.$inferSelect; jobTitle: string; organizationId: string; organizationName: string; candidateName: string | null; candidateHeadline: string | null; candidateLocation: string | null; candidateUserId: string };
@@ -12,7 +13,18 @@ const statusValues = ["new", "shortlisted", "consent_requested", "consent_approv
 const updateSchema = z.object({ status: z.enum(statusValues), reason: z.string().trim().min(3).max(1000).optional() }).strict();
 const idSchema = z.string().uuid();
 const recruiterTransitions: Record<(typeof statusValues)[number], (typeof statusValues)[number][]> = {
-  new: ["shortlisted", "rejected"], shortlisted: ["consent_requested", "screening", "rejected"], consent_requested: ["consent_approved", "rejected"], consent_approved: ["screening", "rejected"], screening: ["assessment", "review", "rejected"], assessment: ["review", "interview", "rejected"], review: ["interview", "offer", "rejected"], interview: ["offer", "hired", "rejected"], offer: ["hired", "rejected"], hired: [], rejected: [], withdrawn: [],
+  new: ["shortlisted", "screening", "interview", "rejected"],
+  shortlisted: ["consent_requested", "screening", "interview", "rejected"],
+  consent_requested: ["consent_approved", "rejected"],
+  consent_approved: ["screening", "interview", "rejected"],
+  screening: ["assessment", "review", "interview", "rejected"],
+  assessment: ["review", "interview", "screening", "rejected"],
+  review: ["interview", "offer", "screening", "rejected"],
+  interview: ["offer", "hired", "screening", "rejected"],
+  offer: ["interview", "screening", "hired", "rejected"],
+  hired: ["offer", "interview", "screening", "rejected"],
+  rejected: ["screening", "interview", "offer"],
+  withdrawn: [],
 };
 
 export async function GET(_request: Request, { params }: { params: Promise<{ applicationId: string }> }) {
@@ -39,6 +51,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
     const participant = await findParticipant(current, applicationId);
     if ("error" in participant) return NextResponse.json({ error: participant.error }, { status: participant.status });
     const currentStatus = participant.application.status;
+    if (currentStatus === parsed.data.status) {
+      return NextResponse.json({ application: participant.application });
+    }
     if (current.user.role === "candidate") {
       if (parsed.data.status !== "withdrawn" || !["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer"].includes(currentStatus)) return NextResponse.json({ error: "Lamaran tidak dapat ditarik pada tahap ini." }, { status: 409 });
     } else {
@@ -56,7 +71,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
            .where(and(eq(schema.jobs.id, participant.application.jobId), or(inArray(schema.organizationMembers.role, ["owner", "admin"]), and(eq(schema.organizationMembers.role, "recruiter"), eq(schema.users.recruiterProvisioningStatus, "active")))));
           await Promise.all(recipients.map(({ userId }) => createNotificationWithDeliveries(tx, systemNotification({ userId, title: "Kandidat menarik lamaran", body: `${participant.value.candidate.name ?? "Kandidat"} menarik lamaran untuk ${participant.value.job.title}.`, data: notificationData(`application:${applicationId}:withdrawn:${userId}`, `/recruiter/applications/${applicationId}`, { applicationId, status: "withdrawn" }) }))));
        } else {
-          await createNotificationWithDeliveries(tx, systemNotification({ userId: participant.candidateUserId, title: `Status lamaran: ${parsed.data.status}`, body: `Status lamaran untuk ${participant.value.job.title} berubah menjadi ${parsed.data.status}.`, data: notificationData(`application:${applicationId}:stage:${parsed.data.status}:${participant.candidateUserId}`, `/candidate/applications/${applicationId}`, { applicationId, status: parsed.data.status }) }));
+          const stageNotif = formatApplicationStageNotification({
+            stage: parsed.data.status,
+            jobTitle: participant.value.job.title,
+            organizationName: participant.value.job.organizationName,
+          });
+          await createNotificationWithDeliveries(
+            tx,
+            systemNotification({
+              userId: participant.candidateUserId,
+              title: stageNotif.title,
+              body: stageNotif.body,
+              data: notificationData(
+                `application:${applicationId}:stage:${parsed.data.status}:${participant.candidateUserId}`,
+                `/candidate/applications/${applicationId}`,
+                { applicationId, status: parsed.data.status }
+              ),
+            })
+          );
        }
        return next;
     });

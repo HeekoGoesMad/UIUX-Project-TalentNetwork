@@ -1,5 +1,7 @@
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { listInterviewsForOrganization, scheduleInterview } from "@/lib/services/recruiter-hiring";
 
@@ -24,12 +26,52 @@ export async function GET(request: Request) {
     const current = await getCurrentAppUser();
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
-    const scope = await getRecruiterScope(current.db, current.user);
-    if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
-
     const url = new URL(request.url);
     const applicationId = url.searchParams.get("applicationId") ?? undefined;
     const limit = Number(url.searchParams.get("limit")) || 50;
+
+    if (current.user.role === "candidate") {
+      if (!applicationId) {
+        return NextResponse.json({ error: "applicationId wajib diberikan." }, { status: 400 });
+      }
+
+      const rawInterviews = await current.db
+        .select({
+          interview: schema.interviews,
+          jobTitle: schema.jobs.title,
+          organizationName: schema.organizations.name,
+        })
+        .from(schema.interviews)
+        .innerJoin(schema.applications, eq(schema.applications.id, schema.interviews.applicationId))
+        .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
+        .innerJoin(schema.organizations, eq(schema.organizations.id, schema.interviews.organizationId))
+        .innerJoin(schema.candidateProfiles, eq(schema.candidateProfiles.id, schema.applications.candidateProfileId))
+        .where(
+          and(
+            eq(schema.interviews.applicationId, applicationId),
+            eq(schema.candidateProfiles.userId, current.user.id)
+          )
+        )
+        .orderBy(desc(schema.interviews.scheduledAt))
+        .limit(limit);
+
+      const interviews = rawInterviews.map(({ interview }) => ({
+        id: interview.id,
+        title: interview.title,
+        scheduledAt: interview.scheduledAt.toISOString(),
+        timezone: interview.timezone || "Asia/Jakarta",
+        durationMinutes: interview.durationMinutes || 45,
+        meetingUrl: interview.meetingUrl,
+        status: interview.status,
+        rescheduleMetadata: interview.rescheduleMetadata,
+        cancellationMetadata: interview.cancellationMetadata,
+      }));
+
+      return NextResponse.json({ interviews });
+    }
+
+    const scope = await getRecruiterScope(current.db, current.user);
+    if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
     const interviews = await listInterviewsForOrganization(current.db, scope.membership.organizationId, {
       applicationId,

@@ -5,39 +5,207 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/providers/app-provider";
 import { ProvisioningStatus, UserRole } from "@/types";
-import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Info, Loader2, Lock, Mail, Sparkles, User } from "lucide-react";
+import { ArrowRight, AlertCircle, Building2, CheckCircle2, Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, User, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { ConsentModal } from "./consent-modal";
 import { OtpVerificationModal } from "./otp-verification-modal";
 import { RoleSelector } from "./role-selector";
 
+function GoogleLogo({ className = "size-4.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.39 7.34 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
+
+export interface PasswordRequirements {
+  hasMinLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasNumber: boolean;
+}
+
+export function checkPasswordRequirements(password: string): PasswordRequirements {
+  return {
+    hasMinLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+  };
+}
+
+export function isPasswordValid(password: string): boolean {
+  const req = checkPasswordRequirements(password);
+  return req.hasMinLength && req.hasUppercase && req.hasLowercase && req.hasNumber;
+}
+
+export interface FieldErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  terms?: string;
+}
+
+export function mapAuthErrorMessage(rawError: string, mode: "login" | "register"): {
+  formError?: string;
+  fieldErrors?: FieldErrors;
+} {
+  const lower = rawError.toLowerCase();
+
+  // Role mismatch (keep intact as it offers role-switching buttons)
+  if (rawError.includes("Talent / Candidate") || rawError.includes("Recruiter / Hiring") || rawError.includes("Partnership")) {
+    return { formError: rawError };
+  }
+
+  // Invalid login credentials
+  if (lower.includes("invalid login credentials") || lower.includes("invalid credential") || lower.includes("invalid password")) {
+    return {
+      formError: "Email atau kata sandi tidak sesuai. Silakan periksa kembali kredensial Anda.",
+      fieldErrors: {
+        password: "Kata sandi salah atau tidak sesuai.",
+      },
+    };
+  }
+
+  // User already registered
+  if (lower.includes("user already registered") || lower.includes("already registered") || lower.includes("already exists")) {
+    return {
+      fieldErrors: {
+        email: "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan verifikasi OTP di bawah.",
+      },
+      formError: "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan verifikasi OTP.",
+    };
+  }
+
+  // Email not confirmed
+  if (lower.includes("email not confirmed")) {
+    return {
+      formError: "Alamat email belum diverifikasi. Silakan masukkan 6 digit kode OTP untuk mengaktifkan akun Anda.",
+    };
+  }
+
+  // Password criteria error from backend
+  if (lower.includes("password should be at least") || lower.includes("password is too short") || lower.includes("weak password")) {
+    return {
+      fieldErrors: {
+        password: "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.",
+      },
+    };
+  }
+
+  // Invalid email format from backend
+  if (lower.includes("invalid format") || lower.includes("invalid email") || lower.includes("valid email")) {
+    return {
+      fieldErrors: {
+        email: "Format alamat email tidak valid (contoh: nama@perusahaan.com).",
+      },
+    };
+  }
+
+  // Rate limiting / security timeout
+  if (lower.includes("security purposes") || lower.includes("too many requests") || lower.includes("rate limit")) {
+    const match = rawError.match(/after (\d+)/i);
+    const seconds = match ? match[1] : "beberapa";
+    return {
+      formError: `Terlalu banyak percobaan. Demi keamanan, silakan tunggu ${seconds} detik sebelum mencoba kembali.`,
+    };
+  }
+
+  // Network or connection timeout
+  if (lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout") || lower.includes("abort")) {
+    return {
+      formError: "Koneksi internet terputus atau server tidak merespons. Silakan periksa koneksi internet Anda.",
+    };
+  }
+
+  return {
+    formError: `Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${rawError}`,
+  };
+}
+
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { user, hydrated, login, register, loginAsDemoCandidate, loginAsFreshCandidate, loginAsDemoPartner } = useApp();
-  const [role, setRole] = useState<UserRole>("recruiter");
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role");
+  const validRoleParam = roleParam === "candidate" || roleParam === "recruiter" || roleParam === "partner" ? roleParam : null;
+  const [role, setRole] = useState<UserRole>(validRoleParam ?? "recruiter");
+  const [prevRoleParam, setPrevRoleParam] = useState<UserRole | null>(validRoleParam);
+
+  if (validRoleParam !== prevRoleParam) {
+    setPrevRoleParam(validRoleParam);
+    if (validRoleParam) {
+      setRole(validRoleParam);
+    }
+  }
+  const [nameValue, setNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const passwordCriteria = checkPasswordRequirements(passwordValue);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
   const [consentAgreed, setConsentAgreed] = useState(false);
+  const [pendingGoogleAuth, setPendingGoogleAuth] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{
     email: string;
     role: UserRole;
     destinationPath: string;
     name?: string;
     companyName?: string;
+    emailResent?: boolean;
   } | null>(null);
 
   useEffect(() => {
-    if (hydrated && user && !loading && !otpModalOpen && mode === "login") {
+    if (hydrated && user && !loading && !googleLoading && !otpModalOpen && mode === "login") {
       const dest = destination(user.role, getNext(), false, user.provisioningStatus);
       window.location.href = dest;
     }
-  }, [hydrated, user, loading, mode, otpModalOpen]);
+  }, [hydrated, user, loading, googleLoading, mode, otpModalOpen]);
+
+  // Reset loading indicators if the user navigates back from external Google OAuth page (bfcache)
+  useEffect(() => {
+    const handlePageRestore = () => {
+      setLoading(false);
+      setGoogleLoading(false);
+      setPendingGoogleAuth(false);
+    };
+
+    window.addEventListener("pageshow", handlePageRestore);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        setGoogleLoading(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageRestore);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     const error = new URLSearchParams(window.location.search).get("error");
@@ -57,24 +225,66 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     event.preventDefault();
     setErrorMessage(null);
 
-    const form = new FormData(event.currentTarget);
-    const rawName = String(form.get("name") ?? "").trim();
-    const email = String(form.get("email") ?? "").trim();
-    const password = String(form.get("password") ?? "");
-    const companyName = role === "recruiter" || role === "partner" ? rawName : String(form.get("companyName") ?? "").trim();
+    const newFieldErrors: FieldErrors = {};
+    const rawName = nameValue.trim();
+    const email = emailValue.trim();
+    const password = passwordValue;
+    const companyName = role === "recruiter" || role === "partner" ? rawName : undefined;
     const name = rawName;
 
+    if (mode === "register") {
+      if (!rawName) {
+        newFieldErrors.name =
+          role === "recruiter"
+            ? "Nama perusahaan wajib diisi."
+            : role === "partner"
+            ? "Nama lembaga / kampus wajib diisi."
+            : "Nama lengkap wajib diisi.";
+      } else if (rawName.length < 2) {
+        newFieldErrors.name = "Nama minimal 2 karakter.";
+      }
+    }
+
+    if (!email) {
+      newFieldErrors.email = "Alamat email wajib diisi.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newFieldErrors.email = "Format alamat email tidak valid (contoh: nama@perusahaan.com).";
+    }
+
+    if (!password) {
+      newFieldErrors.password = "Kata sandi wajib diisi.";
+    } else if (mode === "login" && password.length < 6) {
+      newFieldErrors.password = "Kata sandi minimal 6 karakter.";
+    } else if (mode === "register" && !isPasswordValid(password)) {
+      newFieldErrors.password = "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, serta angka.";
+    }
+
     if (mode === "register" && !consentAgreed) {
-      setConsentModalOpen(true);
-      setErrorMessage("Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.");
+      newFieldErrors.terms = "Harap baca dan setujui Syarat & Ketentuan serta Kebijakan Privasi terlebih dahulu.";
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      if (newFieldErrors.name) document.getElementById("full-name")?.focus();
+      else if (newFieldErrors.email) document.getElementById("email")?.focus();
+      else if (newFieldErrors.password) document.getElementById("password")?.focus();
+      else if (newFieldErrors.terms) setConsentModalOpen(true);
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
+
     const result = mode === "login" ? await login(role, email, password) : await register(name, role, email, password, companyName);
     if (result.error) {
       setLoading(false);
-      setErrorMessage(`Tidak dapat ${mode === "login" ? "masuk" : "mendaftar"}: ${result.error}`);
+      const mapped = mapAuthErrorMessage(result.error, mode);
+      if (mapped.fieldErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...mapped.fieldErrors }));
+      }
+      if (mapped.formError) {
+        setErrorMessage(mapped.formError);
+      }
       return;
     }
     
@@ -83,8 +293,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       setLoading(false);
       const chosenRole = result.role ?? role;
       const dest = registrationDest(chosenRole);
-      if (result.emailResent) toast.info("Akun sudah terdaftar — masukkan kode OTP dari email Anda.");
-      setPendingRegistration({ email, role: chosenRole, destinationPath: dest, name, companyName });
+      setPendingRegistration({
+        email,
+        role: chosenRole,
+        destinationPath: dest,
+        name,
+        companyName,
+        emailResent: result.emailResent,
+      });
       setOtpModalOpen(true);
       return;
     }
@@ -99,8 +315,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     window.location.href = dest;
   };
 
-  const signInWithGoogle = async () => {
-    setLoading(true);
+  const handleGoogleClick = () => {
+    setErrorMessage(null);
+    if (mode === "login") {
+      void executeGoogleSignIn();
+      return;
+    }
+
+    if (consentAgreed) {
+      void executeGoogleSignIn();
+      return;
+    }
+
+    setPendingGoogleAuth(true);
+    setConsentModalOpen(true);
+  };
+
+  const executeGoogleSignIn = async () => {
+    setGoogleLoading(true);
     setErrorMessage(null);
 
     try {
@@ -111,11 +343,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       const { error } = await createClient().auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectUrl.toString() },
+        options: {
+          redirectTo: redirectUrl.toString(),
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
+        },
       });
       if (error) throw error;
     } catch (error) {
-      setLoading(false);
+      setGoogleLoading(false);
       setErrorMessage(`Tidak dapat masuk dengan Google: ${error instanceof Error ? error.message : "Coba lagi."}`);
     }
   };
@@ -205,8 +443,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <Input
               id="full-name"
               name="name"
-              className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-              required
+              value={nameValue}
+              onChange={(e) => {
+                setNameValue(e.target.value);
+                if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "full-name-error" : undefined}
+              className={`pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+                fieldErrors.name
+                  ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                  : ""
+              }`}
               autoComplete={role === "recruiter" || role === "partner" ? "organization" : "name"}
               placeholder={
                 role === "recruiter"
@@ -217,6 +465,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               }
             />
           </div>
+          {fieldErrors.name && (
+            <p id="full-name-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+              <span>{fieldErrors.name}</span>
+            </p>
+          )}
         </div>
       )}
 
@@ -229,14 +483,30 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Input
             id="email"
             name="email"
-            className="pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-            required
+            value={emailValue}
+            onChange={(e) => {
+              setEmailValue(e.target.value);
+              if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
+            className={`pl-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+              fieldErrors.email
+                ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                : ""
+            }`}
             type="email"
             autoComplete="email"
             spellCheck={false}
             placeholder={emailPlaceholder}
           />
         </div>
+        {fieldErrors.email && (
+          <p id="email-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+            <span>{fieldErrors.email}</span>
+          </p>
+        )}
       </div>
 
       <div>
@@ -248,12 +518,21 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Input
             id="password"
             name="password"
-            className="pl-10 pr-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl"
-            required
-            minLength={6}
+            value={passwordValue}
+            onChange={(e) => {
+              setPasswordValue(e.target.value);
+              if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            aria-invalid={Boolean(fieldErrors.password)}
+            aria-describedby={fieldErrors.password ? "password-error" : undefined}
+            className={`pl-10 pr-10 h-10 sm:h-11 text-xs sm:text-sm rounded-xl transition-colors ${
+              fieldErrors.password
+                ? "border-red-400 bg-red-50/20 text-red-950 focus-visible:ring-red-400/30 focus-visible:border-red-500"
+                : ""
+            }`}
             type={showPassword ? "text" : "password"}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder="Minimal 6 karakter"
+            placeholder={mode === "register" ? "Minimal 8 karakter" : "Masukkan kata sandi"}
           />
           <button
             type="button"
@@ -265,24 +544,61 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
+
+        {fieldErrors.password && (
+          <p id="password-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+            <span>{fieldErrors.password}</span>
+          </p>
+        )}
+
+        {mode === "register" && (
+          <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-600 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-700">Kriteria Kata Sandi:</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {[passwordCriteria.hasMinLength, passwordCriteria.hasUppercase, passwordCriteria.hasLowercase, passwordCriteria.hasNumber].filter(Boolean).length}/4 terpenuhi
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasMinLength ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasMinLength ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Minimal 8 karakter</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasUppercase ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasUppercase ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Huruf besar (A-Z)</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasLowercase ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasLowercase ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Huruf kecil (a-z)</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-[11px] transition-colors ${passwordCriteria.hasNumber ? "text-emerald-700 font-medium" : "text-slate-500"}`}>
+                <CheckCircle2 className={`size-3.5 shrink-0 ${passwordCriteria.hasNumber ? "text-emerald-600" : "text-slate-300"}`} />
+                <span>Minimal 1 angka (0-9)</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {mode === "register" && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
-          <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
+        <div className={`space-y-1.5 py-1 rounded-xl transition-colors ${fieldErrors.terms ? "p-2 bg-red-50/40 border border-red-200/70" : ""}`}>
+          <label htmlFor="terms" className="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer select-none">
             <input
               id="terms"
               name="terms"
               type="checkbox"
               checked={consentAgreed}
               onChange={(e) => {
+                if (fieldErrors.terms) setFieldErrors((prev) => ({ ...prev, terms: undefined }));
                 if (!consentAgreed) {
                   setConsentModalOpen(true);
                 } else {
                   setConsentAgreed(e.target.checked);
                 }
               }}
-              className="mt-0.5 size-4 rounded border-slate-300 accent-[#7C3AED]"
+              className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-[#7C3AED] accent-[#7C3AED] focus:ring-[#7C3AED]/20 cursor-pointer"
             />
             <span className="leading-relaxed">
               Saya menyetujui{" "}
@@ -292,33 +608,34 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
-                Syarat &amp; Ketentuan, Persetujuan Akses Data
+                Syarat &amp; Ketentuan Akses Data
               </button>{" "}
-              dan{" "}
+              serta{" "}
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   setConsentModalOpen(true);
                 }}
-                className="font-bold text-[#7C3AED] hover:underline underline-offset-2"
+                className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
                 Kebijakan Privasi
               </button>
               .
             </span>
           </label>
-
-          {consentAgreed ? (
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-              <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
-              <span>Persetujuan Akses Data, Syarat &amp; Kebijakan telah disetujui</span>
+          {consentAgreed && (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 pl-6.5">
+              <CheckCircle2 className="size-3.5 shrink-0" />
+              <span>Ketentuan &amp; akses data telah disetujui</span>
             </div>
-          ) : (
-            <p className="text-[11px] text-slate-500 pl-6">
-              💡 Wajib ditinjau &amp; disetujui sebelum membuat akun di ProofyLink.
+          )}
+          {fieldErrors.terms && (
+            <p id="terms-error" role="alert" className="flex items-center gap-1.5 text-xs text-red-600 font-medium pl-6.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertCircle className="size-3.5 shrink-0 text-red-500" />
+              <span>{fieldErrors.terms}</span>
             </p>
           )}
         </div>
@@ -327,7 +644,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       <Button
         type="submit"
         className="mt-1 w-full rounded-xl bg-[#7C3AED] h-11 sm:h-12 text-xs sm:text-sm font-semibold hover:bg-[#6D28D9] shadow-sm text-white"
-        disabled={loading || otpModalOpen}
+        disabled={loading || googleLoading || otpModalOpen}
       >
         {loading ? (
           <>
@@ -349,21 +666,35 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </Button>
 
       {mode === "register" && (
-        <button
-          type="button"
-          className="text-xs font-semibold text-[#7C3AED] hover:underline underline-offset-2"
-          onClick={() => {
-            const typedEmail = (document.getElementById("email") as HTMLInputElement | null)?.value?.trim();
-            if (!typedEmail) {
-              toast.error("Masukkan email Anda terlebih dahulu.");
-              return;
-            }
-            setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
-            setOtpModalOpen(true);
-          }}
-        >
-          Sudah menerima kode OTP? Verifikasi sekarang
-        </button>
+        <div className="text-center">
+          <button
+            type="button"
+            className="text-xs font-medium text-slate-500 hover:text-[#7C3AED] transition-colors cursor-pointer"
+            onClick={() => {
+              const typedEmail = emailValue.trim();
+              if (!typedEmail) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  email: "Masukkan alamat email Anda terlebih dahulu untuk verifikasi OTP.",
+                }));
+                document.getElementById("email")?.focus();
+                return;
+              }
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typedEmail)) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  email: "Format alamat email tidak valid (contoh: nama@perusahaan.com).",
+                }));
+                document.getElementById("email")?.focus();
+                return;
+              }
+              setPendingRegistration({ email: typedEmail, role, destinationPath: registrationDest(role) });
+              setOtpModalOpen(true);
+            }}
+          >
+            Sudah menerima kode OTP? Verifikasi di sini
+          </button>
+        </div>
       )}
 
       {supabaseConfigured && (
@@ -376,112 +707,78 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full rounded-xl text-xs sm:text-sm"
-            disabled={loading}
-            onClick={signInWithGoogle}
+            className="h-11 w-full rounded-xl text-xs sm:text-sm font-medium border-slate-300 hover:bg-slate-50 gap-2.5 shadow-2xs"
+            disabled={loading || googleLoading}
+            onClick={handleGoogleClick}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="text-base font-bold text-[#4285F4]">G</span>}
-            {loading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}
+            {googleLoading ? <Loader2 className="size-4.5 animate-spin text-slate-500" /> : <GoogleLogo className="size-4.5 shrink-0" />}
+            <span>{googleLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}</span>
           </Button>
         </>
       )}
 
       {process.env.NODE_ENV !== "production" && !supabaseConfigured && (
-        <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-          <Info className="size-3.5 shrink-0 text-[#7C3AED]" aria-hidden="true" />
-          Mode demo: {mode === "login" ? "masuk" : "daftar"} dengan email apa pun
-        </p>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "candidate" && (
-        <div className="mt-2 space-y-2">
-          <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo
-              </span>
-              <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
-                Profil Lengkap
-              </span>
+        <div className="pt-2 border-t border-slate-100 space-y-2">
+          {role === "candidate" && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1 h-9 text-xs font-semibold border-purple-200 bg-purple-50/70 text-[#7C3AED] hover:bg-purple-100 rounded-xl gap-1.5"
+                onClick={() => {
+                  loginAsDemoCandidate();
+                  router.refresh();
+                  router.push("/candidate");
+                }}
+              >
+                <User className="size-3.5" /> Demo Profil (Nadia)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1 h-9 text-xs font-medium border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl gap-1.5"
+                onClick={() => {
+                  loginAsFreshCandidate();
+                  router.refresh();
+                  router.push("/candidate/onboarding");
+                }}
+              >
+                <UserPlus className="size-3.5 text-emerald-600" /> Onboarding Baru
+              </Button>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Masuk sebagai <strong>Nadia Putri Rahayu</strong> (Senior Product Designer) dengan riwayat Tokopedia &amp; OVO.
-            </p>
+          )}
+
+          {role === "recruiter" && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+              className="w-full h-9 text-xs font-semibold border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl gap-1.5"
               onClick={() => {
-                loginAsDemoCandidate();
-                router.refresh();
-                router.push("/candidate");
+                router.push("/recruiter/onboarding");
               }}
             >
-              <User className="size-3.5" /> Masuk Akun Demo (Nadia)
+              <Building2 className="size-3.5 text-slate-600" /> Demo Onboarding Rekruter
             </Button>
-          </div>
+          )}
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full h-9 text-xs font-medium border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl gap-1.5"
-            onClick={() => {
-              loginAsFreshCandidate();
-              router.refresh();
-              router.push("/candidate/onboarding");
-            }}
-          >
-            <Sparkles className="size-3.5 text-emerald-600" /> Uji Coba Daftar Kandidat Baru (Mulai Step 0)
-          </Button>
-        </div>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "recruiter" && (
-        <div className="mt-2 space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full h-9 text-xs font-semibold border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100 rounded-xl gap-1.5"
-            onClick={() => {
-              router.push("/recruiter/onboarding");
-            }}
-          >
-            <Building2 className="size-3.5 text-[#0b2342]" /> Uji Coba Onboarding Rekruter (3 Tahap)
-          </Button>
-        </div>
-      )}
-
-      {process.env.NODE_ENV !== "production" && !supabaseConfigured && role === "partner" && (
-        <div className="mt-2 space-y-2">
-          <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4 space-y-2.5 text-left shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#7C3AED] flex items-center gap-1.5">
-                <Sparkles className="size-4 text-[#7C3AED]" /> Login Cepat Demo Kemitraan
-              </span>
-              <span className="text-[10px] bg-purple-200 text-[#7C3AED] font-bold px-2 py-0.5 rounded-full">
-                Kampus Mitra
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Masuk sebagai <strong>Universitas Indonesia</strong> (Career Center) untuk verifikasi mahasiswa &amp; pantau penempatan karir.
-            </p>
+          {role === "partner" && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="w-full h-10 text-xs font-semibold border-purple-300 bg-white text-[#7C3AED] hover:bg-purple-100 hover:text-[#6D28D9] rounded-xl shadow-2xs gap-1.5"
+              className="w-full h-9 text-xs font-semibold border-purple-200 bg-purple-50/70 text-[#7C3AED] hover:bg-purple-100 rounded-xl gap-1.5"
               onClick={() => {
                 loginAsDemoPartner();
                 router.refresh();
                 router.push("/partner");
               }}
             >
-              <GraduationCap className="size-3.5" /> Masuk Akun Demo (Universitas Indonesia)
+              <GraduationCap className="size-3.5" /> Demo Kampus Mitra (UI)
             </Button>
-          </div>
+          )}
         </div>
       )}
 
@@ -489,16 +786,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {mode === "login" ? "Belum memiliki akun? " : "Sudah memiliki akun? "}
         <Link
           className="font-bold text-[#7C3AED] hover:underline"
-          href={mode === "login" ? "/register" : "/login"}
+          href={mode === "login" ? `/register?role=${role}` : `/login?role=${role}`}
         >
           {mode === "login" ? "Daftar di sini" : "Masuk di sini"}
         </Link>
       </p>
-
-      <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 pt-1">
-        <CheckCircle2 className="size-3.5 text-[#7C3AED]" />
-        <span>{supabaseConfigured ? "Autentikasi Supabase aktif" : "Lingkungan demo terverifikasi"}</span>
-      </div>
 
       {pendingRegistration && (
         <OtpVerificationModal
@@ -522,16 +814,29 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             window.location.href = pendingRegistration.destinationPath;
           }}
           title="Verifikasi Akun Baru"
-          description="Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
+          description={
+            pendingRegistration.emailResent
+              ? "Akun Anda sudah terdaftar sebelumnya. Masukkan 6 digit kode OTP yang telah dikirimkan ke email Anda untuk mengaktifkan akun."
+              : "Masukkan 6 digit kode OTP yang telah dikirimkan ke alamat email Anda untuk mengaktifkan akun."
+          }
         />
       )}
 
       <ConsentModal
         isOpen={consentModalOpen}
-        onClose={() => setConsentModalOpen(false)}
+        actionTitle={pendingGoogleAuth ? "Daftar dengan Google" : undefined}
+        onClose={() => {
+          setConsentModalOpen(false);
+          setPendingGoogleAuth(false);
+        }}
         onAccept={() => {
           setConsentAgreed(true);
+          setFieldErrors((prev) => ({ ...prev, terms: undefined }));
           setErrorMessage(null);
+          if (pendingGoogleAuth) {
+            setPendingGoogleAuth(false);
+            void executeGoogleSignIn();
+          }
         }}
       />
     </form>
@@ -542,7 +847,7 @@ const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && proce
 
 function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus) {
   if (role === "candidate") {
-    if (next?.startsWith("/candidate") || (next !== null && ["/profile", "/jobs", "/messages"].includes(next))) return next;
+    if (next?.startsWith("/candidate") || next?.startsWith("/jobs") || (next !== null && ["/profile", "/messages"].includes(next))) return next;
     return isRegistration ? "/candidate/onboarding" : "/candidate";
   }
   if (role === "partner") {

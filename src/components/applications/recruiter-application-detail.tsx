@@ -12,13 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { createDemoInvitation, getDemoTemplate, listDemoInvitations, listDemoTemplates, type DemoTemplate } from "@/lib/assessment-demo";
 
-type Status = "new" | "shortlisted" | "consent_requested" | "consent_approved" | "screening" | "assessment" | "review" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
+type Status = "new" | "shortlisted" | "screening" | "assessment" | "review" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
 type Application = { id: string; jobId: string; status: Status; coverNote: string | null; submittedAt: string; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
 type History = { id: string; fromStatus: Status | null; toStatus: Status; reason: string | null; createdAt: string };
 type Invitation = { id: string; applicationId: string; templateId: string; templateName: string; status: string; sentAt: string; expiresAt: string | null; attempt?: { id: string; status: string } | null };
 type TemplateOption = Pick<DemoTemplate, "id" | "name" | "description" | "timeLimitMinutes" | "attemptLimit"> & { invitationCount?: number };
 
-const statusLabels: Record<Status, string> = { new: "New", shortlisted: "Shortlisted", consent_requested: "Consent requested", consent_approved: "Consent approved", screening: "Screening", assessment: "Assessment", review: "Review", interview: "Interview", offer: "Offer", hired: "Hired", rejected: "Rejected", withdrawn: "Withdrawn" };
+const statusLabels: Record<Status, string> = { new: "New", shortlisted: "Shortlisted", screening: "Screening", assessment: "Assessment", review: "Review", interview: "Interview", offer: "Offer", hired: "Hired", rejected: "Rejected", withdrawn: "Withdrawn" };
 const invitationLabels: Record<string, string> = { pending: "Menunggu kandidat", started: "Sedang dikerjakan", submitted: "Terkirim", expired: "Kedaluwarsa", revoked: "Dicabut" };
 function date(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "-"; }
 function badge(label: string, tone = "bg-secondary text-secondary-foreground") { return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{label}</span>; }
@@ -81,7 +81,7 @@ export function RecruiterApplicationDetail({ applicationId }: { applicationId: s
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-6xl px-4 py-8 sm:py-12">
     <Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="size-4" /> Kembali ke Jobs</Link>
     {loading ? <div className="mt-8"><State><Loader2 className="mx-auto size-5 animate-spin" /><span className="mt-2 block">Memuat detail aplikasi...</span></State></div> : error && !application ? <div className="mt-8"><State error>{error}</State></div> : !application ? <div className="mt-8"><State error>Aplikasi tidak ditemukan atau tidak termasuk organisasi Anda.</State></div> : <>
-      <header className="mt-7 flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter / application detail</p><h1 className="mt-2 text-3xl font-bold tracking-tight">{application.job?.title ?? "Application"}</h1><p className="mt-2 text-muted-foreground">{application.job?.organizationName ?? "Organisasi"}</p></div>{badge(statusLabels[application.status], "bg-indigo-50 text-indigo-800")}</header>
+      <header className="mt-7 flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-bold tracking-tight">{application.job?.title ?? "Application"}</h1><p className="mt-2 text-muted-foreground">{application.job?.organizationName ?? "Organisasi"}</p></div>{badge(statusLabels[application.status], "bg-muted text-foreground border border-border")}</header>
       {!dbMode && <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Demo mode: application dan invitation demo tidak masuk database.</p>}
       {error && <p className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}
       <div className="mt-7 grid gap-5 lg:grid-cols-[1fr_360px]"><div className="space-y-5">

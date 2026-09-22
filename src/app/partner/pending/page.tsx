@@ -174,18 +174,13 @@ export default function PartnerPendingPage() {
       <div className="container mx-auto max-w-3xl space-y-6">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-purple-800 text-white shadow-xs">
-              <GraduationCap className="size-5" />
+          <Link href="/" className="flex items-center gap-2 font-bold tracking-tight transition-opacity hover:opacity-90">
+            <span className="text-base font-bold text-foreground leading-tight">
+              Talent<span className="text-primary"> Network</span>
             </span>
-            <div className="flex flex-col">
-              <span className="text-base font-bold text-foreground leading-tight">
-                Proofy<span className="text-[#7C3AED]">Link</span>
-              </span>
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-700">
-                Kemitraan Career Center
-              </span>
-            </div>
+            <span className="rounded bg-purple-50 border border-purple-200/60 px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]">
+              Career Center
+            </span>
           </Link>
 
           <Button

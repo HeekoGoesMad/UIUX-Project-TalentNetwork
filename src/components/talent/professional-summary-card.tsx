@@ -31,11 +31,11 @@ export function ProfessionalSummaryCard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <FileText className="size-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <FileText className="h-4 w-4" />
               </div>
-              <h3 className="text-base font-semibold text-foreground">
-                Professional Summary
+              <h3 className="text-sm font-semibold text-foreground">
+                Professional summary
               </h3>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -56,12 +56,12 @@ export function ProfessionalSummaryCard({
             >
               {hasSummary ? (
                 <>
-                  <Pencil className="size-3.5" />
+                  <Pencil className="h-3 w-3" />
                   Edit Ringkasan
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-3.5" />
+                  <Sparkles className="h-3 w-3" />
                   Buat dengan Panduan
                 </>
               )}
@@ -73,14 +73,14 @@ export function ProfessionalSummaryCard({
       <CardContent className="p-6">
         {hasSummary ? (
           <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {summary}
             </p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-6 text-center">
-            <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary mb-3">
-              <Sparkles className="size-5" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
+              <Sparkles className="h-4 w-4" />
             </div>
             <h4 className="text-sm font-semibold text-foreground">
               Belum ada Professional Summary
@@ -96,7 +96,7 @@ export function ProfessionalSummaryCard({
                 onClick={onOpenHelper}
                 className="mt-4 gap-1.5 bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"
               >
-                <Sparkles className="size-3.5" />
+                <Sparkles className="h-3 w-3" />
                 Mulai Panduan Summary
               </Button>
             )}

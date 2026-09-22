@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
@@ -62,7 +62,16 @@ export async function GET(request: Request) {
         const [unlockRes] = await db
           .select({ count: sql<number>`count(*)` })
           .from(schema.consentRequestItems)
-          .where(eq(schema.consentRequestItems.status, "approved"));
+          .innerJoin(
+            schema.consentRequestBatches,
+            eq(schema.consentRequestBatches.id, schema.consentRequestItems.batchId)
+          )
+          .where(
+            and(
+              eq(schema.consentRequestBatches.organizationId, orgId),
+              eq(schema.consentRequestItems.status, "approved")
+            )
+          );
 
         // Total Financial Screening untuk organisasi ini
         const [screeningRes] = await db
@@ -84,6 +93,8 @@ export async function GET(request: Request) {
           slug: row.organization.slug,
           nib: row.organization.nib,
           npwp: row.organization.npwp,
+          nibDocumentUrl: row.organization.nibDocumentUrl,
+          npwpDocumentUrl: row.organization.npwpDocumentUrl,
           industry: row.organization.industry,
           companyScale: row.organization.companyScale,
           province: row.organization.province,

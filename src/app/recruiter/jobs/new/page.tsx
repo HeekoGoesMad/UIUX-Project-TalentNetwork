@@ -1,2 +1,2 @@
-import { JobFormPage } from "@/components/jobs/job-ui";
+import { JobFormPage } from "@/components/recruiter/jobs-manage";
 export default function Page() { return <JobFormPage />; }

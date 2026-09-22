@@ -19,6 +19,7 @@ import {
 import { findCandidate } from "@/data/candidates";
 import { maskName } from "@/lib/candidate-display";
 import { UUID_RE, cn } from "@/lib/utils";
+import { saveDemoApplication } from "@/components/applications/application-ui";
 import { useApp } from "@/providers/app-provider";
 import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
 import {
@@ -28,8 +29,8 @@ import {
     Bookmark,
     Brain,
     Briefcase,
-    Calendar,
     Check,
+    CheckCircle2,
     CircleHelp,
     Copy,
     ExternalLink,
@@ -40,7 +41,6 @@ import {
     Loader2,
     Lock,
     Mail,
-    MessageSquareQuote,
     Phone,
     Printer,
     RefreshCw,
@@ -52,13 +52,14 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
 import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
 import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
 import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
+import { CandidateFloatingChat } from "@/components/recruiter/candidate-floating-chat";
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -167,6 +168,44 @@ function List({ items }: { items: string[] }) {
   );
 }
 
+function getScreeningStatusMeta(label?: string, score?: number) {
+  const norm = (label || "").toLowerCase();
+  if (norm.includes("sangat") || (score !== undefined && score >= 80)) {
+    return {
+      status: "Sangat Sesuai",
+      badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300",
+      iconBoxClass: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/40 dark:border-emerald-800 dark:text-emerald-300",
+      icon: CheckCircle2,
+      description: "Kompetensi teknis, tools, dan rekam jejak kerja kandidat sangat selaras dengan kualifikasi target posisi.",
+    };
+  }
+  if (norm.includes("sesuai") || norm.includes("direkomendasikan") || norm.includes("baik") || (score !== undefined && score >= 60)) {
+    return {
+      status: "Sesuai",
+      badgeClass: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300",
+      iconBoxClass: "bg-purple-50 border-purple-200 text-[#7C3AED] dark:bg-purple-900/40 dark:border-purple-800 dark:text-purple-300",
+      icon: ShieldCheck,
+      description: "Memenuhi mayoritas kualifikasi keahlian inti dengan pengalaman kerja nyata yang relevan.",
+    };
+  }
+  if (norm.includes("cukup") || norm.includes("pertimbangan") || (score !== undefined && score >= 40)) {
+    return {
+      status: "Cukup",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300",
+      iconBoxClass: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/40 dark:border-amber-800 dark:text-amber-300",
+      icon: AlertCircle,
+      description: "Memiliki keahlian dasar yang relevan, namun memerlukan penyesuaian khusus pada beberapa kompetensi spesifik.",
+    };
+  }
+  return {
+    status: "Kurang Sesuai",
+    badgeClass: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300",
+    iconBoxClass: "bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-700 dark:text-slate-400",
+    icon: CircleHelp,
+    description: "Kualifikasi dan latar belakang saat ini belum selaras langsung dengan standar peran yang ditargetkan.",
+  };
+}
+
 function ScreeningResults({
   candidateId,
   candidate,
@@ -265,6 +304,9 @@ function ScreeningResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId, candidate, completed, result]);
 
+  const statusMeta = result ? getScreeningStatusMeta(result.insight.label, result.insight.score) : null;
+  const StatusIcon = statusMeta?.icon;
+
   return (
     <section className="mt-10 border-t pt-10" aria-labelledby="screening-results-title">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
@@ -276,7 +318,7 @@ function ScreeningResults({
             Hasil Screening
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-             Insight berbasis role fit dan kualitas data, ditampilkan setelah screening run selesai. Consent tetap disimpan untuk pemeriksaan finansial atau credit di masa depan.
+            Evaluasi keselarasan peran dan kompetensi teknis berbasis profil terverifikasi ProofyLink Talent Network (Kandidat Opt-In: Open to Work).
           </p>
         </div>
         {completed && (
@@ -299,7 +341,7 @@ function ScreeningResults({
       ) : !completed && (screeningStatus === "processing" || screeningStatus === "in_progress") ? (
         <Card className="mt-5 border-purple-100 bg-purple-50/50">
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground" role="status">
-            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan skor dan AI Summary...
+            <Loader2 className="size-5 animate-spin text-[#7C3AED]" /> Screening otomatis sedang berjalan. Menyiapkan status dan AI Summary...
           </CardContent>
         </Card>
       ) : !completed && (
@@ -346,34 +388,23 @@ function ScreeningResults({
         </Card>
       )}
 
-      {completed && result && (
+      {completed && result && statusMeta && StatusIcon && (
         <div className="mt-5 space-y-4">
-          <Card className="overflow-hidden border-slate-200">
-            <CardContent className="grid gap-6 bg-slate-50/50 p-6 sm:grid-cols-[auto_1fr] sm:items-center">
-              <div className="flex size-28 flex-col items-center justify-center rounded-full border-8 border-slate-200 bg-white">
-                <span className="font-mono text-4xl font-bold text-[#7C3AED]">{result.insight.score}</span>
-                <span className="text-xs text-muted-foreground">dari 100</span>
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-[#7C3AED] text-white">{result.insight.label}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Rekomendasi berbasis data, bukan keputusan otomatis
-                  </span>
+          <Card className="overflow-hidden border-slate-200 shadow-2xs">
+            <CardContent className="flex flex-col gap-5 bg-gradient-to-br from-slate-50/80 via-white to-purple-50/30 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-4">
+                <div className={cn("flex size-14 shrink-0 items-center justify-center rounded-2xl border shadow-xs", statusMeta.iconBoxClass)}>
+                  <StatusIcon className="size-7" />
                 </div>
-                <div className="mt-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Cakupan data</span>
-                    <span className="font-mono text-[#7C3AED]">{result.insight.coverage}%</span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status Screening</span>
+                    <Badge className={cn("text-xs font-semibold px-2.5 py-0.5 shadow-xs border", statusMeta.badgeClass)}>
+                      {statusMeta.status}
+                    </Badge>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-[#7C3AED]/20">
-                    <div
-                      className="h-2 rounded-full bg-[#7C3AED]"
-                      style={{ width: `${result.insight.coverage}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Seberapa banyak konteks profil yang tersedia untuk insight ini.
+                  <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200 leading-snug">
+                    {statusMeta.description}
                   </p>
                 </div>
               </div>
@@ -449,7 +480,6 @@ function ScreeningResults({
 
 export default function TalentProfile() {
   const { candidateId } = useParams<{ candidateId: string }>();
-  const router = useRouter();
   const {
     tokens,
     scans,
@@ -468,8 +498,6 @@ export default function TalentProfile() {
     bootstrapped,
     databaseError,
     partnerVerifications,
-    screeningConsents,
-    reloadBootstrap,
   } = useApp();
 
   const [remoteCandidate, setRemoteCandidate] = useState<Candidate | null>(null);
@@ -479,8 +507,6 @@ export default function TalentProfile() {
   const [scanning, setScanning] = useState(false);
   const [remoteScreeningCompleted, setRemoteScreeningCompleted] = useState(false);
   const [screeningError, setScreeningError] = useState<string | null>(null);
-  const [openingConversation, setOpeningConversation] = useState(false);
-  const [requestingContactConsent, setRequestingContactConsent] = useState(false);
 
   // Recruiter Hiring Flow modals
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
@@ -488,8 +514,6 @@ export default function TalentProfile() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [hiringOutcome, setHiringOutcome] = useState<string | null>(null);
-  const [markingHired, setMarkingHired] = useState(false);
 
   const candidate = dbMode ? (loadedCandidateId === candidateId ? remoteCandidate : null) : findCandidate(candidateId) ?? null;
 
@@ -522,6 +546,17 @@ export default function TalentProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
+  useEffect(() => {
+    const isUnlocked = scans.some((item) => item.candidateId === candidate?.id);
+    if (isUnlocked && dbMode && candidate?.id && UUID_RE.test(candidate.id)) {
+      fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateProfileId: candidate.id }),
+      }).catch((err) => console.error("Auto sync application check failed", err));
+    }
+  }, [scans, dbMode, candidate?.id]);
+
   if (!hydrated || !user || user.role !== "recruiter")
     return (
       <ProtectedRoute role="recruiter">
@@ -550,7 +585,6 @@ export default function TalentProfile() {
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
   const screeningStatus = screeningRunStatuses[candidate.id];
   const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
-  const contactConsent = screeningConsents[candidate.id];
 
   // startScreening only reports success/failure, so attribute dbMode failures via
   // the single-balance endpoint: token shortage is claimed only when the balance
@@ -567,7 +601,7 @@ export default function TalentProfile() {
     } catch {
       // Balance check is best-effort; fall through to the generic message.
     }
-    return "Screening belum dapat dijalankan (consent bersifat opsional, bukan penyebabnya). Coba lagi.";
+    return "Screening belum dapat dijalankan saat ini. Silakan coba beberapa saat lagi.";
   };
 
   const startScan = () => {
@@ -587,6 +621,83 @@ export default function TalentProfile() {
         return;
       }
       setConfirmOpen(false);
+
+      {
+        const orgName = user?.companyName || "Perusahaan Mitra";
+        saveDemoApplication({
+          id: `demo-app-${candidate.id}`,
+          jobId: "talent-pool",
+          status: "screening",
+          coverNote: "Profil dibuka dan sedang dalam tahap screening awal melalui Talent Network.",
+          submittedAt: new Date().toISOString(),
+          withdrawnAt: null,
+          updatedAt: new Date().toISOString(),
+          job: {
+            id: "talent-pool",
+            title: "Talent Pool",
+            organizationName: orgName,
+          },
+          candidate: {
+            name: candidate.name,
+            headline: candidate.role,
+            location: candidate.location,
+          },
+        });
+
+        // Ensure operations pipeline records candidate in Talent Pool (screening stage)
+        try {
+          const opsKey = "proofylink-demo-recruiter-operations";
+          const opsRaw = localStorage.getItem(opsKey);
+          if (opsRaw) {
+            const opsParsed = JSON.parse(opsRaw);
+            if (opsParsed && Array.isArray(opsParsed.candidates)) {
+              const existingIdx = opsParsed.candidates.findIndex((c: { id: string }) => c.id === candidate.id);
+              if (existingIdx >= 0) {
+                // Keep in screening stage if currently in review/interview without actual scheduled interview
+                if (opsParsed.candidates[existingIdx].stage === "interview") {
+                  opsParsed.candidates[existingIdx].stage = "screening";
+                }
+                // Reset jobId to talent-pool if not yet assigned to a real job
+                if (!opsParsed.candidates[existingIdx].jobId || opsParsed.candidates[existingIdx].jobId.startsWith("job-demo-")) {
+                  opsParsed.candidates[existingIdx].jobId = "talent-pool";
+                  opsParsed.candidates[existingIdx].jobTitle = "Talent Pool";
+                }
+              } else {
+                opsParsed.candidates.push({
+                  id: candidate.id,
+                  name: candidate.name,
+                  role: candidate.role || "Talent",
+                  location: candidate.location || "Indonesia",
+                  stage: "screening",
+                  jobId: "talent-pool",
+                  jobTitle: "Talent Pool",
+                  owner: user?.name || "Tim Rekruter",
+                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                  appliedAt: new Date().toISOString().slice(0, 10),
+                  score: 4.5,
+                  feedback: "",
+                  offerStatus: "draft",
+                  compensation: "Rp 15.000.000 / bulan",
+                  reason: "",
+                });
+              }
+              localStorage.setItem(opsKey, JSON.stringify(opsParsed));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (dbMode && UUID_RE.test(candidate.id)) {
+        // In dbMode, notify candidate in DB by creating/updating application review status
+        void fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateProfileId: candidate.id }),
+        }).catch(() => null);
+      }
+
       const started = await startScreening(candidate.id);
       if (dbMode && started) setRemoteScreeningCompleted(true);
       if (!started) setScreeningError(await describeScreeningFailure());
@@ -603,6 +714,8 @@ export default function TalentProfile() {
 
   const displayName = unlocked ? candidate.name : maskName(candidate.name);
   const isShortlisted = shortlisted.includes(candidate.id);
+
+
 
   const copyProfileLink = async () => {
     const url = window.location.href;
@@ -665,11 +778,14 @@ export default function TalentProfile() {
           )}
         </div>
 
-        {/* Profile Info Row with Overlapping Avatar */}
-        <div className="relative bg-white px-6 pb-6 pt-3 dark:bg-slate-900 sm:px-10">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-            <div className="-mt-14 sm:-mt-18 relative shrink-0 z-20">
-              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-1 ring-slate-900/10">
+        {/* Profile Info Row — avatar overlaps banner, actions top-right */}
+        <div className="relative bg-white px-6 pb-6 dark:bg-slate-900 sm:px-10">
+
+          {/* Row 1: Avatar (overlapping) + Action buttons (top-right) */}
+          <div className="flex items-start justify-between gap-4">
+            {/* Avatar — overlaps banner via negative top margin */}
+            <div className="-mt-14 sm:-mt-16 relative shrink-0 z-20">
+              <div className="relative size-24 sm:size-28 rounded-full border-4 border-white dark:border-slate-900 shadow-md overflow-hidden bg-slate-100 ring-2 ring-slate-900/8">
                 <CandidateAvatar
                   initials={candidate.initials}
                   avatarUrl={candidate.avatarUrl}
@@ -680,67 +796,22 @@ export default function TalentProfile() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <CandidateCategoryBadge category={candidate.talentCategory} />
-                {candidate.careerStatus && (
-                  <CandidateStatusBadge status={candidate.careerStatus} />
-                )}
-                {candidate.personality && (
-                  <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
-                    <Brain className="mr-1 size-3.5 text-purple-600" />
-                    {candidate.personality.type} · {candidate.personality.label}
-                  </Badge>
-                )}
-                {verif?.status === "verified" && (
-                  <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
-                    <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
-                    Campus Verified · {verif.institution}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                  {displayName}
-                </h1>
-                {unlocked && (
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
-                    <UserCheck className="mr-1 size-3" /> Terbuka
-                  </Badge>
-                )}
-              </div>
-
-              <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
-                {candidate.role} · {candidate.location}
-              </p>
-
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Pengalaman {candidate.experience} tahun · {candidate.availability}
-                {unlocked && (
-                  <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    · Ekspektasi Gaji: {candidate.salary}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            {/* Quick Action buttons */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Action buttons — always top-right, never wraps under info */}
+            <div className="flex items-center gap-2 shrink-0 pt-3">
               {unlocked && (
                 <Button
-                  size="sm"
-                  className="bg-purple-600 text-white hover:bg-purple-700 font-semibold text-xs h-9 shadow-xs"
+                  size="default"
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs sm:text-sm h-10 px-4 shadow-xs hover:shadow-sm transition-all cursor-pointer"
                   onClick={() => setAssignModalOpen(true)}
                 >
-                  <Briefcase className="mr-1.5 size-3.5" />
+                  <Briefcase className="mr-2 size-4" />
                   Masukkan ke Lowongan
                 </Button>
               )}
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 border-slate-200"
+                className="h-10 w-10 border-slate-200"
                 onClick={() => toggleShortlist(candidate.id)}
                 aria-label={isShortlisted ? "Hapus dari shortlist" : "Simpan ke shortlist"}
                 aria-pressed={isShortlisted}
@@ -758,43 +829,61 @@ export default function TalentProfile() {
               </Button>
             </div>
           </div>
-        </div>
 
-        {/* ── DOVER HIRING PROGRESS STEPPER ── */}
-        <div className="border-b bg-slate-50/90 px-6 py-3.5 sm:px-10 dark:bg-slate-900/50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-[#7C3AED]" />
-              Status Pipeline Dover
-            </span>
-            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto pb-1 sm:pb-0 text-xs font-medium">
-              <div className="flex items-center gap-1.5 shrink-0 text-purple-900 font-semibold">
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${unlocked || completed ? "bg-purple-600 text-white" : "bg-purple-200 text-purple-950"}`}>
-                  1
+          {/* Row 2: Candidate Identity Block */}
+          <div className="mt-3">
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CandidateCategoryBadge category={candidate.talentCategory} />
+              {candidate.careerStatus && (
+                <CandidateStatusBadge status={candidate.careerStatus} />
+              )}
+              {candidate.personality && (
+                <Badge variant="outline" className="border-purple-200 bg-purple-50/70 text-purple-900 font-semibold">
+                  <Brain className="mr-1 size-3.5 text-purple-600" />
+                  {candidate.personality.type} · {candidate.personality.label}
+                </Badge>
+              )}
+              {verif?.status === "verified" && (
+                <Badge className="bg-purple-100 text-purple-900 border-purple-200 shadow-xs font-semibold">
+                  <GraduationCap className="mr-1 size-3.5 text-[#7C3AED]" />
+                  Campus Verified · {verif.institution}
+                </Badge>
+              )}
+            </div>
+
+            {/* Name + unlock badge */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                {displayName}
+              </h1>
+              {unlocked && (
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs font-medium">
+                  <UserCheck className="mr-1 size-3" /> Terbuka
+                </Badge>
+              )}
+            </div>
+
+            {/* Role & location */}
+            <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300 sm:text-base">
+              {candidate.role} · {candidate.location}
+            </p>
+
+            {/* Meta chips row — experience, availability, target role, salary */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                <Briefcase className="size-3 text-slate-400" />
+                {candidate.experience} tahun pengalaman
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {candidate.availability}
+              </span>
+              {candidate.targetRole && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
+                  Target: {candidate.targetRole}
                 </span>
-                <span>Screening</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  2
-                </span>
-                <span>Wawancara</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className="flex items-center gap-1.5 shrink-0 text-slate-700">
-                <span className="flex size-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-800">
-                  3
-                </span>
-                <span>Offer Letter</span>
-              </div>
-              <span className="text-slate-300 font-mono text-xs">→</span>
-              <div className={`flex items-center gap-1.5 shrink-0 ${hiringOutcome === "hired" ? "text-emerald-700 font-bold" : "text-slate-400"}`}>
-                <span className={`flex size-5 items-center justify-center rounded-full text-[10px] ${hiringOutcome === "hired" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>
-                  ✓
-                </span>
-                <span>Hired</span>
-              </div>
+              )}
+
             </div>
           </div>
         </div>
@@ -1003,19 +1092,18 @@ export default function TalentProfile() {
                   <Button variant="outline" size="sm" onClick={() => setCvPreviewOpen(true)} className="border-purple-200 text-[#7C3AED] hover:bg-purple-50">
                     <FileText className="mr-1.5 size-3.5" /> Pratinjau CV
                   </Button>
-                  {completed ? (
-                    <Button size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9]" asChild>
-                      <Link href={`/recruiter/screenings/${candidate.id}`}>
-                        <ShieldCheck className="mr-1.5 size-3.5" /> Lihat Screening Selesai
-                      </Link>
-                    </Button>
-                  ) : screeningError ? (
-                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Screening perlu retry</Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[#7C3AED]">
-                      <Loader2 className="mr-1.5 size-3 animate-spin" /> Screening otomatis
-                    </Badge>
-                  )}
+                  <Button
+                    size="sm"
+                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs"
+                    onClick={() => setAssignModalOpen(true)}
+                  >
+                    <Briefcase className="mr-1.5 size-3.5" /> Tugaskan ke Lowongan
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" asChild>
+                    <Link href="/recruiter/operations">
+                      <ShieldCheck className="mr-1.5 size-3.5 text-[#7C3AED]" /> Buka Operations Hub
+                    </Link>
+                  </Button>
                 </div>
 
                 {candidate.portfolio.length > 0 && (
@@ -1117,82 +1205,19 @@ export default function TalentProfile() {
         )}
       </Card>
 
+
+
       {(unlocked || (dbMode && completed)) && (
-        <>
-          {dbMode && completed && (
-            <Card className="mt-6 border-[#b9e6d0] bg-[#f7fffb]">
-              <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-                <div>
-                  <p className="font-semibold text-[#08744f]">Screening tersimpan</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pemotongan token dan skor sudah tercatat. Kandidat tetap perlu menyetujui permintaan kontak sebelum percakapan dimulai.
-                  </p>
-                </div>
-                {contactConsent === "consented" ? (
-                  <Button
-                    disabled={openingConversation}
-                    onClick={async () => {
-                      setOpeningConversation(true);
-                      try {
-                        const response = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateProfileId: candidate.id }) });
-                        const payload = await response.json() as { conversationId?: string; error?: string };
-                        if (!response.ok || !payload.conversationId) throw new Error(payload.error ?? "Percakapan belum dapat dibuat.");
-                        router.push(`/recruiter/messages?conversationId=${encodeURIComponent(payload.conversationId)}`);
-                      } catch (error) {
-                        toast.error("Percakapan belum dapat dibuat", { description: error instanceof Error ? error.message : "Coba lagi." });
-                      } finally {
-                        setOpeningConversation(false);
-                      }
-                    }}
-                  >
-                    {openingConversation ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                    {openingConversation ? "Membuka..." : "Mulai percakapan"}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    disabled={requestingContactConsent || contactConsent === "pending-candidate-consent"}
-                    onClick={async () => {
-                      setRequestingContactConsent(true);
-                      try {
-                        const response = await fetch("/api/consent-requests", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            candidateProfileIds: [candidate.id],
-                            purpose: "Diskusi peluang setelah screening",
-                            message: "Recruiter ingin mendiskusikan hasil screening dan peluang yang relevan.",
-                          }),
-                        });
-                        const payload = await response.json() as { error?: string };
-                        if (!response.ok) throw new Error(payload.error ?? "Permintaan kontak belum dapat dikirim.");
-                        await reloadBootstrap();
-                        toast.success("Permintaan kontak dikirim", { description: "Tunggu persetujuan kandidat sebelum memulai percakapan." });
-                      } catch (error) {
-                        toast.error("Permintaan kontak gagal", { description: error instanceof Error ? error.message : "Coba lagi." });
-                      } finally {
-                        setRequestingContactConsent(false);
-                      }
-                    }}
-                  >
-                    {requestingContactConsent ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                    {requestingContactConsent ? "Mengirim..." : contactConsent === "pending-candidate-consent" ? "Menunggu persetujuan kandidat" : "Minta izin menghubungi"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          <ScreeningResults
-            candidateId={candidate.id}
-            candidate={candidate}
-            completed={completed}
-            screeningStatus={screeningStatus}
-            screeningError={screeningError}
-            onRetry={() => void retryScreening()}
-            result={screeningResults[candidate.id]}
-            saveResult={saveScreeningResult}
-          />
-        </>
+        <ScreeningResults
+          candidateId={candidate.id}
+          candidate={candidate}
+          completed={completed}
+          screeningStatus={screeningStatus}
+          screeningError={screeningError}
+          onRetry={() => void retryScreening()}
+          result={screeningResults[candidate.id]}
+          saveResult={saveScreeningResult}
+        />
       )}
 
       {/* Confirmation Dialog */}
@@ -1201,7 +1226,7 @@ export default function TalentProfile() {
           <DialogHeader>
             <DialogTitle>Buka Profil Kandidat?</DialogTitle>
             <DialogDescription>
-               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit akan otomatis dijalankan.
+               Tindakan ini akan membuka Nama Lengkap, Email, Nomor Telepon, CV, LinkedIn, dan Portofolio. Setelah unlock berhasil, screening role-fit otomatis dijalankan dan kandidat akan menerima notifikasi bahwa profilnya sedang ditinjau oleh perusahaan Anda.
                {devBypass ? " Mode development: token scan tidak digunakan." : ` Sisa token Anda: ${tokens} token.`}
             </DialogDescription>
           </DialogHeader>
@@ -1304,124 +1329,11 @@ export default function TalentProfile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── FLOATING DOVER ACTION WIDGET (ONLY APPEARS AFTER TOKEN SCAN) ── */}
-      {unlocked && (
-        <aside
-          aria-label="Aksi Cepat Rekruter"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl rounded-2xl border border-purple-200/80 bg-white/95 p-3 shadow-[0_12px_36px_rgba(124,58,237,0.18)] backdrop-blur-md dark:border-purple-900/60 dark:bg-slate-900/95 xl:bottom-auto xl:left-auto xl:right-6 2xl:right-12 xl:top-36 xl:translate-x-0 xl:w-64 xl:p-4"
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-950/60 xl:flex-col xl:items-start xl:gap-2">
-            <div className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED] to-pink-500 text-white shadow-xs">
-                <Sparkles className="size-3.5" />
-              </span>
-              <div>
-                <p className="text-xs font-bold leading-tight text-foreground truncate max-w-[130px] xl:max-w-[170px]">
-                  {candidate.name}
-                </p>
-                <p className="text-[10px] text-muted-foreground font-mono">
-                  Alur Rekrutmen Dover
-                </p>
-              </div>
-            </div>
-            {hiringOutcome === "hired" ? (
-              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5">
-                <UserCheck className="mr-1 size-3" /> Hired ✓
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-purple-300 text-purple-800 dark:border-purple-700 dark:text-purple-300 text-[10px] px-2 py-0.5">
-                Pipeline Aktif
-              </Badge>
-            )}
-          </div>
-
-          <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 xl:mt-3 xl:flex-col xl:items-stretch xl:gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
-              onClick={() => setQuestionModalOpen(true)}
-            >
-              <Brain className="mr-1.5 size-3.5 text-[#7C3AED]" />
-              Pertanyaan AI
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
-              onClick={() => setPromptModalOpen(true)}
-            >
-              <MessageSquareQuote className="mr-1.5 size-3.5 text-[#7C3AED]" />
-              Prompt Pesan
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-purple-200 hover:bg-purple-50 hover:text-purple-900 px-2.5 dark:border-purple-800 xl:h-9 xl:justify-start"
-              onClick={() => setScheduleModalOpen(true)}
-            >
-              <Calendar className="mr-1.5 size-3.5 text-[#7C3AED]" />
-              Jadwal Wawancara
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 px-2.5 dark:border-emerald-800 dark:text-emerald-300 xl:h-9 xl:justify-start"
-              onClick={() => setOfferModalOpen(true)}
-            >
-              <FileCheck2 className="mr-1.5 size-3.5 text-emerald-600" />
-              Buat Offer Letter
-            </Button>
-            <Button
-              size="sm"
-              disabled={markingHired || hiringOutcome === "hired"}
-              className="h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 xl:h-9 xl:w-full"
-              onClick={async () => {
-                if (!window.confirm(`Konfirmasi tandai ${candidate.name} sebagai DITERIMA (HIRED)?`)) return;
-                setMarkingHired(true);
-                try {
-                  if (dbMode) {
-                    const res = await fetch("/api/applications", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        candidateProfileId: candidate.id,
-                        status: "hired",
-                        reason: "Kandidat diterima secara resmi melalui Talent Network.",
-                      }),
-                    });
-                    if (!res.ok) {
-                      const errData = (await res.json()) as { error?: string };
-                      throw new Error(errData.error ?? "Gagal memperbarui status ke Hired.");
-                    }
-                  }
-                  setHiringOutcome("hired");
-                  toast.success(`Kandidat ${candidate.name} resmi ditandai Diterima (Hired)!`);
-                } catch (err) {
-                  toast.error("Gagal menandai status Hired", {
-                    description: err instanceof Error ? err.message : "Terjadi kesalahan.",
-                  });
-                } finally {
-                  setMarkingHired(false);
-                }
-              }}
-            >
-              {markingHired ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <UserCheck className="mr-1.5 size-3.5" />}
-              {hiringOutcome === "hired" ? "Sudah Diterima ✓" : "Tandai Diterima (Hired)"}
-            </Button>
-          </div>
-        </aside>
-      )}
-
       {/* Recruiter Hiring Flow Modals */}
       <InterviewQuestionModal
         open={questionModalOpen}
         onOpenChange={setQuestionModalOpen}
         candidate={candidate}
-        onSaveQuestions={() => {
-          setQuestionModalOpen(false);
-          setScheduleModalOpen(true);
-        }}
       />
 
       <PromptedOutreachComposer
@@ -1455,6 +1367,16 @@ export default function TalentProfile() {
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
         candidate={candidate}
+      />
+
+      {/* Unified Bottom-Right Recruiter Quick Actions & Chat Hub */}
+      <CandidateFloatingChat
+        candidate={candidate}
+        unlocked={unlocked}
+        dbMode={dbMode}
+        currentUserEmail={user?.email}
+        onOpenQuestionModal={() => setQuestionModalOpen(true)}
+        onOpenPromptModal={() => setPromptModalOpen(true)}
       />
     </div>
   );

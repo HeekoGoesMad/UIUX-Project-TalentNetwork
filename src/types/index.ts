@@ -47,6 +47,7 @@ export type Candidate = {
   name: string;
   initials: string;
   role: string;
+  targetRole?: string;
   location: string;
   experience: number;
   availability: string;
@@ -178,6 +179,16 @@ export type CvProfile = {
   campusVerification?: CampusVerification;
   sourceFileName?: string;
   updatedAt: string;
+  careerAdvisorResults?: Record<string, CareerAdvisorSavedResult>;
+};
+
+export type CareerAdvisorSavedResult = {
+  result: unknown;
+  generatedAt: string;
+  targetRole?: string;
+  analysisCount?: number;
+  topic?: string;
+  question?: string;
 };
 
 export type ConsentState = "not-requested" | "pending-candidate-consent" | "consented" | "declined" | "consent-expired" | "withdrawn" | "screening-in-progress" | "screening-completed" | "disputed";
@@ -202,10 +213,12 @@ export type RecruiterOnboardingData = {
   officeAddress: string;
   city: string;
   // Step 3: Legal Documents (NIB & NPWP)
-  nibNumber: string;
+  nibNumber?: string;
   nibFileName?: string;
-  npwpNumber: string;
+  nibDocumentUrl?: string;
+  npwpNumber?: string;
   npwpFileName?: string;
+  npwpDocumentUrl?: string;
   aktaFileName?: string;
   ktpFileName?: string;
   submittedAt?: string;
@@ -213,3 +226,28 @@ export type RecruiterOnboardingData = {
 };
 
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
+
+export type CareerActivityCategory = "project" | "certification" | "leadership" | "skill_research";
+export type CareerActivityStatus = "planned" | "in_progress" | "completed";
+
+export type CareerActivityItem = {
+  id: string;
+  title: string;
+  description?: string;
+  category: CareerActivityCategory;
+  duration: string;
+  status: CareerActivityStatus;
+  achievementNotes?: string;
+  proofUrl?: string;
+  createdAt: string;
+  completedAt?: string;
+};
+
+export type CareerTrackerData = {
+  targetRole: string;
+  targetTimeline: string;
+  currentLevel: string;
+  targetLevel: string;
+  notes?: string;
+  activities: CareerActivityItem[];
+};

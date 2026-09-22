@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const aiNavItems = [
   {
     href: "/candidate/career-advisor",
-    label: "Penasihat Profil Karier AI",
+    label: "AI Career Advisor & Consultation",
     icon: Sparkles,
   },
 ];
@@ -32,7 +32,7 @@ export function CandidateAiNav({ className }: { className?: string }) {
                 : "text-muted-foreground hover:bg-white/60 hover:text-foreground"
             )}
           >
-            <ItemIcon className={cn("size-3.5", active ? "text-[#7C3AED]" : "text-muted-foreground")} />
+            <ItemIcon className={cn("size-3.5", active ? "text-primary" : "text-muted-foreground")} />
             <span>{item.label}</span>
           </Link>
         );

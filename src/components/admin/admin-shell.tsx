@@ -2,169 +2,273 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import {
   ArrowLeft,
   Building2,
   Coins,
   GraduationCap,
   LayoutDashboard,
+  Menu,
   ScrollText,
   Settings,
-  ShieldCheck,
+  X,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/app-provider";
+import { cn } from "@/lib/utils";
 
-interface NavLinkItem {
-  label: string;
-  href: string;
-  icon: typeof LayoutDashboard;
-  badge?: string;
-  disabled?: boolean;
+interface NavGroup {
+  heading: string;
+  items: Array<{
+    label: string;
+    href: string;
+    icon: typeof LayoutDashboard;
+    badge?: string;
+    disabled?: boolean;
+  }>;
 }
 
-const adminNavLinks: NavLinkItem[] = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Companies", href: "/admin/companies", icon: Building2 },
-  { label: "Partnerships", href: "/admin/partnerships", icon: GraduationCap },
-  { label: "Tokens", href: "/admin/tokens", icon: Coins },
-  { label: "Audit Logs", href: "/admin/audit-log", icon: ScrollText },
-  { label: "Settings", href: "#", icon: Settings, badge: "Soon", disabled: true },
+const adminNavGroups: NavGroup[] = [
+  {
+    heading: "Menu Utama",
+    items: [{ label: "Dashboard", href: "/admin", icon: LayoutDashboard }],
+  },
+  {
+    heading: "Verifikasi & Data",
+    items: [
+      { label: "Perusahaan", href: "/admin/companies", icon: Building2 },
+      { label: "Kemitraan", href: "/admin/partnerships", icon: GraduationCap },
+    ],
+  },
+  {
+    heading: "Sistem & Finansial",
+    items: [
+      { label: "Kuota Token", href: "/admin/tokens", icon: Coins },
+      { label: "Audit Log", href: "/admin/audit-log", icon: ScrollText },
+      { label: "Pengaturan", href: "/admin/settings", icon: Settings },
+    ],
+  },
 ];
 
-export function AdminShell({ title, children }: { title: string; children: ReactNode }) {
+export function AdminShell({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useApp();
+  const { user, logout } = useApp();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50/60 antialiased">
+    <div className="min-h-screen bg-slate-50/80 text-slate-900 antialiased flex flex-col selection:bg-purple-100 selection:text-purple-900">
       {/* ─── Admin Top Bar ─── */}
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-white px-4 sm:px-8 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="flex items-center gap-2.5 font-bold text-slate-900 transition-opacity hover:opacity-85">
-            <div className="flex size-8 items-center justify-center rounded-xl bg-[#7C3AED] text-white shadow-xs">
-              <ShieldCheck className="size-4.5" />
-            </div>
-            <span className="text-base font-extrabold tracking-tight text-foreground">ProofyLink</span>
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Mobile hamburger toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden size-9 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu navigasi"}
+          >
+            {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </Button>
+
+          <Link
+            href="/admin"
+            className="flex shrink-0 items-center gap-2 font-bold tracking-tight group transition-transform duration-300 hover:scale-[1.01]"
+          >
+            <span className="text-lg font-bold whitespace-nowrap text-slate-900">
+              Talent<span className="text-primary"> Network</span>
+            </span>
+            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10.5px] font-semibold text-primary border border-purple-200/80">
+              Konsol Admin
+            </span>
           </Link>
-          <span className="text-slate-300">/</span>
-          <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 text-xs font-semibold px-2.5 py-0.5">
-            Admin Portal
-          </Badge>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* User badge */}
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 py-1 pl-1.5 pr-2.5 sm:pr-3">
+            <div className="flex size-6 items-center justify-center rounded-full bg-purple-100 font-bold text-primary text-xs">
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
+            </div>
+            <span className="text-xs font-semibold text-slate-800">
+              {user?.name || "Admin"}
+            </span>
+          </div>
+
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl"
+            className="gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-2.5 h-8 transition-colors cursor-pointer"
             onClick={async () => {
               await logout();
               router.push("/login");
             }}
           >
             <ArrowLeft className="size-3.5" />
-            Kembali ke Web
+            <span className="hidden sm:inline">Kembali ke Web</span>
+            <span className="sm:hidden">Keluar</span>
           </Button>
-          <div className="h-4 w-px bg-slate-200" />
-          <div className="flex items-center gap-2 text-xs">
-            <div className="flex size-7 items-center justify-center rounded-full bg-purple-100 font-bold text-[#7C3AED]">
-              A
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="font-semibold text-slate-900 leading-tight">Admin System</p>
-              <p className="text-[10px] text-muted-foreground">superadmin@talentnetwork.id</p>
-            </div>
-          </div>
         </div>
       </header>
 
-      {/* ─── Main Admin Layout with Sidebar ─── */}
-      <div className="container mx-auto grid gap-8 px-4 py-8 lg:grid-cols-[240px_1fr]">
+      {/* ─── Main Admin Layout with Edge-Anchored Sidebar ─── */}
+      <div className="flex-1 flex w-full">
+        {/* ─── Mobile Sidebar Backdrop & Drawer ─── */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* ─── Sidebar Navigation ─── */}
-        <aside className="h-fit rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-xs lg:sticky lg:top-20">
-          <div className="border-b border-slate-100 pb-3.5">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-[#7C3AED]">
-              Control Panel
-            </p>
-            <h2 className="mt-1 text-lg font-extrabold tracking-tight text-slate-900">
-              Admin Portal
-            </h2>
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-64 bg-white p-4 border-r border-slate-200 transition-transform duration-200 ease-out lg:static lg:z-auto lg:transition-none flex flex-col justify-between",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+            "lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] overflow-y-auto"
+          )}
+        >
+          <div className="space-y-6">
+            {/* Mobile Drawer Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-slate-900">
+                  Talent<span className="text-primary"> Network</span>
+                </span>
+                <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary border border-purple-200/80">
+                  Admin
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-lg text-slate-500"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            {/* Navigation Groups */}
+            <nav className="space-y-5" aria-label="Navigasi admin">
+              {adminNavGroups.map((group) => (
+                <div key={group.heading} className="space-y-1">
+                  <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {group.heading}
+                  </p>
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        item.href === "/admin"
+                          ? pathname === "/admin"
+                          : pathname === item.href || (item.href !== "#" && pathname.startsWith(`${item.href}/`));
+
+                      if (item.disabled) {
+                        return (
+                          <div
+                            key={item.label}
+                            className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-400 opacity-60 cursor-not-allowed select-none"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Icon className="size-4 text-slate-400 shrink-0" />
+                              <span className="truncate">{item.label}</span>
+                            </div>
+                            {item.badge && (
+                              <span className="rounded px-1.5 py-0.2 text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={cn(
+                            "group flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors",
+                            isActive
+                              ? "bg-purple-50 text-[#7C3AED] font-semibold border-l-2 border-[#7C3AED] rounded-l-none"
+                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              className={cn(
+                                "size-4 shrink-0 transition-colors",
+                                isActive ? "text-[#7C3AED]" : "text-slate-400 group-hover:text-slate-600"
+                              )}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[9px] font-bold font-mono shrink-0",
+                                isActive ? "bg-[#7C3AED] text-white" : "bg-slate-100 text-slate-600 border border-slate-200"
+                              )}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
           </div>
 
-          <nav className="mt-4 grid gap-1.5" aria-label="Admin navigation">
-            {adminNavLinks.map((item) => {
-              const Icon = item.icon;
-              const isActive =
-                item.href === "/admin"
-                  ? pathname === "/admin"
-                  : pathname === item.href || (item.href !== "#" && pathname.startsWith(`${item.href}/`));
-
-              if (item.disabled) {
-                return (
-                  <div
-                    key={item.label}
-                    className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-400 opacity-60 cursor-not-allowed select-none"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="size-4 text-slate-400" />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge && (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                        {item.badge}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? "bg-[#7C3AED] text-white shadow-xs font-bold"
-                      : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`size-4 ${isActive ? "text-white" : "text-slate-500"}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        isActive ? "bg-white/20 text-white" : "bg-purple-50 text-[#7C3AED]"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="mt-6 border-t border-slate-100 pt-4 space-y-2">
-            <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 text-xs">
-              <span className="font-semibold text-slate-700 block">Mode Administrator</span>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Akses penuh verifikasi perusahaan, kuota token, dan audit aktivitas.
-              </p>
+          {/* Sidebar Technical Ledger Footer */}
+          <div className="pt-4 border-t border-slate-200/80 mt-auto">
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span className="font-mono font-medium">Talent Network</span>
+              <span className="font-mono text-[10px] text-slate-400">v1.2</span>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">
+              <span className="size-1.5 rounded-full bg-emerald-500"></span>
+              <span>Koneksi Supabase Aktif</span>
             </div>
           </div>
         </aside>
 
-        {/* ─── Main Content ─── */}
-        <main className="min-w-0">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#7C3AED]">Portal Admin</p>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{title}</h1>
+        {/* ─── Main Content Canvas ─── */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-0.5">
+                <Link href="/admin" className="hover:text-slate-900 transition-colors font-medium">
+                  Admin
+                </Link>
+                <span>/</span>
+                <span className="text-[#7C3AED] font-semibold">{title}</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+              )}
+            </div>
+            {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
           </div>
           {children}
         </main>

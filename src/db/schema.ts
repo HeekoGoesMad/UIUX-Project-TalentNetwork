@@ -141,8 +141,26 @@ export const assessmentInvitationStatus = pgEnum("assessment_invitation_status",
 ]);
 export const assessmentAttemptStatus = pgEnum("assessment_attempt_status", ["in_progress", "submitted", "expired", "abandoned"]);
 export const assessmentReviewStatus = pgEnum("assessment_review_status", ["pending", "in_review", "completed", "disputed"]);
-export const interviewStatus = pgEnum("interview_status", ["scheduled", "completed", "cancelled", "rescheduled"]);
-export const interviewEventType = pgEnum("interview_event_type", ["created", "updated", "reminder_sent", "cancelled", "rescheduled", "completed"]);
+export const interviewStatus = pgEnum("interview_status", [
+  "scheduled",
+  "completed",
+  "cancelled",
+  "rescheduled",
+  "confirmed",
+  "reschedule_requested",
+  "declined",
+]);
+export const interviewEventType = pgEnum("interview_event_type", [
+  "created",
+  "updated",
+  "reminder_sent",
+  "cancelled",
+  "rescheduled",
+  "completed",
+  "confirmed",
+  "reschedule_requested",
+  "declined",
+]);
 export const interviewPanelRole = pgEnum("interview_panel_role", ["interviewer", "observer", "coordinator"]);
 export const interviewFeedbackRecommendation = pgEnum("interview_feedback_recommendation", ["strong_yes", "yes", "mixed", "no", "strong_no"]);
 export const offerStatus = pgEnum("offer_status", ["draft", "sent", "accepted", "declined", "withdrawn", "expired"]);
@@ -184,6 +202,8 @@ export const organizations = pgTable("organizations", {
   // Legalitas
   nib: text("nib").unique(),
   npwp: text("npwp").unique(),
+  nibDocumentUrl: text("nib_document_url"),
+  npwpDocumentUrl: text("npwp_document_url"),
   // Informasi Bisnis
   industry: industrySector("industry"),
   companyScale: companyScale("company_scale"),

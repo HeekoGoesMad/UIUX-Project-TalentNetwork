@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory, CareerAdvisorSavedResult } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
@@ -10,6 +10,7 @@ import { candidates } from "@/data/candidates";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
+const candidateDemoNotificationsKey = "proofylink-candidate-demo-notifications-v1";
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([
@@ -39,7 +40,7 @@ const initial: AppState = {
 };
 
 const demoNotifications: BootstrapNotification[] = [
-  { id: "demo-notification-1", type: "system", title: "Selamat datang di ProofyLink", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
+  { id: "demo-notification-1", type: "system", title: "Selamat datang di Talent Network", body: "Lengkapi profil Anda untuk membuka lebih banyak peluang di jaringan talent.", data: {}, readAt: null, createdAt: "2026-08-14T08:00:00Z" },
   { id: "demo-notification-2", type: "message_received", title: "Pesan baru tersedia", body: "Anda memiliki percakapan demo yang siap ditinjau.", data: {}, readAt: "2026-08-13T08:00:00Z", createdAt: "2026-08-13T08:00:00Z" },
 ];
 
@@ -136,6 +137,10 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     : undefined;
   const industries = Array.isArray(preferences.industries) ? (preferences.industries as string[]) : [];
   const certifications = Array.isArray(preferences.certifications) ? (preferences.certifications as string[]) : [];
+  const careerAdvisorResults =
+    preferences.careerAdvisorResults && typeof preferences.careerAdvisorResults === "object"
+      ? (preferences.careerAdvisorResults as Record<string, CareerAdvisorSavedResult>)
+      : undefined;
 
   return {
     id: candidate?.id ?? base?.id ?? "remote-profile",
@@ -165,6 +170,7 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
     personality,
     campusVerification,
     updatedAt: candidate?.updatedAt ?? base?.updatedAt ?? new Date().toISOString(),
+    careerAdvisorResults,
   };
 }
 
@@ -273,16 +279,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? (metadata.provisioningStatus as ProvisioningStatus)
               : "pending");
 
+      const existingCustomName =
+        current?.name && current.name !== current.email?.split("@")[0] ? current.name : null;
+
       return {
         role,
         provisioningStatus,
         provisioningReason: dbIdentity.current.provisioningReason ?? current?.provisioningReason ?? null,
         email: authUser.email ?? "",
-        name: typeof metadata.name === "string" && metadata.name.trim()
+        name: existingCustomName || (typeof metadata.name === "string" && metadata.name.trim()
           ? metadata.name
-          : current?.name && current.name !== current.email?.split("@")[0]
-            ? current.name
-            : authUser.email?.split("@")[0] ?? "Pengguna",
+          : authUser.email?.split("@")[0] ?? "Pengguna"),
         companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : current?.companyName,
       };
     });
@@ -297,8 +304,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null };
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null };
         profile?: BootstrapProfile | null;
+        organization?: { id: string; name: string } | null;
+        partnership?: { id: string; name: string } | null;
         candidateProfile?: { id: string; headline: string | null; targetRole: string | null; location: string | null; summary: string | null; updatedAt?: string } | null;
         candidateSections?: BootstrapSection[];
         token?: BootstrapTokenAccount;
@@ -315,13 +324,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const role = payload.identity.role;
         const status: ProvisioningStatus = payload.identity.provisioningStatus ?? (role === "recruiter" ? "pending" : "active");
         const resolvedName = payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || payload.identity?.email?.split("@")[0] || "Pengguna";
+        const resolvedCompanyName =
+          payload.organization?.name?.trim() ||
+          payload.identity?.companyName?.trim() ||
+          (role === "partner" ? payload.partnership?.name?.trim() : null) ||
+          undefined;
+
         setUser((current) => ({
           email: payload.identity?.email ?? current?.email ?? "",
           name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
           role,
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
-          companyName: current?.companyName,
+          companyName: resolvedCompanyName ?? current?.companyName,
         }));
       }
 
@@ -334,7 +349,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remoteProfile = remoteCvProfile(payload);
       setState((current) => ({
         ...current,
-        cvProfile: remoteProfile,
+        cvProfile: remoteProfile
+          ? {
+              ...remoteProfile,
+              careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
+            }
+          : current.cvProfile,
         careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
         tokens: payload.token?.balance ?? 0,
         screeningTokens: payload.token?.balance ?? 0,
@@ -487,6 +507,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return false;
     }
     setNotifications((current) => current.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item));
+    try {
+      const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      if (candidateDemoNotifs.some((item) => item.id === id)) {
+        localStorage.setItem(
+          candidateDemoNotificationsKey,
+          JSON.stringify(candidateDemoNotifs.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
+        );
+      }
+    } catch {}
     return true;
   };
 
@@ -500,6 +529,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return false;
     }
     setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+    try {
+      const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      if (candidateDemoNotifs.length) {
+        localStorage.setItem(
+          candidateDemoNotificationsKey,
+          JSON.stringify(candidateDemoNotifs.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })))
+        );
+      }
+    } catch {}
     return true;
   };
 
@@ -627,6 +665,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (name: string, role: UserRole, email: string, password: string, companyName?: string): Promise<AuthResult> => {
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return { error: "Kata sandi harus minimal 8 karakter dan memuat kombinasi huruf besar, huruf kecil, dan angka." };
+    }
     pendingRole.current = role;
     if (supabaseConfigured) {
       const supabase = createClient();
@@ -703,6 +744,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast.error("Token Anda habis", { description: "Tambah token untuk membuka profil lainnya." });
       return false;
     }
+    const companyName = user?.companyName || "Perusahaan Mitra";
+    const notifItem: BootstrapNotification = {
+      id: `notif-scan-${id}-${Date.now()}`,
+      type: "system",
+      title: "Profil kamu sedang ditinjau ✨",
+      body: `Profil dan portofolio kamu baru saja dibuka dan sedang ditinjau oleh tim rekruter di ${companyName}.`,
+      data: { candidateProfileId: id, companyName },
+      readAt: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Candidate notification is stored exclusively for candidate demo storage, NOT for the recruiter
+    try {
+      const storedCandidateNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+      localStorage.setItem(
+        candidateDemoNotificationsKey,
+        JSON.stringify([notifItem, ...storedCandidateNotifs.filter((item) => item.data?.candidateProfileId !== id)])
+      );
+    } catch {}
+
+    // Record candidate recruiter activity so candidate's dashboard/timeline reflects the profile view
+    try {
+      const activitiesKey = "proofylink-candidate-recruiter-activities-v1";
+      const storedActivities = JSON.parse(localStorage.getItem(activitiesKey) ?? "[]") as Array<Record<string, unknown>>;
+      const newActivity = {
+        id: `act-scan-${id}-${Date.now()}`,
+        type: "profile_viewed",
+        companyName,
+        companyInitial: companyName.slice(0, 3).toUpperCase(),
+        companyIndustry: "Perusahaan Mitra",
+        recruiterName: user?.name || "Tim Rekruter",
+        recruiterRole: "Talent Acquisition",
+        title: "Profil lengkap Anda telah dilihat",
+        snippet: `Tim rekruter di ${companyName} baru saja membuka profil lengkap dan sedang meninjau kualifikasi Anda.`,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        actionUrl: "/notifications",
+      };
+      localStorage.setItem(activitiesKey, JSON.stringify([newActivity, ...storedActivities]));
+    } catch {}
+
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,
@@ -791,6 +873,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(profile.industries?.length ? { industries: profile.industries } : {}),
             ...(profile.certifications?.length ? { certifications: profile.certifications } : {}),
             ...(profile.bannerUrl !== undefined ? { bannerUrl: profile.bannerUrl || null } : {}),
+            ...(profile.careerAdvisorResults ? { careerAdvisorResults: profile.careerAdvisorResults } : {}),
           },
         },
       ],
@@ -1137,6 +1220,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProvisioningStatus: (status: ProvisioningStatus, reason?: string | null) => actionsRef.current.setProvisioningStatus(status, reason),
   }), []);
 
+  const resolvedNotifications = useMemo<BootstrapNotification[]>(() => {
+    let list = notifications;
+    if (!supabaseConfigured) {
+      if (user?.role === "candidate") {
+        try {
+          const candidateDemoNotifs = JSON.parse(localStorage.getItem(candidateDemoNotificationsKey) ?? "[]") as BootstrapNotification[];
+          list = [...candidateDemoNotifs, ...(notifications.length ? notifications : demoNotifications)];
+        } catch {
+          list = notifications.length ? notifications : demoNotifications;
+        }
+      } else {
+        list = notifications.length ? notifications : demoNotifications;
+      }
+    }
+
+    if (user?.role === "recruiter") {
+      // Recruiter must NEVER see candidate notifications ("Profil kamu sedang ditinjau", etc.)
+      return list.filter((n) => {
+        if (n.id.startsWith("notif-scan-")) return false;
+        const titleLower = n.title.toLowerCase();
+        if (titleLower.includes("profil kamu sedang ditinjau") || titleLower.startsWith("profil dilihat:")) return false;
+        return true;
+      });
+    }
+
+    return list;
+  }, [supabaseConfigured, notifications, user?.role]);
+
   const contextValue = useMemo<Context>(() => ({
     ...state,
     hydrated,
@@ -1147,7 +1258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     tokenAccount,
     screeningRunStatuses,
-    notifications: supabaseConfigured ? notifications : (notifications.length ? notifications : demoNotifications),
+    notifications: resolvedNotifications,
     shortlists,
     consentRequests,
     databaseError,
@@ -1164,7 +1275,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     tokenAccount,
     screeningRunStatuses,
-    notifications,
+    resolvedNotifications,
     shortlists,
     consentRequests,
     databaseError,

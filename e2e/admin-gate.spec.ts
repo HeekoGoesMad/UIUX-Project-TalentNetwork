@@ -5,18 +5,20 @@ import { expect, test } from "playwright/test";
 // configured, regardless of DB health.
 test("logged-out visitor never sees admin data", async ({ page, request }) => {
   await page.goto("/admin");
-  await expect(page.getByText("Memverifikasi akses admin")).toBeVisible();
+  await expect(page.getByText(/memverifikasi (otoritas|akses) admin/i).first()).toBeVisible();
   const probe = await request.get("/api/admin/dashboard");
+  const dashboardHeading = page.getByRole("heading", { name: /metrik utama|ikhtisar operasional/i });
   if (probe.status() === 401 || probe.status() === 403) {
-    const label = probe.status() === 401 ? "Error 401" : "Error 403";
-    await expect(page.getByText(label)).toBeVisible({ timeout: 10_000 });
+    const code = probe.status();
+    const label = new RegExp(`(Error|Akses Ditolak [·•] Kode) ${code}`, "i");
+    await expect(page.getByText(label).first()).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(4000);
-    await expect(page.getByText(label)).toBeVisible();
-    await expect(page.getByText("Metrik Utama")).toHaveCount(0);
+    await expect(page.getByText(label).first()).toBeVisible();
+    await expect(dashboardHeading).toHaveCount(0);
   } else {
-    await expect(page.getByText("Metrik Utama")).toBeVisible({ timeout: 10_000 });
+    await expect(dashboardHeading.first()).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(4000);
-    await expect(page.getByText("Metrik Utama")).toBeVisible();
+    await expect(dashboardHeading.first()).toBeVisible();
   }
 });
 

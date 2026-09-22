@@ -10,10 +10,6 @@
 !.yarn/releases
 !.yarn/versions
 
-# agents
-.agents/
-opencode.json
-
 # testing & playwright
 /coverage
 /.playwright-mcp/
@@ -61,8 +57,13 @@ yarn-error.log*
 logs/
 
 # agent & AI cache
+.agent/
+.agents/
+.impeccable/
 .gemini/
 .claude/
+opencode.json
+PRODUCT.md
 
 # database & local storage
 *.sqlite
@@ -88,3 +89,5 @@ next-env.d.ts
 .mcp.json
 .opencode
 .vscode
+
+mock-talentNetwork.code-workspace

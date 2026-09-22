@@ -7,6 +7,7 @@ import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 import { createClient } from "@/lib/supabase/server";
 import { ShortlistService } from "@/lib/services/shortlist";
 import { ConsentService } from "@/lib/services/consent";
+import { distillNotificationContent } from "@/lib/notifications/candidate-formatter";
 
 export async function GET() {
   try {
@@ -69,7 +70,8 @@ export async function GET() {
     // Batch 2: Concurrently load dependent resources (sections, org details, shortlists, consents, screenings, tokens)
     const [
       candidateSections,
-      organization,
+      organizationFromMember,
+      organizationByCreator,
       shortlistResult,
       consentResult,
       screeningSummaryRaw,
@@ -80,6 +82,9 @@ export async function GET() {
         : Promise.resolve([]),
       resolvedOrgId
         ? current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1).then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      (!resolvedOrgId && isRecruiter)
+        ? current.db.select().from(schema.organizations).where(eq(schema.organizations.createdBy, current.user.id)).limit(1).then((rows) => rows[0] ?? null)
         : Promise.resolve(null),
       activeOrgId
         ? ShortlistService.list(current.db, activeOrgId)
@@ -99,6 +104,8 @@ export async function GET() {
         : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
     ]);
 
+    const organization = organizationFromMember ?? organizationByCreator ?? null;
+
     let provisioningStatus = current.user.recruiterProvisioningStatus;
     let provisioningReason = current.user.recruiterRejectionReason ?? null;
 
@@ -114,6 +121,35 @@ export async function GET() {
       provisioningReason = partnership.verificationNotes ?? null;
     }
 
+    const companyName =
+      organization?.name ?? (current.user.role === "partner" ? partnership?.name : null) ?? null;
+
+    const toUpdateNotifs: Array<{ id: string; title: string; body: string }> = [];
+    const distilledNotifications = notifications.map((notif) => {
+      const distilled = distillNotificationContent({
+        title: notif.title,
+        body: notif.body,
+        type: notif.type,
+        data: notif.data,
+      });
+      if (distilled.changed) {
+        toUpdateNotifs.push({ id: notif.id, title: distilled.title, body: distilled.body });
+        return { ...notif, title: distilled.title, body: distilled.body };
+      }
+      return notif;
+    });
+
+    if (toUpdateNotifs.length > 0) {
+      void Promise.all(
+        toUpdateNotifs.map((item) =>
+          current.db
+            .update(schema.notifications)
+            .set({ title: item.title, body: item.body })
+            .where(eq(schema.notifications.id, item.id))
+        )
+      ).catch((err) => console.error("Auto-update bootstrap notifications in DB failed:", err));
+    }
+
     return NextResponse.json({
       identity: {
         id: current.user.id,
@@ -122,6 +158,7 @@ export async function GET() {
         role: current.user.role,
         provisioningStatus,
         provisioningReason,
+        companyName,
       },
       organization,
       partnership,
@@ -130,7 +167,7 @@ export async function GET() {
       candidateSections,
       shortlists: shortlistResult.shortlists,
       consentRequests: consentResult.requests,
-      notifications,
+      notifications: distilledNotifications,
       token,
       screeningSummary: {
         total: Number(screeningSummaryRaw?.total ?? 0),

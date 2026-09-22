@@ -56,6 +56,7 @@ const onboardingSchema = z.object({
   picEmail: z.string().email(),
   picPhone: z.string().trim().min(6),
   picPosition: z.string().trim().optional(),
+  picTitle: z.string().trim().optional(),
   companyName: z.string().trim().min(2),
   description: z.string().trim().optional(),
   industry: z.string().trim().optional(),
@@ -63,10 +64,14 @@ const onboardingSchema = z.object({
   city: z.string().trim().optional(),
   officeAddress: z.string().trim().optional(),
   website: z.string().trim().optional(),
+  websiteUrl: z.string().trim().optional(),
+  linkedinUrl: z.string().trim().optional(),
   nibNumber: z.string().trim().optional(),
   nibFileName: z.string().trim().optional(),
+  nibDocumentUrl: z.string().trim().min(1, "Dokumen NIB (PDF) wajib diunggah."),
   npwpNumber: z.string().trim().optional(),
   npwpFileName: z.string().trim().optional(),
+  npwpDocumentUrl: z.string().trim().min(1, "Dokumen NPWP (PDF) wajib diunggah."),
   aktaFileName: z.string().trim().optional(),
   ktpFileName: z.string().trim().optional(),
 });
@@ -79,7 +84,8 @@ export async function POST(request: Request) {
 
   const parsed = onboardingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Data onboarding rekruter tidak valid." }, { status: 400 });
+    const errorMsg = parsed.error.issues?.[0]?.message || "Data onboarding rekruter tidak valid.";
+    return NextResponse.json({ error: errorMsg }, { status: 400 });
   }
 
   const { data } = parsed;
@@ -127,12 +133,15 @@ export async function POST(request: Request) {
             createdBy: user.id,
             nib: data.nibNumber || null,
             npwp: data.npwpNumber || null,
+            nibDocumentUrl: data.nibDocumentUrl || null,
+            npwpDocumentUrl: data.npwpDocumentUrl || null,
             industry: normalizedIndustry,
             companyScale: normalizedScale,
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
-            website: data.website || null,
+            website: data.websiteUrl || data.website || null,
+            linkedinUrl: data.linkedinUrl || null,
             description: data.description || null,
             verificationStatus: "pending",
           })
@@ -155,12 +164,15 @@ export async function POST(request: Request) {
             name: data.companyName,
             nib: data.nibNumber || null,
             npwp: data.npwpNumber || null,
+            ...(data.nibDocumentUrl ? { nibDocumentUrl: data.nibDocumentUrl } : {}),
+            ...(data.npwpDocumentUrl ? { npwpDocumentUrl: data.npwpDocumentUrl } : {}),
             industry: normalizedIndustry,
             companyScale: normalizedScale,
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
-            website: data.website || null,
+            website: data.websiteUrl || data.website || null,
+            linkedinUrl: data.linkedinUrl || null,
             description: data.description || null,
             verificationStatus: "pending",
             updatedAt: new Date(),

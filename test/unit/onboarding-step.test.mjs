@@ -44,7 +44,7 @@ test("getFirstIncompleteStep logic", async (t) => {
     );
   });
 
-  await t.test("returns 3 if location or target role is missing", () => {
+  await t.test("returns 3 if location is missing", () => {
     assert.equal(
       getFirstIncompleteStep({
         fullName: "Budi Santoso",
@@ -57,7 +57,9 @@ test("getFirstIncompleteStep logic", async (t) => {
       }),
       3
     );
+  });
 
+  await t.test("passes step 3 even if optional targetRole is blank", () => {
     assert.equal(
       getFirstIncompleteStep({
         fullName: "Budi Santoso",
@@ -68,7 +70,7 @@ test("getFirstIncompleteStep logic", async (t) => {
         location: "Jakarta",
         targetRole: "",
       }),
-      3
+      4 // proceeds to step 4 (experience)
     );
   });
 

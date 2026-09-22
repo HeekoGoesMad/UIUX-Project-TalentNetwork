@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Award,
+  BadgeCheck,
   BriefcaseBusiness,
   Check,
+  Clock,
   GraduationCap,
   Hammer,
   Loader2,
@@ -16,6 +19,7 @@ import {
   Rocket,
   ShieldCheck,
   Sparkles,
+  User,
   UserRound,
   X,
 } from "lucide-react";
@@ -27,6 +31,7 @@ import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { extractIndonesianLocalPhone } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
+import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   CAREER_STATUS_CONFIG,
   TALENT_CATEGORY_CONFIG,
@@ -102,19 +107,18 @@ const careerLabels: Record<CareerStatus, string> = {
 
 const draftKey = "proofylink-onboarding-draft";
 
-const requiredLabels: Record<TextField, string> = {
+const requiredLabels: Record<string, string> = {
   fullName: "Nama lengkap",
-  email: "Email",
+  email: "Email aktif",
   phone: "Nomor telepon",
   headline: "Headline profesional",
   about: "Tentang kamu",
   location: "Domisili saat ini",
-  targetRole: "Peran yang dituju",
 };
 
 const requiredByStep: Record<number, TextField[]> = {
   2: ["fullName", "email", "phone", "headline", "about"],
-  3: ["location", "targetRole"],
+  3: ["location"],
 };
 
 function isDemoCandidateProfile(profile?: CvProfile | null) {
@@ -149,25 +153,54 @@ const initialForm = (profile: CvProfile | null, careerStatus: CareerStatus, emai
 
 function Field({
   label,
+  required,
+  optional,
+  id,
+  extraBadge,
   children,
   hint,
   error,
 }: {
-  label: string;
+  label: React.ReactNode;
+  required?: boolean;
+  optional?: boolean;
+  id?: string;
+  extraBadge?: React.ReactNode;
   children: React.ReactNode;
   hint?: string;
   error?: string;
 }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-sm font-semibold text-foreground">{label}</span>
+    <div className="space-y-1.5" id={id ? `field-${id}` : undefined}>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          htmlFor={id}
+          className="text-sm font-semibold text-foreground flex items-center gap-1.5 select-none"
+        >
+          <span>{label}</span>
+          {required && (
+            <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+              Wajib
+            </span>
+          )}
+          {optional && (
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
+              Opsional
+            </span>
+          )}
+        </label>
+        {extraBadge && <div>{extraBadge}</div>}
+      </div>
       {children}
       {error ? (
-        <span role="alert" className="block text-xs font-medium text-destructive">{error}</span>
+        <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 animate-fade-up">
+          <AlertCircle className="size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
       ) : hint ? (
-        <span className="block text-xs text-muted-foreground">{hint}</span>
+        <p className="text-xs text-muted-foreground leading-relaxed">{hint}</p>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -219,6 +252,9 @@ export function CandidateOnboarding() {
     softSkills: "",
   });
   const [errors, setErrors] = useState<Partial<Record<TextField, string>>>({});
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [educationError, setEducationError] = useState<string | null>(null);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
   const [edits, setEdits] = useState(0);
   const restoredRef = useRef(false);
   const draftAppliedRef = useRef(false);
@@ -227,6 +263,9 @@ export function CandidateOnboarding() {
   const goToStep = (targetStep: number) => {
     if (targetStep < 0 || targetStep >= steps.length) return;
     setStep(targetStep);
+    setStepError(null);
+    setEducationError(null);
+    setSkillsError(null);
     try {
       window.localStorage.setItem(draftKey, JSON.stringify({ form, step: targetStep }));
     } catch {
@@ -336,6 +375,7 @@ export function CandidateOnboarding() {
     setForm((current) => ({ ...current, [key]: value }));
     setEdits((current) => current + 1);
     if (key in requiredLabels) setErrors((current) => ({ ...current, [key as TextField]: undefined }));
+    setStepError(null);
   };
 
   const updateHistory = (index: number, key: keyof HistoryItem, value: unknown) =>
@@ -357,7 +397,7 @@ export function CandidateOnboarding() {
       })
     );
 
-  const updateEducation = (index: number, key: keyof EducationItem, value: unknown) =>
+  const updateEducation = (index: number, key: keyof EducationItem, value: unknown) => {
     setValue(
       "education",
       form.education.map((item, itemIndex) => {
@@ -374,15 +414,21 @@ export function CandidateOnboarding() {
         return updated;
       })
     );
+    setEducationError(null);
+  };
 
   const addTag = (kind: "skills" | "tools" | "softSkills") => {
     const value = tagInput[kind].trim();
     if (!value || form[kind].includes(value)) return;
     setValue(kind, [...form[kind], value]);
     setTagInput((current) => ({ ...current, [kind]: "" }));
+    if (kind === "skills") setSkillsError(null);
   };
 
-  const removeTag = (kind: "skills" | "tools" | "softSkills", tag: string) => setValue(kind, form[kind].filter((item) => item !== tag));
+  const removeTag = (kind: "skills" | "tools" | "softSkills", tag: string) => {
+    setValue(kind, form[kind].filter((item) => item !== tag));
+    if (kind === "skills") setSkillsError(null);
+  };
 
   const validateFields = (fields: TextField[]) => {
     const found: Partial<Record<TextField, string>> = {};
@@ -394,6 +440,11 @@ export function CandidateOnboarding() {
         const digits = extractIndonesianLocalPhone(text);
         if (!digits) found[field] = "Nomor telepon wajib diisi.";
         else if (digits.length < 8) found[field] = "Nomor telepon minimal 8 digit angka.";
+      } else if (field === "location") {
+        const locCheck = isValidLocationFormat(text);
+        if (!locCheck.isValid) {
+          found[field] = locCheck.error;
+        }
       }
     }
     setErrors(found);
@@ -404,21 +455,34 @@ export function CandidateOnboarding() {
     const found = validateFields(Object.keys(requiredLabels) as TextField[]);
     const missing = Object.keys(found) as TextField[];
     if (missing.length > 0) {
-      toast.error("Profil belum lengkap", { description: "Lengkapi isian wajib yang bertanda merah sebelum mempublikasikan." });
       setStep(missing.some((field) => requiredByStep[2]?.includes(field)) ? 2 : 3);
+      setStepError("Lengkapi seluruh isian wajib sebelum mempublikasikan profil.");
+      const firstKey = missing[0];
+      setTimeout(() => {
+        const el = document.getElementById(`input-${firstKey}`) || document.querySelector(`[name="${firstKey}"]`);
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
     const hasValidEducation = form.education.some((item) => item.school.trim() && item.program.trim());
     if (!hasValidEducation) {
-      toast.error("Pendidikan wajib diisi", { description: "Isi minimal 1 riwayat institusi dan program studi pada langkah pendidikan." });
       setStep(5);
+      setEducationError("Isi minimal 1 riwayat institusi dan program studi pada langkah pendidikan.");
+      setTimeout(() => {
+        const el = document.getElementById("input-education-school-0");
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
     if (form.skills.length < 3) {
-      toast.error("Skill belum cukup", { description: "Tambahkan minimal 3 keahlian utama kamu." });
       setStep(6);
+      setSkillsError(`Tambahkan minimal 3 keahlian teknis kamu (saat ini: ${form.skills.length}/3).`);
+      setTimeout(() => {
+        const el = document.getElementById("input-tags-skills");
+        (el as HTMLElement)?.focus();
+      }, 100);
       return;
     }
 
@@ -433,7 +497,7 @@ export function CandidateOnboarding() {
       fullName: form.fullName.trim(),
       headline: form.headline.trim(),
       about: form.about.trim(),
-      location: form.location.trim(),
+      location: normalizeLocation(form.location.trim()) || form.location.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
       skills: form.skills,
@@ -495,9 +559,16 @@ export function CandidateOnboarding() {
     event.preventDefault();
 
     if (step === 2 || step === 3) {
-      const found = validateFields(requiredByStep[step] ?? []);
-      if ((Object.keys(found) as TextField[]).length > 0) {
-        toast.error("Periksa kembali formulir", { description: "Ada isian wajib yang belum terisi dengan benar." });
+      const fieldsToValidate = requiredByStep[step] ?? [];
+      const found = validateFields(fieldsToValidate);
+      const missingKeys = Object.keys(found) as TextField[];
+      if (missingKeys.length > 0) {
+        setStepError("Mohon lengkapi isian wajib yang ditandai sebelum melanjutkan.");
+        const firstKey = missingKeys[0];
+        setTimeout(() => {
+          const el = document.getElementById(`input-${firstKey}`) || document.querySelector(`[name="${firstKey}"]`);
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
@@ -505,14 +576,22 @@ export function CandidateOnboarding() {
     if (step === 5) {
       const hasValidEducation = form.education.some((item) => item.school.trim() && item.program.trim());
       if (!hasValidEducation) {
-        toast.error("Pendidikan wajib diisi", { description: "Isi minimal 1 riwayat institusi dan program studi kamu." });
+        setEducationError("Mohon lengkapi minimal 1 riwayat institusi dan program studi formal.");
+        setTimeout(() => {
+          const el = document.getElementById("input-education-school-0");
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
 
     if (step === 6) {
       if (form.skills.length < 3) {
-        toast.error("Skill minimal 3", { description: "Tambahkan setidaknya 3 keahlian utama untuk memudahkan pencocokan." });
+        setSkillsError(`Tambahkan minimal 3 keahlian teknis (saat ini: ${form.skills.length}/3).`);
+        setTimeout(() => {
+          const el = document.getElementById("input-tags-skills");
+          (el as HTMLElement)?.focus();
+        }, 50);
         return;
       }
     }
@@ -529,29 +608,28 @@ export function CandidateOnboarding() {
       <div className="fixed inset-0 z-10 flex flex-col overflow-hidden bg-background md:p-3 lg:p-6">
         <div className="mx-auto flex h-full w-full max-w-7xl flex-col md:flex-row overflow-hidden border-border bg-card md:rounded-2xl md:border md:shadow-2xl">
           {/* Mobile Brand Top Bar */}
-          <div className="flex items-center justify-between border-b bg-[#0b2342] px-4 py-3 text-white md:hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-dark-navy px-4 py-3 text-white md:hidden">
             <div className="flex items-center gap-2 font-bold text-sm">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="size-4" />
               </span>
               <span>ProofyLink</span>
             </div>
-            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-[#7aaee0]">
+            <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-purple-200">
               Kandidat
             </span>
           </div>
 
-          <aside className="hidden w-[285px] shrink-0 flex-col bg-[#0b2342] p-7 text-white md:flex">
+          <aside className="hidden w-[285px] shrink-0 flex-col bg-dark-navy p-7 text-white md:flex">
             <div className="flex items-center gap-2 font-bold">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="size-5" />
               </span>
               ProofyLink
             </div>
             <div className="mt-16">
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#7aaee0]">Onboarding kandidat</p>
-              <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight">Bangun profil yang terasa seperti kamu.</h1>
-              <p className="mt-4 text-sm leading-6 text-[#b7c8dc]">Jawab beberapa pertanyaan singkat. Kamu tetap memegang kendali sebelum profil dipublikasikan.</p>
+              <h1 className="text-3xl font-bold leading-tight tracking-tight">Bangun profil yang terasa seperti kamu.</h1>
+              <p className="mt-4 text-sm leading-6 text-slate-300">Jawab beberapa pertanyaan singkat. Kamu tetap memegang kendali sebelum profil dipublikasikan.</p>
             </div>
             <div className="mt-auto space-y-2">
               {steps.map((item, index) => {
@@ -566,24 +644,24 @@ export function CandidateOnboarding() {
                       index === step
                         ? "bg-white text-foreground shadow-xs font-medium"
                         : index < step
-                        ? "text-[#8de0be] hover:bg-white/10"
-                        : "text-[#8fa7c0] hover:bg-white/5"
+                        ? "text-emerald-300 hover:bg-white/10"
+                        : "text-slate-400 hover:bg-white/5"
                     }`}
                   >
                     <span
                       className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs transition-colors ${
                         index === step
-                          ? "bg-[#7C3AED] text-white font-bold"
+                          ? "bg-primary text-white font-bold"
                           : index < step
-                          ? "bg-emerald-500/20 text-[#8de0be]"
-                          : "bg-white/10 text-[#8fa7c0]"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-white/10 text-slate-400"
                       }`}
                     >
                       {index < step ? <Check className="size-3.5 stroke-[2.5]" /> : <Icon className="size-3.5" />}
                     </span>
                     <span className="min-w-0">
                       <strong className="block text-xs font-semibold truncate">{item.title}</strong>
-                      <small className={`text-[11px] truncate block ${index === step ? "text-muted-foreground" : "text-[#8fa7c0]"}`}>
+                      <small className={`text-[11px] truncate block ${index === step ? "text-muted-foreground" : "text-slate-400"}`}>
                         {item.note}
                       </small>
                     </span>
@@ -597,16 +675,16 @@ export function CandidateOnboarding() {
             <div className="border-b bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-widest text-[#7C3AED]">
-                    Langkah {String(step + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
+                  <h2 className="text-xl font-bold text-foreground md:text-2xl">{steps[step].title}</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Langkah {step + 1} dari {steps.length} · {steps[step].note}
                   </p>
-                  <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">{steps[step].title}</h2>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-semibold text-muted-foreground">{Math.round(((step + 1) / steps.length) * 100)}% selesai</p>
                   <div className="mt-2 h-1.5 w-28 overflow-hidden rounded-full bg-muted sm:w-40">
                     <div
-                      className="h-full rounded-full bg-[#7C3AED] transition-all duration-300"
+                      className="h-full rounded-full bg-primary transition-all duration-300"
                       style={{ width: `${((step + 1) / steps.length) * 100}%` }}
                     />
                   </div>
@@ -622,7 +700,7 @@ export function CandidateOnboarding() {
                     aria-label={`Lompat ke langkah ${index + 1}: ${item.title}`}
                     className={`h-1.5 flex-1 rounded-full transition-all cursor-pointer ${
                       index === step
-                        ? "bg-[#7C3AED]"
+                        ? "bg-primary"
                         : index < step
                         ? "bg-emerald-500"
                         : "bg-muted hover:bg-muted-foreground/30"
@@ -635,6 +713,20 @@ export function CandidateOnboarding() {
             <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
                 <div className="mx-auto max-w-2xl animate-fade-up">
+                  {stepError && (
+                    <div
+                      role="alert"
+                      className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-destructive animate-fade-up shadow-xs"
+                    >
+                      <AlertCircle className="size-4.5 shrink-0 mt-0.5 text-destructive" />
+                      <div>
+                        <p className="font-bold text-sm text-destructive">Periksa Isian Wajib</p>
+                        <p className="mt-0.5 text-muted-foreground leading-relaxed">
+                          {stepError}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {step === 0 && <TalentCategoryStep value={form.talentCategory} onChange={(value) => setValue("talentCategory", value)} />}
                   {step === 1 && <StatusStep value={form.careerStatus} onChange={(value) => setValue("careerStatus", value)} />}
                   {step === 2 && <BasicStep form={form} errors={errors} setValue={setValue} />}
@@ -653,6 +745,7 @@ export function CandidateOnboarding() {
                       update={updateEducation}
                       add={() => setValue("education", [...form.education, { ...emptyEducation }])}
                       remove={(index) => setValue("education", form.education.filter((_, itemIndex) => itemIndex !== index))}
+                      educationError={educationError}
                     />
                   )}
                   {step === 6 && (
@@ -662,6 +755,7 @@ export function CandidateOnboarding() {
                       setTagInput={setTagInput}
                       addTag={addTag}
                       removeTag={removeTag}
+                      skillsError={skillsError}
                     />
                   )}
                   {step === 7 && <ArrangementStep value={form.workArrangement} onChange={(value) => setValue("workArrangement", value)} />}
@@ -683,7 +777,7 @@ export function CandidateOnboarding() {
                   </Button>
                 ) : (
                   <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-[#7C3AED]" />
+                    <span className="size-2 rounded-full bg-primary" />
                     <span>Langkah 1 dari {steps.length} (Wajib)</span>
                   </div>
                 )}
@@ -691,7 +785,7 @@ export function CandidateOnboarding() {
                   type="submit"
                   size="lg"
                   disabled={isPublishing}
-                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10 transition-all disabled:opacity-70"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-xs text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-10 transition-all disabled:opacity-70"
                 >
                   {isPublishing ? (
                     <>
@@ -729,19 +823,22 @@ function TalentCategoryStep({ value, onChange }: { value: TalentCategory; onChan
         {(Object.keys(TALENT_CATEGORY_CONFIG) as TalentCategory[]).map((category) => {
           const config = TALENT_CATEGORY_CONFIG[category];
           const isSelected = value === category;
+          const CategoryIcon = category === "djoin-verified" ? BadgeCheck : User;
           return (
             <button
               type="button"
               key={category}
               onClick={() => onChange(category)}
               aria-pressed={isSelected}
-              className={`rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                isSelected ? "border-[#7C3AED] bg-purple-50/50 ring-2 ring-[#7C3AED]/20 shadow-xs" : "bg-card border-border"
+              className={`rounded-2xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-xs" : "bg-card border-border"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-2xl">{config.badge}</span>
-                {isSelected && <span className="text-xs font-bold text-[#7C3AED] bg-purple-100 px-2 py-0.5 rounded-full">Dipilih</span>}
+                <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                  <CategoryIcon className="size-4.5" />
+                </span>
+                {isSelected && <span className="text-xs font-bold text-primary bg-secondary px-2 py-0.5 rounded-full">Dipilih</span>}
               </div>
               <strong className="mt-3 block text-base font-bold text-foreground">{config.label}</strong>
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
@@ -765,11 +862,11 @@ function StatusStep({ value, onChange }: { value: CareerStatus; onChange: (value
               key={status}
               onClick={() => onChange(status)}
               aria-pressed={value === status}
-              className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                value === status ? "border-[#7C3AED] bg-secondary ring-2 ring-[#7C3AED]/20" : "bg-card"
+              className={`rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                value === status ? "border-primary bg-secondary ring-2 ring-primary/20" : "bg-card"
               }`}
             >
-              <span className="text-xl">{config.emoji}</span>
+              <span className={`inline-flex size-2.5 rounded-full ${config.dot}`} aria-hidden="true" />
               <strong className="mt-3 block text-sm">{careerLabels[status]}</strong>
               <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                 {status === "not-available" ? "Belum ingin menerima peluang" : "Terbuka untuk percakapan yang relevan"}
@@ -805,9 +902,9 @@ function BasicStep({
     <Intro title="Mari kenalan lebih dekat." text="Tulis ringkasan singkat agar recruiter langsung memahami kontak dan arah kariermu.">
       <div className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Nama lengkap *" error={errors.fullName}>
+          <Field label="Nama lengkap" required id="fullName" error={errors.fullName}>
             <input
-              required
+              id="input-fullName"
               aria-invalid={Boolean(errors.fullName)}
               autoComplete="name"
               className={inputClass}
@@ -816,9 +913,9 @@ function BasicStep({
               placeholder="Contoh: Budi Pratama / Siti Rahmawati"
             />
           </Field>
-          <Field label="Email aktif *" error={errors.email}>
+          <Field label="Email aktif" required id="email" error={errors.email}>
             <input
-              required
+              id="input-email"
               aria-invalid={Boolean(errors.email)}
               type="email"
               autoComplete="email"
@@ -831,17 +928,28 @@ function BasicStep({
           </Field>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Nomor telepon / WhatsApp *" error={errors.phone} hint="Digunakan recruiter untuk menghubungi saat screening disetujui">
+          <Field
+            label="Nomor telepon / WhatsApp"
+            required
+            id="phone"
+            extraBadge={
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                <Clock className="size-2.5" /> Verifikasi Segera Hadir
+              </span>
+            }
+            error={errors.phone}
+            hint="Metode verifikasi telepon segera hadir. Saat ini nomor disimpan sebagai kontak untuk dihubungi recruiter saat screening disetujui."
+          >
             <IndonesianPhoneInput
-              required
+              id="input-phone"
               error={Boolean(errors.phone)}
               value={form.phone}
               onChange={(val) => setValue("phone", val)}
             />
           </Field>
-          <Field label="Headline profesional *" hint="Contoh: Senior Product Designer | UX Research" error={errors.headline}>
+          <Field label="Headline profesional" required id="headline" hint="Contoh: Senior Product Designer | UX Research" error={errors.headline}>
             <input
-              required
+              id="input-headline"
               aria-invalid={Boolean(errors.headline)}
               className={inputClass}
               value={form.headline}
@@ -850,12 +958,15 @@ function BasicStep({
             />
           </Field>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Tentang kamu *
-          </label>
+        <Field
+          label="Tentang kamu"
+          required
+          id="about"
+          error={errors.about}
+          hint="Ceritakan ringkasan singkat profil, minat karier, atau keahlian utamamu. Kamu dapat menyempurnakannya nanti di workspace."
+        >
           <textarea
-            required
+            id="input-about"
             aria-invalid={Boolean(errors.about)}
             className={textareaClass}
             value={form.about}
@@ -863,14 +974,7 @@ function BasicStep({
             placeholder="Ceritakan gambaran singkat profil profesionalmu..."
             rows={4}
           />
-          {errors.about ? (
-            <p className="text-xs text-destructive">{errors.about}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Ceritakan ringkasan singkat profil, minat karier, atau keahlian utamamu. Kamu dapat menyempurnakannya nanti di workspace.
-            </p>
-          )}
-        </div>
+        </Field>
       </div>
     </Intro>
   );
@@ -888,24 +992,35 @@ function LocationStep({
   return (
     <Intro title="Di mana kamu ingin bekerja?" text="Lokasi membantu recruiter menemukan kecocokan yang realistis.">
       <div className="space-y-5">
-        <Field label="Domisili saat ini *" error={errors.location}>
+        <Field
+          label="Domisili saat ini (Kabupaten/Kota, Provinsi)"
+          required
+          id="location"
+          hint="Wajib pisahkan dengan koma: [Kabupaten/Kota], [Provinsi]. Contoh: Sleman, D.I. Yogyakarta"
+          error={errors.location}
+        >
           <input
-            required
+            id="input-location"
             aria-invalid={Boolean(errors.location)}
             className={inputClass}
             value={form.location}
             onChange={(event) => setValue("location", event.target.value)}
-            placeholder="Jakarta Selatan, DKI Jakarta"
+            placeholder="Contoh: Sleman, D.I. Yogyakarta atau Jakarta Selatan, DKI Jakarta"
+            list="onboarding-locations-list"
           />
+          <datalist id="onboarding-locations-list">
+            {POPULAR_LOCATION_SUGGESTIONS.map((loc) => (
+              <option key={loc} value={loc} />
+            ))}
+          </datalist>
         </Field>
-        <Field label="Peran yang dituju *" hint="Satu peran utama membantu profilmu tampil lebih fokus." error={errors.targetRole}>
+        <Field label="Peran yang dituju" optional id="targetRole" hint="Satu peran utama membantu profilmu tampil lebih fokus.">
           <input
-            required
-            aria-invalid={Boolean(errors.targetRole)}
+            id="input-targetRole"
             className={inputClass}
             value={form.targetRole}
             onChange={(event) => setValue("targetRole", event.target.value)}
-            placeholder="Senior Product Designer"
+            placeholder="Contoh: Senior Product Designer (Opsional)"
           />
         </Field>
         <Card className="border-emerald-200 bg-emerald-50 p-5">
@@ -947,11 +1062,11 @@ function HistoryStep({
           <Card key={index} className="p-5 border-border space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                <span className="text-xs font-semibold text-foreground">
                   Pengalaman {index + 1}
                 </span>
                 {item.employmentType && (
-                  <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                  <span className="bg-secondary text-primary text-[11px] font-bold px-2 py-0.5 rounded-md">
                     {item.employmentType}
                   </span>
                 )}
@@ -969,18 +1084,16 @@ function HistoryStep({
 
             {/* Row 1: Company Name & Position */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nama Perusahaan (Company Name) *">
+              <Field label="Nama Perusahaan" optional>
                 <input
-                  required
                   className={inputClass}
                   value={item.company}
                   onChange={(event) => update(index, "company", event.target.value)}
                   placeholder="Contoh: PT GoTo Gojek Tokopedia"
                 />
               </Field>
-              <Field label="Jabatan / Posisi (Position) *">
+              <Field label="Jabatan / Posisi" optional>
                 <input
-                  required
                   className={inputClass}
                   value={item.role}
                   onChange={(event) => update(index, "role", event.target.value)}
@@ -990,7 +1103,7 @@ function HistoryStep({
             </div>
 
             {/* Row 2: Employment Type */}
-            <Field label="Tipe Pekerjaan (Employment Type) *">
+            <Field label="Tipe Pekerjaan" optional>
               <select
                 className={inputClass}
                 value={item.employmentType || "Full Time"}
@@ -1007,7 +1120,7 @@ function HistoryStep({
             {/* Row 3: Start Date, End Date, & Current Position Checkbox */}
             <div className="space-y-2">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Tanggal / Tahun Mulai (Start Date) *">
+                <Field label="Tanggal / Tahun Mulai (Start Date)" optional>
                   <input
                     className={inputClass}
                     value={item.startDate || ""}
@@ -1016,7 +1129,7 @@ function HistoryStep({
                   />
                 </Field>
 
-                <Field label="Tanggal / Tahun Selesai (End Date)">
+                <Field label="Tanggal / Tahun Selesai (End Date)" optional>
                   <input
                     className={inputClass}
                     disabled={Boolean(item.currentPosition)}
@@ -1033,19 +1146,19 @@ function HistoryStep({
                   type="checkbox"
                   checked={Boolean(item.currentPosition)}
                   onChange={(event) => update(index, "currentPosition", event.target.checked)}
-                  className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                  className="size-4 rounded border-input text-primary focus:ring-primary"
                 />
                 <span>Masih Bekerja di Sini (Current Position)</span>
               </label>
             </div>
 
-            {/* Row 4: Job Description (Mandatory) */}
+            {/* Row 4: Job Description */}
             <Field
-              label="Deskripsi Pekerjaan & Tanggung Jawab (Job Description) *"
-              hint="Jelaskan peran utama dan tanggung jawab harianmu (Wajib diisi)"
+              label="Deskripsi Pekerjaan & Tanggung Jawab"
+              optional
+              hint="Jelaskan peran utama dan tanggung jawab harianmu"
             >
               <textarea
-                required
                 rows={3}
                 className={`${textareaClass} min-h-24`}
                 value={item.description || ""}
@@ -1054,10 +1167,11 @@ function HistoryStep({
               />
             </Field>
 
-            {/* Row 5: Achievement (Optional) */}
+            {/* Row 5: Achievement */}
             <Field
-              label="Pencapaian Utama (Achievement - Opsional)"
-              hint="Tuliskan hasil konkret, metrik atau capaian terbaik selama bekerja di sini (Opsional)"
+              label="Pencapaian Utama (Achievement)"
+              optional
+              hint="Tuliskan hasil konkret, metrik atau capaian terbaik selama bekerja di sini"
             >
               <textarea
                 rows={2}
@@ -1083,25 +1197,41 @@ function EducationStep({
   update,
   add,
   remove,
+  educationError,
 }: {
   items: EducationItem[];
   update: (index: number, key: keyof EducationItem, value: unknown) => void;
   add: () => void;
   remove: (index: number) => void;
+  educationError?: string | null;
 }) {
   const educationLevels = ["SMA/SMK", "Diploma", "S1", "S2", "S3"];
 
   return (
     <Intro
-      title="Latar belajarmu *"
-      text="Pendidikan formal atau kampus. Kampus mitra kami akan memverifikasi profilmu secara resmi!"
+      title="Latar belajarmu"
+      text="Pendidikan formal atau kampus. Fitur verifikasi resmi terintegrasi dengan kampus mitra akan segera hadir."
     >
       <div className="space-y-4">
+        {educationError && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-xs text-destructive animate-fade-up"
+          >
+            <AlertCircle className="size-4 shrink-0 mt-0.5" />
+            <span>{educationError}</span>
+          </div>
+        )}
         {/* Partner campus quick suggestions */}
-        <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3.5 text-xs">
-          <p className="font-semibold text-[#7C3AED] mb-1.5 flex items-center gap-1.5">
-            <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi Djoin untuk Verifikasi Otomatis:
-          </p>
+        <div className="rounded-xl border border-primary/20 bg-secondary/60 p-3.5 text-xs">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+            <p className="font-semibold text-primary flex items-center gap-1.5">
+              <GraduationCap className="size-3.5" /> Pilih dari Kampus Mitra Resmi:
+            </p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              <Clock className="size-2.5" /> Verifikasi Kampus Segera Hadir
+            </span>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {PARTNER_CAMPUSES.map((campus) => (
               <button
@@ -1115,7 +1245,7 @@ function EducationStep({
                     update(0, "school", campus);
                   }
                 }}
-                className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-purple-100/70 transition-colors"
+                className="rounded-lg border border-primary/20 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 + {campus}
               </button>
@@ -1132,11 +1262,11 @@ function EducationStep({
             <Card key={index} className="p-5 border-border">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs uppercase tracking-widest text-[#7C3AED] font-bold">
+                  <span className="text-xs font-semibold text-foreground">
                     Pendidikan {index + 1}
                   </span>
                   {item.level && (
-                    <span className="bg-purple-100 text-[#7C3AED] text-[11px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-secondary text-primary text-[11px] font-bold px-2 py-0.5 rounded-md">
                       {item.level}
                     </span>
                   )}
@@ -1155,7 +1285,7 @@ function EducationStep({
               <div className="space-y-4">
                 {/* Education Level & Institution */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Jenjang Pendidikan *">
+                  <Field label="Jenjang pendidikan" required>
                     <select
                       className={inputClass}
                       value={item.level || "S1"}
@@ -1170,9 +1300,9 @@ function EducationStep({
                   </Field>
 
                   <div className="sm:col-span-2">
-                    <Field label="Institusi / Universitas *">
+                    <Field label="Institusi / Universitas" required id={`education-school-${index}`}>
                       <input
-                        required
+                        id={`input-education-school-${index}`}
                         className={inputClass}
                         value={item.school}
                         onChange={(event) => update(index, "school", event.target.value)}
@@ -1185,9 +1315,9 @@ function EducationStep({
                 {/* Major & GPA */}
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="sm:col-span-2">
-                    <Field label="Jurusan / Program Studi *">
+                    <Field label="Jurusan / Program Studi" required id={`education-program-${index}`}>
                       <input
-                        required
+                        id={`input-education-program-${index}`}
                         className={inputClass}
                         value={item.program}
                         onChange={(event) => update(index, "program", event.target.value)}
@@ -1196,7 +1326,7 @@ function EducationStep({
                     </Field>
                   </div>
 
-                  <Field label="IPK / Nilai Akhir (GPA)">
+                  <Field label="IPK / Nilai Akhir (GPA)" optional>
                     <input
                       className={inputClass}
                       value={item.gpa || ""}
@@ -1209,7 +1339,7 @@ function EducationStep({
                 {/* Dates & Currently Studying */}
                 <div className="space-y-2">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Tahun / Bulan Mulai (Start Date)">
+                    <Field label="Tahun / Bulan Mulai (Start Date)" optional>
                       <input
                         className={inputClass}
                         value={item.startDate || ""}
@@ -1218,7 +1348,7 @@ function EducationStep({
                       />
                     </Field>
 
-                    <Field label="Tahun / Bulan Selesai (End Date)">
+                    <Field label="Tahun / Bulan Selesai (End Date)" optional>
                       <input
                         className={inputClass}
                         disabled={Boolean(item.currentlyStudying)}
@@ -1235,17 +1365,22 @@ function EducationStep({
                       type="checkbox"
                       checked={Boolean(item.currentlyStudying)}
                       onChange={(event) => update(index, "currentlyStudying", event.target.checked)}
-                      className="size-4 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                      className="size-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span>Masih Menempuh Pendidikan (Currently Studying)</span>
                   </label>
                 </div>
 
                 {partnerMatch && (
-                  <div className="flex items-center gap-2 rounded-lg bg-purple-50 p-2.5 text-xs text-[#7C3AED] font-medium border border-purple-100">
-                    <GraduationCap className="size-4 shrink-0" />
-                    <span>
-                      Terhubung ke Career Center <strong>{partnerMatch}</strong>. Profilmu akan masuk ke antrean verifikasi resmi!
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50/70 p-2.5 text-xs text-amber-900 font-medium border border-amber-200/80">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <GraduationCap className="size-4 shrink-0 text-amber-700" />
+                      <span className="truncate">
+                        Terhubung ke Career Center <strong>{partnerMatch}</strong>.
+                      </span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 shrink-0 text-[10px] font-semibold text-amber-700 bg-white/80 border border-amber-200 px-2 py-0.5 rounded-full">
+                      <Clock className="size-2.5" /> Verifikasi Segera Hadir
                     </span>
                   </div>
                 )}
@@ -1268,21 +1403,42 @@ function TagsStep({
   setTagInput,
   addTag,
   removeTag,
+  skillsError,
 }: {
   form: FormState;
   tagInput: { skills: string; tools: string; softSkills: string };
   setTagInput: React.Dispatch<React.SetStateAction<{ skills: string; tools: string; softSkills: string }>>;
   addTag: (kind: "skills" | "tools" | "softSkills") => void;
   removeTag: (kind: "skills" | "tools" | "softSkills", tag: string) => void;
+  skillsError?: string | null;
 }) {
-  const group = (kind: "skills" | "tools" | "softSkills", label: string, placeholder: string, minNote?: string) => (
-    <Field label={label} hint={`Tekan Enter untuk menambahkan tag. ${minNote ?? ""}`}>
-      <div className="rounded-md border bg-transparent p-2 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+  const group = (
+    kind: "skills" | "tools" | "softSkills",
+    label: string,
+    placeholder: string,
+    required?: boolean,
+    optional?: boolean,
+    hint?: string,
+    error?: string | null
+  ) => (
+    <Field
+      label={label}
+      required={required}
+      optional={optional}
+      hint={hint}
+      error={error ?? undefined}
+      id={`input-tags-${kind}`}
+    >
+      <div
+        className={`rounded-md border bg-transparent p-2 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 ${
+          error ? "border-destructive ring-1 ring-destructive/30" : ""
+        }`}
+      >
         <div className="flex flex-wrap gap-2">
           {form[kind].map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-[#7C3AED]"
+              className="inline-flex items-center gap-1 rounded-full bg-secondary border border-primary/20 px-2.5 py-1 text-xs font-semibold text-primary"
             >
               {tag}
               <button type="button" aria-label={`Hapus ${tag}`} onClick={() => removeTag(kind, tag)}>
@@ -1291,6 +1447,7 @@ function TagsStep({
             </span>
           ))}
           <input
+            id={`input-tags-${kind}`}
             className="h-7 min-w-[140px] flex-1 border-0 bg-transparent px-1 text-sm outline-none"
             value={tagInput[kind]}
             onChange={(event) => setTagInput((current) => ({ ...current, [kind]: event.target.value }))}
@@ -1309,25 +1466,34 @@ function TagsStep({
 
   return (
     <Intro
-      title="Framework Kompetensi (Competencies) *"
+      title="Framework Kompetensi (Competencies)"
       text="Klasifikasikan keahlianmu ke dalam Hard Competencies, Tools, dan Soft Skills untuk memudahkan pencocokan cerdas dengan kriteria rekruter."
     >
       <div className="space-y-6">
         {group(
           "skills",
-          "1. Hard Competencies (Kompetensi Teknis) *",
+          "Hard Competencies (Kompetensi Teknis)",
           "Ketik kompetensi teknis lalu Enter (Contoh: UI/UX Design, Data Analysis, Backend Development)",
-          "(Wajib, minimal 3 kompetensi)"
+          true,
+          false,
+          `Tekan Enter untuk menambahkan. Minimal 3 kompetensi teknis (${form.skills.length}/3 ditambahkan).`,
+          skillsError
         )}
         {group(
           "tools",
-          "2. Tools & Teknologi Pendukung",
-          "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)"
+          "Tools & Software Pendukung",
+          "Ketik nama software/tools lalu Enter (Contoh: Figma, VS Code, Docker, Notion, Postman)",
+          false,
+          true,
+          "Tekan Enter untuk menambahkan tools dan software yang kamu kuasai."
         )}
         {group(
           "softSkills",
-          "3. Soft Skills (Kompetensi Interpersonal)",
-          "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)"
+          "Soft Skills (Kompetensi Interpersonal)",
+          "Ketik soft skill lalu Enter (Contoh: Problem Solving, Public Speaking, Leadership, Team Collaboration)",
+          false,
+          true,
+          "Tekan Enter untuk menambahkan kompetensi komunikasi dan interpersonal."
         )}
       </div>
     </Intro>
@@ -1357,12 +1523,12 @@ function ArrangementStep({
             onClick={() => onChange(option.value)}
             aria-pressed={value === option.value}
             className={`flex w-full items-start gap-4 rounded-xl border p-5 text-left transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              value === option.value ? "border-[#7C3AED] bg-purple-50/50 ring-2 ring-[#7C3AED]/20" : "bg-card border-border"
+              value === option.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "bg-card border-border"
             }`}
           >
             <span
               className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${
-                value === option.value ? "border-[#7C3AED] bg-[#7C3AED] text-white" : "border-input"
+                value === option.value ? "border-primary bg-primary text-primary-foreground" : "border-input"
               }`}
             >
               {value === option.value && <Check className="size-3.5" />}
@@ -1384,24 +1550,24 @@ function ReviewStep({ form }: { form: FormState }) {
   return (
     <Intro title="Satu langkah lagi." text="Tinjau detailmu sebelum profil ini ditemukan recruiter.">
       <Card className="overflow-hidden border-border shadow-sm">
-        <div className="bg-[#0b2342] p-6 text-white">
+        <div className="bg-dark-navy p-6 text-white">
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-white/10 px-2.5 py-0.5 rounded-full font-medium text-[#8de0be]">
+            <span className="text-xs bg-white/10 px-2.5 py-0.5 rounded-full font-medium text-emerald-300">
               {careerLabels[form.careerStatus]}
             </span>
-            <span className="text-xs bg-purple-500/30 text-purple-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span className="text-xs bg-white/10 text-purple-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
               <span>{talentConfig.badge}</span> {talentConfig.label}
             </span>
           </div>
           <h3 className="mt-3 text-2xl font-bold">{form.fullName || "Nama kamu"}</h3>
-          <p className="mt-1 text-sm text-[#b7c8dc]">{form.headline || "Headline profesional"}</p>
-          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[#b7c8dc]">
+          <p className="mt-1 text-sm text-slate-300">{form.headline || "Headline profesional"}</p>
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-300">
             <MapPin className="size-3.5 text-emerald-400" />
             <span>{form.location || "Lokasi belum diisi"}</span>
-            <span className="text-[#55718f]">•</span>
+            <span className="text-slate-500">•</span>
             <span>{form.workArrangement}</span>
-            <span className="text-[#55718f]">•</span>
-            <span>{form.phone || "No. Telepon belum diisi"}</span>
+            <span className="text-slate-500">•</span>
+            <span>{form.phone ? `${form.phone} (Verifikasi Segera Hadir)` : "No. Telepon belum diisi"}</span>
           </p>
         </div>
         <div className="grid gap-5 p-6 sm:grid-cols-2">
@@ -1416,11 +1582,14 @@ function ReviewStep({ form }: { form: FormState }) {
             value={`${form.education.filter((item) => item.school || item.program).length} entri`}
           />
           <Summary label="Skill & tools" value={`${form.skills.length + form.tools.length} item`} />
-          <Summary label="Status kontak" value={form.email} />
+          <Summary
+            label="Status kontak & verifikasi"
+            value={`${form.email} (Email) • ${form.phone || "No. Telepon"} (Telepon - Verifikasi Segera Hadir)`}
+          />
         </div>
       </Card>
-      <div className="mt-5 flex gap-3 rounded-lg bg-purple-50 border border-purple-100 p-4 text-sm text-purple-900">
-        <ShieldCheck className="size-5 shrink-0 text-[#7C3AED]" />
+      <div className="mt-5 flex gap-3 rounded-xl bg-secondary/50 border border-primary/20 p-4 text-sm text-foreground">
+        <ShieldCheck className="size-5 shrink-0 text-primary" />
         <p className="text-xs leading-relaxed">
           Dengan mempublikasikan, profilmu akan langsung terdaftar di Talent Network sesuai status karier, preferensi kerja, dan kategori yang kamu pilih.
         </p>

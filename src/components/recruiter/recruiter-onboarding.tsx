@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -12,6 +13,7 @@ import {
   FileUp,
   Globe,
   Info,
+  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -36,6 +38,7 @@ const recruiterSteps = [
 const INDUSTRY_OPTIONS = [
   "Teknologi & Perangkat Lunak (SaaS / IT)",
   "Fintech & Layanan Keuangan",
+  "Hospitality, Pariwisata & Hotel",
   "E-Commerce & Retail Modern",
   "FMCG & Manufaktur",
   "Kesehatan, Farmasi & Medtech",
@@ -141,7 +144,7 @@ function getSavedDraft(): { form: RecruiterOnboardingData; step: number } | null
 
 export function RecruiterOnboarding() {
   const router = useRouter();
-  const { user, logout, setProvisioningStatus } = useApp();
+  const { user, logout, setProvisioningStatus, reloadBootstrap } = useApp();
 
   const [step, setStep] = useState<number>(() => {
     const draft = getSavedDraft();
@@ -161,6 +164,7 @@ export function RecruiterOnboarding() {
   const [agreementChecked, setAgreementChecked] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState<"nib" | "npwp" | null>(null);
   const editsRef = useRef(0);
 
   // Save draft
@@ -188,14 +192,54 @@ export function RecruiterOnboarding() {
     }
   };
 
-  const handleFileUpload = (field: "nibFileName" | "npwpFileName", file: File | null) => {
+  const handleFileUpload = async (field: "nibFileName" | "npwpFileName", file: File | null) => {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Ukuran berkas maksimal 10MB");
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Format berkas tidak valid. Hanya berkas PDF (.pdf) yang diperbolehkan.");
       return;
     }
-    update(field, file.name);
-    toast.success(`Berkas ${file.name} berhasil diunggah!`);
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ukuran berkas PDF maksimal 10MB");
+      return;
+    }
+
+    const docType = field === "nibFileName" ? "nib" : "npwp";
+    setUploadingDoc(docType);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", docType);
+
+      const res = await fetch("/api/recruiter/legal-docs", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengunggah berkas PDF");
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        [field]: file.name,
+        [field === "nibFileName" ? "nibDocumentUrl" : "npwpDocumentUrl"]: data.storagePath,
+      }));
+      editsRef.current += 1;
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[docType];
+        return next;
+      });
+      toast.success(`Berkas PDF ${file.name} berhasil diunggah!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah berkas PDF.");
+    } finally {
+      setUploadingDoc(null);
+    }
   };
 
   const validateStep = (s: number) => {
@@ -213,7 +257,12 @@ export function RecruiterOnboarding() {
       if (!form.city.trim()) errs.city = "Kota kantor operasional wajib diisi.";
       if (!form.officeAddress.trim()) errs.officeAddress = "Alamat kantor operasional wajib diisi.";
     } else if (s === 2) {
-      // Pengecualian: NIB dan NPWP tidak diwajibkan saat masa pengujian/testing akun rekruter
+      if (!form.nibDocumentUrl) {
+        errs.nib = "Dokumen resmi NIB OSS dalam format PDF (.pdf) wajib diunggah.";
+      }
+      if (!form.npwpDocumentUrl) {
+        errs.npwp = "Dokumen resmi NPWP Badan Usaha dalam format PDF (.pdf) wajib diunggah.";
+      }
     }
 
     setErrors(errs);
@@ -254,6 +303,7 @@ export function RecruiterOnboarding() {
         // ignore
       }
       setProvisioningStatus("pending");
+      await reloadBootstrap();
       toast.success("Dokumen legalitas berhasil dikirim ke antrean review compliance!");
       router.push("/recruiter/pending");
     } catch (err) {
@@ -570,74 +620,178 @@ export function RecruiterOnboarding() {
                 {/* ── STEP 2: DOKUMEN LEGALITAS ── */}
                 {step === 2 && (
                   <Intro
-                    title="Unggah Dokumen Legalitas (NIB & NPWP)"
-                    text="Berkas resmi ini digunakan tim compliance untuk memverifikasi keabsahan entitas bisnis sebelum akun diaktifkan. (Opsional selama fase pengujian)"
+                    title="Unggah Dokumen Legalitas Resmi (PDF)"
+                    text="Unggah berkas resmi NIB OSS dan NPWP Badan Usaha dalam format PDF. Berkas ini wajib dilampirkan agar tim compliance dapat memverifikasi keabsahan entitas bisnis sebelum akun diaktifkan."
                   >
                     <div className="space-y-4">
                       {/* NIB */}
-                      <Card className="p-4 border-border shadow-2xs space-y-3">
+                      <Card className={`p-4 border shadow-2xs space-y-3 transition-colors ${errors.nib ? "border-destructive/60 bg-destructive/5" : "border-border"}`}>
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <FileText className="size-4 text-[#0b2342]" /> 1. Nomor Induk Berusaha (NIB OSS)
+                            <FileText className="size-4 text-[#7C3AED]" /> 1. Nomor Induk Berusaha (NIB OSS) *
                           </span>
-                          {form.nibFileName && (
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              Terunggah
+                          {form.nibDocumentUrl ? (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                              <Check className="size-3 text-emerald-600" /> PDF Terunggah
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                              Wajib PDF
                             </span>
                           )}
                         </div>
-                        <input
-                          className={inputClass}
-                          value={form.nibNumber}
-                          onChange={(e) => update("nibNumber", e.target.value)}
-                          placeholder="Nomor 13 digit NIB (opsional)"
-                        />
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.nibFileName || "Pilih Berkas NIB (PDF / JPG) - Opsional"}</span>
-                          <input
-                            type="file"
-                            accept=".pdf,image/*"
-                            className="sr-only"
-                            onChange={(e) => handleFileUpload("nibFileName", e.target.files?.[0] || null)}
-                          />
-                        </label>
+                        <p className="text-[11px] text-muted-foreground">
+                          Dokumen NIB resmi yang diterbitkan melalui sistem Online Single Submission (OSS).
+                        </p>
+
+                        {form.nibDocumentUrl ? (
+                          <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                                <FileText className="size-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-emerald-950 truncate">
+                                  {form.nibFileName || "Berkas_NIB.pdf"}
+                                </p>
+                                <p className="text-[10px] text-emerald-700">Berkas PDF siap diverifikasi compliance</p>
+                              </div>
+                            </div>
+                            <label className="cursor-pointer text-xs font-semibold text-primary hover:underline shrink-0 ml-3">
+                              Ganti Berkas
+                              <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                className="sr-only"
+                                disabled={uploadingDoc === "nib"}
+                                onChange={(e) => handleFileUpload("nibFileName", e.target.files?.[0] || null)}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label
+                            className={`cursor-pointer flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+                              errors.nib
+                                ? "border-destructive/40 bg-white hover:bg-destructive/5"
+                                : "border-slate-300 bg-slate-50/60 hover:bg-slate-100/80"
+                            } ${uploadingDoc === "nib" ? "pointer-events-none opacity-60" : ""}`}
+                          >
+                            {uploadingDoc === "nib" ? (
+                              <Loader2 className="size-6 text-primary animate-spin" />
+                            ) : (
+                              <FileUp className="size-6 text-muted-foreground" />
+                            )}
+                            <span className="text-xs font-semibold text-foreground">
+                              {uploadingDoc === "nib"
+                                ? "Mengunggah berkas NIB PDF..."
+                                : "Pilih atau Tarik Berkas NIB (.pdf)"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Format resmi: Hanya PDF (Maks. 10MB)
+                            </span>
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              className="sr-only"
+                              disabled={uploadingDoc === "nib"}
+                              onChange={(e) => handleFileUpload("nibFileName", e.target.files?.[0] || null)}
+                            />
+                          </label>
+                        )}
+
+                        {errors.nib && (
+                          <p className="text-[11px] text-destructive font-medium flex items-center gap-1">
+                            <AlertCircle className="size-3" /> {errors.nib}
+                          </p>
+                        )}
                       </Card>
 
                       {/* NPWP */}
-                      <Card className="p-4 border-border shadow-2xs space-y-3">
+                      <Card className={`p-4 border shadow-2xs space-y-3 transition-colors ${errors.npwp ? "border-destructive/60 bg-destructive/5" : "border-border"}`}>
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <FileText className="size-4 text-[#0b2342]" /> 2. NPWP Badan Usaha
+                            <FileText className="size-4 text-[#7C3AED]" /> 2. NPWP Badan Usaha *
                           </span>
-                          {form.npwpFileName && (
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              Terunggah
+                          {form.npwpDocumentUrl ? (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                              <Check className="size-3 text-emerald-600" /> PDF Terunggah
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                              Wajib PDF
                             </span>
                           )}
                         </div>
-                        <input
-                          className={inputClass}
-                          value={form.npwpNumber}
-                          onChange={(e) => update("npwpNumber", e.target.value)}
-                          placeholder="Nomor 16 digit NPWP Badan (opsional)"
-                        />
-                        <label className="cursor-pointer flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                          <FileUp className="size-4 text-[#0b2342]" />
-                          <span className="truncate">{form.npwpFileName || "Pilih Berkas NPWP (PDF / JPG) - Opsional"}</span>
-                          <input
-                            type="file"
-                            accept=".pdf,image/*"
-                            className="sr-only"
-                            onChange={(e) => handleFileUpload("npwpFileName", e.target.files?.[0] || null)}
-                          />
-                        </label>
+                        <p className="text-[11px] text-muted-foreground">
+                          Salinan resmi kartu NPWP Badan atau Surat Keterangan Terdaftar (SKT) dari Ditjen Pajak.
+                        </p>
+
+                        {form.npwpDocumentUrl ? (
+                          <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                                <FileText className="size-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-emerald-950 truncate">
+                                  {form.npwpFileName || "Berkas_NPWP.pdf"}
+                                </p>
+                                <p className="text-[10px] text-emerald-700">Berkas PDF siap diverifikasi compliance</p>
+                              </div>
+                            </div>
+                            <label className="cursor-pointer text-xs font-semibold text-primary hover:underline shrink-0 ml-3">
+                              Ganti Berkas
+                              <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                className="sr-only"
+                                disabled={uploadingDoc === "npwp"}
+                                onChange={(e) => handleFileUpload("npwpFileName", e.target.files?.[0] || null)}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label
+                            className={`cursor-pointer flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+                              errors.npwp
+                                ? "border-destructive/40 bg-white hover:bg-destructive/5"
+                                : "border-slate-300 bg-slate-50/60 hover:bg-slate-100/80"
+                            } ${uploadingDoc === "npwp" ? "pointer-events-none opacity-60" : ""}`}
+                          >
+                            {uploadingDoc === "npwp" ? (
+                              <Loader2 className="size-6 text-primary animate-spin" />
+                            ) : (
+                              <FileUp className="size-6 text-muted-foreground" />
+                            )}
+                            <span className="text-xs font-semibold text-foreground">
+                              {uploadingDoc === "npwp"
+                                ? "Mengunggah berkas NPWP PDF..."
+                                : "Pilih atau Tarik Berkas NPWP (.pdf)"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Format resmi: Hanya PDF (Maks. 10MB)
+                            </span>
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              className="sr-only"
+                              disabled={uploadingDoc === "npwp"}
+                              onChange={(e) => handleFileUpload("npwpFileName", e.target.files?.[0] || null)}
+                            />
+                          </label>
+                        )}
+
+                        {errors.npwp && (
+                          <p className="text-[11px] text-destructive font-medium flex items-center gap-1">
+                            <AlertCircle className="size-3" /> {errors.npwp}
+                          </p>
+                        )}
                       </Card>
 
                       <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3.5 text-xs text-slate-700 flex items-start gap-2.5">
                         <Info className="size-4 text-blue-600 shrink-0 mt-0.5" />
                         <p className="leading-relaxed">
-                          Seluruh berkas legalitas perusahaan disimpan terenkripsi dengan standar kepatuhan tinggi untuk verifikasi manual internal ProofyLink. Selama masa testing, Anda dapat melewati langkah ini.
+                          Seluruh berkas legalitas perusahaan disimpan terenkripsi dengan standar keamanan tinggi untuk verifikasi keabsahan hukum manual oleh tim compliance ProofyLink.
                         </p>
                       </div>
                     </div>
@@ -693,13 +847,15 @@ export function RecruiterOnboarding() {
                         </div>
 
                         <div className="p-6 bg-slate-50/50 space-y-2 text-xs">
-                          <strong className="text-foreground block">Berkas Terlampir:</strong>
+                          <strong className="text-foreground block">Dokumen Legalitas Terlampir (PDF):</strong>
                           <div className="grid sm:grid-cols-2 gap-2 text-slate-700">
-                            <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> NIB: {form.nibFileName || (form.nibNumber ? `No: ${form.nibNumber}` : "Tidak dilampirkan (opsional)")}
+                            <p className="flex items-center gap-1.5 font-medium">
+                              <Check className="size-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">NIB: {form.nibFileName ? `${form.nibFileName} (PDF Resmi)` : "Terlampir"}</span>
                             </p>
-                            <p className="flex items-center gap-1.5">
-                              <Check className="size-3.5 text-emerald-600" /> NPWP: {form.npwpFileName || (form.npwpNumber ? `No: ${form.npwpNumber}` : "Tidak dilampirkan (opsional)")}
+                            <p className="flex items-center gap-1.5 font-medium">
+                              <Check className="size-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">NPWP: {form.npwpFileName ? `${form.npwpFileName} (PDF Resmi)` : "Terlampir"}</span>
                             </p>
                           </div>
                         </div>

@@ -1,84 +1,114 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight, CheckCircle2, ClipboardList, ShieldCheck, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
-import { getFirstIncompleteStep } from "@/lib/candidate/onboarding-step";
-import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 
 export function ProfileCompletionCard() {
   const { cvProfile } = useApp();
-  const sections = [
-    { label: "Data dasar", done: Boolean(cvProfile?.fullName.trim() && cvProfile?.email.trim()) },
-    { label: "Headline & ringkasan", done: Boolean(cvProfile?.headline.trim() && cvProfile?.about.trim()) },
-    { label: "Lokasi & peran tujuan", done: Boolean(cvProfile?.location.trim() && cvProfile?.targetRole.trim()) },
-    { label: "Skill & tools", done: Boolean(cvProfile?.skills.length && cvProfile?.tools.length) },
-    { label: "Pengalaman", done: Boolean(cvProfile?.experience.length) },
-    { label: "Pendidikan", done: Boolean(cvProfile?.education.length) },
-  ];
-  const doneCount = sections.filter((section) => section.done).length;
-  const percent = Math.round((doneCount / sections.length) * 100);
-  const complete = percent === 100;
-  const remaining = sections.filter((section) => !section.done);
-  const targetStep = getFirstIncompleteStep(cvProfile);
+  const readiness = calculateCandidateReadiness(cvProfile);
 
   return (
-    <Card>
-      <CardContent className="p-5">
+    <Card className="border-border/80 bg-card shadow-xs">
+      <CardContent className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              {complete ? <ShieldCheck className="size-5" /> : <ClipboardList className="size-5" />}
+          <div className="flex items-start gap-3.5">
+            <span
+              className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                readiness.complete ? "bg-emerald-50 text-emerald-600" : "bg-primary/10 text-primary"
+              }`}
+            >
+              {readiness.complete ? <ShieldCheck className="size-5" /> : <ClipboardList className="size-5" />}
             </span>
             <div>
-              <p className="font-semibold text-foreground">Kelengkapan profil</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {complete
-                  ? "Semua bagian utama sudah terisi."
-                  : `${remaining.length} bagian belum terisi.`}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-foreground">Kesiapan profil</p>
+                <Badge
+                  variant="outline"
+                  className={`text-[11px] font-medium ${
+                    readiness.complete
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-primary/20 bg-primary/5 text-primary"
+                  }`}
+                >
+                  {readiness.tier}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {readiness.complete
+                  ? "Semua bagian utama terisi. Profil siap dilamar dan lolos pindaian ATS."
+                  : `${readiness.missingSections.length} bagian penting belum dilengkapi agar profil optimal.`}
               </p>
             </div>
           </div>
-          <p className={`font-mono text-2xl font-bold ${complete ? "text-emerald-600" : "text-primary"}`}>
-            {percent}%
+          <p className={`font-mono text-2xl font-bold tabular-nums tracking-tight ${readiness.tierColor}`}>
+            {readiness.percent}%
           </p>
         </div>
+
         <div
-          className="mt-4 h-2 overflow-hidden rounded-full bg-muted"
+          className="mt-4 h-2.5 overflow-hidden rounded-full bg-muted"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={percent}
-          aria-label="Kelengkapan profil"
+          aria-valuenow={readiness.percent}
+          aria-label="Kesiapan profil ATS"
         >
           <div
-            className={`h-full rounded-full transition-all duration-300 ${complete ? "bg-emerald-500" : "bg-primary"}`}
-            style={{ width: `${percent}%` }}
+            className={`h-full rounded-full transition-all duration-500 ${
+              readiness.complete ? "bg-emerald-500" : "bg-primary"
+            }`}
+            style={{ width: `${readiness.percent}%` }}
           />
         </div>
-        {!complete && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {remaining.map((section) => (
-              <Badge key={section.label} variant="outline" className="font-normal text-muted-foreground">
-                {section.label}
-              </Badge>
-            ))}
+
+        {!readiness.complete && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Bagian yang perlu dilengkapi
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {readiness.missingSections.map((section) => (
+                <Link key={section.id} href={section.anchor}>
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer border-border bg-muted/40 text-xs font-normal text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                  >
+                    + {section.label}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
-        {!complete ? (
-          <Link
-            href={`/candidate/onboarding?step=${targetStep}`}
-            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-          >
-            Lanjutkan onboarding <ArrowRight className="size-4" />
-          </Link>
-        ) : (
-          <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-            <ShieldCheck className="size-4" /> Profil siap ditemukan recruiter
-          </p>
-        )}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+          {!readiness.complete ? (
+            <>
+              <Link
+                href={readiness.firstIncompleteAnchor}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+              >
+                Lengkapi di CV Studio <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                href="/candidate/career-advisor"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Sparkles className="size-3.5 text-primary" />
+                Minta saran AI
+              </Link>
+            </>
+          ) : (
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+              <CheckCircle2 className="size-4" /> Profil aktif dan dapat ditemukan rekruter
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
 }
+

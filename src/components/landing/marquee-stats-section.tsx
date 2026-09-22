@@ -1,34 +1,51 @@
-import { InteractiveMarquee } from "@/components/ui/interactive-marquee";
-
-const STATS = [
-  { val: "30+", color: "text-[#111827]", label: "Profil Talent Terverifikasi" },
-  { val: "98%", color: "text-[#7C3AED]", label: "Akurasi Sinyal Match" },
-  { val: "3x", color: "text-[#111827]", label: "Skrining Recruiter Lebih Cepat" },
-  { val: "1 Token", color: "text-[#7C3AED]", label: "Biaya Transparan per Unlock" },
-  { val: "100%", color: "text-[#111827]", label: "Privasi Berbasis Consent" },
-  { val: "0 Spam", color: "text-[#7C3AED]", label: "Kontak Terverifikasi Langsung" },
-];
-
 export function MarqueeStatsSection() {
-  return (
-    <section className="relative overflow-hidden border-y border-slate-200/80 bg-white py-7 shadow-xs">
-      {/* Edge Fade Gradients */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white to-transparent z-10" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white to-transparent z-10" />
+  const METRICS = [
+    {
+      value: "30+",
+      label: "Talent Aktif Terkurasi",
+      detail: "Portofolio & rekam jejak verified",
+    },
+    {
+      value: "96.4%",
+      label: "Akurasi AI Match",
+      detail: "Berdasarkan 5 pilar kompetensi teknis",
+    },
+    {
+      value: "1 Token",
+      label: "Model Pay-per-Unlock",
+      detail: "Fleksibel tanpa komitmen langganan",
+    },
+    {
+      value: "< 48 Jam",
+      label: "Average Response Time",
+      detail: "Jauh lebih cepat dari cold outreach biasa",
+    },
+  ];
 
-      <InteractiveMarquee speed={0.7} hoverSpeed={0.15}>
-        <div className="flex items-center gap-12 sm:gap-16 pr-12 sm:pr-16">
-          {STATS.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-6 text-center shrink-0">
-              <div>
-                <p className={`font-mono text-3xl font-extrabold ${item.color}`}>{item.val}</p>
-                <p className="text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">{item.label}</p>
-              </div>
-              <span className="size-1.5 rounded-full bg-slate-300 ml-4" />
+  return (
+    <section className="relative z-10 isolate border-b border-slate-200/80 bg-slate-50/60 py-8">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+          {METRICS.map((item, idx) => (
+            <div
+              key={item.label}
+              className={`flex flex-col justify-center px-4 py-4 md:py-0 ${
+                idx === 0 ? "md:pl-0" : ""
+              } ${idx === METRICS.length - 1 ? "md:pr-0" : ""}`}
+            >
+              <p className="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-800">
+                {item.label}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 leading-snug">
+                {item.detail}
+              </p>
             </div>
           ))}
         </div>
-      </InteractiveMarquee>
+      </div>
     </section>
   );
 }

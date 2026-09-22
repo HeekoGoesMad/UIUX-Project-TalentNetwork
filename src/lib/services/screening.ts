@@ -163,11 +163,11 @@ export class ScreeningService {
         action: "screening.run.started",
         entityType: "screening_run",
         entityId: run.id,
-          metadata: {
-            candidateProfileId: params.candidateProfileId,
-            consentRequestItemId,
-            idempotent: false,
-          },
+        metadata: {
+          candidateProfileId: params.candidateProfileId,
+          consentRequestItemId,
+          idempotent: false,
+        },
       });
 
       return { runId: run.id, runStatus: run.status, balance: charged.balance, idempotent: false };

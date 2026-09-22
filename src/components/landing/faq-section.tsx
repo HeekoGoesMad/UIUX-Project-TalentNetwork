@@ -1,24 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, HelpCircle } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const FAQS = [
   {
-    q: "Bagaimana sistem Token di ProofyLink bekerja?",
-    a: "Pencarian dan pemantauan profil kandidat 100% gratis. Anda hanya menggunakan 1 token saat ingin membuka kontak langsung dan portofolio lengkap kandidat yang sesuai dengan kriteria kebutuhan Anda.",
+    q: "Gimana cara kerja sistem token di Talent Network?",
+    a: "Kamu bisa bebas cari dan lihat sinyal kompetensi semua kandidat secara gratis tanpa batas. Token cuma dipakai (1 token) waktu kamu mau buka kontak langsung (WhatsApp & email) dan dossier lengkap dari kandidat yang kamu pilih.",
   },
   {
-    q: "Bagaimana ProofyLink menjaga privasi kandidat?",
-    a: "Secara default, profil kandidat ditampilkan dalam bentuk anonim (Kandidat Privat) dengan sinyal kompetensi & ekspektasi karir. Kontak dan nama lengkap hanya diberikan jika recruiter menggunakan token dan terdapat kualifikasi yang relevan.",
+    q: "Gimana Talent Network melindungi privasi kandidat?",
+    a: "Secara default, profil kandidat ditampilkan dalam mode proteksi tanpa memunculkan kontak pribadi atau identitas sensitif (Private Mode). Karena kandidat telah memberikan izin akses data resmi saat registrasi akun, kontak langsung (WhatsApp & email) akan langsung terbuka seketika saat kamu mengonfirmasi penggunaan 1 token, tanpa perlu menunggu proses approval tambahan.",
   },
   {
-    q: "Apa perbedaan ProofyLink dibanding platform rekrutmen biasa?",
-    a: "Platform biasa penuh spam inbox dan CV tidak terverifikasi. ProofyLink memberikan Sinyal Terverifikasi (Signal-based matching) dengan AI scoring, memastikan kecocokan tinggi sebelum kontak dilakukan.",
+    q: "Apa bedanya Talent Network dengan job portal biasa?",
+    a: "Job portal biasa umumnya cuma mengandalkan teks resume yang rawan dilebih-lebihkan dan sering bikin spam inbox. Di Talent Network, kami mengevaluasi bukti nyata (audit commit, studi kasus produksi, dan validasi rekan kerja) dengan 5 pilar kompetensi yang terukur.",
   },
   {
-    q: "Apakah kandidat dikenakan biaya untuk menggunakan ProofyLink?",
-    a: "Kandidat 100% gratis menggunakan ProofyLink, termasuk fitur AI CV Builder, Career Advisor, dan opsi penerimaan tawaran yang relevan secara privat.",
+    q: "Apakah kandidat dikenakan biaya untuk bergabung?",
+    a: "Sama sekali nggak ada biaya untuk kandidat. Kandidat bisa bergabung, melengkapi profil sinyal kompetensi, dan menerima tawaran diskusi karier yang relevan secara 100% gratis selamanya.",
   },
 ];
 
@@ -26,18 +27,18 @@ export function FaqSection() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-20 lg:py-28 bg-white scroll-mt-20">
+    <section id="faq" className="py-20 lg:py-28 bg-white border-b border-slate-200/80 scroll-mt-20">
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3.5 py-1 text-xs font-semibold text-[#7C3AED]">
-            <HelpCircle className="size-3.5 text-[#7C3AED]" /> Pertanyaan Umum
-          </span>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
-            Sering Ditanyakan (FAQ)
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-balance">
+            Pertanyaan yang Sering Ditanyakan
           </h2>
+          <p className="mt-3 text-base text-slate-600">
+            Hal-hal penting seputar verifikasi sinyal, privasi kandidat, dan penggunaan token.
+          </p>
         </div>
 
-        <div className="mt-12 space-y-4">
+        <div className="mt-12 space-y-3">
           {FAQS.map((faq, idx) => {
             const isOpen = openFaq === idx;
             const buttonId = `faq-trigger-${idx}`;
@@ -45,7 +46,12 @@ export function FaqSection() {
             return (
               <div
                 key={idx}
-                className="rounded-2xl border border-slate-200/80 bg-[#f8fafc] overflow-hidden transition-colors"
+                className={cn(
+                  "rounded-2xl border transition-all duration-300 overflow-hidden",
+                  isOpen
+                    ? "border-slate-300/90 bg-slate-50/40 shadow-xs"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/20"
+                )}
               >
                 <button
                   type="button"
@@ -53,23 +59,32 @@ export function FaqSection() {
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between p-5 text-left text-sm font-bold text-[#111827] hover:bg-slate-100 cursor-pointer"
+                  className="w-full flex items-center justify-between p-5 text-left text-sm sm:text-base font-semibold text-slate-900 cursor-pointer transition-colors"
                 >
-                  <span>{faq.q}</span>
+                  <span className="pr-4">{faq.q}</span>
                   <ChevronDown
-                    className={`size-5 text-muted-foreground transition-transform duration-200 shrink-0 ${
-                      isOpen ? "rotate-180 text-[#7C3AED]" : ""
-                    }`}
+                    className={cn(
+                      "size-4 text-slate-400 transition-transform duration-300 shrink-0",
+                      isOpen && "rotate-180 text-slate-900"
+                    )}
                   />
                 </button>
+
+                {/* Smooth Animated Accordion Grid Row Expansion */}
                 <div
                   id={panelId}
                   role="region"
                   aria-labelledby={buttonId}
-                  hidden={!isOpen}
-                  className="px-5 pb-5 text-xs sm:text-sm leading-6 text-muted-foreground border-t border-slate-200/60 pt-3"
+                  className={cn(
+                    "grid transition-all duration-300 ease-out",
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                  )}
                 >
-                  {faq.a}
+                  <div className="overflow-hidden">
+                    <div className="px-5 pb-5 text-xs sm:text-sm leading-relaxed text-slate-600 border-t border-slate-100/90 pt-3">
+                      {faq.a}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
