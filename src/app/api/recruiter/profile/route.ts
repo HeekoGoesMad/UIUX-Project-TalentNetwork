@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { isDevBypassEnabled } from "@/lib/config/server";
+import { createClient } from "@/lib/supabase/server";
 
 type IndustrySector = typeof schema.industrySector.enumValues[number];
 type CompanyScale = typeof schema.companyScale.enumValues[number];
@@ -34,8 +35,7 @@ function emptyToUndefined<T extends z.ZodType>(inner: T) {
 const updateProfileSchema = z
   .object({
     picName: z.string().trim().min(2, "Nama PIC minimal 2 karakter").max(120).optional(),
-    // Diterima agar payload form lama tetap valid, tetapi tidak disimpan (tidak ada kolomnya di profiles).
-    picTitle: z.string().trim().max(120).optional(),
+    picTitle: z.string().trim().min(2, "Jabatan / Role PIC minimal 2 karakter").max(120).optional(),
     picPhone: z.string().trim().min(6, "Nomor telepon tidak valid").max(32).optional(),
     companyName: z.string().trim().min(2, "Nama perusahaan minimal 2 karakter").max(160).optional(),
     industry: emptyToUndefined(
@@ -44,15 +44,15 @@ const updateProfileSchema = z
     companySize: emptyToUndefined(
       z.enum(SCALE_VALUES, { error: "Skala perusahaan tidak valid." })
     ),
-    description: z.string().trim().max(2000).optional(),
+    description: z.string().trim().min(10, "Deskripsi perusahaan minimal 10 karakter").max(2000).optional(),
     websiteUrl: emptyToUndefined(
       z.string().trim().url("URL website tidak valid.").max(2048)
     ),
     linkedinUrl: emptyToUndefined(
       z.string().trim().url("URL LinkedIn tidak valid.").max(2048)
     ),
-    officeAddress: z.string().trim().max(500).optional(),
-    city: z.string().trim().max(120).optional(),
+    officeAddress: z.string().trim().min(5, "Alamat kantor minimal 5 karakter").max(500).optional(),
+    city: z.string().trim().min(2, "Kota kantor minimal 2 karakter").max(120).optional(),
     nibNumber: z.string().trim().max(32).optional().nullable(),
     npwpNumber: z.string().trim().max(32).optional().nullable(),
     nibDocumentUrl: z.string().trim().optional().nullable(),
@@ -134,12 +134,22 @@ export async function GET() {
           .limit(1)
       : [null];
 
+    // Ambil picTitle dari Supabase auth user metadata (disimpan saat onboarding)
+    let picTitle: string | null = null;
+    try {
+      const supabase = await createClient();
+      const { data: authData } = await supabase.auth.getUser();
+      picTitle =
+        (typeof authData.user?.user_metadata?.picTitle === "string" ? authData.user.user_metadata.picTitle : "") ||
+        (typeof authData.user?.user_metadata?.picPosition === "string" ? authData.user.user_metadata.picPosition : "") ||
+        null;
+    } catch {}
+
     return NextResponse.json({
       data: {
         picName: profile?.displayName ?? user.email.split("@")[0] ?? null,
         picEmail: user.email,
-        // Tidak ada kolom jabatan di profiles; jangan kirim PII/nilai demo.
-        picTitle: null,
+        picTitle: picTitle,
         picPhone: profile?.phone ?? null,
         companyName: org?.name ?? null,
         industry: org?.industry ?? null,
@@ -201,6 +211,20 @@ export async function PATCH(request: Request) {
         { error: "Hanya owner atau admin organisasi yang dapat mengubah data perusahaan." },
         { status: 403 }
       );
+    }
+
+    // Perbarui picTitle ke Supabase auth user metadata jika dikirim
+    if (data.picTitle !== undefined) {
+      try {
+        const supabase = await createClient();
+        await supabase.auth.updateUser({
+          data: {
+            picTitle: data.picTitle,
+          },
+        });
+      } catch (err) {
+        console.error("Gagal memperbarui picTitle ke Supabase auth metadata:", err);
+      }
     }
 
     await db.transaction(async (tx) => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Building2,
   CheckCircle2,
   ExternalLink,
@@ -20,8 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
+import { cn, extractIndonesianLocalPhone } from "@/lib/utils";
 
 // Nilai value selaras dengan enum API (industry_sector / company_scale); label tetap Bahasa Indonesia.
 const INDUSTRY_OPTIONS = [
@@ -77,6 +80,18 @@ export function RecruiterSettingsView() {
   const [openingDoc, setOpeningDoc] = useState<"nib" | "npwp" | null>(null);
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleChangeField = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   const handleOpenDocument = async (type: "nib" | "npwp") => {
     setOpeningDoc(type);
@@ -155,6 +170,20 @@ export function RecruiterSettingsView() {
               const v = json.data[key];
               next[key] = typeof v === "string" ? v : "";
             }
+
+            // Autofill Jabatan / Role PIC jika belum terisi dari server: fallback ke draft onboarding di localStorage
+            if (!next.picTitle) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.picTitle === "string" && draft.form.picTitle.trim()) {
+                    next.picTitle = draft.form.picTitle.trim();
+                  }
+                }
+              } catch {}
+            }
+
             return next;
           });
         }
@@ -168,13 +197,137 @@ export function RecruiterSettingsView() {
     loadData();
   }, []);
 
+  const validateForm = () => {
+    const errs: Record<string, string> = {};
+
+    // 1. Identitas PIC
+    if (!form.picName.trim()) {
+      errs.picName = "Nama lengkap PIC wajib diisi.";
+    } else if (form.picName.trim().length < 2) {
+      errs.picName = "Nama lengkap PIC minimal 2 karakter.";
+    }
+
+    if (!form.picTitle.trim()) {
+      errs.picTitle = "Jabatan / Role PIC wajib diisi.";
+    } else if (form.picTitle.trim().length < 2) {
+      errs.picTitle = "Jabatan / Role PIC minimal 2 karakter.";
+    }
+
+    const phoneDigits = extractIndonesianLocalPhone(form.picPhone);
+    if (!phoneDigits) {
+      errs.picPhone = "Nomor WhatsApp / telepon wajib diisi.";
+    } else if (phoneDigits.length < 8) {
+      errs.picPhone = "Nomor telepon minimal 8 digit angka.";
+    } else if (phoneDigits.length > 15) {
+      errs.picPhone = "Nomor telepon maksimal 15 digit angka.";
+    }
+
+    // 2. Profil Entitas Bisnis & Operasional
+    if (!form.companyName.trim()) {
+      errs.companyName = "Nama resmi perusahaan (PT/CV) wajib diisi.";
+    } else if (form.companyName.trim().length < 2) {
+      errs.companyName = "Nama resmi perusahaan minimal 2 karakter.";
+    }
+
+    if (!form.industry) {
+      errs.industry = "Sektor industri wajib dipilih.";
+    }
+
+    if (!form.companySize) {
+      errs.companySize = "Skala / ukuran perusahaan wajib dipilih.";
+    }
+
+    if (!form.city.trim()) {
+      errs.city = "Kota kantor operasional wajib diisi.";
+    } else if (form.city.trim().length < 2) {
+      errs.city = "Kota kantor minimal 2 karakter.";
+    }
+
+    if (!form.description.trim()) {
+      errs.description = "Deskripsi perusahaan wajib diisi.";
+    } else if (form.description.trim().length < 10) {
+      errs.description = "Deskripsi perusahaan minimal 10 karakter.";
+    }
+
+    // Website Resmi (Opsional, tetapi jika diisi harus URL valid)
+    const rawWebsite = form.websiteUrl.trim();
+    if (rawWebsite) {
+      const fullWebsite = /^https?:\/\//i.test(rawWebsite) ? rawWebsite : `https://${rawWebsite}`;
+      try {
+        const u = new URL(fullWebsite);
+        if (!u.hostname.includes(".") || u.hostname.length < 4) {
+          errs.websiteUrl = "Format URL website tidak valid (contoh: https://perusahaan.com).";
+        }
+      } catch {
+        errs.websiteUrl = "Format URL website tidak valid (contoh: https://perusahaan.com).";
+      }
+    }
+
+    // Profil LinkedIn Perusahaan (Opsional, tetapi jika diisi harus URL LinkedIn valid)
+    const rawLinkedIn = form.linkedinUrl.trim();
+    if (rawLinkedIn) {
+      const fullLinkedIn = /^https?:\/\//i.test(rawLinkedIn) ? rawLinkedIn : `https://${rawLinkedIn}`;
+      try {
+        const u = new URL(fullLinkedIn);
+        if (!u.hostname.toLowerCase().includes("linkedin.com")) {
+          errs.linkedinUrl = "URL harus mengarah ke profil LinkedIn perusahaan (contoh: https://linkedin.com/company/nama-perusahaan).";
+        }
+      } catch {
+        errs.linkedinUrl = "Format URL LinkedIn tidak valid.";
+      }
+    }
+
+    if (!form.officeAddress.trim()) {
+      errs.officeAddress = "Alamat kantor lengkap wajib diisi.";
+    } else if (form.officeAddress.trim().length < 5) {
+      errs.officeAddress = "Alamat kantor minimal 5 karakter.";
+    }
+
+    setErrors(errs);
+    return errs;
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationErrors = validateForm();
+    const errorKeys = Object.keys(validationErrors);
+    if (errorKeys.length > 0) {
+      toast.error("Mohon lengkapi seluruh kolom wajib sebelum menyimpan profil.");
+      const firstKey = errorKeys[0];
+      setTimeout(() => {
+        const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
+        if (el) {
+          (el as HTMLElement).focus();
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload = { ...form };
+      const rawWebsite = form.websiteUrl.trim();
+      const normalizedWebsite = rawWebsite
+        ? /^https?:\/\//i.test(rawWebsite)
+          ? rawWebsite
+          : `https://${rawWebsite}`
+        : "";
+
+      const rawLinkedIn = form.linkedinUrl.trim();
+      const normalizedLinkedIn = rawLinkedIn
+        ? /^https?:\/\//i.test(rawLinkedIn)
+          ? rawLinkedIn
+          : `https://${rawLinkedIn}`
+        : "";
+
+      const payload = {
+        ...form,
+        websiteUrl: normalizedWebsite,
+        linkedinUrl: normalizedLinkedIn,
+      };
       delete (payload as Record<string, unknown>).picEmail;
       delete (payload as Record<string, unknown>).verificationStatus;
+
       const res = await fetch("/api/recruiter/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -182,6 +335,34 @@ export function RecruiterSettingsView() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan perubahan");
+
+      setForm((prev) => ({
+        ...prev,
+        websiteUrl: normalizedWebsite,
+        linkedinUrl: normalizedLinkedIn,
+      }));
+
+      // Sinkronkan ke draft onboarding lokal jika ada
+      try {
+        const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+        if (draftRaw) {
+          const draft = JSON.parse(draftRaw);
+          if (draft && draft.form) {
+            draft.form.picName = form.picName;
+            draft.form.picTitle = form.picTitle;
+            draft.form.picPhone = form.picPhone;
+            draft.form.companyName = form.companyName;
+            draft.form.industry = form.industry;
+            draft.form.companySize = form.companySize;
+            draft.form.city = form.city;
+            draft.form.description = form.description;
+            draft.form.websiteUrl = normalizedWebsite;
+            draft.form.linkedinUrl = normalizedLinkedIn;
+            draft.form.officeAddress = form.officeAddress;
+            window.localStorage.setItem("proofylink-recruiter-onboarding-draft", JSON.stringify(draft));
+          }
+        }
+      } catch {}
 
       if (data?.isDemo) {
         toast.success("Tersimpan sebagai demo (tanpa database).");
@@ -327,28 +508,59 @@ export function RecruiterSettingsView() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label htmlFor="picName" className="text-xs font-semibold text-foreground">Nama Lengkap PIC</label>
+                <label htmlFor="picName" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                  <span>Nama Lengkap PIC</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                    Wajib
+                  </span>
+                </label>
                 <Input
                   id="picName"
+                  name="picName"
                   type="text"
-                  required
                   value={form.picName}
-                  onChange={(e) => setForm({ ...form, picName: e.target.value })}
-                  className={inputClass}
+                  onChange={(e) => handleChangeField("picName", e.target.value)}
+                  className={cn(
+                    inputClass,
+                    errors.picName && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                  )}
                   placeholder="Contoh: Budi Santoso"
+                  aria-invalid={Boolean(errors.picName)}
                 />
+                {errors.picName && (
+                  <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>{errors.picName}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="picTitle" className="text-xs font-semibold text-foreground">Jabatan / Role PIC</label>
+                <label htmlFor="picTitle" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                  <span>Jabatan / Role PIC</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                    Wajib
+                  </span>
+                </label>
                 <Input
                   id="picTitle"
+                  name="picTitle"
                   type="text"
                   value={form.picTitle}
-                  onChange={(e) => setForm({ ...form, picTitle: e.target.value })}
-                  className={inputClass}
+                  onChange={(e) => handleChangeField("picTitle", e.target.value)}
+                  className={cn(
+                    inputClass,
+                    errors.picTitle && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                  )}
                   placeholder="Contoh: Talent Acquisition Lead"
+                  aria-invalid={Boolean(errors.picTitle)}
                 />
+                {errors.picTitle && (
+                  <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>{errors.picTitle}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -366,16 +578,30 @@ export function RecruiterSettingsView() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="picPhone" className="text-xs font-semibold text-foreground">Nomor Telepon / WhatsApp</label>
-                <Input
+                <label htmlFor="picPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                  <span>Nomor Telepon / WhatsApp</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                    Wajib
+                  </span>
+                </label>
+                <IndonesianPhoneInput
                   id="picPhone"
-                  type="tel"
-                  required
+                  name="picPhone"
                   value={form.picPhone}
-                  onChange={(e) => setForm({ ...form, picPhone: e.target.value })}
-                  className={inputClass}
-                  placeholder="0812-xxxx-xxxx"
+                  onChange={(val) => handleChangeField("picPhone", val)}
+                  error={Boolean(errors.picPhone)}
+                  placeholder="812-3456-7890"
                 />
+                {errors.picPhone ? (
+                  <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>{errors.picPhone}</span>
+                  </p>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">
+                    Hanya angka, otomatis menggunakan format kode negara +62.
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -398,25 +624,50 @@ export function RecruiterSettingsView() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label htmlFor="companyName" className="text-xs font-semibold text-foreground">Nama Resmi Perusahaan (PT/CV)</label>
+                  <label htmlFor="companyName" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Nama Resmi Perusahaan (PT/CV)</span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                      Wajib
+                    </span>
+                  </label>
                   <Input
                     id="companyName"
+                    name="companyName"
                     type="text"
-                    required
                     value={form.companyName}
-                    onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                    className={inputClass}
+                    onChange={(e) => handleChangeField("companyName", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.companyName && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
                     placeholder="Nama badan hukum perusahaan"
+                    aria-invalid={Boolean(errors.companyName)}
                   />
+                  {errors.companyName && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.companyName}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="industry" className="text-xs font-semibold text-foreground">Sektor Industri</label>
+                  <label htmlFor="industry" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Sektor Industri</span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                      Wajib
+                    </span>
+                  </label>
                   <select
                     id="industry"
+                    name="industry"
                     value={form.industry}
-                    onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                    className={inputClass}
+                    onChange={(e) => handleChangeField("industry", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.industry && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
+                    aria-invalid={Boolean(errors.industry)}
                   >
                     <option value="">Pilih sektor industri</option>
                     {INDUSTRY_OPTIONS.map((ind) => (
@@ -425,15 +676,31 @@ export function RecruiterSettingsView() {
                       </option>
                     ))}
                   </select>
+                  {errors.industry && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.industry}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="companySize" className="text-xs font-semibold text-foreground">Skala / Ukuran Perusahaan</label>
+                  <label htmlFor="companySize" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Skala / Ukuran Perusahaan</span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                      Wajib
+                    </span>
+                  </label>
                   <select
                     id="companySize"
+                    name="companySize"
                     value={form.companySize}
-                    onChange={(e) => setForm({ ...form, companySize: e.target.value })}
-                    className={inputClass}
+                    onChange={(e) => handleChangeField("companySize", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.companySize && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
+                    aria-invalid={Boolean(errors.companySize)}
                   >
                     <option value="">Pilih skala perusahaan</option>
                     {COMPANY_SIZE_OPTIONS.map((sz) => (
@@ -442,68 +709,154 @@ export function RecruiterSettingsView() {
                       </option>
                     ))}
                   </select>
+                  {errors.companySize && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.companySize}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="city" className="text-xs font-semibold text-foreground">Kota Kantor</label>
+                  <label htmlFor="city" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Kota Kantor</span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                      Wajib
+                    </span>
+                  </label>
                   <Input
                     id="city"
+                    name="city"
                     type="text"
                     value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className={inputClass}
+                    onChange={(e) => handleChangeField("city", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.city && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
                     placeholder="Contoh: Jakarta Selatan"
+                    aria-invalid={Boolean(errors.city)}
                   />
+                  {errors.city && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.city}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="description" className="text-xs font-semibold text-foreground">Deskripsi Perusahaan</label>
+                <label htmlFor="description" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                  <span>Deskripsi Perusahaan</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                    Wajib
+                  </span>
+                </label>
                 <Textarea
                   id="description"
+                  name="description"
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className={textareaClass}
-                  placeholder="Ceritakan tentang model bisnis, produk, atau nilai perusahaan..."
+                  onChange={(e) => handleChangeField("description", e.target.value)}
+                  className={cn(
+                    textareaClass,
+                    errors.description && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                  )}
+                  placeholder="Ceritakan tentang model bisnis, produk, atau nilai perusahaan (minimal 10 karakter)..."
+                  aria-invalid={Boolean(errors.description)}
                 />
+                {errors.description && (
+                  <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>{errors.description}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label htmlFor="websiteUrl" className="text-xs font-semibold text-foreground">Website Resmi</label>
+                  <label htmlFor="websiteUrl" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Website Resmi</span>
+                    <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
+                      Opsional
+                    </span>
+                  </label>
                   <Input
                     id="websiteUrl"
-                    type="url"
+                    name="websiteUrl"
+                    type="text"
                     value={form.websiteUrl}
-                    onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
-                    className={inputClass}
-                    placeholder="https://perusahaan.com"
+                    onChange={(e) => handleChangeField("websiteUrl", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.websiteUrl && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
+                    placeholder="https://perusahaan.com (opsional)"
+                    aria-invalid={Boolean(errors.websiteUrl)}
                   />
+                  {errors.websiteUrl && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.websiteUrl}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="linkedinUrl" className="text-xs font-semibold text-foreground">Profil LinkedIn Perusahaan</label>
+                  <label htmlFor="linkedinUrl" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <span>Profil LinkedIn Perusahaan</span>
+                    <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
+                      Opsional
+                    </span>
+                  </label>
                   <Input
                     id="linkedinUrl"
-                    type="url"
+                    name="linkedinUrl"
+                    type="text"
                     value={form.linkedinUrl}
-                    onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
-                    className={inputClass}
-                    placeholder="https://linkedin.com/company/..."
+                    onChange={(e) => handleChangeField("linkedinUrl", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.linkedinUrl && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
+                    placeholder="https://linkedin.com/company/nama-perusahaan (opsional)"
+                    aria-invalid={Boolean(errors.linkedinUrl)}
                   />
+                  {errors.linkedinUrl && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.linkedinUrl}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="officeAddress" className="text-xs font-semibold text-foreground">Alamat Kantor Lengkap</label>
+                <label htmlFor="officeAddress" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                  <span>Alamat Kantor Lengkap</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                    Wajib
+                  </span>
+                </label>
                 <Input
                   id="officeAddress"
+                  name="officeAddress"
                   type="text"
                   value={form.officeAddress}
-                  onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
-                  className={inputClass}
-                  placeholder="Gedung, lantai, nomor, dan nama jalan"
+                  onChange={(e) => handleChangeField("officeAddress", e.target.value)}
+                  className={cn(
+                    inputClass,
+                    errors.officeAddress && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                  )}
+                  placeholder="Gedung, lantai, nomor, dan nama jalan (minimal 5 karakter)"
+                  aria-invalid={Boolean(errors.officeAddress)}
                 />
+                {errors.officeAddress && (
+                  <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>{errors.officeAddress}</span>
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
