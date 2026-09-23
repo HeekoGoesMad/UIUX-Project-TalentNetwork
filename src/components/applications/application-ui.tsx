@@ -2504,13 +2504,152 @@ export function RecruiterPipelinePage({ jobId }: { jobId: string }) {
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-7xl px-4 py-8 sm:py-12"><Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Jobs</Link><div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter workspace</p><h1 className="mt-2 text-3xl font-bold">Pipeline</h1><p className="mt-2 text-muted-foreground">{job?.title ?? "Job"} {job?.organizationName ? `· ${job.organizationName}` : ""}</p></div><div className="flex items-center gap-2 text-sm text-muted-foreground"><UserRound className="size-4" /> {visible.length} kandidat</div></div><label className="mt-6 block max-w-xl text-sm font-semibold">Alasan perubahan tahap<span className="ml-2 text-xs font-normal text-muted-foreground">(opsional)<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="field mt-2 min-h-20 py-2" placeholder="Catatan untuk histori aplikasi" /></span></label>{loading ? <div className="mt-6"><State text="Memuat pipeline..." /></div> : error ? <div className="mt-6"><State text={error} error /></div> : visible.length === 0 ? <div className="mt-6"><State text="Belum ada aplikasi untuk job ini. Kandidat yang melamar akan muncul di sini." /></div> : <div className="mt-6 grid gap-4 lg:grid-cols-3">{grouped.map((group) => <section key={group.status} className="rounded-2xl border bg-muted/30 p-3"><div className="flex items-center justify-between px-2 py-2"><h2 className="font-semibold">{labels[group.status]}</h2><span className="text-xs text-muted-foreground">{group.items.length}</span></div><div className="space-y-3">{group.items.map((application) => <Card key={application.id}><CardContent className="p-4"><div className="flex items-start gap-3"><div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRound className="size-4" /></div><div className="min-w-0"><p className="font-semibold">{application.candidate?.name ?? "Kandidat"}</p><p className="mt-1 text-xs text-muted-foreground">{application.candidate?.headline ?? "Profil kandidat"}</p>{application.candidate?.location && <p className="mt-1 text-xs text-muted-foreground">{application.candidate.location}</p>}</div></div><div className="mt-4 flex flex-wrap gap-2"><select aria-label={`Pindahkan aplikasi ${application.id}`} value={application.status} disabled={updating === application.id} onChange={(event) => void transition(application, event.target.value as ApplicationStatus)} className="field h-9 text-xs">{applicationStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select><span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3" /> Histori tersimpan</span></div></CardContent></Card>)}</div></section>)}</div>}</main></ProtectedRoute>;
 }
 
-export function ApplyForm({ job }: { job: Job }) {
-  const { dbMode } = useApp(); const { applications } = useApplications(); const [coverNote, setCoverNote] = useState(""); const [status, setStatus] = useState<"idle" | "saving" | "success">("idle"); const [error, setError] = useState<string | null>(null);
+export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?: boolean }) {
+  const { dbMode } = useApp();
+  const { applications } = useApplications();
+  const [coverNote, setCoverNote] = useState("");
+  const [status, setStatus] = useState<"idle" | "saving" | "success">("idle");
+  const [error, setError] = useState<string | null>(null);
+
   const duplicate = applications.find((item) => item.jobId === job.id);
-  const apply = async (event: React.FormEvent) => { event.preventDefault(); setError(null); if (duplicate) return; if (coverNote.trim().length < 20) { setError("Cover note minimal 20 karakter."); return; } setStatus("saving"); try { if (dbMode) { const response = await fetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: job.id, coverNote }) }); const payload = await response.json() as { error?: string }; if (!response.ok) throw new Error(payload.error ?? "Lamaran belum dapat dikirim."); } else { const now = new Date().toISOString(); saveDemoApplication({ id: `demo-application-${Date.now()}`, jobId: job.id, status: "new", coverNote: coverNote.trim(), submittedAt: now, withdrawnAt: null, updatedAt: now, job: { id: job.id, title: job.title, organizationName: job.organizationName }, candidate: { name: DEMO_CANDIDATE_CV.fullName, headline: DEMO_CANDIDATE_CV.headline, location: DEMO_CANDIDATE_CV.location } }); } setStatus("success"); } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Lamaran belum dapat dikirim."); setStatus("idle"); } };
-  if (status === "success") return <Card className="mt-8 border-emerald-200 bg-emerald-50/60"><CardContent className="flex items-start gap-3 p-5"><Check className="mt-0.5 size-5 text-emerald-700" /><div><p className="font-semibold text-emerald-900">Lamaran terkirim</p><p className="mt-1 text-sm text-emerald-800">Kamu bisa memantau perkembangannya di aplikasi saya.</p><Link href="/candidate/applications" className="mt-3 inline-flex text-sm font-semibold text-primary">Buka aplikasi saya -&gt;</Link></div></CardContent></Card>;
-  if (duplicate) return <div className="mt-8 rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">Anda sudah melamar lowongan ini. <Link href={`/candidate/applications/${duplicate.id}`} className="font-semibold text-primary">Lihat lamaran -&gt;</Link></div>;
-  return <Card className="mt-8"><CardHeader><CardTitle>Kirim lamaran</CardTitle></CardHeader><CardContent><form onSubmit={apply} className="space-y-4"><label className="block text-sm font-semibold" htmlFor="cover-note">Cover note<span className="ml-2 text-xs font-normal text-muted-foreground">20-4.000 karakter</span></label><textarea id="cover-note" value={coverNote} onChange={(event) => setCoverNote(event.target.value)} className="field min-h-32 py-3" placeholder="Ceritakan alasan kamu cocok untuk peran ini." required aria-describedby="cover-note-help" /><p id="cover-note-help" className="text-xs text-muted-foreground">Profil kandidat akan diambil dari profil tersimpan saat lamaran dikirim.</p>{error && <p className="text-sm text-red-700" role="alert">{error}</p>}<Button type="submit" disabled={status === "saving"}>{status === "saving" ? "Mengirim..." : "Kirim lamaran"} <Send className="size-4" /></Button></form></CardContent></Card>;
+
+  const apply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (duplicate) return;
+    if (coverNote.trim().length < 20) {
+      setError("Cover note minimal 20 karakter.");
+      return;
+    }
+    setStatus("saving");
+    try {
+      if (dbMode) {
+        const response = await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: job.id, coverNote: coverNote.trim() }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Lamaran belum dapat dikirim.");
+      } else {
+        const now = new Date().toISOString();
+        saveDemoApplication({
+          id: `demo-application-${Date.now()}`,
+          jobId: job.id,
+          status: "new",
+          coverNote: coverNote.trim(),
+          submittedAt: now,
+          withdrawnAt: null,
+          updatedAt: now,
+          job: { id: job.id, title: job.title, organizationName: job.organizationName },
+          candidate: {
+            name: DEMO_CANDIDATE_CV.fullName,
+            headline: DEMO_CANDIDATE_CV.headline,
+            location: DEMO_CANDIDATE_CV.location,
+          },
+        });
+      }
+      setStatus("success");
+      toast.success("Lamaran berhasil dikirim!");
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : "Lamaran belum dapat dikirim.");
+      setStatus("idle");
+    }
+  };
+
+  if (status === "success") {
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900">
+        <div className="flex items-start gap-3">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 mt-0.5">
+            <Check className="size-4" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-emerald-950">Lamaran Berhasil Terkirim</p>
+            <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
+              Profil Anda telah diteruskan ke tim rekruter. Anda dapat memantau status lamaran di menu aplikasi saya.
+            </p>
+            <Link
+              href="/candidate/applications"
+              className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+            >
+              Buka Aplikasi Saya &rarr;
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (duplicate) {
+    return (
+      <div className="rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground">
+        <p className="font-semibold text-foreground">Anda sudah melamar posisi ini.</p>
+        <p className="mt-1">
+          Pantau proses dan feedback rekruter melalui{" "}
+          <Link href={`/candidate/applications/${duplicate.id}`} className="font-semibold text-primary hover:underline">
+            halaman lamaran Anda &rarr;
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
+  const formContent = (
+    <form onSubmit={apply} className="space-y-4">
+      <div>
+        <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+          <label htmlFor="cover-note" className="text-foreground">
+            Cover note / Catatan Pembuka
+          </label>
+          <span className="text-[11px] text-muted-foreground font-normal">
+            {coverNote.length}/4.000 karakter
+          </span>
+        </div>
+        <textarea
+          id="cover-note"
+          value={coverNote}
+          onChange={(event) => setCoverNote(event.target.value)}
+          className="field min-h-28 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 transition-all rounded-xl focus:ring-2 focus:ring-primary/20"
+          placeholder="Ceritakan secara singkat alasan kamu tertarik dan cocok untuk posisi ini..."
+          required
+          maxLength={4000}
+          aria-describedby="cover-note-help"
+        />
+        <p id="cover-note-help" className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
+          CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter saat lamaran dikirim.
+        </p>
+      </div>
+
+      {error && (
+        <p className="rounded-lg bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive font-medium" role="alert">
+          {error}
+        </p>
+      )}
+
+      <Button
+        type="submit"
+        disabled={status === "saving"}
+        className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-10 shadow-xs cursor-pointer gap-2 transition-all"
+      >
+        {status === "saving" ? "Mengirim Lamaran..." : "Kirim Lamaran Sekarang"}
+        <Send className="size-3.5" />
+      </Button>
+    </form>
+  );
+
+  if (withoutCard) {
+    return formContent;
+  }
+
+  return (
+    <Card className="rounded-2xl border-border/80 shadow-xs">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-bold text-foreground">Kirim Lamaran Anda</CardTitle>
+      </CardHeader>
+      <CardContent>{formContent}</CardContent>
+    </Card>
+  );
 }
 
 function canWithdraw(status: ApplicationStatus) { return !["hired", "rejected", "withdrawn"].includes(status); }
