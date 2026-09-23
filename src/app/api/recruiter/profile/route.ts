@@ -53,6 +53,17 @@ const updateProfileSchema = z
     ),
     officeAddress: z.string().trim().min(5, "Alamat kantor minimal 5 karakter").max(500).optional(),
     city: z.string().trim().min(2, "Kota kantor minimal 2 karakter").max(120).optional(),
+    province: z.string().trim().max(120).optional().nullable(),
+    companyEmail: emptyToUndefined(
+      z.string().trim().email("Format email perusahaan tidak valid.").max(255)
+    ),
+    companyPhone: z.string().trim().min(6, "Nomor telepon kantor tidak valid").max(32).optional().nullable(),
+    logoUrl: emptyToUndefined(
+      z.string().trim().max(2048)
+    ),
+    bannerUrl: emptyToUndefined(
+      z.string().trim().max(2048)
+    ),
     nibNumber: z.string().trim().max(32).optional().nullable(),
     npwpNumber: z.string().trim().max(32).optional().nullable(),
     nibDocumentUrl: z.string().trim().optional().nullable(),
@@ -74,7 +85,12 @@ const ORG_WRITE_KEYS = [
   "websiteUrl",
   "linkedinUrl",
   "city",
+  "province",
   "officeAddress",
+  "companyEmail",
+  "companyPhone",
+  "logoUrl",
+  "bannerUrl",
   "nibNumber",
   "npwpNumber",
   "nibDocumentUrl",
@@ -95,6 +111,11 @@ function emptyProfileData() {
     linkedinUrl: null,
     officeAddress: null,
     city: null,
+    province: null,
+    companyEmail: null,
+    companyPhone: null,
+    logoUrl: null,
+    bannerUrl: null,
     nibNumber: null,
     npwpNumber: null,
     nibDocumentUrl: null,
@@ -159,6 +180,11 @@ export async function GET() {
         linkedinUrl: org?.linkedinUrl ?? null,
         officeAddress: org?.officeAddress ?? null,
         city: org?.city ?? null,
+        province: org?.province ?? null,
+        companyEmail: org?.companyEmail ?? null,
+        companyPhone: org?.companyPhone ?? null,
+        logoUrl: org?.logoUrl ?? null,
+        bannerUrl: org?.bannerUrl ?? null,
         nibNumber: org?.nib ?? null,
         npwpNumber: org?.npwp ?? null,
         nibDocumentUrl: org?.nibDocumentUrl ?? null,
@@ -255,8 +281,17 @@ export async function PATCH(request: Request) {
         if (data.websiteUrl !== undefined) orgSet.website = nullIfBlank(data.websiteUrl);
         if (data.linkedinUrl !== undefined) orgSet.linkedinUrl = nullIfBlank(data.linkedinUrl);
         if (data.city !== undefined) orgSet.city = nullIfBlank(data.city);
+        if (data.province !== undefined) orgSet.province = nullIfBlank(data.province);
         if (data.officeAddress !== undefined)
           orgSet.officeAddress = nullIfBlank(data.officeAddress);
+        if (data.companyEmail !== undefined)
+          orgSet.companyEmail = nullIfBlank(data.companyEmail);
+        if (data.companyPhone !== undefined)
+          orgSet.companyPhone = nullIfBlank(data.companyPhone);
+        if (data.logoUrl !== undefined)
+          orgSet.logoUrl = nullIfBlank(data.logoUrl);
+        if (data.bannerUrl !== undefined)
+          orgSet.bannerUrl = nullIfBlank(data.bannerUrl);
         if (data.nibNumber !== undefined) orgSet.nib = nullIfBlank(data.nibNumber);
         if (data.npwpNumber !== undefined) orgSet.npwp = nullIfBlank(data.npwpNumber);
         if (data.nibDocumentUrl !== undefined)

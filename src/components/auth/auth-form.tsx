@@ -172,6 +172,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentModalStep, setConsentModalStep] = useState<1 | 2>(1);
   const [consentAgreed, setConsentAgreed] = useState(false);
   const [pendingGoogleAuth, setPendingGoogleAuth] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{
@@ -273,7 +274,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (newFieldErrors.name) document.getElementById("full-name")?.focus();
       else if (newFieldErrors.email) document.getElementById("email")?.focus();
       else if (newFieldErrors.password) document.getElementById("password")?.focus();
-      else if (newFieldErrors.terms) setConsentModalOpen(true);
+      else if (newFieldErrors.terms) {
+        setConsentModalStep(1);
+        setConsentModalOpen(true);
+      }
       return;
     }
 
@@ -334,6 +338,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
 
     setPendingGoogleAuth(true);
+    setConsentModalStep(1);
     setConsentModalOpen(true);
   };
 
@@ -616,6 +621,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               onChange={(e) => {
                 if (fieldErrors.terms) setFieldErrors((prev) => ({ ...prev, terms: undefined }));
                 if (!consentAgreed) {
+                  setConsentModalStep(1);
                   setConsentModalOpen(true);
                 } else {
                   setConsentAgreed(e.target.checked);
@@ -629,17 +635,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
+                  setConsentModalStep(1);
                   setConsentModalOpen(true);
                 }}
                 className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
-                Syarat &amp; Ketentuan Akses Data
+                Ketentuan Penggunaan Layanan
               </button>{" "}
               serta{" "}
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
+                  setConsentModalStep(2);
                   setConsentModalOpen(true);
                 }}
                 className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
@@ -652,7 +660,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {consentAgreed && (
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 pl-6.5">
               <CheckCircle2 className="size-3.5 shrink-0" />
-              <span>Ketentuan &amp; akses data telah disetujui</span>
+              <span>
+                Ketentuan penggunaan layanan &amp; privasi telah disetujui
+              </span>
             </div>
           )}
           {fieldErrors.terms && (
@@ -847,6 +857,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <ConsentModal
         isOpen={consentModalOpen}
+        initialStep={consentModalStep}
+        role={role}
         actionTitle={pendingGoogleAuth ? "Daftar dengan Google" : undefined}
         onClose={() => {
           setConsentModalOpen(false);

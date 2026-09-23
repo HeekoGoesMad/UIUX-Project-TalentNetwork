@@ -26,13 +26,32 @@ export function SiteFooter() {
 
   const isRecruiter = visibleUser?.role === "recruiter" || pathname?.startsWith("/recruiter");
   const isCandidate = visibleUser?.role === "candidate" || pathname?.startsWith("/candidate");
-  const isWorkspace = isRecruiter || isCandidate;
+  const isPartner = visibleUser?.role === "partner" || pathname?.startsWith("/partner");
+  const isWorkspace = isRecruiter || isCandidate || isPartner;
 
   const currentYear = new Date().getFullYear();
   const djoinLogoUrl = "https://cms.solusisakti.id/assets/1b874983-6a51-42f6-873a-e504cd42e934";
 
+  const termsHref = isCandidate
+    ? "/terms?from=candidate&role=candidate"
+    : isRecruiter
+    ? "/terms?from=recruiter&role=recruiter"
+    : isPartner
+    ? "/terms?from=partner"
+    : "/terms?from=landing";
+
+  const privacyHref = isCandidate
+    ? "/privacy?from=candidate"
+    : isRecruiter
+    ? "/privacy?from=recruiter"
+    : isPartner
+    ? "/privacy?from=partner"
+    : "/privacy?from=landing";
+
   if (isWorkspace) {
-    const helpSubject = isRecruiter
+    const helpSubject = isPartner
+      ? "Bantuan%20Mitra%20Talent%20Network"
+      : isRecruiter
       ? "Bantuan%20Rekruter%20Talent%20Network"
       : "Bantuan%20Kandidat%20Talent%20Network";
 
@@ -67,13 +86,13 @@ export function SiteFooter() {
               Bantuan
             </a>
             <Link
-              href="/terms"
+              href={termsHref}
               className="transition-colors hover:text-foreground"
             >
               Syarat &amp; Ketentuan
             </Link>
             <Link
-              href="/privacy"
+              href={privacyHref}
               className="transition-colors hover:text-foreground"
             >
               Kebijakan Privasi
@@ -112,8 +131,8 @@ export function SiteFooter() {
           <Link href="/pricing" className="transition-colors hover:text-foreground">Harga &amp; Token</Link>
           <Link href="/jobs" className="transition-colors hover:text-foreground">Lowongan</Link>
           <Link href="/messages" className="transition-colors hover:text-foreground">Pesan</Link>
-          <Link href="/terms" className="transition-colors hover:text-foreground">Syarat &amp; Ketentuan</Link>
-          <Link href="/privacy" className="transition-colors hover:text-foreground">Kebijakan Privasi</Link>
+          <Link href="/terms?from=landing" className="transition-colors hover:text-foreground">Syarat &amp; Ketentuan</Link>
+          <Link href="/privacy?from=landing" className="transition-colors hover:text-foreground">Kebijakan Privasi</Link>
         </nav>
       </div>
     </footer>
