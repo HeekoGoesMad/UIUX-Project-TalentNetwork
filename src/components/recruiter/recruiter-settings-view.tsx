@@ -11,10 +11,13 @@ import {
   FileUp,
   Loader2,
   Lock,
+  Mail,
+  Phone,
   Save,
   ShieldCheck,
-  User,
   Sliders,
+  Upload,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -48,7 +51,6 @@ const COMPANY_SIZE_OPTIONS = [
   { id: "500+ Karyawan", label: "500+ Karyawan (Korporasi / Enterprise)" },
 ];
 
-// Form kosong: jangan pernah tampilkan data demo seolah data asli.
 const EMPTY_FORM = {
   picName: "",
   picEmail: "",
@@ -62,6 +64,11 @@ const EMPTY_FORM = {
   linkedinUrl: "",
   officeAddress: "",
   city: "",
+  province: "",
+  companyEmail: "",
+  companyPhone: "",
+  logoUrl: "",
+  bannerUrl: "",
   nibNumber: "",
   npwpNumber: "",
   nibDocumentUrl: "",
@@ -78,6 +85,7 @@ export function RecruiterSettingsView() {
   const [isDemo, setIsDemo] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState<"nib" | "npwp" | null>(null);
   const [openingDoc, setOpeningDoc] = useState<"nib" | "npwp" | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -149,12 +157,36 @@ export function RecruiterSettingsView() {
         [type === "nib" ? "nibDocumentUrl" : "npwpDocumentUrl"]: data.storagePath,
       }));
       toast.success(`Berkas PDF ${file.name} berhasil diunggah!`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah berkas PDF.");
     } finally {
       setUploadingDoc(null);
     }
   };
+
+  const handleUploadLogo = async (file: File | null) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ukuran logo maksimal 5MB");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/recruiter/company-logo", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengunggah logo");
+      handleChangeField("logoUrl", data.url);
+      toast.success("Foto / Logo perusahaan berhasil diunggah!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
 
   useEffect(() => {
     async function loadData() {
@@ -238,9 +270,9 @@ export function RecruiterSettingsView() {
     }
 
     if (!form.city.trim()) {
-      errs.city = "Kota kantor operasional wajib diisi.";
+      errs.city = "Kota & Provinsi kantor operasional wajib diisi.";
     } else if (form.city.trim().length < 2) {
-      errs.city = "Kota kantor minimal 2 karakter.";
+      errs.city = "Kota & Provinsi kantor minimal 2 karakter.";
     }
 
     if (!form.description.trim()) {
@@ -275,6 +307,18 @@ export function RecruiterSettingsView() {
       } catch {
         errs.linkedinUrl = "Format URL LinkedIn tidak valid.";
       }
+    }
+
+    // Email Resmi Perusahaan (Opsional, jika diisi harus email valid)
+    if (form.companyEmail.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.companyEmail.trim())) {
+        errs.companyEmail = "Format email perusahaan tidak valid (contoh: careers@perusahaan.com).";
+      }
+    }
+
+    // Nomor Telepon Kantor Resmi (Opsional, jika diisi min 6 karakter)
+    if (form.companyPhone.trim() && form.companyPhone.trim().length < 6) {
+      errs.companyPhone = "Nomor telepon kantor minimal 6 karakter.";
     }
 
     if (!form.officeAddress.trim()) {
@@ -355,6 +399,11 @@ export function RecruiterSettingsView() {
             draft.form.industry = form.industry;
             draft.form.companySize = form.companySize;
             draft.form.city = form.city;
+            draft.form.province = form.province;
+            draft.form.companyEmail = form.companyEmail;
+            draft.form.companyPhone = form.companyPhone;
+            draft.form.logoUrl = form.logoUrl;
+            draft.form.bannerUrl = form.bannerUrl;
             draft.form.description = form.description;
             draft.form.websiteUrl = normalizedWebsite;
             draft.form.linkedinUrl = normalizedLinkedIn;
@@ -621,7 +670,85 @@ export function RecruiterSettingsView() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Branding Perusahaan: Logo */}
+              <div className="rounded-xl border border-border/80 bg-slate-50/60 p-4 sm:p-5">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  {/* Preview Logo */}
+                  <div className="flex flex-col items-center sm:items-start gap-2">
+                    <div className="relative flex size-24 sm:size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-white shadow-2xs transition-all hover:bg-slate-50/70">
+                      {form.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={form.logoUrl}
+                          alt="Logo Perusahaan"
+                          className="size-full object-contain p-2"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-2 text-center select-none">
+                          <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-primary/70 shadow-2xs border border-slate-200/80 mb-1.5 ring-1 ring-slate-100">
+                            <Building2 className="size-5 text-primary/70" />
+                          </div>
+                          <span className="text-[10px] font-semibold text-slate-600 whitespace-nowrap tracking-tight">
+                            Belum ada logo
+                          </span>
+                          <span className="mt-0.5 text-[9px] text-muted-foreground whitespace-nowrap">
+                            PNG, JPG, WebP
+                          </span>
+                        </div>
+                      )}
+                      {uploadingLogo && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white backdrop-blur-2xs">
+                          <Loader2 className="size-5 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    {form.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleChangeField("logoUrl", "")}
+                        className="text-[11px] font-medium text-destructive hover:underline"
+                      >
+                        Hapus Logo
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Kontrol Upload Berkas Logo & Info */}
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <span>Foto / Logo Resmi Perusahaan</span>
+                        <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                          Direkomendasikan
+                        </span>
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Logo ini akan langsung ditampilkan kepada kandidat pada kartu pencarian dan halaman detail lowongan kerja. Gunakan format PNG, JPG, atau WebP transparan/putih (maks. 5MB).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-xs transition hover:bg-accent">
+                        <Upload className="size-4 text-primary" />
+                        <span>{uploadingLogo ? "Mengunggah berkas..." : "Unggah Berkas Logo"}</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          className="sr-only"
+                          disabled={uploadingLogo}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            handleUploadLogo(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label htmlFor="companyName" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
@@ -719,7 +846,7 @@ export function RecruiterSettingsView() {
 
                 <div className="space-y-1.5">
                   <label htmlFor="city" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
-                    <span>Kota Kantor</span>
+                    <span>Kota &amp; Provinsi Kantor</span>
                     <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
                       Wajib
                     </span>
@@ -734,7 +861,7 @@ export function RecruiterSettingsView() {
                       inputClass,
                       errors.city && "border-destructive focus-visible:border-destructive ring-destructive/20"
                     )}
-                    placeholder="Contoh: Jakarta Selatan"
+                    placeholder="Contoh: Denpasar, Bali atau Jakarta Selatan, DKI Jakarta"
                     aria-invalid={Boolean(errors.city)}
                   />
                   {errors.city && (
@@ -742,6 +869,66 @@ export function RecruiterSettingsView() {
                       <AlertCircle className="size-3.5 shrink-0" />
                       <span>{errors.city}</span>
                     </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Kontak Resmi Perusahaan */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label htmlFor="companyEmail" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <Mail className="size-3.5 text-primary" />
+                    <span>Email Resmi Rekrutmen / Kantor</span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                      Penting
+                    </span>
+                  </label>
+                  <Input
+                    id="companyEmail"
+                    name="companyEmail"
+                    type="email"
+                    value={form.companyEmail}
+                    onChange={(e) => handleChangeField("companyEmail", e.target.value)}
+                    className={cn(
+                      inputClass,
+                      errors.companyEmail && "border-destructive focus-visible:border-destructive ring-destructive/20"
+                    )}
+                    placeholder="Contoh: careers@perusahaan.com"
+                    aria-invalid={Boolean(errors.companyEmail)}
+                  />
+                  {errors.companyEmail && (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.companyEmail}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="companyPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                    <Phone className="size-3.5 text-primary" />
+                    <span>Telepon / Kontak Kantor Resmi</span>
+                    <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
+                      Opsional
+                    </span>
+                  </label>
+                  <IndonesianPhoneInput
+                    id="companyPhone"
+                    name="companyPhone"
+                    value={form.companyPhone}
+                    onChange={(val) => handleChangeField("companyPhone", val)}
+                    error={Boolean(errors.companyPhone)}
+                    placeholder="361-555-0148 atau 812-3456-7890"
+                  />
+                  {errors.companyPhone ? (
+                    <p role="alert" className="text-xs font-medium text-destructive flex items-center gap-1.5 mt-1">
+                      <AlertCircle className="size-3.5 shrink-0" />
+                      <span>{errors.companyPhone}</span>
+                    </p>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">
+                      Hanya angka, otomatis menggunakan format kode negara +62.
+                    </span>
                   )}
                 </div>
               </div>

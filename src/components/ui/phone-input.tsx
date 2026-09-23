@@ -24,8 +24,8 @@ export const IndonesianPhoneInput = React.forwardRef<HTMLInputElement, Indonesia
       <div className="relative flex w-full items-center">
         <span
           className={cn(
-            "inline-flex h-10 items-center justify-center rounded-l-md border border-r-0 bg-slate-50 px-3 text-sm font-semibold text-slate-700 select-none shrink-0 transition-colors shadow-2xs",
-            error ? "border-destructive text-destructive bg-destructive/10" : "border-input text-slate-700"
+            "inline-flex h-10 items-center justify-center rounded-l-xl border border-r-0 bg-slate-50/90 px-3.5 text-xs sm:text-sm font-bold text-slate-700 select-none shrink-0 transition-colors shadow-2xs",
+            error ? "border-destructive text-destructive bg-destructive/10" : "border-border/80 text-slate-700"
           )}
         >
           +62
@@ -41,7 +41,7 @@ export const IndonesianPhoneInput = React.forwardRef<HTMLInputElement, Indonesia
           disabled={disabled}
           aria-invalid={error}
           className={cn(
-            "h-10 w-full rounded-r-md border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "h-10 w-full rounded-r-xl border border-border/80 bg-background px-3 text-xs sm:text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
             error && "border-destructive ring-destructive/20 focus-visible:border-destructive",
             disabled && "cursor-not-allowed opacity-50 bg-muted",
             className
