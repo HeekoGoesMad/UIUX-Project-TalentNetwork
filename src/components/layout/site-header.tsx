@@ -10,10 +10,14 @@ import {
   ChevronDown,
   GitBranch,
   GraduationCap,
+  LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   Search,
   Settings,
+  ShieldCheck,
+  Sparkles,
   UserPlus,
   UserRound,
   WalletCards,
@@ -285,16 +289,7 @@ export function SiteHeader() {
         </nav>
 
         {/* Right Actions */}
-        <div className="flex shrink-0 items-center gap-2">
-          {!isPublicHeader && !isPartnerSection && visibleUser?.role === "recruiter" && (
-            <Button variant="outline" size="sm" className="hidden rounded-full sm:inline-flex whitespace-nowrap shrink-0 px-3" asChild>
-              <Link href="/search" className="flex items-center gap-1.5">
-                <Search className="size-3.5" />
-                <span className="hidden xl:inline text-xs">Cari talent</span>
-              </Link>
-            </Button>
-          )}
-
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {(isPartnerSection || visibleUser?.role === "partner") && (
             <Link
               href="/partner"
@@ -308,9 +303,9 @@ export function SiteHeader() {
           {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
             <Link
               href="/dashboard"
-              className="flex shrink-0 items-center gap-2 rounded-full border bg-white/90 px-3.5 py-1.5 text-sm font-semibold shadow-xs"
+              className="flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-full border bg-white/90 px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs sm:text-sm font-semibold shadow-xs hover:bg-slate-50 transition-colors"
             >
-              <WalletCards className="size-4 text-primary" />
+              <WalletCards className="size-3.5 sm:size-4 text-primary" />
               <span className="font-mono">{devBypass ? "∞" : tokens}</span>
               <span className="hidden text-muted-foreground sm:inline">token</span>
             </Link>
@@ -319,8 +314,8 @@ export function SiteHeader() {
           {visibleUser && (() => {
             const unreadCount = notifications.filter((notification) => !notification.readAt).length;
             return (
-              <Link href="/notifications" className={cn("relative flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50", pathname?.startsWith("/notifications") && "border-primary bg-primary/10 text-primary")} aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
-                <Bell className="size-4" />
+              <Link href="/notifications" className={cn("relative flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-emerald-50", pathname?.startsWith("/notifications") && "border-primary bg-primary/10 text-primary")} aria-label={unreadCount ? `${unreadCount} notifikasi baru` : "Notifikasi"}>
+                <Bell className="size-3.5 sm:size-4" />
                 {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </Link>
             );
@@ -330,7 +325,7 @@ export function SiteHeader() {
             <Link
               href={settingsHref}
               className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
+                "hidden md:flex size-9 shrink-0 items-center justify-center rounded-full border bg-white/80 text-foreground shadow-xs transition-colors hover:bg-slate-100",
                 pathname === settingsHref && "border-primary bg-primary/10 text-primary"
               )}
               aria-label="Pengaturan Akun"
@@ -344,7 +339,7 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full shrink-0 text-foreground hover:bg-slate-100"
+              className="hidden md:flex rounded-full shrink-0 text-foreground hover:bg-slate-100"
               aria-label="Keluar dari akun"
               onClick={logout}
             >
@@ -404,98 +399,290 @@ export function SiteHeader() {
           role="dialog"
           aria-modal="true"
           aria-label="Menu navigasi"
-          className="mt-2 rounded-2xl border bg-white/95 backdrop-blur-xl p-4 shadow-2xl md:hidden pointer-events-auto animate-fade-up"
+          className="mt-2 max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-2xl border bg-white/95 backdrop-blur-xl p-4 shadow-2xl md:hidden pointer-events-auto animate-fade-up dark:bg-slate-900/95 dark:border-slate-800"
         >
-          <div className="flex flex-col gap-1">
-            {links.map((link) => {
-              const isAnchor = link.href.startsWith("#") || link.href.includes("#");
-              return isAnchor ? (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-slate-50 hover:text-foreground"
-                  onClick={() => setOpen(false)}
+          {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection ? (
+            <div className="flex flex-col gap-3">
+              {/* Recruiter Header Profile & Token Card */}
+              <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 dark:border-purple-900/40 dark:bg-purple-950/20">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-foreground">
+                      {user?.companyName || user?.name || "Perusahaan Rekruter"}
+                    </p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <ShieldCheck className="size-3" />
+                        Rekruter Terverifikasi
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between rounded-lg border border-slate-200/70 bg-white/95 px-3 py-2 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-primary dark:bg-purple-950/60">
+                      <WalletCards className="size-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-medium">Saldo Token</p>
+                      <p className="font-mono text-xs font-bold text-foreground">{devBypass ? "∞" : tokens} token</p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/pricing"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-1 rounded-md bg-purple-50 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-purple-100 transition-colors dark:bg-purple-950/60 dark:hover:bg-purple-900/80"
+                  >
+                    <Sparkles className="size-3" />
+                    <span>Top Up</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* 1. Navigasi Utama */}
+              <div>
+                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Navigasi Utama
+                </p>
+                <div className="flex flex-col gap-1">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      pathname === "/dashboard"
+                        ? "bg-slate-900 text-white font-semibold shadow-xs"
+                        : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <LayoutDashboard className="size-4" />
+                    <span>Dashboard</span>
+                  </Link>
+
+                  <Link
+                    href="/search"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      pathname === "/search" || pathname.startsWith("/search/")
+                        ? "bg-slate-900 text-white font-semibold shadow-xs"
+                        : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <Search className="size-4" />
+                    <span>Cari Talent</span>
+                  </Link>
+
+                  <Link
+                    href="/messages"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      pathname?.startsWith("/messages")
+                        ? "bg-slate-900 text-white font-semibold shadow-xs"
+                        : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <MessageSquare className="size-4" />
+                    <span>Pesan</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* 2. Alur Rekrutmen */}
+              <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
+                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Alur Rekrutmen
+                </p>
+                <div className="flex flex-col gap-1">
+                  {recruiterFeatures.map((feat) => {
+                    const Icon = feat.icon;
+                    const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
+                    return (
+                      <Link
+                        key={feat.href}
+                        href={feat.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-purple-50 text-purple-950 font-semibold dark:bg-purple-950/40 dark:text-purple-100"
+                            : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex size-7 shrink-0 items-center justify-center rounded-lg",
+                          isActive ? "bg-[#7C3AED] text-white" : "bg-purple-100 text-[#7C3AED] dark:bg-purple-950/60"
+                        )}>
+                          <Icon className="size-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold leading-tight">{feat.label}</p>
+                          <p className="text-[10px] text-muted-foreground line-clamp-1">{feat.desc}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Pengaturan & Akun */}
+              <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
+                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Akun &amp; Bantuan
+                </p>
+                <div className="flex flex-col gap-1">
+                  <Link
+                    href="/notifications"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      pathname?.startsWith("/notifications")
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Bell className="size-4" />
+                      <span>Notifikasi</span>
+                    </div>
+                    {notifications.filter((n) => !n.readAt).length > 0 && (
+                      <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">
+                        {notifications.filter((n) => !n.readAt).length}
+                      </span>
+                    )}
+                  </Link>
+
+                  {settingsHref && (
+                    <Link
+                      href={settingsHref}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                        pathname === settingsHref
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      <Settings className="size-4" />
+                      <span>Pengaturan Akun</span>
+                    </Link>
+                  )}
+
+                  <Link
+                    href="/pricing"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      pathname === "/pricing"
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <Sparkles className="size-4" />
+                    <span>Paket &amp; Token</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* 4. Tombol Logout */}
+              <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    logout();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-red-50/60 py-2.5 text-sm font-semibold text-destructive hover:bg-red-100/80 transition-colors cursor-pointer dark:border-red-900/40 dark:bg-red-950/20"
                 >
-                  {link.label}
-                </a>
-              ) : (
+                  <LogOut className="size-4" />
+                  <span>Keluar dari Akun</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {links.map((link) => {
+                const isAnchor = link.href.startsWith("#") || link.href.includes("#");
+                return isAnchor ? (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-slate-50 hover:text-foreground"
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                      isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
+                    )}
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+
+              {settingsHref && (
                 <Link
-                  key={link.href}
-                  href={link.href}
+                  href={settingsHref}
                   className={cn(
-                    "rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
-                    isLinkActive(link.href) && "bg-slate-900 text-white font-semibold"
+                    "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
+                    pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
                   )}
                   onClick={() => setOpen(false)}
                 >
-                  {link.label}
+                  <Settings className="size-4 text-primary" />
+                  Pengaturan
                 </Link>
-              );
-            })}
+              )}
 
-            {/* Mobile Recruiter Features Group */}
-            {visibleUser?.role === "recruiter" && !isPartnerSection && !isCandidateSection && (
-              <div className="mt-2 border-t border-slate-100 pt-2">
-                <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Pipeline Rekrutmen
-                </p>
-                {recruiterFeatures.map((feat) => {
-                  const Icon = feat.icon;
-                  const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
-                  return (
+              {visibleUser && (
+                <div className="mt-2 border-t pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      logout();
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-red-50/60 py-2.5 text-sm font-semibold text-destructive hover:bg-red-100/80 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="size-4" />
+                    <span>Keluar dari Akun</span>
+                  </button>
+                </div>
+              )}
+
+              {!visibleUser && (
+                <div className="mt-2 border-t pt-3 flex flex-col gap-2">
+                  {pathname !== "/login" && (
                     <Link
-                      key={feat.href}
-                      href={feat.href}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                      href="/login"
                       onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted",
-                        isActive && "bg-purple-50 text-purple-950 font-semibold"
-                      )}
                     >
-                      <Icon className={cn("size-4", isActive ? "text-[#7C3AED]" : "text-muted-foreground")} />
-                      <span>{feat.label}</span>
+                      <UserRound className="size-4" /> Masuk ke workspace
                     </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            {settingsHref && (
-              <Link
-                href={settingsHref}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-muted",
-                  pathname === settingsHref && "bg-primary/10 font-semibold text-primary"
-                )}
-                onClick={() => setOpen(false)}
-              >
-                <Settings className="size-4 text-primary" />
-                Pengaturan
-              </Link>
-            )}
-            {!visibleUser && (
-              <div className="mt-2 border-t pt-3 flex flex-col gap-2">
-                {pathname !== "/login" && (
-                  <Link
-                    className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                  >
-                    <UserRound className="size-4" /> Masuk ke workspace
-                  </Link>
-                )}
-                {pathname !== "/register" && (
-                  <Link
-                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-xs"
-                    href="/register"
-                    onClick={() => setOpen(false)}
-                  >
-                    <UserPlus className="size-4 text-primary" /> Daftar akun baru
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
+                  )}
+                  {pathname !== "/register" && (
+                    <Link
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-xs"
+                      href="/register"
+                      onClick={() => setOpen(false)}
+                    >
+                      <UserPlus className="size-4 text-primary" /> Daftar akun baru
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
       )}
     </header>
