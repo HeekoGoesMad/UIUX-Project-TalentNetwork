@@ -140,9 +140,6 @@ export function getFirstIncompleteStep(data?: CandidateStepData | null): number 
   if (!data.location?.trim()) {
     return 3;
   }
-  if (!data.experience?.some((item) => Boolean(item.company?.trim() || item.role?.trim()))) {
-    return 4;
-  }
   if (!data.education?.some((item) => Boolean(item.school?.trim() && item.program?.trim()))) {
     return 5;
   }

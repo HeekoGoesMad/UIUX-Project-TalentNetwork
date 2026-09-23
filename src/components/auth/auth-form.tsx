@@ -344,8 +344,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     try {
       const next = getNext();
       const redirectUrl = new URL("/auth/callback", window.location.origin);
-      if (next && next.startsWith("/") && !next.startsWith("//")) redirectUrl.searchParams.set("next", next);
+      const effectiveNext = next || (mode === "register" ? registrationDest(role) : null);
+      if (effectiveNext && effectiveNext.startsWith("/") && !effectiveNext.startsWith("//")) {
+        redirectUrl.searchParams.set("next", effectiveNext);
+      }
       redirectUrl.searchParams.set("role", role);
+      if (mode === "register") {
+        redirectUrl.searchParams.set("mode", "register");
+      }
 
       const { error } = await createClient().auth.signInWithOAuth({
         provider: "google",
@@ -864,8 +870,17 @@ const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && proce
 
 function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus, hasSubmittedOnboarding?: boolean) {
   if (role === "candidate") {
+    // If onboarding is completed, never redirect back to onboarding
+    if (hasSubmittedOnboarding === true) {
+      if (next && !next.startsWith("/candidate/onboarding") && (next.startsWith("/candidate") || next.startsWith("/jobs") || ["/profile", "/messages"].includes(next))) {
+        return next;
+      }
+      return "/candidate";
+    }
+    // If registering or onboarding not submitted yet, route to onboarding
+    if (isRegistration || hasSubmittedOnboarding === false) return "/candidate/onboarding";
     if (next?.startsWith("/candidate") || next?.startsWith("/jobs") || (next !== null && ["/profile", "/messages"].includes(next))) return next;
-    return isRegistration ? "/candidate/onboarding" : "/candidate";
+    return "/candidate";
   }
   if (role === "partner") {
     if (isRegistration) return "/partner/onboarding";

@@ -159,7 +159,11 @@ export async function GET() {
         provisioningStatus,
         provisioningReason,
         companyName,
-        hasSubmittedOnboarding: isRecruiter ? Boolean(organization?.nibDocumentUrl && organization?.npwpDocumentUrl) : true,
+        hasSubmittedOnboarding: isRecruiter
+          ? Boolean(organization?.nibDocumentUrl && organization?.npwpDocumentUrl)
+          : isCandidate
+          ? Boolean(candidateProfile && candidateProfile.isPublished)
+          : true,
       },
       organization,
       partnership,
