@@ -182,6 +182,27 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus, isNew: !existing };
     }
 
+    if (role === "candidate") {
+      const [cand] = await tx
+        .select({
+          id: schema.candidateProfiles.id,
+          isPublished: schema.candidateProfiles.isPublished,
+        })
+        .from(schema.candidateProfiles)
+        .where(eq(schema.candidateProfiles.userId, user.id))
+        .limit(1);
+
+      const hasSubmittedOnboarding = Boolean(cand && cand.isPublished);
+
+      return {
+        userId: user.id,
+        role: user.role,
+        provisioningStatus: user.recruiterProvisioningStatus,
+        hasSubmittedOnboarding,
+        isNew: !existing,
+      };
+    }
+
     return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus, isNew: !existing };
   });
 }

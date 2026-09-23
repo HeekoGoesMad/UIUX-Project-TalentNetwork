@@ -40,11 +40,18 @@ export async function GET(request: Request) {
       result.role === "admin"
         ? "/admin"
         : result.role === "candidate"
-        ? (result.isNew ? "/candidate/onboarding" : "/candidate")
+        ? (result.isNew || result.hasSubmittedOnboarding === false ? "/candidate/onboarding" : "/candidate")
         : result.role === "partner"
         ? (result.isNew ? "/partner/onboarding" : result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
         : (result.isNew || result.hasSubmittedOnboarding === false ? "/recruiter/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
-    const destination = safeNext(next, fallback);
+    let destination = safeNext(next, fallback);
+    if (result.role === "candidate") {
+      if (result.hasSubmittedOnboarding === true && destination.startsWith("/candidate/onboarding")) {
+        destination = "/candidate";
+      } else if (result.hasSubmittedOnboarding === false && !destination.startsWith("/candidate/onboarding")) {
+        destination = "/candidate/onboarding";
+      }
+    }
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({
         data: { role: result.role },

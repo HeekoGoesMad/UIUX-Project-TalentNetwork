@@ -659,6 +659,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       email: `kandidat.baru+${Date.now()}@example.com`,
       role: "candidate",
       provisioningStatus: "active",
+      hasSubmittedOnboarding: false,
     };
     setUser(freshUser);
     setState((current) => ({
@@ -734,16 +735,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           return { error: msg };
         }
-        if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending" };
-        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name: effectiveDisplayName || email.split("@")[0], companyName: effectiveCompanyName });
-        return { role, provisioningStatus: role === "candidate" ? "active" : "pending" };
+        if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending", hasSubmittedOnboarding: false };
+        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name: effectiveDisplayName || email.split("@")[0], companyName: effectiveCompanyName, hasSubmittedOnboarding: false });
+        return { role, provisioningStatus: role === "candidate" ? "active" : "pending", hasSubmittedOnboarding: false };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Gagal mendaftar." };
       }
     }
     const fallbackStatus: ProvisioningStatus = role === "candidate" ? "active" : "pending";
-    setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName });
-    return { role, provisioningStatus: fallbackStatus };
+    setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName, hasSubmittedOnboarding: false });
+    return { role, provisioningStatus: fallbackStatus, hasSubmittedOnboarding: false };
   };
 
   const logout = async () => {
@@ -952,7 +953,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString(),
     };
     if (saved.fullName?.trim()) {
-      setUser((current) => current ? { ...current, name: saved.fullName } : null);
+      setUser((current) => current ? { ...current, name: saved.fullName, hasSubmittedOnboarding: true } : null);
     }
     setProfile((current) => current ? {
       ...current,
@@ -971,7 +972,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         : current.partnerVerifications,
     }));
     if (supabaseConfigured) {
-      try { await syncProfile(saved); } catch (error) { toast.error("Profil tersimpan sementara", { description: error instanceof Error ? error.message : "Database belum diperbarui." }); return; }
+      try {
+        await syncProfile(saved);
+      } catch (error) {
+        toast.error("Profil tersimpan sementara", { description: error instanceof Error ? error.message : "Database belum diperbarui." });
+        throw error;
+      }
     }
     toast.success("Profil CV tersimpan", {
       description: campusVerification ? `Terhubung ke Career Center ${campusVerification.institution}` : undefined,
