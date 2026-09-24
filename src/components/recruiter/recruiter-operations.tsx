@@ -696,7 +696,7 @@ export function RecruiterOperationsPage() {
   }, [activeCandidates, searchQuery, jobFilter]);
 
   const handleAssignJob = useCallback(
-    (candidateId: string, jobId: string, jobTitle: string) => {
+    async (candidateId: string, jobId: string, jobTitle: string) => {
       const target = data.candidates.find((c) => c.id === candidateId);
       const existingHist = target?.statusHistory || (target ? getDefaultStatusHistory(target, recruiterName) : []);
       const assignItem: StatusHistoryItem = {
@@ -717,22 +717,99 @@ export function RecruiterOperationsPage() {
       };
       const updatedHistory = [...existingHist, assignItem];
 
+      const updatedCandidates = data.candidates.map((c) =>
+        c.id === candidateId ? { ...c, jobId, jobTitle, statusHistory: updatedHistory } : c
+      );
+
       setData((current) => ({
         ...current,
-        candidates: current.candidates.map((c) =>
-          c.id === candidateId ? { ...c, jobId, jobTitle, statusHistory: updatedHistory } : c
-        ),
+        candidates: updatedCandidates,
       }));
+
       if (selectedCandidate && selectedCandidate.id === candidateId) {
         setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle, statusHistory: updatedHistory });
       }
+
+      // 1. Sync ke penyimpanan operasional rekruter lokal
+      try {
+        const opsRaw = localStorage.getItem(storageKey);
+        if (opsRaw) {
+          const opsData = JSON.parse(opsRaw);
+          opsData.candidates = updatedCandidates;
+          localStorage.setItem(storageKey, JSON.stringify(opsData));
+        }
+      } catch {}
+
+      // 2. Sinkronkan dua arah ke berkas lamaran kandidat (demoApplications)
+      try {
+        const demoAppKey = "proofylink-demo-applications-v1";
+        const demoAppsRaw = localStorage.getItem(demoAppKey);
+        if (demoAppsRaw) {
+          const apps = JSON.parse(demoAppsRaw);
+          if (Array.isArray(apps)) {
+            const appIdx = apps.findIndex(
+              (a: { candidateProfileId?: string; id?: string; candidate?: { name?: string } }) =>
+                a.candidateProfileId === candidateId ||
+                a.id === `demo-app-${candidateId}` ||
+                (target?.name && a.candidate?.name === target.name)
+            );
+            if (appIdx >= 0) {
+              apps[appIdx].jobId = jobId;
+              if (apps[appIdx].job) {
+                apps[appIdx].job.id = jobId;
+                apps[appIdx].job.title = jobTitle;
+              } else {
+                apps[appIdx].job = { id: jobId, title: jobTitle, organizationName: "Perusahaan Mitra" };
+              }
+              apps[appIdx].updatedAt = new Date().toISOString();
+              localStorage.setItem(demoAppKey, JSON.stringify(apps));
+            } else if (jobId !== "talent-pool") {
+              apps.push({
+                id: `demo-app-${candidateId}`,
+                jobId,
+                status: target?.stage || "screening",
+                coverNote: `Kandidat ditugaskan dari Talent Network ke posisi ${jobTitle}.`,
+                submittedAt: new Date().toISOString(),
+                withdrawnAt: null,
+                updatedAt: new Date().toISOString(),
+                job: {
+                  id: jobId,
+                  title: jobTitle,
+                  organizationName: "Perusahaan Mitra",
+                },
+                candidate: {
+                  name: target?.name || "Kandidat",
+                  headline: target?.role || "Talent",
+                  location: target?.location || "Indonesia",
+                },
+              });
+              localStorage.setItem(demoAppKey, JSON.stringify(apps));
+            }
+          }
+        }
+      } catch {}
+
+      // 3. Sinkronkan ke database Supabase jika dalam dbMode
+      if (dbMode && jobId !== "talent-pool") {
+        try {
+          await fetch("/api/applications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidateProfileId: candidateId,
+              jobId,
+            }),
+          });
+        } catch {}
+      }
+
       toast.success(
         jobId === "talent-pool"
           ? "Kandidat dipindahkan ke Talent Pool"
           : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
       );
     },
-    [data.candidates, recruiterName, selectedCandidate]
+    [data.candidates, recruiterName, selectedCandidate, dbMode]
   );
 
   // KPI Metrics
@@ -1528,9 +1605,13 @@ export function RecruiterOperationsPage() {
                                   </span>
                                 ) : (
                                   <>
-                                    {(!candidate.jobId || candidate.jobId === "talent-pool") && (
+                                    {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
                                       <span className="inline-flex items-center text-[10px] font-semibold text-[#7C3AED] bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
                                         Talent Pool
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center text-[10px] font-medium text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                                        {candidate.jobTitle || "Lowongan Terpilih"}
                                       </span>
                                     )}
 

@@ -207,6 +207,21 @@ export async function findOrCreateApplicationForCandidate(
   const orgName = org?.name || "Perusahaan Mitra";
 
   if (existing) {
+    if (input.jobId && input.jobId !== existing.jobId) {
+      await db
+        .update(schema.applications)
+        .set({ jobId: input.jobId, updatedAt: new Date() })
+        .where(eq(schema.applications.id, existing.id));
+      await db.insert(schema.applicationStageHistory).values({
+        applicationId: existing.id,
+        fromStatus: existing.status,
+        toStatus: existing.status,
+        changedBy: input.recruiterUserId,
+        reason: "Posisi lamaran dialihkan ke lowongan baru oleh rekruter.",
+      });
+      existing.jobId = input.jobId;
+    }
+
     if (existing.status === "new" || existing.status === "screening") {
       await db
         .update(schema.applications)

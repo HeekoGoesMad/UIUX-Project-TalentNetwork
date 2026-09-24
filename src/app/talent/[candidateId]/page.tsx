@@ -624,17 +624,37 @@ export default function TalentProfile() {
 
       {
         const orgName = user?.companyName || "Perusahaan Mitra";
+        let resolvedJobId = "talent-pool";
+        let resolvedJobTitle = "Talent Pool";
+        try {
+          const demoAppKey = "proofylink-demo-applications-v1";
+          const rawApps = localStorage.getItem(demoAppKey);
+          if (rawApps) {
+            const apps = JSON.parse(rawApps);
+            if (Array.isArray(apps)) {
+              const found = apps.find(
+                (a: { id?: string; candidateProfileId?: string; jobId?: string; job?: { title?: string } }) =>
+                  a.id === `demo-app-${candidate.id}` || a.candidateProfileId === candidate.id
+              );
+              if (found && found.jobId && found.jobId !== "talent-pool") {
+                resolvedJobId = found.jobId;
+                resolvedJobTitle = found.job?.title || "Lowongan Terpilih";
+              }
+            }
+          }
+        } catch {}
+
         saveDemoApplication({
           id: `demo-app-${candidate.id}`,
-          jobId: "talent-pool",
+          jobId: resolvedJobId,
           status: "screening",
           coverNote: "Profil dibuka dan sedang dalam tahap screening awal melalui Talent Network.",
           submittedAt: new Date().toISOString(),
           withdrawnAt: null,
           updatedAt: new Date().toISOString(),
           job: {
-            id: "talent-pool",
-            title: "Talent Pool",
+            id: resolvedJobId,
+            title: resolvedJobTitle,
             organizationName: orgName,
           },
           candidate: {
@@ -644,7 +664,7 @@ export default function TalentProfile() {
           },
         });
 
-        // Ensure operations pipeline records candidate in Talent Pool (screening stage)
+        // Ensure operations pipeline records candidate in Talent Pool or assigned job (screening stage)
         try {
           const opsKey = "proofylink-demo-recruiter-operations";
           const opsRaw = localStorage.getItem(opsKey);
@@ -657,10 +677,10 @@ export default function TalentProfile() {
                 if (opsParsed.candidates[existingIdx].stage === "interview") {
                   opsParsed.candidates[existingIdx].stage = "screening";
                 }
-                // Reset jobId to talent-pool if not yet assigned to a real job
-                if (!opsParsed.candidates[existingIdx].jobId || opsParsed.candidates[existingIdx].jobId.startsWith("job-demo-")) {
-                  opsParsed.candidates[existingIdx].jobId = "talent-pool";
-                  opsParsed.candidates[existingIdx].jobTitle = "Talent Pool";
+                // Hanya atur ke talent-pool jika kandidat belum memiliki lowongan aktif
+                if (!opsParsed.candidates[existingIdx].jobId) {
+                  opsParsed.candidates[existingIdx].jobId = resolvedJobId;
+                  opsParsed.candidates[existingIdx].jobTitle = resolvedJobTitle;
                 }
               } else {
                 opsParsed.candidates.push({
