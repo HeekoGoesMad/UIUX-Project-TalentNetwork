@@ -180,3 +180,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ jo
     return unavailable();
   }
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
+  try {
+    const current = await (await import("@/lib/api/auth")).getCurrentAppUser();
+    if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
+
+    const scope = await getRecruiterScope(current.db, current.user);
+    if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+    const { jobId } = await params;
+    const existing = await current.db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.organizationId, scope.membership.organizationId)))
+      .limit(1);
+
+    if (!existing[0]) return NextResponse.json({ error: "Job tidak ditemukan." }, { status: 404 });
+
+    await current.db
+      .delete(schema.jobs)
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.organizationId, scope.membership.organizationId)));
+
+    return NextResponse.json({ success: true, message: "Lowongan berhasil dihapus." });
+  } catch {
+    return unavailable();
+  }
+}

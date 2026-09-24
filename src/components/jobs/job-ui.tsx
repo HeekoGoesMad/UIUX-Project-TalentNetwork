@@ -31,19 +31,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApp } from "@/providers/app-provider";
+import { cn } from "@/lib/utils";
 import {
   DEMO_JOBS,
   arrangementLabels,
   educationLabels,
   employmentLabels,
   experienceLabels,
+  formatOfficeAddress,
+  formatPhoneDisplay,
   formatSalaryDisplay,
   statusLabels,
   type EducationLevel,
   type ExperienceLevel,
   type Job,
 } from "@/lib/jobs";
-import { ApplyForm } from "@/components/applications/application-ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ApplyForm, useApplications } from "@/components/applications/application-ui";
 
 const PAGE_LIMIT = 24;
 
@@ -473,23 +483,14 @@ function StructuredContentList({
   );
 }
 
-function formatPhoneDisplay(phone: string): string {
-  const trimmed = phone.trim();
-  if (trimmed.includes(" ") || trimmed.includes("-")) return trimmed;
-  if (trimmed.startsWith("+62")) {
-    const digits = trimmed.slice(3);
-    if (digits.length <= 8) return `+62 ${digits.slice(0, 3)} ${digits.slice(3)}`;
-    if (digits.length <= 10) return `+62 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-    return `+62 ${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
-  }
-  return trimmed;
-}
 
 export function JobDetailPage({ jobId }: { jobId: string }) {
   const { dbMode, user } = useApp();
+  const { applications } = useApplications();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
 
   useEffect(() => {
     if (!dbMode) {
@@ -513,6 +514,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
   const salaryText = job ? formatSalaryDisplay(job) : "";
   const org = job?.organization;
   const companyName = org?.name || job?.organizationName || "Perusahaan";
+  const existingApp = job ? applications.find((app) => app.jobId === job.id) : undefined;
 
   const expLabel = job?.experienceLevel
     ? experienceLabels[job.experienceLevel as ExperienceLevel] ?? job.experienceLevel
@@ -574,8 +576,8 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
         <div className="mt-6 space-y-8">
           {/* Header Identitas Lowongan & Perusahaan */}
           <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
-              <div className="flex items-start gap-4 sm:gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-stretch justify-between gap-5">
+              <div className="flex items-start gap-4 sm:gap-5 min-w-0 flex-1">
                 {/* Logo Perusahaan */}
                 <div className="size-16 sm:size-20 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-white shadow-xs flex items-center justify-center p-2">
                   {org?.logoUrl ? (
@@ -588,7 +590,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                   )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm sm:text-base font-bold text-foreground">{companyName}</span>
                     {org?.verificationStatus === "approved" && (
@@ -605,7 +607,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                     {job.title}
                   </h1>
 
-                  {/* Meta tags bar */}
+                  {/* Meta tags bar (alamat, jenis perusahaan, penempatan, tipe kerja) */}
                   <div className="pt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground">
                     <span className="inline-flex items-center gap-1 rounded-lg border border-border/80 bg-muted/60 px-2.5 py-1 text-slate-700">
                       {employmentLabels[job.employmentType]}
@@ -629,19 +631,66 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span
-                  className={`rounded-full px-3.5 py-1 text-xs font-bold ${
-                    job.status === "published"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs"
-                      : "bg-slate-100 text-slate-600 border border-slate-200"
-                  }`}
-                >
-                  {statusLabels[job.status]}
-                </span>
+              <div className="flex flex-col items-start sm:items-end justify-between gap-4 shrink-0 sm:self-stretch">
+                <div>
+                  <span
+                    className={`rounded-full px-3.5 py-1 text-xs font-bold ${
+                      job.status === "published"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs"
+                        : "bg-slate-100 text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    {statusLabels[job.status]}
+                  </span>
+                </div>
+
+                {/* Tombol Kirim Lamaran sejajar dengan baris tag (alamat, jenis perusahaan, dll) */}
+                <div className="flex items-center sm:items-end">
+                {user?.role === "candidate" ? (
+                  isClosed ? (
+                    <Button disabled variant="outline" className="rounded-xl font-semibold text-xs h-9 px-4 opacity-70">
+                      Lowongan Ditutup
+                    </Button>
+                  ) : existingApp ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/70 font-semibold text-xs h-9 px-3.5 gap-1.5 shadow-2xs"
+                    >
+                      <Link href="/candidate/applications">
+                        <CheckCircle2 className="size-3.5 text-emerald-600" />
+                        <span>Sudah Dilamar</span>
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setApplyModalOpen(true)}
+                      className="rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-9 px-4 gap-2 shadow-xs cursor-pointer transition-all"
+                    >
+                      <Send className="size-3.5" />
+                      <span>Kirim Lamaran</span>
+                    </Button>
+                  )
+                ) : user?.role === "recruiter" ? (
+                  <Button asChild variant="outline" size="sm" className="rounded-xl border-border/80 font-semibold text-xs h-9 px-3.5 gap-1.5 shadow-2xs">
+                    <Link href="/recruiter/jobs">
+                      <BriefcaseBusiness className="size-3.5 text-primary" />
+                      <span>Kelola Lowongan</span>
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild className="rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-9 px-4 gap-2 shadow-xs">
+                    <Link href={`/login?next=${encodeURIComponent(`/jobs/${job.id}`)}`}>
+                      <Send className="size-3.5" />
+                      <span>Masuk untuk Melamar</span>
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
+        </div>
 
           {/* Quick Highlight Cards (Gaji & Kriteria) */}
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
@@ -850,10 +899,11 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
               )}
             </div>
 
-            {/* Right Column: Profil Perusahaan (PT) & Apply Action */}
+            {/* Right Column: Profil Perusahaan (PT) */}
             <div className="space-y-6">
-              {/* Profil Perusahaan */}
-              <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
+              <div className="sticky top-24">
+                {/* Profil Perusahaan */}
+                <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
                 <div className="border-b border-border/60 p-5 bg-gradient-to-b from-slate-50/70 to-transparent">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
                     Profil Perusahaan
@@ -872,11 +922,11 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                 <CardContent className="space-y-4 p-5 text-xs">
                   {/* Deskripsi PT */}
                   {org?.description && (
-                    <div>
-                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider mb-1.5">
+                    <div className="space-y-1.5">
+                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         Tentang Perusahaan
                       </p>
-                      <p className="leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                      <p className="leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line text-justify sm:text-left">
                         {org.description}
                       </p>
                     </div>
@@ -884,29 +934,27 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
 
                   {/* Ukuran Perusahaan */}
                   {org?.companyScale && (
-                    <div>
-                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider mb-1.5">
+                    <div className="space-y-1">
+                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         Ukuran Perusahaan
                       </p>
-                      <p className="font-semibold text-foreground flex items-center gap-2">
-                        <Users className="size-3.5 text-primary" />
+                      <div className="flex items-center gap-2 font-semibold text-foreground">
+                        <Users className="size-3.5 text-primary shrink-0" />
                         <span>{org.companyScale}</span>
-                      </p>
+                      </div>
                     </div>
                   )}
 
                   {/* Alamat Lengkap Kantor PT */}
                   {(org?.officeAddress || org?.city) && (
-                    <div>
-                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider mb-1.5">
+                    <div className="space-y-1">
+                      <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         Alamat Kantor
                       </p>
-                      <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                      <div className="flex items-start gap-2 font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
                         <MapPin className="size-3.5 text-primary shrink-0 mt-0.5" />
-                        <span>
-                          {org.officeAddress ? `${org.officeAddress}, ` : ""}
-                          {org.city ? `${org.city}` : ""}
-                          {org.province ? `, ${org.province}` : ""}
+                        <span className="break-words">
+                          {formatOfficeAddress(org.officeAddress, org.city, org.province)}
                         </span>
                       </div>
                     </div>
@@ -919,8 +967,8 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                     </p>
 
                     {org?.companyEmail && (
-                      <div className="flex items-center justify-between rounded-xl border border-border/70 bg-slate-50/70 p-2.5 text-xs">
-                        <span className="flex items-center gap-2 text-foreground font-medium truncate">
+                      <div className="flex items-center justify-between rounded-xl border border-border/70 bg-slate-50/70 p-2.5 text-xs transition-colors hover:bg-slate-100/70">
+                        <span className="flex items-center gap-2 text-foreground font-medium truncate min-w-0" title={org.companyEmail}>
                           <Mail className="size-3.5 text-primary shrink-0" />
                           <span className="truncate">{org.companyEmail}</span>
                         </span>
@@ -928,7 +976,8 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                           type="button"
                           onClick={() => copyEmail(org.companyEmail!)}
                           title="Salin email"
-                          className="text-primary hover:text-primary/80 p-1 rounded-md hover:bg-purple-100/50 transition-colors"
+                          aria-label="Salin email perusahaan"
+                          className="text-primary hover:text-primary/80 p-1 rounded-md hover:bg-purple-100/50 transition-colors shrink-0 ml-1.5"
                         >
                           <Copy className="size-3.5" />
                         </button>
@@ -936,101 +985,77 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                     )}
 
                     {org?.companyPhone && (
-                      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-slate-50/70 p-2.5 text-xs text-foreground font-medium">
+                      <a
+                        href={`tel:${org.companyPhone.replace(/[^\d+]/g, "")}`}
+                        title={`Hubungi ${formatPhoneDisplay(org.companyPhone)}`}
+                        className="flex items-center gap-2 rounded-xl border border-border/70 bg-slate-50/70 p-2.5 text-xs text-foreground font-medium hover:border-primary/40 hover:bg-purple-50/20 transition-colors"
+                      >
                         <Phone className="size-3.5 text-primary shrink-0" />
-                        <span>{formatPhoneDisplay(org.companyPhone)}</span>
-                      </div>
+                        <span className="truncate">{formatPhoneDisplay(org.companyPhone)}</span>
+                      </a>
                     )}
 
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {org?.website && (
-                        <a
-                          href={org.website.startsWith("http") ? org.website : `https://${org.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground hover:border-primary/40 hover:text-primary hover:bg-purple-50/30 transition shadow-2xs"
-                        >
-                          <ExternalLink className="size-3 text-primary" />
-                          <span>Website Resmi</span>
-                        </a>
-                      )}
+                    {(org?.website || org?.linkedinUrl) && (
+                      <div
+                        className={cn(
+                          "grid gap-2 pt-1",
+                          org?.website && org?.linkedinUrl ? "grid-cols-2" : "grid-cols-1"
+                        )}
+                      >
+                        {org?.website && (
+                          <a
+                            href={org.website.startsWith("http") ? org.website : `https://${org.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Buka Website Resmi"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-2 text-[11px] font-semibold text-foreground hover:border-primary/40 hover:text-primary hover:bg-purple-50/30 transition shadow-2xs text-center"
+                          >
+                            <ExternalLink className="size-3 text-primary shrink-0" />
+                            <span className="truncate">Website Resmi</span>
+                          </a>
+                        )}
 
-                      {org?.linkedinUrl && (
-                        <a
-                          href={org.linkedinUrl.startsWith("http") ? org.linkedinUrl : `https://${org.linkedinUrl}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground hover:border-primary/40 hover:text-primary hover:bg-purple-50/30 transition shadow-2xs"
-                        >
-                          <ExternalLink className="size-3 text-primary" />
-                          <span>Profil LinkedIn</span>
-                        </a>
-                      )}
-                    </div>
+                        {org?.linkedinUrl && (
+                          <a
+                            href={org.linkedinUrl.startsWith("http") ? org.linkedinUrl : `https://${org.linkedinUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Buka Profil LinkedIn"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-2 text-[11px] font-semibold text-foreground hover:border-primary/40 hover:text-primary hover:bg-purple-50/30 transition shadow-2xs text-center"
+                          >
+                            <ExternalLink className="size-3 text-primary shrink-0" />
+                            <span className="truncate">Profil LinkedIn</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Form / Tombol Melamar Lowongan */}
-              <div className="sticky top-24">
-                {user?.role === "candidate" ? (
-                  isClosed ? (
-                    <Card className="rounded-2xl border-slate-200 bg-slate-50 p-5 text-center">
-                      <p className="text-sm font-semibold text-slate-700">Lowongan Sudah Ditutup</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Posisi ini tidak lagi menerima lamaran baru dari kandidat.
-                      </p>
-                    </Card>
-                  ) : (
-                    <Card className="rounded-2xl border-border/80 shadow-xs">
-                      <CardHeader className="pb-3 border-b border-border/60">
-                        <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
-                          <Send className="size-4 text-primary" />
-                          <span>Kirim Lamaran Anda</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <ApplyForm job={job} withoutCard />
-                      </CardContent>
-                    </Card>
-                  )
-                ) : user?.role === "recruiter" ? (
-                  <Card className="rounded-2xl border-border/80 bg-slate-50/60 p-5 text-center">
-                    <div className="flex size-10 mx-auto items-center justify-center rounded-full bg-primary/10 text-primary mb-2.5">
-                      <BriefcaseBusiness className="size-5" />
-                    </div>
-                    <p className="text-xs font-semibold text-foreground">Tampilan Mode Recruiter</p>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      Anda sedang melihat tampilan sebagai <strong>Recruiter</strong>. Kelola pelamar untuk posisi ini melalui{" "}
-                      <Link href="/recruiter/jobs" className="font-semibold text-primary hover:underline">
-                        Kelola Lowongan &rarr;
-                      </Link>
-                    </p>
-                  </Card>
-                ) : (
-                  <Card className="rounded-2xl border-primary/30 bg-primary/5 p-6 text-center shadow-xs">
-                    <CardContent className="space-y-4 p-0">
-                      <div className="size-12 mx-auto rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                        <BriefcaseBusiness className="size-6" />
-                      </div>
-                      <div>
-                        <h4 className="text-base font-bold text-foreground">Tertarik Melamar Posisi Ini?</h4>
-                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                          Masuk atau daftarkan akun kandidat terverifikasi Anda untuk melamar lowongan ini secara instan.
-                        </p>
-                      </div>
-                      <Button asChild className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
-                        <Link href={`/login?next=${encodeURIComponent(`/jobs/${job.id}`)}`}>
-                          Masuk untuk Melamar
-                        </Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Dialog Modal Kirim Lamaran */}
+      {job && (
+        <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
+          <DialogContent className="max-w-lg p-6 rounded-2xl">
+            <DialogHeader className="pb-3 border-b border-border/60">
+              <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                <Send className="size-4 text-primary" />
+                <span>Kirim Lamaran Anda</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                Lamar posisi <strong>{job.title}</strong> di <strong>{companyName}</strong>. CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="pt-4">
+              <ApplyForm job={job} withoutCard />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </main>
   );
