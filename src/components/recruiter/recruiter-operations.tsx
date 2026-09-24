@@ -213,22 +213,81 @@ const initialInterviews: Interview[] = [
 ];
 
 const DB_CACHE_KEY = "proofylink-ops-db-cache-v1";
+export const JOB_ASSIGNMENTS_KEY = "proofylink-job-assignments-v1";
+
+export type StoredJobAssignment = {
+  jobId: string;
+  jobTitle: string;
+  updatedAt: string;
+  historyItem?: StatusHistoryItem;
+};
+
+export function getStoredJobAssignments(): Record<string, StoredJobAssignment> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(JOB_ASSIGNMENTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveStoredJobAssignment(candidateId: string, assignment: StoredJobAssignment) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getStoredJobAssignments();
+    current[candidateId] = assignment;
+    localStorage.setItem(JOB_ASSIGNMENTS_KEY, JSON.stringify(current));
+  } catch {}
+}
+
+export function saveStoredJobAssignmentsBatch(assignments: Record<string, StoredJobAssignment>) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getStoredJobAssignments();
+    Object.assign(current, assignments);
+    localStorage.setItem(JOB_ASSIGNMENTS_KEY, JSON.stringify(current));
+  } catch {}
+}
 
 function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews: Interview[] } {
+  const assignments = getStoredJobAssignments();
+  const applyOverrides = (c: Candidate): Candidate => {
+    const override = assignments[c.id];
+    if (override) {
+      const existingHistory =
+        c.statusHistory && c.statusHistory.length > 0
+          ? c.statusHistory
+          : getDefaultStatusHistory(c, c.owner || "Adrienne");
+      const hasHistory = override.historyItem && existingHistory.some((h) => h.id === override.historyItem?.id);
+      return {
+        ...c,
+        jobId: override.jobId,
+        jobTitle: override.jobTitle,
+        statusHistory:
+          override.historyItem && !hasHistory ? [...existingHistory, override.historyItem] : existingHistory,
+      };
+    }
+    return c;
+  };
+
   if (isDb) {
     try {
       const cached = typeof window !== "undefined" ? localStorage.getItem(DB_CACHE_KEY) : null;
       if (cached) {
         const parsed = JSON.parse(cached) as { candidates?: Candidate[]; interviews?: Interview[] };
         if (Array.isArray(parsed?.candidates)) {
-          const resolved: Candidate[] = parsed.candidates.map((c) => ({
-            ...c,
-            avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
-            statusHistory:
-              c.statusHistory && c.statusHistory.length > 0
-                ? c.statusHistory
-                : getDefaultStatusHistory(c, c.owner || "Adrienne"),
-          }));
+          const resolved: Candidate[] = parsed.candidates.map((c) => {
+            const withAvatar: Candidate = {
+              ...c,
+              avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+              statusHistory:
+                c.statusHistory && c.statusHistory.length > 0
+                  ? c.statusHistory
+                  : getDefaultStatusHistory(c, c.owner || "Adrienne"),
+            };
+            return applyOverrides(withAvatar);
+          });
           return { candidates: resolved, interviews: parsed.interviews ?? [] };
         }
       }
@@ -246,21 +305,27 @@ function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews:
         status: iv.status === "Dibatalkan" ? ("Dibatalkan" as const) : isPast ? ("Selesai" as const) : iv.status,
       };
     });
-    const loadedCandidates: Candidate[] = (parsed?.candidates ?? initialCandidates).map((c) => ({
-      ...c,
-      avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
-      statusHistory:
-        c.statusHistory && c.statusHistory.length > 0
-          ? c.statusHistory
-          : getDefaultStatusHistory(c, c.owner || "Adrienne"),
-    }));
+    const loadedCandidates: Candidate[] = (parsed?.candidates ?? initialCandidates).map((c) => {
+      const withAvatar: Candidate = {
+        ...c,
+        avatarUrl: SUPABASE_AVATARS[c.id] || (c.name ? SUPABASE_AVATARS[c.name] : undefined) || c.avatarUrl,
+        statusHistory:
+          c.statusHistory && c.statusHistory.length > 0
+            ? c.statusHistory
+            : getDefaultStatusHistory(c, c.owner || "Adrienne"),
+      };
+      return applyOverrides(withAvatar);
+    });
     return { candidates: loadedCandidates, interviews: loadedInterviews };
   } catch {
     return {
-      candidates: initialCandidates.map((c) => ({
-        ...c,
-        statusHistory: getDefaultStatusHistory(c, c.owner || "Adrienne"),
-      })),
+      candidates: initialCandidates.map((c) => {
+        const withHist: Candidate = {
+          ...c,
+          statusHistory: getDefaultStatusHistory(c, c.owner || "Adrienne"),
+        };
+        return applyOverrides(withHist);
+      }),
       interviews: initialInterviews,
     };
   }
@@ -476,6 +541,8 @@ export function RecruiterOperationsPage() {
         }
         const candidateMap = new Map(remoteCandList.map((c) => [c.id, c]));
 
+        const storedAssignments = getStoredJobAssignments();
+
         if (appRes.ok) {
           type AppRow = {
             id: string;
@@ -512,11 +579,19 @@ export function RecruiterOperationsPage() {
                   (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
                   SUPABASE_AVATARS[app.candidateProfileId || ""];
 
+                const candId = app.candidateProfileId || app.id;
+                const override = storedAssignments[candId];
+                const finalJobId = override ? override.jobId : app.jobId;
+                const finalJobTitle = override ? override.jobTitle : app.job?.title;
+
                 const candObj: Candidate = {
-                  id: app.candidateProfileId || app.id,
+                  id: candId,
                   applicationId: app.id,
                   name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
-                  role: app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
+                  role:
+                    finalJobTitle && finalJobTitle !== "Talent Pool"
+                      ? finalJobTitle
+                      : app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
                   location: app.candidate?.location || candProfile?.location || "Indonesia",
                   stage: mappedStage,
                   owner: recruiterName,
@@ -527,11 +602,15 @@ export function RecruiterOperationsPage() {
                   offerStatus: mappedStage === "offer" ? "sent" : mappedStage === "hired" ? "accepted" : "draft",
                   compensation: "Rp 15.000.000 / bulan",
                   reason: "",
-                  jobId: app.jobId,
-                  jobTitle: app.job?.title,
+                  jobId: finalJobId,
+                  jobTitle: finalJobTitle,
                   avatarUrl: resolvedAvatar,
                 };
                 candObj.statusHistory = getDefaultStatusHistory(candObj, recruiterName);
+                if (override?.historyItem) {
+                  const alreadyHas = candObj.statusHistory.some((h) => h.id === override.historyItem?.id);
+                  if (!alreadyHas) candObj.statusHistory.push(override.historyItem);
+                }
                 return candObj;
               });
           }
@@ -541,10 +620,17 @@ export function RecruiterOperationsPage() {
         const existingAppCandIds = new Set(mappedCandidates.map((c) => c.id));
         for (const cand of remoteCandList) {
           if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
+            const override = storedAssignments[cand.id];
+            const finalJobId = override ? override.jobId : "talent-pool";
+            const finalJobTitle = override ? override.jobTitle : "Talent Pool";
+
             const poolCand: Candidate = {
               id: cand.id,
               name: cand.name || "Talent Network Candidate",
-              role: cand.role || "Talent Candidate",
+              role:
+                finalJobTitle && finalJobTitle !== "Talent Pool"
+                  ? finalJobTitle
+                  : cand.role || "Talent Candidate",
               location: cand.location || "Indonesia",
               stage: "screening",
               owner: recruiterName,
@@ -555,11 +641,15 @@ export function RecruiterOperationsPage() {
               offerStatus: "draft",
               compensation: "Rp 15.000.000 / bulan",
               reason: "",
-              jobId: "talent-pool",
-              jobTitle: "Talent Pool",
+              jobId: finalJobId,
+              jobTitle: finalJobTitle,
               avatarUrl: cand.avatarUrl || (cand.name ? SUPABASE_AVATARS[cand.name] : undefined) || SUPABASE_AVATARS[cand.id],
             };
             poolCand.statusHistory = getDefaultStatusHistory(poolCand, recruiterName);
+            if (override?.historyItem) {
+              const alreadyHas = poolCand.statusHistory.some((h) => h.id === override.historyItem?.id);
+              if (!alreadyHas) poolCand.statusHistory.push(override.historyItem);
+            }
             mappedCandidates.push(poolCand);
           }
         }
@@ -753,7 +843,7 @@ export function RecruiterOperationsPage() {
       const target = data.candidates.find((c) => c.id === candidateId);
       const existingHist = target?.statusHistory || (target ? getDefaultStatusHistory(target, recruiterName) : []);
       const assignItem: StatusHistoryItem = {
-        id: `hist-assign-${candidateId}-${existingHist.length + 1}`,
+        id: `hist-assign-${candidateId}-${Date.now()}`,
         stage: target?.stage || "screening",
         title:
           jobId === "talent-pool"
@@ -774,26 +864,38 @@ export function RecruiterOperationsPage() {
         c.id === candidateId ? { ...c, jobId, jobTitle, statusHistory: updatedHistory } : c
       );
 
-      setData((current) => ({
-        ...current,
+      const nextData = {
+        ...data,
         candidates: updatedCandidates,
-      }));
+      };
+
+      setData(nextData);
 
       if (selectedCandidate && selectedCandidate.id === candidateId) {
         setSelectedCandidate({ ...selectedCandidate, jobId, jobTitle, statusHistory: updatedHistory });
       }
 
-      // 1. Sync ke penyimpanan operasional rekruter lokal
+      // 1. Simpan ke persistent job assignments registry (bertahan lintas reload)
+      saveStoredJobAssignment(candidateId, {
+        jobId,
+        jobTitle,
+        updatedAt: new Date().toISOString(),
+        historyItem: assignItem,
+      });
+
+      // 2. Sync ke penyimpanan operasional rekruter lokal DAN DB cache
       try {
         const opsRaw = localStorage.getItem(storageKey);
-        if (opsRaw) {
-          const opsData = JSON.parse(opsRaw);
-          opsData.candidates = updatedCandidates;
-          localStorage.setItem(storageKey, JSON.stringify(opsData));
-        }
+        const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
       } catch {}
 
-      // 2. Sinkronkan dua arah ke berkas lamaran kandidat (demoApplications)
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+      } catch {}
+
+      // 3. Sinkronkan dua arah ke berkas lamaran kandidat (demoApplications)
       try {
         const demoAppKey = "proofylink-demo-applications-v1";
         const demoAppsRaw = localStorage.getItem(demoAppKey);
@@ -842,8 +944,9 @@ export function RecruiterOperationsPage() {
         }
       } catch {}
 
-      // 3. Sinkronkan ke database Supabase jika dalam dbMode
-      if (dbMode && jobId !== "talent-pool") {
+      // 4. Sinkronkan ke database Supabase jika dalam dbMode dan jobId berupa UUID valid
+      const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId);
+      if (dbMode && jobId !== "talent-pool" && isValidUuid) {
         try {
           await fetch("/api/applications", {
             method: "POST",
@@ -862,7 +965,7 @@ export function RecruiterOperationsPage() {
           : `Kandidat ditugaskan ke lowongan: ${jobTitle}`
       );
     },
-    [data.candidates, recruiterName, selectedCandidate, dbMode]
+    [data, recruiterName, selectedCandidate, dbMode]
   );
 
   // Batch assign multiple selected candidates to a job
@@ -879,7 +982,7 @@ export function RecruiterOperationsPage() {
       if (!selectedCandidateIds.includes(c.id)) return c;
       const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
       const assignItem: StatusHistoryItem = {
-        id: `hist-assign-${c.id}-${existingHist.length + 1}`,
+        id: `hist-assign-${c.id}-${Date.now()}`,
         stage: c.stage,
         title:
           batchTargetJobId === "talent-pool"
@@ -902,23 +1005,41 @@ export function RecruiterOperationsPage() {
       };
     });
 
-    setData((current) => ({
-      ...current,
+    const nextData = {
+      ...data,
       candidates: updatedCandidates,
-    }));
+    };
+
+    setData(nextData);
 
     if (selectedCandidate && selectedCandidateIds.includes(selectedCandidate.id)) {
       const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
       if (updated) setSelectedCandidate(updated);
     }
 
+    const batchAssignments: Record<string, StoredJobAssignment> = {};
+    for (const c of updatedCandidates) {
+      if (selectedCandidateIds.includes(c.id)) {
+        const latestHist = c.statusHistory?.[c.statusHistory.length - 1];
+        batchAssignments[c.id] = {
+          jobId: batchTargetJobId,
+          jobTitle: targetJobTitle,
+          updatedAt: new Date().toISOString(),
+          historyItem: latestHist,
+        };
+      }
+    }
+    saveStoredJobAssignmentsBatch(batchAssignments);
+
     try {
       const opsRaw = localStorage.getItem(storageKey);
-      if (opsRaw) {
-        const opsData = JSON.parse(opsRaw);
-        opsData.candidates = updatedCandidates;
-        localStorage.setItem(storageKey, JSON.stringify(opsData));
-      }
+      const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+      opsData.candidates = updatedCandidates;
+      localStorage.setItem(storageKey, JSON.stringify(opsData));
+    } catch {}
+
+    try {
+      localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
     } catch {}
 
     try {
@@ -971,7 +1092,8 @@ export function RecruiterOperationsPage() {
       }
     } catch {}
 
-    if (dbMode && batchTargetJobId !== "talent-pool") {
+    const isBatchValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchTargetJobId);
+    if (dbMode && batchTargetJobId !== "talent-pool" && isBatchValidUuid) {
       try {
         await Promise.allSettled(
           selectedCandidateIds.map((cid) =>
