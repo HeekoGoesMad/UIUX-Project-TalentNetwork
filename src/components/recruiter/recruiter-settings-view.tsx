@@ -16,6 +16,7 @@ import {
   Save,
   ShieldCheck,
   Sliders,
+  Trash2,
   Upload,
   User,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { cn, extractIndonesianLocalPhone } from "@/lib/utils";
 
 // Nilai value selaras dengan enum API (industry_sector / company_scale); label tetap Bahasa Indonesia.
@@ -86,6 +88,15 @@ export function RecruiterSettingsView() {
   const [uploadingDoc, setUploadingDoc] = useState<"nib" | "npwp" | null>(null);
   const [openingDoc, setOpeningDoc] = useState<"nib" | "npwp" | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [cropModal, setCropModal] = useState<{
+    open: boolean;
+    imageSrc: string | null;
+    fileName: string;
+  }>({
+    open: false,
+    imageSrc: null,
+    fileName: "",
+  });
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -162,16 +173,13 @@ export function RecruiterSettingsView() {
     }
   };
 
-  const handleUploadLogo = async (file: File | null) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Ukuran logo maksimal 5MB");
-      return;
-    }
+  const uploadLogoBlob = async (blob: Blob, fileName: string) => {
     setUploadingLogo(true);
+    const toastId = toast.loading("Mengunggah foto / logo perusahaan...");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", blob, fileName);
+
       const res = await fetch("/api/recruiter/company-logo", {
         method: "POST",
         body: formData,
@@ -179,11 +187,54 @@ export function RecruiterSettingsView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengunggah logo");
       handleChangeField("logoUrl", data.url);
-      toast.success("Foto / Logo perusahaan berhasil diunggah!");
+      toast.success("Foto / Logo perusahaan berhasil diperbarui!", { id: toastId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah logo.");
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah logo.", { id: toastId });
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const onSelectLogoFile = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ukuran logo maksimal 5MB");
+      return;
+    }
+
+    const isSvg = file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+    if (isSvg) {
+      void uploadLogoBlob(file, file.name);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({
+        open: true,
+        imageSrc: reader.result as string,
+        fileName: file.name,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const cleanBase = (cropModal.fileName || "company-logo").replace(/\.[^/.]+$/, "");
+    await uploadLogoBlob(croppedBlob, `${cleanBase}.webp`);
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!form.logoUrl) return;
+    const toastId = toast.loading("Menghapus foto / logo perusahaan...");
+    try {
+      const res = await fetch("/api/recruiter/company-logo", { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Gagal menghapus logo.");
+      handleChangeField("logoUrl", "");
+      toast.success("Logo perusahaan berhasil dihapus!", { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus logo.", { id: toastId });
     }
   };
 
@@ -675,7 +726,7 @@ export function RecruiterSettingsView() {
               <div className="rounded-xl border border-border/80 bg-slate-50/60 p-4 sm:p-5">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                   {/* Preview Logo */}
-                  <div className="flex flex-col items-center sm:items-start gap-2">
+                  <div className="flex flex-col items-center gap-2 w-24 sm:w-28 shrink-0">
                     <div className="relative flex size-24 sm:size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-white shadow-2xs transition-all hover:bg-slate-50/70">
                       {form.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -706,10 +757,11 @@ export function RecruiterSettingsView() {
                     {form.logoUrl && (
                       <button
                         type="button"
-                        onClick={() => handleChangeField("logoUrl", "")}
-                        className="text-[11px] font-medium text-destructive hover:underline"
+                        onClick={handleRemoveLogo}
+                        className="inline-flex w-full items-center justify-center gap-1 text-[11px] font-medium text-destructive hover:text-destructive/80 hover:underline transition-colors text-center"
                       >
-                        Hapus Logo
+                        <Trash2 className="size-3" />
+                        <span>Hapus Logo</span>
                       </button>
                     )}
                   </div>
@@ -724,7 +776,7 @@ export function RecruiterSettingsView() {
                         </span>
                       </h4>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Logo ini akan langsung ditampilkan kepada kandidat pada kartu pencarian dan halaman detail lowongan kerja. Gunakan format PNG, JPG, atau WebP transparan/putih (maks. 5MB).
+                        Logo ini akan langsung ditampilkan kepada kandidat pada kartu pencarian dan halaman detail lowongan kerja. Gunakan format PNG, JPG, atau WebP (disesuaikan otomatis 512x512) atau SVG vektor (maks. 5MB).
                       </p>
                     </div>
 
@@ -739,7 +791,7 @@ export function RecruiterSettingsView() {
                           disabled={uploadingLogo}
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
-                            handleUploadLogo(file);
+                            onSelectLogoFile(file);
                             e.target.value = "";
                           }}
                         />
@@ -1191,6 +1243,19 @@ export function RecruiterSettingsView() {
 
       {/* Konten Tab 3: Keamanan & Sandi */}
       {activeTab === "security" && <SecuritySettings />}
+
+      {/* Dialog Crop & Kompresi Logo Perusahaan (Rasio 1:1, Max 512x512 WebP) */}
+      <ImageCropDialog
+        open={cropModal.open}
+        onOpenChange={(open) => setCropModal((prev) => ({ ...prev, open }))}
+        imageSrc={cropModal.imageSrc}
+        aspectRatio={1}
+        cropShape="rect"
+        targetWidth={512}
+        title="Sesuaikan Logo Perusahaan"
+        description="Geser dan sesuaikan zoom untuk mengatur posisi logo perusahaan Anda (rasio 1:1)."
+        onCropComplete={handleCropComplete}
+      />
     </div>
   );
 }

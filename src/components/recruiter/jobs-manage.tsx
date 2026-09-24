@@ -15,8 +15,10 @@ import {
   GraduationCap,
   Layers,
   MapPin,
+  Pencil,
   Plus,
   Sparkles,
+  Trash2,
   Users,
   Workflow,
 } from "lucide-react";
@@ -24,6 +26,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useApp } from "@/providers/app-provider";
 import {
@@ -342,14 +352,92 @@ function skillNames(value: string) {
     .filter(Boolean);
 }
 
-export function JobFormPage() {
+export function JobFormPage({ jobId }: { jobId?: string } = {}) {
   const router = useRouter();
   const { dbMode } = useApp();
+  const isEdit = Boolean(jobId);
   const [form, setForm] = useState(initialForm);
+  const [loadingJob, setLoadingJob] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [publishImmediately, setPublishImmediately] = useState(false);
   const [customBenefit, setCustomBenefit] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    let active = true;
+    setLoadingJob(true);
+    setError(null);
+
+    const populate = (found: Job) => {
+      let formattedExpires = "";
+      if (found.expiresAt) {
+        try {
+          formattedExpires = new Date(found.expiresAt).toISOString().split("T")[0];
+        } catch {
+          formattedExpires = "";
+        }
+      }
+      setForm({
+        title: found.title || "",
+        jobCategory: found.jobCategory || "engineering_it",
+        employmentType: found.employmentType || "full_time",
+        workArrangement: found.workArrangement || "hybrid",
+        location: found.location || "",
+        vacanciesCount: found.vacanciesCount || 1,
+        expiresAt: formattedExpires,
+        showSalary: !found.hideSalary,
+        salaryMin: found.salaryMin != null ? String(found.salaryMin) : "",
+        salaryMax: found.salaryMax != null ? String(found.salaryMax) : "",
+        salaryPeriod: found.salaryPeriod || "monthly",
+        isSalaryNegotiable: Boolean(found.isSalaryNegotiable),
+        experienceLevel: found.experienceLevel || "1_3_years",
+        minEducation: found.minEducation || "bachelor",
+        requiredSkills: (found.requirements || [])
+          .filter((req) => req.type === "required")
+          .map((req) => req.name)
+          .join(", "),
+        preferredSkills: (found.requirements || [])
+          .filter((req) => req.type === "preferred")
+          .map((req) => req.name)
+          .join(", "),
+        description: found.description || "",
+        responsibilities: found.responsibilities || "",
+        qualifications: found.qualifications || "",
+        benefits: Array.isArray(found.benefits) && found.benefits.length > 0 ? found.benefits : [],
+      });
+    };
+
+    if (!dbMode) {
+      const stored = localStorage.getItem("proofylink-demo-jobs");
+      const list = stored ? (JSON.parse(stored) as Job[]) : [demoRecruiterJob, ...DEMO_JOBS];
+      const found = list.find((item) => item.id === jobId);
+      if (found) {
+        populate(found);
+      } else {
+        setError("Lowongan tidak ditemukan.");
+      }
+      setLoadingJob(false);
+      return;
+    }
+
+    fetch(`/api/jobs/${jobId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as { job?: Job; error?: string };
+        if (!response.ok || !data.job) throw new Error(data.error ?? "Lowongan tidak ditemukan.");
+        if (active) populate(data.job);
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : "Lowongan tidak ditemukan.");
+      })
+      .finally(() => {
+        if (active) setLoadingJob(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [dbMode, jobId]);
 
   const update = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -410,54 +498,103 @@ export function JobFormPage() {
     };
 
     try {
-      if (dbMode) {
-        const response = await fetch("/api/jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const result = (await response.json()) as { job?: Job; error?: string };
-        if (!response.ok || !result.job) throw new Error(result.error ?? "Job tidak dapat dibuat.");
-
-        if (publishImmediately) {
-          await fetch(`/api/jobs/${result.job.id}`, {
+      if (isEdit) {
+        if (dbMode) {
+          const response = await fetch(`/api/jobs/${jobId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "published" }),
+            body: JSON.stringify(payload),
           });
+          const result = (await response.json()) as { job?: Job; error?: string };
+          if (!response.ok || !result.job) throw new Error(result.error ?? "Gagal memperbarui lowongan.");
+          router.push(`/recruiter/jobs/${jobId}`);
+        } else {
+          const jobs = JSON.parse(
+            localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
+          ) as Job[];
+          const target = jobs.find((j) => j.id === jobId);
+          if (!target) throw new Error("Lowongan tidak ditemukan.");
+
+          const updated: Job = {
+            ...target,
+            ...payload,
+            updatedAt: new Date().toISOString(),
+            requirements: [
+              ...payload.requiredSkills.map((name, index) => ({
+                id: `req-${Date.now()}-${index}`,
+                name,
+                type: "required" as const,
+              })),
+              ...payload.preferredSkills.map((name, index) => ({
+                id: `pref-${Date.now()}-${index}`,
+                name,
+                type: "preferred" as const,
+              })),
+            ],
+          };
+
+          localStorage.setItem(
+            "proofylink-demo-jobs",
+            JSON.stringify(jobs.map((item) => (item.id === jobId ? updated : item)))
+          );
+          router.push(`/recruiter/jobs/${jobId}`);
         }
-        router.push(`/recruiter/jobs/${result.job.id}`);
       } else {
-        const job: Job = {
-          ...payload,
-          id: `demo-job-${Date.now()}`,
-          organizationName: "Perusahaan Anda",
-          status: publishImmediately ? "published" : "draft",
-          publishedAt: publishImmediately ? new Date().toISOString() : null,
-          closedAt: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          requirements: [
-            ...payload.requiredSkills.map((name, index) => ({
-              id: `req-${Date.now()}-${index}`,
-              name,
-              type: "required" as const,
-            })),
-            ...payload.preferredSkills.map((name, index) => ({
-              id: `pref-${Date.now()}-${index}`,
-              name,
-              type: "preferred" as const,
-            })),
-          ],
-        };
-        const jobs = JSON.parse(
-          localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
-        ) as Job[];
-        localStorage.setItem("proofylink-demo-jobs", JSON.stringify([job, ...jobs]));
-        router.push(`/recruiter/jobs/${job.id}`);
+        if (dbMode) {
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = (await response.json()) as { job?: Job; error?: string };
+          if (!response.ok || !result.job) throw new Error(result.error ?? "Job tidak dapat dibuat.");
+
+          if (publishImmediately) {
+            await fetch(`/api/jobs/${result.job.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "published" }),
+            });
+          }
+          router.push(`/recruiter/jobs/${result.job.id}`);
+        } else {
+          const job: Job = {
+            ...payload,
+            id: `demo-job-${Date.now()}`,
+            organizationName: "Perusahaan Anda",
+            status: publishImmediately ? "published" : "draft",
+            publishedAt: publishImmediately ? new Date().toISOString() : null,
+            closedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            requirements: [
+              ...payload.requiredSkills.map((name, index) => ({
+                id: `req-${Date.now()}-${index}`,
+                name,
+                type: "required" as const,
+              })),
+              ...payload.preferredSkills.map((name, index) => ({
+                id: `pref-${Date.now()}-${index}`,
+                name,
+                type: "preferred" as const,
+              })),
+            ],
+          };
+          const jobs = JSON.parse(
+            localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
+          ) as Job[];
+          localStorage.setItem("proofylink-demo-jobs", JSON.stringify([job, ...jobs]));
+          router.push(`/recruiter/jobs/${job.id}`);
+        }
       }
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : "Job tidak dapat dibuat.");
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : isEdit
+          ? "Lowongan tidak dapat diperbarui."
+          : "Job tidak dapat dibuat."
+      );
     } finally {
       setSaving(false);
     }
@@ -468,18 +605,37 @@ export function JobFormPage() {
   const fieldTextareaClass =
     "min-h-24 w-full rounded-lg border border-input bg-transparent p-3 text-sm shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
 
+  if (loadingJob) {
+    return (
+      <ProtectedRoute role="recruiter">
+        <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
+          <State text="Memuat data lowongan untuk diedit..." />
+        </main>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute role="recruiter">
       <main className="container mx-auto max-w-4xl px-4 py-8 sm:py-12">
-        <Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-          <ArrowLeft className="size-4" /> Kembali ke kelola lowongan
+        <Link
+          href={isEdit ? `/recruiter/jobs/${jobId}` : "/recruiter/jobs"}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
+        >
+          <ArrowLeft className="size-4" /> {isEdit ? "Kembali ke detail lowongan" : "Kembali ke kelola lowongan"}
         </Link>
         <div className="mt-4 flex items-center justify-between">
           <div>
-            <span className="font-mono text-xs uppercase tracking-widest text-primary">Formulir Rekrutmen Glints</span>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Pasang Lowongan Pekerjaan</h1>
+            <span className="font-mono text-xs uppercase tracking-widest text-primary">
+              {isEdit ? "Perbarui Lowongan" : "Formulir Rekrutmen Glints"}
+            </span>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+              {isEdit ? "Edit Lowongan Pekerjaan" : "Pasang Lowongan Pekerjaan"}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Lengkapi kriteria, rentang gaji, dan deskripsi terstruktur agar lowongan Anda diminati kandidat terbaik.
+              {isEdit
+                ? "Perbarui kriteria kualifikasi, rentang kompensasi, dan deskripsi tugas lowongan ini."
+                : "Lengkapi kriteria, rentang gaji, dan deskripsi terstruktur agar lowongan Anda diminati kandidat terbaik."}
             </p>
           </div>
         </div>
@@ -934,25 +1090,47 @@ export function JobFormPage() {
           {/* Form Actions */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
             <div className="text-xs text-muted-foreground">
-              Pastikan seluruh kriteria telah akurat sebelum menerbitkan ke jaringan ProofyLink.
+              Pastikan seluruh kriteria telah akurat sebelum {isEdit ? "menyimpan perubahan" : "menerbitkan ke jaringan ProofyLink"}.
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button
-                type="submit"
-                variant="outline"
-                disabled={saving}
-                onClick={() => setPublishImmediately(false)}
-              >
-                {saving && !publishImmediately ? "Menyimpan..." : "Simpan sebagai Draft"}
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving}
-                onClick={() => setPublishImmediately(true)}
-                className="bg-primary hover:bg-primary/90 text-white"
-              >
-                {saving && publishImmediately ? "Menerbitkan..." : "Terbitkan Lowongan Sekarang"}
-              </Button>
+              {isEdit ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => router.push(`/recruiter/jobs/${jobId}`)}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-primary hover:bg-primary/90 text-white"
+                  >
+                    {saving ? "Menyimpan Perubahan..." : "Simpan Perubahan"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => setPublishImmediately(false)}
+                  >
+                    {saving && !publishImmediately ? "Menyimpan..." : "Simpan sebagai Draft"}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    onClick={() => setPublishImmediately(true)}
+                    className="bg-primary hover:bg-primary/90 text-white"
+                  >
+                    {saving && publishImmediately ? "Menerbitkan..." : "Terbitkan Lowongan Sekarang"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </form>
@@ -961,11 +1139,49 @@ export function JobFormPage() {
   );
 }
 
+export function JobEditPage({ jobId }: { jobId: string }) {
+  return <JobFormPage jobId={jobId} />;
+}
+
 export function JobManagePage({ jobId }: { jobId: string }) {
+  const router = useRouter();
   const { dbMode } = useApp();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteJob = async () => {
+    if (!job) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      if (dbMode) {
+        const response = await fetch(`/api/jobs/${job.id}`, {
+          method: "DELETE",
+        });
+        const data = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(data.error ?? "Gagal menghapus lowongan.");
+        }
+      } else {
+        const stored = localStorage.getItem("proofylink-demo-jobs");
+        if (stored) {
+          const list = JSON.parse(stored) as Job[];
+          const filtered = list.filter((item) => item.id !== job.id);
+          localStorage.setItem("proofylink-demo-jobs", JSON.stringify(filtered));
+        }
+      }
+      setDeleteDialogOpen(false);
+      router.push("/recruiter/jobs");
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Gagal menghapus lowongan.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!dbMode) {
@@ -1042,10 +1258,15 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                   {arrangementLabels[job.workArrangement]}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
                   {statusLabels[job.status]}
                 </span>
+                <Button asChild variant="outline">
+                  <Link href={`/recruiter/jobs/${job.id}/edit`}>
+                    <Pencil className="size-4 mr-1.5" /> Edit Lowongan
+                  </Link>
+                </Button>
                 <Button asChild>
                   <Link href={`/recruiter/jobs/${job.id}/pipeline`}>
                     <Workflow className="size-4 mr-1.5" /> Pipeline Pelamar
@@ -1161,7 +1382,7 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {job.status === "draft" && (
                       <Button onClick={() => changeStatus("published")}>Terbitkan Lowongan (Publish)</Button>
                     )}
@@ -1175,15 +1396,69 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                         Lowongan ini sudah ditutup dan tidak menerima pelamar baru.
                       </p>
                     )}
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="size-4 mr-1.5" /> Hapus Lowongan
+                    </Button>
                   </div>
-                  <Button variant="outline" asChild>
-                    <Link href={`/recruiter/jobs/${job.id}/pipeline`}>
-                      <Workflow className="size-4 mr-1.5" /> Buka Pipeline Pelamar &rarr;
-                    </Link>
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" asChild>
+                      <Link href={`/recruiter/jobs/${job.id}/edit`}>
+                        <Pencil className="size-4 mr-1.5" /> Edit Lowongan
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href={`/recruiter/jobs/${job.id}/pipeline`}>
+                        <Workflow className="size-4 mr-1.5" /> Buka Pipeline Pelamar &rarr;
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive mb-2">
+                    <Trash2 className="size-5" />
+                  </div>
+                  <DialogTitle>Hapus Lowongan Kerja?</DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground">
+                    Tindakan ini tidak dapat dibatalkan. Lowongan{" "}
+                    <strong className="text-foreground">&quot;{job.title}&quot;</strong> beserta seluruh data pelamar,
+                    jadwal wawancara, dan riwayat seleksi yang terkait akan dihapus secara permanen.
+                  </DialogDescription>
+                </DialogHeader>
+                {deleteError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive flex items-center gap-2">
+                    <AlertCircle className="size-4 shrink-0" />
+                    <span>{deleteError}</span>
+                  </div>
+                )}
+                <DialogFooter className="mt-4 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDeleteDialogOpen(false)}
+                    disabled={deleting}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeleteJob}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Menghapus..." : "Ya, Hapus Lowongan"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </main>

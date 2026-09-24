@@ -193,6 +193,53 @@ export function formatSalaryDisplay(job: Partial<Job>): string {
   return baseStr;
 }
 
+export function formatOfficeAddress(
+  address?: string | null,
+  city?: string | null,
+  province?: string | null
+): string {
+  let cleanAddr = address?.trim() || "";
+  cleanAddr = cleanAddr.replace(/,\s*$/, "");
+  const cleanCity = city?.trim().replace(/,\s*$/, "") || "";
+  const cleanProv = province?.trim().replace(/,\s*$/, "") || "";
+
+  if (!cleanAddr && !cleanCity && !cleanProv) return "-";
+  if (!cleanAddr) {
+    return [cleanCity, cleanProv].filter(Boolean).join(", ");
+  }
+
+  const parts = [cleanAddr];
+  const lowerAddr = cleanAddr.toLowerCase();
+
+  if (cleanCity && !lowerAddr.includes(cleanCity.toLowerCase())) {
+    parts.push(cleanCity);
+  }
+
+  const lowerCity = cleanCity.toLowerCase();
+  if (
+    cleanProv &&
+    !lowerAddr.includes(cleanProv.toLowerCase()) &&
+    !lowerCity.includes(cleanProv.toLowerCase())
+  ) {
+    parts.push(cleanProv);
+  }
+
+  return parts.join(", ");
+}
+
+export function formatPhoneDisplay(phone?: string | null): string {
+  if (!phone) return "-";
+  const trimmed = phone.trim();
+  if (trimmed.includes(" ") || trimmed.includes("-")) return trimmed;
+  if (trimmed.startsWith("+62")) {
+    const digits = trimmed.slice(3);
+    if (digits.length <= 8) return `+62 ${digits.slice(0, 3)} ${digits.slice(3)}`;
+    if (digits.length <= 10) return `+62 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    return `+62 ${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
+  }
+  return trimmed;
+}
+
 export const DEMO_JOBS: Job[] = [
   {
     id: "demo-job-product-designer",
