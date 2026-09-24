@@ -354,7 +354,7 @@ export function CandidateDetailDrawer({
                   isOfferOrAbove || candidate.stage === "rejected" ? "w-full" : "flex-1"
                 )}
               >
-                <Link href={`/messages`}>
+                <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
                   <MessageSquare className="size-3.5" /> Kirim Pesan
                 </Link>
               </Button>
@@ -800,7 +800,7 @@ export function CandidateDetailDrawer({
                                     asChild
                                     className="h-7 text-xs font-medium text-slate-700 hover:bg-amber-100/60"
                                   >
-                                    <Link href="/messages">
+                                    <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
                                       <MessageSquare className="size-3.5 mr-1" /> Kirim Pesan
                                     </Link>
                                   </Button>

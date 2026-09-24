@@ -2105,7 +2105,7 @@ export function RecruiterOperationsPage() {
 
                                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <Link
-                                    href="/messages"
+                                    href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}
                                     className="p-1 rounded-md text-slate-400 hover:text-[#7C3AED] hover:bg-purple-50 transition-colors"
                                     title="Kirim pesan"
                                   >

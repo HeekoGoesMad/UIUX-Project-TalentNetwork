@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useApp } from "@/providers/app-provider";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn, UUID_RE } from "@/lib/utils";
 
 type Participant = { id: string; name: string | null; email?: string | null };
 type Conversation = { id: string; status: string; updatedAt: string; participants: Participant[]; lastMessage: { body: string; createdAt: string } | null };
@@ -201,18 +201,39 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const candidateParam = searchParams.get("candidateProfileId") || searchParams.get("candidateId");
   const requestedConversationId = routeConversationId ?? searchParams.get("conversationId");
   const currentQueryConversationId = searchParams.get("conversationId");
-  const contact = searchParams.get("contact");
-  const candidateProfileId = searchParams.get("candidateProfileId");
+  const contact = searchParams.get("contact") || searchParams.get("name");
+  const candidateProfileId = candidateParam;
   const consentRequestItemId = searchParams.get("consentRequestItemId");
+  const targetCandidateId = candidateProfileId || (routeConversationId && routeConversationId !== "demo" ? routeConversationId : null);
+
   const initialConversationData = appUserKey ? conversationCache.get(appUserKey)?.data : undefined;
   const initialSelectedId = requestedConversationId ?? "";
   const initialMessageData = appUserKey && initialSelectedId ? messageCache.get(messageCacheKey(appUserKey, initialSelectedId)) : undefined;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const consentConversationAttempt = useRef<string | null>(null);
   const selectedIdRef = useRef(initialSelectedId);
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversationData ?? []);
+
+  const demoCandidateName = contact || (targetCandidateId === "b082c226-1a6e-42a6-80e0-150ce5f01745" ? "Alga Ramandika Praba" : targetCandidateId === "cd6ec533-5d1c-4f87-842c-888de3e825ec" ? "Adrienne Kayana Wistara Lie" : "Kandidat");
+
+  const [conversations, setConversations] = useState<Conversation[]>(() => {
+    if (initialConversationData) return initialConversationData;
+    if (!dbMode && targetCandidateId) {
+      return [
+        {
+          id: targetCandidateId,
+          status: "active",
+          updatedAt: new Date().toISOString(),
+          participants: [{ id: targetCandidateId, name: demoCandidateName }],
+          lastMessage: { body: `Mulai percakapan dengan ${demoCandidateName}`, createdAt: new Date().toISOString() },
+        },
+        { id: "demo", status: "active", updatedAt: "", participants: [{ id: "other", name: "Nadia Pratama" }], lastMessage: { body: "Percakapan demo untuk pratinjau", createdAt: "" } },
+      ];
+    }
+    return [];
+  });
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [messages, setMessages] = useState<Message[]>(() => {
     if (!initialSelectedId) return [];
@@ -277,24 +298,68 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   }, [hydrated, userEmail, userRole, router]);
 
   useEffect(() => {
+    if (dbMode || !targetCandidateId) return;
+    void Promise.resolve().then(() => {
+      setConversations((prev) => {
+        if (prev.some((c) => c.id === targetCandidateId)) return prev;
+        return [
+          {
+            id: targetCandidateId,
+            status: "active",
+            updatedAt: new Date().toISOString(),
+            participants: [{ id: targetCandidateId, name: demoCandidateName }],
+            lastMessage: { body: `Mulai percakapan dengan ${demoCandidateName}`, createdAt: new Date().toISOString() },
+          },
+          ...prev.filter((c) => c.id !== targetCandidateId),
+        ];
+      });
+      setSelectedId(targetCandidateId);
+    });
+  }, [dbMode, targetCandidateId, demoCandidateName]);
+
+  useEffect(() => {
     if (!dbMode || !appUserKey) return;
     let cancelled = false;
     const cachedEntry = conversationCache.get(appUserKey);
     const cached = cachedEntry?.data;
 
     const applySelection = (next: Conversation[], navigate: boolean, deferMissingRequested = false): string | null => {
-      const requested = requestedConversationId && next.some((item) => item.id === requestedConversationId) ? requestedConversationId : null;
-      if (requestedConversationId && !requested && deferMissingRequested) return null;
-      const contacted = contact ? next.find((item) => item.participants.some((participant) => [participant.id, participant.email, participant.name].includes(contact)))?.id ?? "" : "";
-      // ponytail: no auto-pick of current/next[0]; empty unless explicit requested/contact match
-      const nextId = requested ?? contacted;
-      setSelectedId(nextId);
-      if (nextId && navigate) navigateToConversation(router, pathname, currentQueryConversationId, nextId);
-      else if (!nextId && contact) setError("Belum ada percakapan dengan recruiter ini.");
-      return nextId || null;
+      // 1. Direct match by conversation ID
+      const directMatch = requestedConversationId && next.find((item) => item.id === requestedConversationId);
+      if (directMatch) {
+        setSelectedId(directMatch.id);
+        if (navigate) navigateToConversation(router, pathname, currentQueryConversationId, directMatch.id);
+        return directMatch.id;
+      }
+
+      // 2. Match by participant ID (candidate profile / user ID) or contact name
+      const participantMatch = next.find((item) =>
+        item.participants.some(
+          (p) =>
+            (targetCandidateId && p.id === targetCandidateId) ||
+            (contact && (p.id === contact || p.email === contact || (p.name && p.name.toLowerCase() === contact.toLowerCase())))
+        )
+      );
+
+      if (participantMatch) {
+        setSelectedId(participantMatch.id);
+        if (navigate) navigateToConversation(router, pathname, currentQueryConversationId, participantMatch.id);
+        return participantMatch.id;
+      }
+
+      if (requestedConversationId && deferMissingRequested) return null;
+      return null;
     };
 
-    const hasContactMatch = Boolean(cached?.some((item) => item.participants.some((participant) => [participant.id, participant.email, participant.name].includes(contact ?? ""))));
+    const hasContactMatch = Boolean(
+      cached?.some((item) =>
+        item.id === requestedConversationId ||
+        item.participants.some((participant) =>
+          [participant.id, participant.email, participant.name].includes(contact ?? "") ||
+          (targetCandidateId && participant.id === targetCandidateId)
+        )
+      )
+    );
     const stale = cachedEntry ? isCacheStale(cachedEntry) : true;
     if (cached !== undefined) {
       void Promise.resolve().then(() => {
@@ -312,7 +377,7 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
       });
     }
 
-    const shouldFetch = cached === undefined || stale || (Boolean(contact) && !hasContactMatch);
+    const shouldFetch = cached === undefined || stale || ((Boolean(contact) || Boolean(targetCandidateId)) && !hasContactMatch);
     if (!shouldFetch) return () => { cancelled = true; };
 
     void (async () => {
@@ -322,26 +387,45 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
         setConversations(next);
         let nextId = applySelection(next, false);
 
-        if (!nextId && contact && candidateProfileId && consentRequestItemId) {
-          const attemptKey = `${appUserKey}:${contact}:${candidateProfileId}:${consentRequestItemId}`;
+        if (!nextId && (targetCandidateId || (contact && consentRequestItemId))) {
+          const attemptKey = `${appUserKey}:${contact ?? ""}:${targetCandidateId ?? ""}:${consentRequestItemId ?? ""}`;
           if (consentConversationAttempt.current !== attemptKey) {
             consentConversationAttempt.current = attemptKey;
-            const createResponse = await fetch("/api/conversations", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ candidateProfileId, consentRequestItemId }),
-            });
-            const createPayload = await createResponse.json() as { conversationId?: string; error?: string };
-            if (!createResponse.ok || !createPayload.conversationId) throw new Error(createPayload.error ?? "Percakapan belum dapat dibuat.");
-            next = await fetchConversations(appUserKey, true);
-            if (cancelled) return;
-            setConversations(next);
-            nextId = createPayload.conversationId;
-            setSelectedId(nextId);
-            navigateToConversation(router, pathname, currentQueryConversationId, nextId);
+            if (targetCandidateId && UUID_RE.test(targetCandidateId)) {
+              try {
+                const createPayload: Record<string, string> = { candidateProfileId: targetCandidateId };
+                if (consentRequestItemId) createPayload.consentRequestItemId = consentRequestItemId;
+
+                const createResponse = await fetch("/api/conversations", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(createPayload),
+                });
+                const createPayloadData = (await createResponse.json()) as { conversationId?: string; error?: string };
+                if (createResponse.ok && createPayloadData.conversationId) {
+                  next = await fetchConversations(appUserKey, true);
+                  if (cancelled) return;
+                  setConversations(next);
+                  nextId = createPayloadData.conversationId;
+                  setSelectedId(nextId);
+                  navigateToConversation(router, pathname, currentQueryConversationId, nextId);
+                }
+              } catch {}
+            }
           }
         }
-        if (!nextId && contact) setError("Belum ada percakapan dengan recruiter ini.");
+        if (!nextId && targetCandidateId) {
+          const fallbackConv: Conversation = {
+            id: targetCandidateId,
+            status: "active",
+            updatedAt: new Date().toISOString(),
+            participants: [{ id: targetCandidateId, name: contact || demoCandidateName }],
+            lastMessage: null,
+          };
+          setConversations((prev) => (prev.some((c) => c.id === targetCandidateId) ? prev : [fallbackConv, ...prev]));
+          setSelectedId(targetCandidateId);
+        }
+        if (!nextId && contact && !targetCandidateId) setError("Belum ada percakapan dengan recruiter ini.");
         else setError(null);
       } catch (reason: unknown) {
         if (!cancelled) setError(reason instanceof Error ? reason.message : "Gagal memuat percakapan.");
@@ -351,7 +435,7 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
     })();
 
     return () => { cancelled = true; };
-  }, [dbMode, appUserKey, requestedConversationId, contact, candidateProfileId, consentRequestItemId, pathname, currentQueryConversationId, router]);
+  }, [dbMode, appUserKey, requestedConversationId, contact, candidateProfileId, targetCandidateId, consentRequestItemId, pathname, currentQueryConversationId, router, demoCandidateName]);
 
   async function loadMessages(before?: string | null, options: { background?: boolean } = {}) {
     const background = options.background === true;
@@ -511,8 +595,8 @@ function MessagesContent({ routeConversationId }: { routeConversationId?: string
   );
   if (databaseModeUnavailable(dbMode, bootstrapped) && !hasCachedInboxData) return <StateMessage text="Memuat pesan..." />;
   const selected = conversations.find((conversation) => conversation.id === selectedId);
-  const other = selected?.participants.find((participant) => participant.id !== currentUserId && participant.email !== userEmail)?.name ?? (dbMode ? "Kontak" : "Nadia Pratama");
-  const hasActiveThread = databaseMode ? Boolean(selected) : selectedId === "demo";
+  const other = selected?.participants.find((participant) => participant.id !== currentUserId && participant.email !== userEmail)?.name ?? (contact || demoCandidateName || (dbMode ? "Kontak" : "Nadia Pratama"));
+  const hasActiveThread = databaseMode ? Boolean(selected) : (Boolean(selected) || selectedId === "demo" || Boolean(targetCandidateId));
   const visibleError = error ?? (dbMode ? databaseError : null);
 
   async function sendMessage(event?: FormEvent) {
