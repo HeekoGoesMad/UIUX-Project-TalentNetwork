@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   BarChart3,
   Calendar,
   Clock,
@@ -1645,9 +1646,9 @@ export function RecruiterOperationsPage() {
 
                                       if (isDeclined) {
                                         return (
-                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-md">
-                                            <Calendar className="size-2.5 text-slate-500" />
-                                            Sesi Ditolak Kandidat
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md">
+                                            <AlertCircle className="size-2.5 text-amber-600" />
+                                            Sesi Ditolak (Perlu Tindak Lanjut)
                                           </span>
                                         );
                                       }
@@ -1874,6 +1875,7 @@ export function RecruiterOperationsPage() {
           recruiterName={recruiterName}
           availableJobs={availableJobs}
           onAssignJob={handleAssignJob}
+          onOpenScheduleModal={(c) => setScheduleModalCandidate(c)}
         />
 
         {/* Schedule Interview Transition Modal (Screening -> Interview) */}
