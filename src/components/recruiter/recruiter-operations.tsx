@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   BarChart3,
+  Briefcase,
   Calendar,
   Clock,
   DollarSign,
@@ -319,6 +320,28 @@ export function validateCandidateStageTransition(
   return { allowed: true };
 }
 
+export function getDaysInCurrentStage(candidate: Candidate): number {
+  if (Array.isArray(candidate.statusHistory) && candidate.statusHistory.length > 0) {
+    const sorted = [...candidate.statusHistory].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    const latestStageEntry = sorted.find((h) => h.stage === candidate.stage);
+    if (latestStageEntry && latestStageEntry.timestamp) {
+      const time = new Date(latestStageEntry.timestamp).getTime();
+      if (!isNaN(time)) {
+        return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
+      }
+    }
+  }
+  if (candidate.appliedAt) {
+    const time = new Date(candidate.appliedAt).getTime();
+    if (!isNaN(time)) {
+      return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
+    }
+  }
+  return 0;
+}
+
 export function RecruiterOperationsPage() {
   const { dbMode, scans, user } = useApp();
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
@@ -326,7 +349,13 @@ export function RecruiterOperationsPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">("all");
   const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(defaultJobs);
+
+  // Batch actions states
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [batchTargetJobId, setBatchTargetJobId] = useState<string>("");
+  const [isBatchAssigning, setIsBatchAssigning] = useState(false);
 
   // Modals & Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -679,6 +708,18 @@ export function RecruiterOperationsPage() {
     };
   }, [dbMode, scans, recruiterName]);
 
+  // Scope counts for segmented control
+  const scopeCounts = useMemo(() => {
+    const total = activeCandidates.length;
+    const pool = activeCandidates.filter(
+      (c) => !c.jobId || c.jobId === "talent-pool" || c.jobTitle === "Talent Pool"
+    ).length;
+    const jobs = activeCandidates.filter(
+      (c) => c.jobId && c.jobId !== "talent-pool" && c.jobTitle !== "Talent Pool"
+    ).length;
+    return { total, pool, jobs };
+  }, [activeCandidates]);
+
   // Filtered candidates
   const filteredCandidates = useMemo(() => {
     return activeCandidates.filter((candidate) => {
@@ -686,15 +727,26 @@ export function RecruiterOperationsPage() {
         searchQuery.trim() === "" ||
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const isPool =
+        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+
+      const matchScope =
+        scopeFilter === "all"
+          ? true
+          : scopeFilter === "pool"
+          ? isPool
+          : !isPool;
+
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
-          ? !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool"
+          ? isPool
           : candidate.jobId === jobFilter || candidate.role === jobFilter;
-      return matchSearch && matchJob;
+      return matchSearch && matchScope && matchJob;
     });
-  }, [activeCandidates, searchQuery, jobFilter]);
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -812,6 +864,140 @@ export function RecruiterOperationsPage() {
     },
     [data.candidates, recruiterName, selectedCandidate, dbMode]
   );
+
+  // Batch assign multiple selected candidates to a job
+  const handleBatchAssign = async () => {
+    if (selectedCandidateIds.length === 0 || !batchTargetJobId) return;
+    setIsBatchAssigning(true);
+
+    const targetJobTitle =
+      batchTargetJobId === "talent-pool"
+        ? "Talent Pool"
+        : availableJobs.find((j) => j.id === batchTargetJobId)?.title || "Lowongan Terpilih";
+
+    const updatedCandidates = data.candidates.map((c) => {
+      if (!selectedCandidateIds.includes(c.id)) return c;
+      const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
+      const assignItem: StatusHistoryItem = {
+        id: `hist-assign-${c.id}-${existingHist.length + 1}`,
+        stage: c.stage,
+        title:
+          batchTargetJobId === "talent-pool"
+            ? "Dipindahkan ke Talent Pool"
+            : `Penugasan Posisi: ${targetJobTitle}`,
+        actionType: "recruiter",
+        timestamp: new Date().toISOString(),
+        actor: recruiterName,
+        actorRole: "Recruiter Lead",
+        notes:
+          batchTargetJobId === "talent-pool"
+            ? "Kandidat dipindahkan ke Talent Pool umum untuk peluang masa depan."
+            : `Kandidat ditugaskan ke lowongan ${targetJobTitle} untuk proses evaluasi dan seleksi aktif.`,
+      };
+      return {
+        ...c,
+        jobId: batchTargetJobId,
+        jobTitle: targetJobTitle,
+        statusHistory: [...existingHist, assignItem],
+      };
+    });
+
+    setData((current) => ({
+      ...current,
+      candidates: updatedCandidates,
+    }));
+
+    if (selectedCandidate && selectedCandidateIds.includes(selectedCandidate.id)) {
+      const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
+      if (updated) setSelectedCandidate(updated);
+    }
+
+    try {
+      const opsRaw = localStorage.getItem(storageKey);
+      if (opsRaw) {
+        const opsData = JSON.parse(opsRaw);
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
+      }
+    } catch {}
+
+    try {
+      const demoAppKey = "proofylink-demo-applications-v1";
+      const demoAppsRaw = localStorage.getItem(demoAppKey);
+      if (demoAppsRaw) {
+        const apps = JSON.parse(demoAppsRaw);
+        if (Array.isArray(apps)) {
+          for (const candId of selectedCandidateIds) {
+            const target = data.candidates.find((c) => c.id === candId);
+            const appIdx = apps.findIndex(
+              (a: { candidateProfileId?: string; id?: string; candidate?: { name?: string } }) =>
+                a.candidateProfileId === candId ||
+                a.id === `demo-app-${candId}` ||
+                (target?.name && a.candidate?.name === target.name)
+            );
+            if (appIdx >= 0) {
+              apps[appIdx].jobId = batchTargetJobId;
+              if (apps[appIdx].job) {
+                apps[appIdx].job.id = batchTargetJobId;
+                apps[appIdx].job.title = targetJobTitle;
+              } else {
+                apps[appIdx].job = { id: batchTargetJobId, title: targetJobTitle, organizationName: "Perusahaan Mitra" };
+              }
+              apps[appIdx].updatedAt = new Date().toISOString();
+            } else if (batchTargetJobId !== "talent-pool") {
+              apps.push({
+                id: `demo-app-${candId}`,
+                jobId: batchTargetJobId,
+                status: target?.stage || "screening",
+                coverNote: `Kandidat ditugaskan dari Talent Network ke posisi ${targetJobTitle}.`,
+                submittedAt: new Date().toISOString(),
+                withdrawnAt: null,
+                updatedAt: new Date().toISOString(),
+                job: {
+                  id: batchTargetJobId,
+                  title: targetJobTitle,
+                  organizationName: "Perusahaan Mitra",
+                },
+                candidate: {
+                  name: target?.name || "Kandidat",
+                  headline: target?.role || "Talent",
+                  location: target?.location || "Indonesia",
+                },
+              });
+            }
+          }
+          localStorage.setItem(demoAppKey, JSON.stringify(apps));
+        }
+      }
+    } catch {}
+
+    if (dbMode && batchTargetJobId !== "talent-pool") {
+      try {
+        await Promise.allSettled(
+          selectedCandidateIds.map((cid) =>
+            fetch("/api/applications", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                candidateProfileId: cid,
+                jobId: batchTargetJobId,
+              }),
+            })
+          )
+        );
+      } catch {}
+    }
+
+    toast.success(
+      batchTargetJobId === "talent-pool"
+        ? `${selectedCandidateIds.length} kandidat dipindahkan ke Talent Pool`
+        : `${selectedCandidateIds.length} kandidat berhasil ditugaskan ke: ${targetJobTitle}`
+    );
+
+    setSelectedCandidateIds([]);
+    setBatchTargetJobId("");
+    setIsBatchAssigning(false);
+  };
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -1431,27 +1617,78 @@ export function RecruiterOperationsPage() {
 
         {/* Filter Bar */}
         <div className="container mx-auto px-4 sm:px-6 py-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="relative w-full md:w-80">
-              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari kandidat atau posisi..."
-                className="w-full text-xs rounded-xl border border-slate-200 pl-9 pr-3 py-2 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden transition-colors"
-              />
-              {searchQuery && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+              <div className="relative w-full sm:w-72">
+                <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari kandidat atau posisi..."
+                  className="w-full text-xs rounded-xl border border-slate-200 pl-9 pr-3 py-2 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Segmented Scope Filter Toggle */}
+              <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200/80 shrink-0">
                 <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  type="button"
+                  onClick={() => setScopeFilter("all")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                    scopeFilter === "all"
+                      ? "bg-white text-slate-900 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
                 >
-                  <X className="size-3.5" />
+                  Semua
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 font-medium text-slate-600">
+                    {scopeCounts.total}
+                  </span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setScopeFilter("pool")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                    scopeFilter === "pool"
+                      ? "bg-white text-[#7C3AED] shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  Talent Pool
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-100/70 font-medium text-purple-700">
+                    {scopeCounts.pool}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScopeFilter("jobs")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                    scopeFilter === "jobs"
+                      ? "bg-white text-slate-900 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  Lowongan Aktif
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 font-medium text-slate-600">
+                    {scopeCounts.jobs}
+                  </span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end overflow-x-auto">
+            <div className="flex items-center gap-2 justify-end overflow-x-auto">
               {/* Job Opening Filter */}
               {availableJobs.length > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -1471,13 +1708,14 @@ export function RecruiterOperationsPage() {
                 </div>
               )}
 
-              {(searchQuery || jobFilter !== "all") && (
+              {(searchQuery || jobFilter !== "all" || scopeFilter !== "all") && (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
                     setSearchQuery("");
                     setJobFilter("all");
+                    setScopeFilter("all");
                   }}
                   className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
                 >
@@ -1571,12 +1809,31 @@ export function RecruiterOperationsPage() {
                                   "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
                                   isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
                                   isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : "",
-                                  focusedCandidateId === candidate.id ? "ring-2 ring-[#7C3AED] ring-offset-2 border-purple-300 shadow-md" : ""
+                                  focusedCandidateId === candidate.id ? "ring-2 ring-[#7C3AED] ring-offset-2 border-purple-300 shadow-md" : "",
+                                  selectedCandidateIds.includes(candidate.id) ? "ring-2 ring-[#7C3AED] bg-purple-50/25 border-purple-300" : ""
                                 )}
                               >
-                              {/* Top Bar: Avatar, Name & Actions */}
+                              {/* Top Bar: Selection Checkbox, Avatar, Name & Actions */}
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2.5">
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center justify-center shrink-0"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedCandidateIds.includes(candidate.id)}
+                                      onChange={() => {
+                                        setSelectedCandidateIds((prev) =>
+                                          prev.includes(candidate.id)
+                                            ? prev.filter((id) => id !== candidate.id)
+                                            : [...prev, candidate.id]
+                                        );
+                                      }}
+                                      className="size-3.5 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED] cursor-pointer"
+                                      aria-label={`Pilih ${candidate.name}`}
+                                    />
+                                  </div>
                                   <CandidateAvatar
                                     initials={candidate.name
                                       .split(" ")
@@ -1699,12 +1956,32 @@ export function RecruiterOperationsPage() {
                                 )}
                               </div>
 
-                              {/* Card Footer: Clean Location & Actions */}
+                              {/* Card Footer: Location, SLA & Actions */}
                               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                                <span className="text-[10px] flex items-center gap-1 truncate max-w-[130px] text-slate-500">
-                                  <MapPin className="size-3 text-slate-400 shrink-0" />
-                                  {candidate.location}
-                                </span>
+                                <div className="flex items-center gap-2 max-w-[170px] truncate">
+                                  <span className="text-[10px] flex items-center gap-1 truncate text-slate-500">
+                                    <MapPin className="size-3 text-slate-400 shrink-0" />
+                                    {candidate.location}
+                                  </span>
+                                  {(() => {
+                                    const days = getDaysInCurrentStage(candidate);
+                                    const isAgingAlert = days >= 7;
+                                    return (
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center gap-1 text-[10px] shrink-0",
+                                          isAgingAlert
+                                            ? "text-amber-800 bg-amber-50 border border-amber-300 px-1.5 py-0.2 rounded font-semibold"
+                                            : "text-slate-400"
+                                        )}
+                                        title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
+                                      >
+                                        <Clock className={cn("size-2.5", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
+                                        {days === 0 ? "Hari ini" : `${days} hr`}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
 
                                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <Link
@@ -1749,9 +2026,32 @@ export function RecruiterOperationsPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="px-5 py-3.5">Kandidat</th>
+                      <th className="px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredCandidates.length > 0 &&
+                              filteredCandidates.every((c) => selectedCandidateIds.includes(c.id))
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const visibleIds = filteredCandidates.map((c) => c.id);
+                                setSelectedCandidateIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+                              } else {
+                                const visibleIds = new Set(filteredCandidates.map((c) => c.id));
+                                setSelectedCandidateIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+                              }
+                            }}
+                            className="size-3.5 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED] cursor-pointer"
+                            aria-label="Pilih semua kandidat yang tampil"
+                          />
+                          <span>Kandidat</span>
+                        </div>
+                      </th>
                       <th className="px-4 py-3.5">Posisi &amp; Lokasi</th>
                       <th className="px-4 py-3.5">Tahap Seleksi</th>
+                      <th className="px-4 py-3.5">Durasi Tahap</th>
                       <th className="px-4 py-3.5">Status Offer</th>
                       <th className="px-4 py-3.5">Penanggung Jawab</th>
                       <th className="px-5 py-3.5 text-right">Aksi</th>
@@ -1760,96 +2060,136 @@ export function RecruiterOperationsPage() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredCandidates.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                           Tidak ada kandidat yang cocok dengan kriteria filter.
                         </td>
                       </tr>
                     ) : (
-                      filteredCandidates.map((candidate) => (
-                        <tr
-                          key={candidate.id}
-                          onClick={() => {
-                            setSelectedCandidate(candidate);
-                            setDrawerOpen(true);
-                          }}
-                          className={cn(
-                            "hover:bg-slate-50/80 transition-colors cursor-pointer",
-                            focusedCandidateId === candidate.id ? "bg-purple-50/70 ring-1 ring-inset ring-purple-300" : ""
-                          )}
-                        >
-                          <td className="px-5 py-3.5 font-bold text-slate-900">
-                            <div className="flex items-center gap-2.5">
-                              <CandidateAvatar
-                                initials={candidate.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .slice(0, 2)
-                                  .toUpperCase()}
-                                avatarUrl={candidate.avatarUrl}
-                                name={candidate.name}
-                                className="size-8 rounded-xl ring-1 ring-purple-100 shrink-0"
-                              />
-                              <div>
-                                <p className="font-bold text-slate-900 leading-tight">{candidate.name}</p>
-                                {(!candidate.jobId || candidate.jobId === "talent-pool") && (
-                                  <span className="inline-flex text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
-                                    Talent Pool
-                                  </span>
-                                )}
+                      filteredCandidates.map((candidate) => {
+                        const days = getDaysInCurrentStage(candidate);
+                        const isAgingAlert = days >= 7;
+                        const isSelected = selectedCandidateIds.includes(candidate.id);
+
+                        return (
+                          <tr
+                            key={candidate.id}
+                            onClick={() => {
+                              setSelectedCandidate(candidate);
+                              setDrawerOpen(true);
+                            }}
+                            className={cn(
+                              "hover:bg-slate-50/80 transition-colors cursor-pointer",
+                              focusedCandidateId === candidate.id ? "bg-purple-50/70 ring-1 ring-inset ring-purple-300" : "",
+                              isSelected ? "bg-purple-50/40" : ""
+                            )}
+                          >
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              <div className="flex items-center gap-2.5">
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setSelectedCandidateIds((prev) =>
+                                        prev.includes(candidate.id)
+                                          ? prev.filter((id) => id !== candidate.id)
+                                          : [...prev, candidate.id]
+                                      );
+                                    }}
+                                    className="size-3.5 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED] cursor-pointer"
+                                    aria-label={`Pilih ${candidate.name}`}
+                                  />
+                                </div>
+                                <CandidateAvatar
+                                  initials={candidate.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                  avatarUrl={candidate.avatarUrl}
+                                  name={candidate.name}
+                                  className="size-8 rounded-xl ring-1 ring-purple-100 shrink-0"
+                                />
+                                <div>
+                                  <p className="font-bold text-slate-900 leading-tight">{candidate.name}</p>
+                                  {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
+                                    <span className="inline-flex text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
+                                      Talent Pool
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex text-[9px] font-medium text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 mt-0.5">
+                                      {candidate.jobTitle || "Lowongan Terpilih"}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <p className="font-medium text-slate-800">{candidate.role}</p>
-                            <p className="text-[11px] text-slate-400">{candidate.location}</p>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={cn(
-                                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                                STAGES.find((s) => s.id === candidate.stage)?.border,
-                                STAGES.find((s) => s.id === candidate.stage)?.bg,
-                                STAGES.find((s) => s.id === candidate.stage)?.text
-                              )}
-                            >
-                              {STAGES.find((s) => s.id === candidate.stage)?.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={cn(
-                                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold",
-                                candidate.offerStatus === "accepted"
-                                  ? "bg-emerald-100 text-emerald-800"
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <p className="font-medium text-slate-800">{candidate.role}</p>
+                              <p className="text-[11px] text-slate-400">{candidate.location}</p>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                                  STAGES.find((s) => s.id === candidate.stage)?.border,
+                                  STAGES.find((s) => s.id === candidate.stage)?.bg,
+                                  STAGES.find((s) => s.id === candidate.stage)?.text
+                                )}
+                              >
+                                {STAGES.find((s) => s.id === candidate.stage)?.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1 text-[11px]",
+                                  isAgingAlert
+                                    ? "text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md font-semibold"
+                                    : "text-slate-600 font-medium"
+                                )}
+                                title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
+                              >
+                                <Clock className={cn("size-3", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
+                                {days === 0 ? "Hari ini" : `${days} hari`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold",
+                                  candidate.offerStatus === "accepted"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : candidate.offerStatus === "sent"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-slate-100 text-slate-600"
+                                )}
+                              >
+                                {candidate.offerStatus === "accepted"
+                                  ? "Accepted"
                                   : candidate.offerStatus === "sent"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-slate-100 text-slate-600"
-                              )}
-                            >
-                              {candidate.offerStatus === "accepted"
-                                ? "Accepted"
-                                : candidate.offerStatus === "sent"
-                                ? "Sent"
-                                : "Draft"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5 text-slate-600">{candidate.owner}</td>
-                          <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
-                              onClick={() => {
-                                setSelectedCandidate(candidate);
-                                setDrawerOpen(true);
-                              }}
-                            >
-                              Detail
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
+                                  ? "Sent"
+                                  : "Draft"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-600">{candidate.owner}</td>
+                            <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                                onClick={() => {
+                                  setSelectedCandidate(candidate);
+                                  setDrawerOpen(true);
+                                }}
+                              >
+                                Detail
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1857,6 +2197,55 @@ export function RecruiterOperationsPage() {
             </div>
           )}
         </div>
+
+        {/* Floating Batch Assignment Action Bar */}
+        {selectedCandidateIds.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-slate-200/90 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center gap-2">
+              <span className="size-6 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold">
+                {selectedCandidateIds.length}
+              </span>
+              <span className="text-xs font-semibold text-slate-900">Kandidat Terpilih</span>
+            </div>
+
+            <div className="h-5 w-px bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <select
+                value={batchTargetJobId}
+                onChange={(e) => setBatchTargetJobId(e.target.value)}
+                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+              >
+                <option value="">Pilih Lowongan Tujuan...</option>
+                <option value="talent-pool">Talent Pool (Pindahkan ke Pool)</option>
+                {availableJobs.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.title}
+                  </option>
+                ))}
+              </select>
+
+              <Button
+                size="sm"
+                disabled={!batchTargetJobId || isBatchAssigning}
+                onClick={handleBatchAssign}
+                className="h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+              >
+                <Briefcase className="size-3.5" />
+                {isBatchAssigning ? "Menugaskan..." : "Tugaskan ke Lowongan"}
+              </Button>
+            </div>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedCandidateIds([])}
+              className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
+            >
+              Batal
+            </Button>
+          </div>
+        )}
 
         {/* Candidate Detail Contextual Drawer */}
         <CandidateDetailDrawer
