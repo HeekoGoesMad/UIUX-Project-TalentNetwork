@@ -177,14 +177,42 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
 const AppContext = createContext<Context | null>(null);
 
 function parseState(value: string | null): AppState {
-  if (!value) return initial;
+  let permanentScans: string[] = [];
+  try {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("proofylink-permanent-scans-v1") : null;
+    if (stored) {
+      const arr = JSON.parse(stored);
+      if (Array.isArray(arr)) permanentScans = arr;
+    }
+  } catch {}
+
+  if (!value) {
+    return {
+      ...initial,
+      scans: permanentScans.map((id) => ({ candidateId: id, scannedAt: new Date().toISOString() })),
+    };
+  }
   try {
     const parsed = JSON.parse(value) as Partial<AppState>;
+    const scanMap = new Map<string, string>();
+    if (Array.isArray(parsed.scans)) {
+      parsed.scans.forEach((s) => {
+        if (s && s.candidateId) scanMap.set(s.candidateId, s.scannedAt || new Date().toISOString());
+      });
+    }
+    permanentScans.forEach((id) => {
+      if (!scanMap.has(id)) scanMap.set(id, new Date().toISOString());
+    });
+    const combinedScans = Array.from(scanMap.entries()).map(([candidateId, scannedAt]) => ({
+      candidateId,
+      scannedAt,
+    }));
+
     return {
       ...initial,
       ...parsed,
       tokens: typeof parsed.tokens === "number" && parsed.tokens >= 0 ? parsed.tokens : initial.tokens,
-      scans: Array.isArray(parsed.scans) ? parsed.scans : [],
+      scans: combinedScans,
       shortlisted: Array.isArray(parsed.shortlisted) ? parsed.shortlisted : [],
       notes: parsed.notes && typeof parsed.notes === "object" ? parsed.notes : {},
       recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
@@ -338,6 +366,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notifications?: BootstrapNotification[];
         shortlists?: BootstrapShortlist[];
         consentRequests?: Record<string, unknown>[];
+        scannedCandidateIds?: string[];
         error?: string;
       };
 
@@ -372,29 +401,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const consents = payload.consentRequests ?? [];
       setConsentRequests(consents);
       const remoteProfile = remoteCvProfile(payload);
-      setState((current) => ({
-        ...current,
-        cvProfile: remoteProfile
-          ? {
-              ...remoteProfile,
-              careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
-            }
-          : current.cvProfile,
-        careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
-        tokens: payload.token?.balance ?? 0,
-        screeningTokens: payload.token?.balance ?? 0,
-        shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
-        screeningConsents: Object.fromEntries(consents.flatMap((request) => {
-          const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
-          const status = request.status;
-          if (!candidateId || typeof status !== "string") return [];
-          const consent = CONSENT_STATE_BY_DB_STATUS[status];
-          return consent ? [[candidateId, consent]] : [];
-        })),
-      }));
+
+      const remoteScannedIds: string[] = Array.isArray(payload.scannedCandidateIds)
+        ? (payload.scannedCandidateIds as string[])
+        : [];
+
+      let permanentScans: string[] = [];
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("proofylink-permanent-scans-v1") : null;
+        if (stored) {
+          const arr = JSON.parse(stored);
+          if (Array.isArray(arr)) permanentScans = arr;
+        }
+      } catch {}
+
+      setState((current) => {
+        const allUnlockedIds = new Set([
+          ...current.scans.map((s) => s.candidateId),
+          ...remoteScannedIds,
+          ...permanentScans,
+        ]);
+
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("proofylink-permanent-scans-v1", JSON.stringify(Array.from(allUnlockedIds)));
+          }
+        } catch {}
+
+        const mergedScans = Array.from(allUnlockedIds).map((cid) => {
+          const existingScan = current.scans.find((s) => s.candidateId === cid);
+          return existingScan || { candidateId: cid, scannedAt: new Date().toISOString() };
+        });
+
+        return {
+          ...current,
+          cvProfile: remoteProfile
+            ? {
+                ...remoteProfile,
+                careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
+              }
+            : current.cvProfile,
+          careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
+          tokens: payload.token?.balance ?? 0,
+          screeningTokens: payload.token?.balance ?? 0,
+          scans: mergedScans,
+          shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
+          screeningConsents: Object.fromEntries(consents.flatMap((request) => {
+            const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
+            const status = request.status;
+            if (!candidateId || typeof status !== "string") return [];
+            const consent = CONSENT_STATE_BY_DB_STATUS[status];
+            return consent ? [[candidateId, consent]] : [];
+          })),
+        };
+      });
       setBootstrapped(true);
     } catch (error) {
-      setState({ ...initial, tokens: 0, screeningTokens: 0 });
+      setState((curr) => ({ ...curr, tokens: 0, screeningTokens: 0 }));
       setProfile(null);
       setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
        setNotifications([]);
@@ -816,13 +879,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(activitiesKey, JSON.stringify([newActivity, ...storedActivities]));
     } catch {}
 
+    try {
+      const stored = localStorage.getItem("proofylink-permanent-scans-v1");
+      const list: string[] = stored ? JSON.parse(stored) : [];
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem("proofylink-permanent-scans-v1", JSON.stringify(list));
+      }
+    } catch {}
+
+    if (supabaseConfigured && UUID_RE.test(id)) {
+      void fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateProfileId: id }),
+      }).catch(() => {});
+    }
+
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,
       // ponytail: single-balance mirror in dbMode — scan spends the same server
       // balance as screening, so decrement both; demo keeps separate currencies.
       screeningTokens: supabaseConfigured ? current.screeningTokens - 1 : current.screeningTokens,
-      scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
+      scans: current.scans.some((s) => s.candidateId === id)
+        ? current.scans
+        : [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
     toast.success("Profil berhasil dibuka", { description: "1 token telah digunakan." });
     return true;
