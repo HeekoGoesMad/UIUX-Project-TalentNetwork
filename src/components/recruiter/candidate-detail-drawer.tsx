@@ -3,9 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   AlertTriangle,
+  ArrowLeft,
   Briefcase,
   Calendar,
+  CalendarClock,
   CheckCircle2,
   Clock,
   DollarSign,
@@ -92,6 +95,7 @@ interface CandidateDetailDrawerProps {
   recruiterName: string;
   availableJobs?: Array<{ id: string; title: string }>;
   onAssignJob?: (candidateId: string, jobId: string, jobTitle: string) => void;
+  onOpenScheduleModal?: (candidate: Candidate) => void;
 }
 
 const STAGE_OPTIONS: Array<{ id: Stage; label: string; color: string }> = [
@@ -129,6 +133,7 @@ export function CandidateDetailDrawer({
   recruiterName,
   availableJobs = [],
   onAssignJob,
+  onOpenScheduleModal,
 }: CandidateDetailDrawerProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "interview" | "offer" | "notes">("overview");
   const [feedbackText, setFeedbackText] = useState("");
@@ -349,7 +354,7 @@ export function CandidateDetailDrawer({
                   isOfferOrAbove || candidate.stage === "rejected" ? "w-full" : "flex-1"
                 )}
               >
-                <Link href={`/messages`}>
+                <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
                   <MessageSquare className="size-3.5" /> Kirim Pesan
                 </Link>
               </Button>
@@ -553,26 +558,65 @@ export function CandidateDetailDrawer({
 
                   {candidate.stage === "interview" && (
                     <>
-                      <p className="text-xs text-slate-500">
-                        Kandidat sedang dalam proses wawancara. Terbitkan surat penawaran resmi jika dinyatakan lolos.
-                      </p>
-                      <div className="pt-2 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                          onClick={() => onOpenOfferModal(candidate)}
-                        >
-                          <DollarSign className="size-3.5 mr-1" /> Terbitkan Surat Penawaran
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-8 font-medium bg-white text-slate-700"
-                          onClick={() => setActiveTab("interview")}
-                        >
-                          <Clock className="size-3.5 mr-1 text-purple-600" /> Lihat Jadwal Wawancara
-                        </Button>
-                      </div>
+                      {interviews.filter((i) => i.candidateId === candidate.id).some((iv) => iv.status === "Ditolak Kandidat" || iv.status === "declined") ? (
+                        <>
+                          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-900 space-y-1">
+                            <p className="font-semibold text-slate-800">
+                              Sesi Wawancara Ditolak Kandidat
+                            </p>
+                            <p className="text-[11px] text-slate-600">
+                              Kandidat berhalangan hadir pada jadwal yang diajukan. Lamaran tetap aktif. Anda dapat menjadwalkan ulang atau mengembalikan kandidat ke tahap screening.
+                            </p>
+                          </div>
+                          <div className="pt-2 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                              onClick={() => {
+                                if (onOpenScheduleModal) onOpenScheduleModal(candidate);
+                              }}
+                            >
+                              <CalendarClock className="size-3.5 mr-1" /> Jadwalkan Ulang
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                              onClick={() => {
+                                onStageChange(candidate.id, "screening", {
+                                  reason: "Dikembalikan ke tahap screening setelah penolakan sesi wawancara.",
+                                });
+                                toast.info("Kandidat dikembalikan ke tahap Screening.");
+                              }}
+                            >
+                              <ArrowLeft className="size-3.5 mr-1" /> Kembalikan ke Screening
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-slate-500">
+                            Kandidat sedang dalam proses wawancara. Terbitkan surat penawaran resmi jika dinyatakan lolos.
+                          </p>
+                          <div className="pt-2 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                              onClick={() => onOpenOfferModal(candidate)}
+                            >
+                              <DollarSign className="size-3.5 mr-1" /> Terbitkan Surat Penawaran
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 font-medium bg-white text-slate-700"
+                              onClick={() => setActiveTab("interview")}
+                            >
+                              <Clock className="size-3.5 mr-1 text-purple-600" /> Lihat Jadwal Wawancara
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
 
@@ -701,23 +745,66 @@ export function CandidateDetailDrawer({
                             )}
 
                             {effectiveStatus === "Ditolak Kandidat" && (
-                              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1">
-                                <p className="font-semibold text-slate-800">
-                                  Kandidat tidak dapat menghadiri sesi wawancara ini.
-                                </p>
-                                {(() => {
-                                  const declineItem = candidate.statusHistory?.slice().reverse().find(
-                                    (h) => h.title.includes("Ditolak Kandidat") || (h.notes && h.notes.includes("Kandidat tidak dapat menghadiri"))
-                                  );
-                                  const noteText = iv.declineReason
-                                    ? `Kandidat tidak dapat menghadiri sesi ini (${iv.declineReason}). Lamaran tetap aktif.`
-                                    : declineItem?.notes;
-                                  return noteText ? (
-                                    <p className="text-slate-600 text-[11px] leading-relaxed">
-                                      {noteText}
+                              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-slate-700 space-y-2">
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="font-semibold text-slate-800">
+                                      Kandidat tidak dapat menghadiri sesi wawancara ini
                                     </p>
-                                  ) : null;
-                                })()}
+                                    {(() => {
+                                      const declineItem = candidate.statusHistory?.slice().reverse().find(
+                                        (h) => h.title.includes("Ditolak Kandidat") || (h.notes && h.notes.includes("Kandidat tidak dapat menghadiri"))
+                                      );
+                                      const noteText = iv.declineReason
+                                        ? `Alasan: "${iv.declineReason}". Lamaran tetap aktif.`
+                                        : declineItem?.notes;
+                                      return noteText ? (
+                                        <p className="text-slate-600 text-[11px] leading-relaxed mt-0.5">
+                                          {noteText}
+                                        </p>
+                                      ) : null;
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                                    onClick={() => {
+                                      if (onOpenScheduleModal && candidate) {
+                                        onOpenScheduleModal(candidate);
+                                      }
+                                    }}
+                                  >
+                                    <CalendarClock className="size-3.5 mr-1" /> Jadwalkan Ulang
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                                    onClick={() => {
+                                      if (candidate) {
+                                        onStageChange(candidate.id, "screening", {
+                                          reason: "Dikembalikan ke tahap screening setelah penolakan sesi wawancara.",
+                                        });
+                                        toast.info("Kandidat dipindahkan kembali ke tahap Screening.");
+                                      }
+                                    }}
+                                  >
+                                    <ArrowLeft className="size-3.5 mr-1" /> Kembalikan ke Screening
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    asChild
+                                    className="h-7 text-xs font-medium text-slate-700 hover:bg-amber-100/60"
+                                  >
+                                    <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
+                                      <MessageSquare className="size-3.5 mr-1" /> Kirim Pesan
+                                    </Link>
+                                  </Button>
+                                </div>
                               </div>
                             )}
 
