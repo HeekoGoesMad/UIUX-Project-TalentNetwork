@@ -1849,7 +1849,15 @@ export function RecruiterOperationsPage() {
                                     <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#7C3AED] transition-colors line-clamp-1">
                                       {candidate.name}
                                     </h3>
-                                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{candidate.role}</p>
+                                    {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
+                                      <p className="text-[11px] font-medium text-[#7C3AED] line-clamp-1 mt-0.5">
+                                        Talent Pool
+                                      </p>
+                                    ) : (
+                                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                                        {candidate.jobTitle || candidate.role}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1863,16 +1871,6 @@ export function RecruiterOperationsPage() {
                                   </span>
                                 ) : (
                                   <>
-                                    {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
-                                      <span className="inline-flex items-center text-[10px] font-semibold text-[#7C3AED] bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
-                                        Talent Pool
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center text-[10px] font-medium text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                                        {candidate.jobTitle || "Lowongan Terpilih"}
-                                      </span>
-                                    )}
-
                                     {candidate.stage === "screening" && (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
                                         <Sparkles className="size-2.5 text-blue-600" />
