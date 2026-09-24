@@ -29,7 +29,7 @@ import {
   getStoredJobAssignments,
   SUPABASE_AVATARS,
 } from "@/components/recruiter/recruiter-operations";
-import { cn } from "@/lib/utils";
+import { cn, UUID_RE } from "@/lib/utils";
 
 interface ShortlistCandidateItem {
   id: string;
@@ -79,25 +79,54 @@ export default function Shortlist() {
   const [savedNoteMap, setSavedNoteMap] = useState<Record<string, string>>({});
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
 
-  // Fetch Supabase candidate profiles to enrich remote shortlist items
+  const [applications, setApplications] = useState<
+    Array<{
+      id: string;
+      candidateProfileId?: string;
+      jobId?: string;
+      job?: { id?: string; title?: string };
+      status?: string;
+    }>
+  >([]);
+
+  // Fetch Supabase candidate profiles & applications to enrich remote shortlist items
   useEffect(() => {
     let active = true;
-    fetch("/api/candidates?limit=50", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) return;
-        const payload = (await res.json()) as {
-          candidates?: Array<{
-            id: string;
-            name?: string;
-            headline?: string;
-            role?: string;
-            location?: string;
-            avatarUrl?: string;
-            skills?: string[];
-          }>;
-        };
-        if (active && payload.candidates) {
-          setRemoteCandidates(payload.candidates);
+    Promise.all([
+      fetch("/api/candidates?limit=50", { cache: "no-store" }),
+      fetch("/api/applications", { cache: "no-store" }),
+    ])
+      .then(async ([candRes, appRes]) => {
+        if (!active) return;
+        if (candRes.ok) {
+          const payload = (await candRes.json()) as {
+            candidates?: Array<{
+              id: string;
+              name?: string;
+              headline?: string;
+              role?: string;
+              location?: string;
+              avatarUrl?: string;
+              skills?: string[];
+            }>;
+          };
+          if (payload.candidates) {
+            setRemoteCandidates(payload.candidates);
+          }
+        }
+        if (appRes.ok) {
+          const payload = (await appRes.json()) as {
+            applications?: Array<{
+              id: string;
+              candidateProfileId?: string;
+              jobId?: string;
+              job?: { id?: string; title?: string };
+              status?: string;
+            }>;
+          };
+          if (payload.applications) {
+            setApplications(payload.applications);
+          }
         }
       })
       .catch(() => {});
@@ -150,14 +179,24 @@ export default function Shortlist() {
   const mockCandMap = new Map(defaultCandidates.map((c) => [c.id, c]));
   const storedAssignments = getStoredJobAssignments();
 
-  // Distinct IDs of all shortlisted talent
-  const targetIds = Array.from(
-    new Set([
-      ...shortlisted,
-      ...remoteItems.map((item) => item.candidateProfileId),
-      ...scans.map((scan) => scan.candidateId),
-    ])
-  );
+  // Strict business model enforcement:
+  // Hanya talenta yang sudah di-scanning/dibuka profilnya yang dapat tampil di workspace
+  // Selaras dengan aturan operasional recruiter/operations
+  const scannedCandidateIds = new Set(scans.map((scan) => scan.candidateId));
+
+  const candidateSource = [
+    ...shortlisted,
+    ...remoteItems.map((item) => item.candidateProfileId),
+    ...scans.map((scan) => scan.candidateId),
+  ];
+
+  const targetIds = Array.from(new Set(candidateSource)).filter((id) => {
+    // 1. Must be scanned/unlocked
+    if (!scannedCandidateIds.has(id)) return false;
+    // 2. In dbMode, candidate must be a valid candidate profile (UUID)
+    if (dbMode && !UUID_RE.test(id)) return false;
+    return true;
+  });
 
   const list: ShortlistCandidateItem[] = targetIds
     .map((id) => {
@@ -171,7 +210,18 @@ export default function Shortlist() {
         mockCand?.name ||
         `Kandidat (${id.slice(0, 8)})`;
 
+      // Synchronize with applications and stored job assignment
+      const app = applications.find(
+        (a) => a.candidateProfileId === id || a.id === id
+      );
+      const override = storedAssignments[id];
+      const finalJobId = override ? override.jobId : (app?.jobId || "talent-pool");
+      const finalJobTitle = override
+        ? override.jobTitle
+        : (app?.job?.title && app.job.title !== "Talent Pool" ? app.job.title : "Talent Pool");
+
       const role =
+        (finalJobTitle !== "Talent Pool" ? finalJobTitle : undefined) ||
         remoteCand?.role ||
         remoteCand?.headline ||
         remoteItem?.candidate?.role ||
@@ -193,11 +243,6 @@ export default function Shortlist() {
         (name ? SUPABASE_AVATARS[name] : undefined) ||
         SUPABASE_AVATARS[id] ||
         mockCand?.avatarUrl;
-
-      // Synchronize with stored job assignment
-      const override = storedAssignments[id];
-      const jobId = override ? override.jobId : "talent-pool";
-      const jobTitle = override ? override.jobTitle : "Talent Pool";
 
       // Notes resolution
       const currentNote = savedNoteMap[id] ?? notes[id] ?? remoteItem?.notes ?? "";
@@ -225,8 +270,8 @@ export default function Shortlist() {
         experience,
         skills,
         avatarUrl: resolvedAvatar,
-        jobId,
-        jobTitle,
+        jobId: finalJobId,
+        jobTitle: finalJobTitle,
         notes: currentNote,
         itemId: remoteItem?.id,
         verified,
@@ -362,7 +407,7 @@ export default function Shortlist() {
               Shortlist Kandidat
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Kelola kandidat pilihan Anda, tambahkan catatan evaluasi, dan pantau status talenta di pipeline.
+              Menampilkan talenta yang telah discan dan disimpan di workspace. Kelola catatan evaluasi dan pantau status di pipeline.
             </p>
           </div>
 
@@ -699,8 +744,8 @@ export default function Shortlist() {
         ) : (
           <EmptyState
             icon={Bookmark}
-            title="Belum ada kandidat di shortlist."
-            description="Simpan talenta dari halaman Pencarian Talenta atau profil kandidat untuk mengumpulkannya di sini."
+            title="Belum ada talenta yang discan di shortlist."
+            description="Lakukan scanning profil talenta terlebih dahulu di Pencarian Talenta untuk membuka dan mengelola kandidat di shortlist Anda."
             action={
               <Button asChild size="sm" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white">
                 <Link href="/search">Cari Talenta</Link>
