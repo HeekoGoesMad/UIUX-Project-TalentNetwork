@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     const result = await MessagingService.listConversations(current.db, current.user.id, limitParam);
 
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/conversations Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
@@ -65,7 +66,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(result, { status: result.reused ? 200 : 201 });
-  } catch {
+  } catch (err) {
+    console.error("[POST /api/conversations Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

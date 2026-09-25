@@ -193,7 +193,8 @@ export async function GET() {
       },
       isDemo: false,
     });
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/recruiter/profile Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
@@ -306,7 +307,8 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ success: true, data, isDemo: false });
-  } catch {
+  } catch (err) {
+    console.error("[PATCH /api/recruiter/profile Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
