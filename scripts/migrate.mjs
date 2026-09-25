@@ -43,16 +43,15 @@ try {
   console.log("✓ All pending migrations applied successfully.");
 } catch (error) {
   console.error("❌ Migration failed with error:");
-  if (error && typeof error === "object") {
-    const err = error;
-    if ("message" in err) console.error("Message:", err.message);
-    if ("detail" in err && err.detail) console.error("Detail:", err.detail);
-    if ("hint" in err && err.hint) console.error("Hint:", err.hint);
-    if ("code" in err && err.code) console.error("Code:", err.code);
-    if ("stack" in err && err.stack) console.error(err.stack);
-  } else {
-    console.error(error);
-  }
+  const err = error && typeof error === "object" ? error : { message: String(error) };
+  const cause = "cause" in err && err.cause && typeof err.cause === "object" ? err.cause : null;
+
+  if ("message" in err) console.error("Message:", err.message);
+  if (cause && "message" in cause) console.error("Underlying Cause:", cause.message);
+  if (cause && "detail" in cause && cause.detail) console.error("Detail:", cause.detail);
+  if (cause && "hint" in cause && cause.hint) console.error("Hint:", cause.hint);
+  if (cause && "code" in cause && cause.code) console.error("Code:", cause.code);
+  if ("stack" in err && err.stack) console.error(err.stack);
   process.exit(1);
 } finally {
   await sql.end({ timeout: 5 });
