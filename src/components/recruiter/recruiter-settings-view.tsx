@@ -352,7 +352,9 @@ export function RecruiterSettingsView() {
       const fullLinkedIn = /^https?:\/\//i.test(rawLinkedIn) ? rawLinkedIn : `https://${rawLinkedIn}`;
       try {
         const u = new URL(fullLinkedIn);
-        if (!u.hostname.toLowerCase().includes("linkedin.com")) {
+        const host = u.hostname.toLowerCase();
+        const isLinkedInHost = host === "linkedin.com" || host.endsWith(".linkedin.com");
+        if ((u.protocol !== "http:" && u.protocol !== "https:") || !isLinkedInHost) {
           errs.linkedinUrl = "URL harus mengarah ke profil LinkedIn perusahaan (contoh: https://linkedin.com/company/nama-perusahaan).";
         }
       } catch {

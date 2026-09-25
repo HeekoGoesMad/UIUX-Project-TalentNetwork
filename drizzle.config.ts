@@ -9,7 +9,10 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "",
+    url:
+      process.env.DIRECT_URL?.trim() ||
+      process.env.DATABASE_URL?.trim() ||
+      "",
   },
   strict: true,
   verbose: true,
