@@ -61,9 +61,11 @@ export async function GET() {
   const revisionReason = user.recruiterRejectionReason || null;
 
   const orgName = org?.name || "";
+  const isAutoPlaceholderOrg = orgName.endsWith("(Organization)");
+  const initialCompanyName = isAutoPlaceholderOrg ? "" : orgName;
   const rawPicName = profile?.displayName?.trim() || "";
   const picName =
-    (orgName && rawPicName.toLowerCase() === orgName.toLowerCase()) ||
+    (initialCompanyName && rawPicName.toLowerCase() === initialCompanyName.toLowerCase()) ||
     (user.email && rawPicName.toLowerCase() === user.email.split("@")[0].toLowerCase())
       ? ""
       : rawPicName;
@@ -73,7 +75,7 @@ export async function GET() {
     picTitle: picTitle || "",
     picPhone: profile?.phone || "",
     picEmail: org?.companyEmail || user.email || "",
-    companyName: orgName,
+    companyName: initialCompanyName,
     industry: org?.industry || "",
     companySize: org?.companyScale || "",
     description: org?.description || "",

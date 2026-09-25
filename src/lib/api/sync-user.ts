@@ -7,7 +7,16 @@ import { ShortlistService } from "@/lib/services/shortlist";
 
 type PersistedRole = "candidate" | "recruiter" | "partner" | "admin";
 
-export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string; role?: PersistedRole }) {
+export async function syncAuthenticatedUser(
+  authUser: User,
+  input: {
+    name?: string;
+    companyName?: string;
+    role?: PersistedRole;
+    hasPassword?: boolean;
+    allowRoleFallback?: boolean;
+  }
+) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
   const authEmail = authUser.email;
 
@@ -17,11 +26,13 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       id: schema.users.id,
       role: schema.users.role,
       recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+      hasPassword: schema.users.hasPassword,
     }).from(schema.users).where(eq(schema.users.authUserId, authUser.id)).limit(1);
     const [existingByEmail] = existingByAuthId ? [] : await tx.select({
       id: schema.users.id,
       role: schema.users.role,
       recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+      hasPassword: schema.users.hasPassword,
     }).from(schema.users).where(eq(schema.users.email, authEmail)).limit(1);
     const existing = existingByAuthId ?? existingByEmail;
 
@@ -33,34 +44,70 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
     // Strict 1 Email = 1 Role check:
     // If the user already exists in the database with an assigned role, do NOT allow changing roles.
     // Existing admins are exempt so they can sign in via any login tab; their role is never mutated.
+    // If allowRoleFallback is true (e.g. Google Sign-In), seamlessly adopt their existing role without error.
     if (existing && requestedRole && existing.role !== requestedRole && existing.role !== "admin") {
-      const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
-      err.name = "RoleMismatchError";
-      throw err;
+      if (!input.allowRoleFallback) {
+        const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
+        err.name = "RoleMismatchError";
+        throw err;
+      }
     }
 
     const role: PersistedRole = existing?.role ?? requestedRole ?? "candidate";
+
+    const hasPassword =
+      input.hasPassword !== undefined
+        ? input.hasPassword
+        : existing?.hasPassword ??
+          Boolean(
+            authUser.app_metadata?.providers?.includes("email") ||
+            authUser.identities?.some((id) => id.provider === "email") ||
+            authUser.user_metadata?.hasPassword
+          );
 
     const [user] = existing
       ? await tx.update(schema.users).set({
           authUserId: authUser.id,
           email: authEmail,
           role: existing.role, // Never mutate an existing account's role
+          hasPassword: input.hasPassword !== undefined ? input.hasPassword : existing.hasPassword || hasPassword,
           recruiterProvisioningStatus: existing.role === "recruiter" ? (existing.recruiterProvisioningStatus ?? "pending") : "active",
           updatedAt: new Date(),
-        }).where(eq(schema.users.id, existing.id)).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus })
+        }).where(eq(schema.users.id, existing.id)).returning({
+          id: schema.users.id,
+          role: schema.users.role,
+          recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+          hasPassword: schema.users.hasPassword,
+        })
       : await tx.insert(schema.users).values({
           authUserId: authUser.id,
           email: authEmail,
           role,
+          hasPassword,
           recruiterProvisioningStatus: role === "candidate" ? "active" : "pending",
-        }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
+        }).returning({
+          id: schema.users.id,
+          role: schema.users.role,
+          recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+          hasPassword: schema.users.hasPassword,
+        });
 
     // Ensure displayName is NOT overwritten if an existing profile already has one set
     // (e.g. Google OAuth name should never overwrite a name the user chose during onboarding)
     const [existingProfile] = await tx.select({
       displayName: schema.profiles.displayName,
+      avatarUrl: schema.profiles.avatarUrl,
     }).from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
+
+    const googleName =
+      (typeof authUser.user_metadata?.full_name === "string" && authUser.user_metadata.full_name.trim()) ||
+      (typeof authUser.user_metadata?.name === "string" && authUser.user_metadata.name.trim()) ||
+      undefined;
+
+    const googleAvatar =
+      (typeof authUser.user_metadata?.avatar_url === "string" && authUser.user_metadata.avatar_url.trim()) ||
+      (typeof authUser.user_metadata?.picture === "string" && authUser.user_metadata.picture.trim()) ||
+      undefined;
 
     const isRecruiterCompanyInput = role === "recruiter" && Boolean(input.companyName);
     const providedName = isRecruiterCompanyInput ? undefined : input.name?.trim();
@@ -68,20 +115,23 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       existingProfile?.displayName?.trim() && existingProfile.displayName !== input.companyName
         ? existingProfile.displayName
         : providedName ||
-          (role === "recruiter"
+          (googleName && googleName !== input.companyName
+            ? googleName
+            : role === "recruiter"
             ? null
-            : typeof authUser.user_metadata?.name === "string" &&
-              authUser.user_metadata.name !== input.companyName
-            ? authUser.user_metadata.name
             : authEmail.split("@")[0]);
+
+    const resolvedAvatar = existingProfile?.avatarUrl || googleAvatar || null;
 
     await tx.insert(schema.profiles).values({
       userId: user.id,
       displayName: resolvedName,
+      avatarUrl: resolvedAvatar,
     }).onConflictDoUpdate({
       target: schema.profiles.userId,
       set: {
         ...(resolvedName !== undefined ? { displayName: resolvedName } : {}),
+        ...(resolvedAvatar ? { avatarUrl: resolvedAvatar } : {}),
         updatedAt: new Date(),
       },
     });
@@ -124,6 +174,22 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           organizationId = organization.id;
           await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
           await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
+        } else {
+          // Provision placeholder organization for new recruiter registering via Google without company name
+          const defaultOrgName = `${resolvedName || authEmail.split("@")[0]} (Organization)`;
+          const slug = `org-${authUser.id}`;
+          const [organization] = await tx.insert(schema.organizations).values({
+            name: defaultOrgName,
+            slug,
+            createdBy: user.id,
+            verificationStatus: "pending",
+          }).onConflictDoUpdate({
+            target: schema.organizations.slug,
+            set: { updatedAt: new Date() },
+          }).returning({ id: schema.organizations.id });
+          organizationId = organization.id;
+          await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
+          await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
         }
       }
       if (organizationId && user.recruiterProvisioningStatus === "active") {
@@ -149,6 +215,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         provisioningStatus: user.recruiterProvisioningStatus,
         hasSubmittedOnboarding,
         isNew: !existing,
+        hasPassword: user.hasPassword,
       };
     }
 
@@ -179,7 +246,13 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           ? ("rejected" as const)
           : ("pending" as const);
 
-      return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus, isNew: !existing };
+      return {
+        userId: user.id,
+        role: user.role,
+        provisioningStatus: partnerProvisioningStatus,
+        isNew: !existing,
+        hasPassword: user.hasPassword,
+      };
     }
 
     if (role === "candidate") {
@@ -200,9 +273,16 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         provisioningStatus: user.recruiterProvisioningStatus,
         hasSubmittedOnboarding,
         isNew: !existing,
+        hasPassword: user.hasPassword,
       };
     }
 
-    return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus, isNew: !existing };
+    return {
+      userId: user.id,
+      role: user.role,
+      provisioningStatus: user.recruiterProvisioningStatus,
+      isNew: !existing,
+      hasPassword: user.hasPassword,
+    };
   });
 }

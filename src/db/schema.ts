@@ -175,6 +175,7 @@ export const users = pgTable("users", {
   authUserId: uuid("auth_user_id").notNull().unique(),
   email: text("email").notNull().unique(),
   role: userRole("role").notNull(),
+  hasPassword: boolean("has_password").notNull().default(false),
   recruiterProvisioningStatus: recruiterProvisioningStatus("recruiter_provisioning_status").notNull().default("pending"),
   recruiterRejectionReason: text("recruiter_rejection_reason"),
   createdAt: createdAt(),
