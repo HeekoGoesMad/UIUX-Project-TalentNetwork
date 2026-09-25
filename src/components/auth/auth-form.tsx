@@ -36,11 +36,17 @@ function GoogleLogo({ className = "size-4.5" }: { className?: string }) {
   );
 }
 
-export {
+import {
   checkPasswordRequirements,
   isPasswordValid,
   type PasswordRequirements,
 } from "@/lib/auth/password";
+
+export {
+  checkPasswordRequirements,
+  isPasswordValid,
+  type PasswordRequirements,
+};
 
 export interface FieldErrors {
   name?: string;
