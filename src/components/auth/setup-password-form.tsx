@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,6 @@ function GoogleIcon({ className = "size-4" }: { className?: string }) {
 }
 
 export function SetupPasswordForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const rawRole = searchParams.get("role");
   const nextParam = searchParams.get("next");

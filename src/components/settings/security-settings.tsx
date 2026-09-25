@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
-  Lock,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,33 +20,12 @@ import { checkPasswordRequirements, isPasswordValid } from "@/components/auth/au
 export function SecuritySettings() {
   const { user, devBypass } = useApp();
 
-  const [hasPassword, setHasPassword] = useState<boolean>(() => {
-    return user?.hasPassword ?? true;
-  });
+  const [passwordSetOverride, setPasswordSetOverride] = useState<boolean | null>(null);
+  const [supabaseHasPassword, setSupabaseHasPassword] = useState<boolean | null>(null);
   const [isSettingInitialPassword, setIsSettingInitialPassword] = useState(false);
 
-  // Initial password setup fields (for OAuth users with no password set yet)
-  const [setupPassword, setSetupPassword] = useState("");
-  const [setupConfirm, setSetupConfirm] = useState("");
-  const [showSetupPassword, setShowSetupPassword] = useState(false);
-  const [showSetupConfirm, setShowSetupConfirm] = useState(false);
-  const [setupLoading, setSetupLoading] = useState(false);
-
-  // Change password fields (for accounts with existing password)
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-
   useEffect(() => {
-    if (typeof user?.hasPassword === "boolean") {
-      setHasPassword(user.hasPassword);
-    } else {
+    if (typeof user?.hasPassword !== "boolean") {
       createClient()
         .auth.getUser()
         .then(({ data }) => {
@@ -55,14 +33,21 @@ export function SecuritySettings() {
           const hasUserMetadata = Boolean(data.user?.user_metadata?.hasPassword);
           const hasIdentityEmail = data.user?.identities?.some((id) => id.provider === "email");
           if (hasEmailProvider || hasUserMetadata || hasIdentityEmail) {
-            setHasPassword(true);
+            setSupabaseHasPassword(true);
           } else if (data.user?.app_metadata?.providers?.includes("google")) {
-            setHasPassword(false);
+            setSupabaseHasPassword(false);
           }
         })
         .catch(() => {});
     }
   }, [user?.hasPassword]);
+
+  const hasPassword =
+    passwordSetOverride !== null
+      ? passwordSetOverride
+      : typeof user?.hasPassword === "boolean"
+      ? user.hasPassword
+      : supabaseHasPassword ?? true;
 
   // Initial setup criteria
   const setupCriteria = checkPasswordRequirements(setupPassword);
@@ -132,7 +117,7 @@ export function SecuritySettings() {
       if (devBypass || !user) {
         await new Promise((res) => setTimeout(res, 600));
         toast.success("Demo Mode — kata sandi disimulasikan berhasil diatur.");
-        setHasPassword(true);
+        setPasswordSetOverride(true);
         setIsSettingInitialPassword(false);
         setSetupPassword("");
         setSetupConfirm("");
@@ -152,7 +137,7 @@ export function SecuritySettings() {
       }
 
       toast.success("Kata sandi berhasil diatur dengan aman.");
-      setHasPassword(true);
+      setPasswordSetOverride(true);
       setIsSettingInitialPassword(false);
       setSetupPassword("");
       setSetupConfirm("");
