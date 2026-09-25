@@ -24,6 +24,22 @@ export function SecuritySettings() {
   const [supabaseHasPassword, setSupabaseHasPassword] = useState<boolean | null>(null);
   const [isSettingInitialPassword, setIsSettingInitialPassword] = useState(false);
 
+  // Initial password setup fields (for OAuth users with no password set yet)
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupConfirm, setSetupConfirm] = useState("");
+  const [showSetupPassword, setShowSetupPassword] = useState(false);
+  const [showSetupConfirm, setShowSetupConfirm] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  // Change password fields (for accounts with existing password)
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     if (typeof user?.hasPassword !== "boolean") {
       createClient()
