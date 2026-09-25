@@ -7,7 +7,10 @@ import { ShortlistService } from "@/lib/services/shortlist";
 
 type PersistedRole = "candidate" | "recruiter" | "partner" | "admin";
 
-export async function syncAuthenticatedUser(authUser: User, input: { name?: string; companyName?: string; role?: PersistedRole }) {
+export async function syncAuthenticatedUser(
+  authUser: User,
+  input: { name?: string; companyName?: string; role?: PersistedRole; hasPassword?: boolean }
+) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
   const authEmail = authUser.email;
 
@@ -17,11 +20,13 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
       id: schema.users.id,
       role: schema.users.role,
       recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+      hasPassword: schema.users.hasPassword,
     }).from(schema.users).where(eq(schema.users.authUserId, authUser.id)).limit(1);
     const [existingByEmail] = existingByAuthId ? [] : await tx.select({
       id: schema.users.id,
       role: schema.users.role,
       recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+      hasPassword: schema.users.hasPassword,
     }).from(schema.users).where(eq(schema.users.email, authEmail)).limit(1);
     const existing = existingByAuthId ?? existingByEmail;
 
@@ -41,20 +46,42 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
 
     const role: PersistedRole = existing?.role ?? requestedRole ?? "candidate";
 
+    const hasPassword =
+      input.hasPassword !== undefined
+        ? input.hasPassword
+        : existing?.hasPassword ??
+          Boolean(
+            authUser.app_metadata?.providers?.includes("email") ||
+            authUser.identities?.some((id) => id.provider === "email") ||
+            authUser.user_metadata?.hasPassword
+          );
+
     const [user] = existing
       ? await tx.update(schema.users).set({
           authUserId: authUser.id,
           email: authEmail,
           role: existing.role, // Never mutate an existing account's role
+          hasPassword: input.hasPassword !== undefined ? input.hasPassword : existing.hasPassword || hasPassword,
           recruiterProvisioningStatus: existing.role === "recruiter" ? (existing.recruiterProvisioningStatus ?? "pending") : "active",
           updatedAt: new Date(),
-        }).where(eq(schema.users.id, existing.id)).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus })
+        }).where(eq(schema.users.id, existing.id)).returning({
+          id: schema.users.id,
+          role: schema.users.role,
+          recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+          hasPassword: schema.users.hasPassword,
+        })
       : await tx.insert(schema.users).values({
           authUserId: authUser.id,
           email: authEmail,
           role,
+          hasPassword,
           recruiterProvisioningStatus: role === "candidate" ? "active" : "pending",
-        }).returning({ id: schema.users.id, role: schema.users.role, recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus });
+        }).returning({
+          id: schema.users.id,
+          role: schema.users.role,
+          recruiterProvisioningStatus: schema.users.recruiterProvisioningStatus,
+          hasPassword: schema.users.hasPassword,
+        });
 
     // Ensure displayName is NOT overwritten if an existing profile already has one set
     // (e.g. Google OAuth name should never overwrite a name the user chose during onboarding)
@@ -149,6 +176,7 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         provisioningStatus: user.recruiterProvisioningStatus,
         hasSubmittedOnboarding,
         isNew: !existing,
+        hasPassword: user.hasPassword,
       };
     }
 
@@ -179,7 +207,13 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
           ? ("rejected" as const)
           : ("pending" as const);
 
-      return { userId: user.id, role: user.role, provisioningStatus: partnerProvisioningStatus, isNew: !existing };
+      return {
+        userId: user.id,
+        role: user.role,
+        provisioningStatus: partnerProvisioningStatus,
+        isNew: !existing,
+        hasPassword: user.hasPassword,
+      };
     }
 
     if (role === "candidate") {
@@ -200,9 +234,16 @@ export async function syncAuthenticatedUser(authUser: User, input: { name?: stri
         provisioningStatus: user.recruiterProvisioningStatus,
         hasSubmittedOnboarding,
         isNew: !existing,
+        hasPassword: user.hasPassword,
       };
     }
 
-    return { userId: user.id, role: user.role, provisioningStatus: user.recruiterProvisioningStatus, isNew: !existing };
+    return {
+      userId: user.id,
+      role: user.role,
+      provisioningStatus: user.recruiterProvisioningStatus,
+      isNew: !existing,
+      hasPassword: user.hasPassword,
+    };
   });
 }
