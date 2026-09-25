@@ -199,10 +199,12 @@ Deployment is push-to-deploy via Vercel:
 The first database phase uses Supabase Auth and PostgreSQL with Drizzle ORM.
 
 1. Create a Supabase project and enable email/password authentication.
-2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the pooled `DATABASE_URL`.
-3. Generate migrations with `npm run db:generate`.
-4. Apply migrations with `npm run db:migrate`.
-5. Validate the schema with `npm run db:check`.
+2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `DATABASE_URL` (and optional `DIRECT_URL`).
+3. Modify schema in `src/db/schema.ts` when changing models.
+4. Generate migrations with `npm run db:generate`.
+5. Validate migration snapshots with `npm run db:check`.
+6. Apply migrations locally/dev with `npm run db:migrate`.
+7. Commit `src/db/schema.ts`, `drizzle/*.sql`, and `drizzle/meta/*`. On merge to `master`, GitHub Actions applies pending migrations to production automatically.
 
 Never use `drizzle-kit push` or `drizzle push`. Keep generated migrations committed. The application can still run in local demo fallback mode when Supabase variables are absent, but real registration, persistent profiles, and database consent requests require Supabase configuration.
 
