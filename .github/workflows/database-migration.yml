@@ -39,16 +39,30 @@ jobs:
 
       - name: Validate database credentials are provided
         run: |
-          if [ -z "${DATABASE_URL}" ] && [ -z "${DIRECT_URL}" ]; then
+          RESOLVED_DB="${MASTER_DATABASE_URL:-${REPO_DATABASE_URL:-}}"
+          RESOLVED_DIR="${MASTER_DIRECT_URL:-${REPO_DIRECT_URL:-}}"
+          if [ -z "$RESOLVED_DB" ] && [ -z "$RESOLVED_DIR" ]; then
             echo "::error::Neither MASTER_DATABASE_URL nor DATABASE_URL secret is configured for environment 'production'."
             exit 1
           fi
+          echo "Database credentials successfully resolved."
         env:
-          DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL || secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL || secrets.DIRECT_URL }}
+          MASTER_DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL }}
+          REPO_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MASTER_DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL }}
+          REPO_DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Apply pending database migrations
-        run: npm run db:migrate
+        run: |
+          RESOLVED_DB="${MASTER_DATABASE_URL:-${REPO_DATABASE_URL:-}}"
+          RESOLVED_DIR="${MASTER_DIRECT_URL:-${REPO_DIRECT_URL:-}}"
+          if [ -n "$RESOLVED_DIR" ]; then
+            export DIRECT_URL="$RESOLVED_DIR"
+          fi
+          export DATABASE_URL="$RESOLVED_DB"
+          npm run db:migrate
         env:
-          DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL || secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL || secrets.DIRECT_URL }}
+          MASTER_DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL }}
+          REPO_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MASTER_DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL }}
+          REPO_DIRECT_URL: ${{ secrets.DIRECT_URL }}
