@@ -109,7 +109,9 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
         if ("BroadcastChannel" in window) {
           var channel = new BroadcastChannel("proofylink_oauth_channel");
           channel.postMessage(payload);
-          channel.close();
+          setTimeout(function() {
+            try { channel.close(); } catch (e) {}
+          }, 2000);
         }
       } catch (e) {}
 
@@ -236,7 +238,9 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string, openerOri
         if ("BroadcastChannel" in window) {
           var channel = new BroadcastChannel("proofylink_oauth_channel");
           channel.postMessage(payload);
-          channel.close();
+          setTimeout(function() {
+            try { channel.close(); } catch (e) {}
+          }, 2000);
         }
       } catch (e) {}
 
@@ -329,7 +333,6 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next");
   const requestedRole = requestUrl.searchParams.get("role");
-  const mode = requestUrl.searchParams.get("mode");
   const isPopup = requestUrl.searchParams.get("popup") === "true";
   const openerOrigin = requestUrl.searchParams.get("origin") || requestUrl.origin;
   const validRole = requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner";
@@ -390,7 +393,7 @@ export async function GET(request: Request) {
     }
 
     // Determine final destination: if new user registration with Google, route to optional setup-password before onboarding
-    const shouldShowPasswordSetup = (result.isNew || mode === "register") && !result.hasPassword;
+    const shouldShowPasswordSetup = result.isNew && !result.hasPassword;
     const finalDestination = shouldShowPasswordSetup
       ? `/auth/setup-password?role=${result.role}&next=${encodeURIComponent(destination)}`
       : destination;
@@ -425,16 +428,21 @@ export async function GET(request: Request) {
             recoveredResult.hasSubmittedOnboarding,
             recoveredResult.provisioningStatus
           );
+          const shouldRecoverPasswordSetup = recoveredResult.isNew && !recoveredResult.hasPassword;
+          const finalRecoveredDest = shouldRecoverPasswordSetup
+            ? `/auth/setup-password?role=${recoveredResult.role}&next=${encodeURIComponent(recoveredDest)}`
+            : recoveredDest;
+
           if (isPopup) {
             return popupSuccessResponse({
               isNew: recoveredResult.isNew,
               hasPassword: Boolean(recoveredResult.hasPassword),
               role: recoveredResult.role,
-              destination: recoveredDest,
+              destination: finalRecoveredDest,
               openerOrigin,
             });
           }
-          return NextResponse.redirect(new URL(recoveredDest, requestUrl.origin));
+          return NextResponse.redirect(new URL(finalRecoveredDest, requestUrl.origin));
         }
       } catch (recoverErr) {
         console.error("Gagal pemulihan peran:", recoverErr);
