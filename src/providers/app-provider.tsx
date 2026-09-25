@@ -356,7 +356,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null; hasSubmittedOnboarding?: boolean };
+        identity?: { role?: UserRole; email?: string; name?: string; hasPassword?: boolean; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null; hasSubmittedOnboarding?: boolean };
         profile?: BootstrapProfile | null;
         organization?: { id: string; name: string } | null;
         partnership?: { id: string; name: string } | null;
@@ -387,6 +387,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           email: payload.identity?.email ?? current?.email ?? "",
           name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
           role,
+          hasPassword: payload.identity?.hasPassword ?? current?.hasPassword,
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
           companyName: resolvedCompanyName ?? current?.companyName,

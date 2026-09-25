@@ -193,6 +193,7 @@ export async function GET() {
           : isCandidate
           ? Boolean(candidateProfile && candidateProfile.isPublished)
           : true,
+        hasPassword: current.user.hasPassword || Boolean(current.authUser.app_metadata?.providers?.includes("email")),
       },
       organization,
       partnership,
