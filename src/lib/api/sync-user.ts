@@ -9,7 +9,13 @@ type PersistedRole = "candidate" | "recruiter" | "partner" | "admin";
 
 export async function syncAuthenticatedUser(
   authUser: User,
-  input: { name?: string; companyName?: string; role?: PersistedRole; hasPassword?: boolean }
+  input: {
+    name?: string;
+    companyName?: string;
+    role?: PersistedRole;
+    hasPassword?: boolean;
+    allowRoleFallback?: boolean;
+  }
 ) {
   if (!authUser.email) throw new Error("AUTH_EMAIL_MISSING");
   const authEmail = authUser.email;
@@ -38,10 +44,13 @@ export async function syncAuthenticatedUser(
     // Strict 1 Email = 1 Role check:
     // If the user already exists in the database with an assigned role, do NOT allow changing roles.
     // Existing admins are exempt so they can sign in via any login tab; their role is never mutated.
+    // If allowRoleFallback is true (e.g. Google Sign-In), seamlessly adopt their existing role without error.
     if (existing && requestedRole && existing.role !== requestedRole && existing.role !== "admin") {
-      const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
-      err.name = "RoleMismatchError";
-      throw err;
+      if (!input.allowRoleFallback) {
+        const err = new Error(`ROLE_MISMATCH:${existing.role}:${requestedRole}`);
+        err.name = "RoleMismatchError";
+        throw err;
+      }
     }
 
     const role: PersistedRole = existing?.role ?? requestedRole ?? "candidate";
