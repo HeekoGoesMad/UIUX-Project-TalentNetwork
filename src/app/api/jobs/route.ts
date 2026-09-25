@@ -35,7 +35,10 @@ const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(24),
 });
 
-function dbError() {
+function dbError(error?: unknown) {
+  if (error) {
+    console.error("[GET/POST /api/jobs Database Error]:", error);
+  }
   return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
 }
 
@@ -191,8 +194,8 @@ export async function GET(request: Request) {
 
     const { jobs, hasMore } = await jobRows(db, where, { limit, offset });
     return NextResponse.json({ jobs, page, limit, hasMore });
-  } catch {
-    return dbError();
+  } catch (error) {
+    return dbError(error);
   }
 }
 
@@ -240,7 +243,7 @@ export async function POST(request: Request) {
     if (requirements.length) await current.db.insert(schema.jobRequirements).values(requirements);
 
     return NextResponse.json({ job: { ...job, requirements } }, { status: 201 });
-  } catch {
-    return dbError();
+  } catch (error) {
+    return dbError(error);
   }
 }

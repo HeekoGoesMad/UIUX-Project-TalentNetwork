@@ -66,3 +66,18 @@ jobs:
           REPO_DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MASTER_DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL }}
           REPO_DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Verify database schema parity
+        run: |
+          RESOLVED_DB="${MASTER_DATABASE_URL:-${REPO_DATABASE_URL:-}}"
+          RESOLVED_DIR="${MASTER_DIRECT_URL:-${REPO_DIRECT_URL:-}}"
+          if [ -n "$RESOLVED_DIR" ]; then
+            export DIRECT_URL="$RESOLVED_DIR"
+          fi
+          export DATABASE_URL="$RESOLVED_DB"
+          npm run db:verify
+        env:
+          MASTER_DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL }}
+          REPO_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MASTER_DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL }}
+          REPO_DIRECT_URL: ${{ secrets.DIRECT_URL }}

@@ -52,7 +52,8 @@ export async function GET(request: Request) {
 
     const result = await ScreeningService.getLatestRun(current.db, scope, candidateId.data);
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/screening-runs Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

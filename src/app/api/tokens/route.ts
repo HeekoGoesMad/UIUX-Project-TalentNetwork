@@ -13,7 +13,8 @@ export async function GET() {
 
     const token = await TokenLedgerService.getAccount(current.db, scope.membership.organizationId);
     return NextResponse.json({ token });
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/tokens Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

@@ -48,7 +48,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ notifications: distilledList, unreadCount: unread?.value ?? 0 });
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/notifications Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
@@ -69,7 +70,8 @@ export async function PATCH(request: Request) {
       .returning({ id: schema.notifications.id, readAt: schema.notifications.readAt });
     if (!notification) return NextResponse.json({ error: "Notifikasi tidak ditemukan." }, { status: 404 });
     return NextResponse.json({ notification });
-  } catch {
+  } catch (err) {
+    console.error("[PATCH /api/notifications Database Error]:", err);
     return NextResponse.json({ error: "Notifikasi belum dapat diperbarui." }, { status: 503 });
   }
 }
@@ -86,7 +88,8 @@ export async function POST(request: Request) {
       .set({ readAt: new Date() })
       .where(and(eq(schema.notifications.userId, current.user.id), isNull(schema.notifications.readAt)));
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("[POST /api/notifications Database Error]:", err);
     return NextResponse.json({ error: "Notifikasi belum dapat diperbarui." }, { status: 503 });
   }
 }
