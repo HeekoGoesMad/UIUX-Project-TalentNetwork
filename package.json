@@ -16,7 +16,7 @@
     "worker:outbox": "node scripts/outbox-worker.mjs",
     "db:seed": "node scripts/seed.mjs",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/migrate.mjs",
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
