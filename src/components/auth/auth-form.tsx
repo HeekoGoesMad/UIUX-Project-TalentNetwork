@@ -41,11 +41,19 @@ import {
   isPasswordValid,
   type PasswordRequirements,
 } from "@/lib/auth/password";
+import {
+  ALLOWED_REDIRECT_PREFIXES,
+  safeRedirectPath,
+  sanitizeNextParam,
+} from "@/lib/auth/redirect";
 
 export {
   checkPasswordRequirements,
   isPasswordValid,
   type PasswordRequirements,
+  ALLOWED_REDIRECT_PREFIXES,
+  safeRedirectPath,
+  sanitizeNextParam,
 };
 
 export interface FieldErrors {
@@ -173,7 +181,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   useEffect(() => {
     if (hydrated && user && !loading && !googleLoading && !otpModalOpen && mode === "login") {
       const dest = destination(user.role, getNext(), false, user.provisioningStatus);
-      window.location.href = dest;
+      window.location.href = safeRedirectPath(dest, "/dashboard");
     }
   }, [hydrated, user, loading, googleLoading, mode, otpModalOpen]);
 
@@ -308,7 +316,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       result.provisioningStatus,
       result.hasSubmittedOnboarding
     );
-    window.location.href = dest;
+    window.location.href = safeRedirectPath(dest, "/dashboard");
   };
 
   const handleGoogleClick = () => {
@@ -412,7 +420,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               typeof authData.destination === "string"
                 ? authData.destination
                 : destination(authData.role ?? role, null);
-            window.location.href = target;
+            window.location.href = safeRedirectPath(target, "/dashboard");
           } else if (authData.type === "GOOGLE_AUTH_ERROR") {
             handled = true;
             if (popup && !popup.closed) {
@@ -463,63 +471,77 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         window.addEventListener("storage", handleStorage);
 
         const pollTimer = setInterval(async () => {
-          // 1. Check if localStorage already has the auth event payload written by the popup
-          if (!handled) {
-            try {
-              const stored = localStorage.getItem("proofylink_oauth_event");
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                if (parsed && typeof parsed === "object" && typeof parsed.type === "string" && parsed.type.startsWith("GOOGLE_AUTH_")) {
-                  handleAuthPayload(parsed);
-                  return;
-                }
-              }
-            } catch {}
-          }
+          if (handled) return;
 
-          // 2. Only run session fail-safe if popup was closed
-          if (popup && popup.closed) {
-            cleanup();
-            if (!handled) {
-              // Secondary check for stored event before session check
+          // 1. Check if localStorage already has the auth event payload written by the popup
+          try {
+            const stored = localStorage.getItem("proofylink_oauth_event");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (
+                parsed &&
+                typeof parsed === "object" &&
+                typeof parsed.type === "string" &&
+                parsed.type.startsWith("GOOGLE_AUTH_")
+              ) {
+                handleAuthPayload(parsed);
+                return;
+              }
+            }
+          } catch {}
+
+          // 2. Active session check: parent window detects session and closes child popup immediately
+          try {
+            const supabase = createClient();
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user) {
+              handled = true;
+              if (popup && !popup.closed) {
+                try {
+                  popup.close();
+                } catch {}
+              }
+              cleanup();
+
+              // If localStorage has the server-calculated destination, use it
               try {
                 const stored = localStorage.getItem("proofylink_oauth_event");
                 if (stored) {
                   const parsed = JSON.parse(stored);
-                  if (parsed && typeof parsed === "object" && typeof parsed.type === "string" && parsed.type.startsWith("GOOGLE_AUTH_")) {
-                    handleAuthPayload(parsed);
+                  if (parsed && typeof parsed === "object" && typeof parsed.destination === "string") {
+                    window.location.href = safeRedirectPath(parsed.destination, "/dashboard");
                     return;
                   }
                 }
               } catch {}
 
-              // Fail-safe check: Popup closed, verify if user session was established
-              try {
-                const supabase = createClient();
-                const { data: userData } = await supabase.auth.getUser();
-                if (userData?.user) {
-                  handled = true;
-                  const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
-                  const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
-                  const identity = bootstrapData?.identity;
-                  const userRole = (identity?.role as UserRole) || role;
-                  const hasPassword = Boolean(identity?.hasPassword);
-                  const dest = destination(
-                    userRole,
-                    getNext(),
-                    false,
-                    identity?.provisioningStatus,
-                    identity?.hasSubmittedOnboarding
-                  );
-                  // Setup password only if user explicitly registered and has no password
-                  const shouldSetupPassword = mode === "register" && !hasPassword;
-                  const target = shouldSetupPassword
-                    ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
-                    : dest;
-                  window.location.href = target;
-                  return;
-                }
-              } catch {}
+              // Otherwise load bootstrap identity to determine role and onboarding status
+              const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
+              const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
+              const identity = bootstrapData?.identity;
+              const userRole = (identity?.role as UserRole) || role;
+              const hasPassword = Boolean(identity?.hasPassword);
+              const dest = destination(
+                userRole,
+                getNext(),
+                false,
+                identity?.provisioningStatus,
+                identity?.hasSubmittedOnboarding
+              );
+              // Setup password only if user explicitly registered and has no password
+              const shouldSetupPassword = mode === "register" && !hasPassword;
+              const target = shouldSetupPassword
+                ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+                : dest;
+              window.location.href = safeRedirectPath(target, "/dashboard");
+              return;
+            }
+          } catch {}
+
+          // 3. User closed popup without authenticating
+          if (popup && popup.closed) {
+            cleanup();
+            if (!handled) {
               setGoogleLoading(false);
             }
           }
@@ -1020,7 +1042,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               }).catch(() => null);
             }
             setOtpModalOpen(false);
-            window.location.href = pendingRegistration.destinationPath;
+            window.location.href = safeRedirectPath(pendingRegistration.destinationPath, "/dashboard");
           }}
           title="Verifikasi Akun Baru"
           description={
@@ -1088,6 +1110,7 @@ function destination(role: UserRole, next: string | null, isRegistration = false
   return "/dashboard";
 }
 
-function getNext() {
-  return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
+function getNext(): string | null {
+  if (typeof window === "undefined") return null;
+  return sanitizeNextParam(new URLSearchParams(window.location.search).get("next"));
 }
