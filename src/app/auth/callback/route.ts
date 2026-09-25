@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
+import { safeRedirectPath, sanitizeNextParam } from "@/lib/auth/redirect";
 
-function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string; openerOrigin?: string }) {
+function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string }) {
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -90,17 +91,12 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
         destination: ${JSON.stringify(data.destination)}
       };
 
-      var targetOrigin = ${JSON.stringify(data.openerOrigin || "*")};
+      var targetOrigin = window.location.origin;
 
-      // 1. Direct window.opener postMessage with specific origin and fallback
+      // 1. Direct window.opener postMessage strictly to same origin
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage(payload, targetOrigin);
-        } catch (e) {}
-        try {
-          if (targetOrigin !== "*") {
-            window.opener.postMessage(payload, window.location.origin);
-          }
         } catch (e) {}
       }
 
@@ -154,7 +150,7 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
   });
 }
 
-function popupErrorResponse(errorMessage: string, fallbackUrl: string, openerOrigin?: string) {
+function popupErrorResponse(errorMessage: string) {
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -223,15 +219,10 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string, openerOri
         error: errorMsg
       };
 
-      var targetOrigin = ${JSON.stringify(openerOrigin || "*")};
+      var targetOrigin = window.location.origin;
 
       if (window.opener && !window.opener.closed) {
         try { window.opener.postMessage(payload, targetOrigin); } catch (e) {}
-        try {
-          if (targetOrigin !== "*") {
-            window.opener.postMessage(payload, window.location.origin);
-          }
-        } catch (e) {}
       }
 
       try {
@@ -262,6 +253,18 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string, openerOri
       "Cache-Control": "no-store, no-cache, must-revalidate",
     },
   });
+}
+
+function createAuthErrorResponse(
+  errorMessage: string,
+  requestUrl: URL,
+  isPopup: boolean
+): NextResponse {
+  if (isPopup) {
+    return popupErrorResponse(errorMessage);
+  }
+  const fallbackUrl = new URL(`/login?error=${encodeURIComponent(errorMessage)}`, requestUrl.origin).toString();
+  return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
 }
 
 function resolveRoleDestination(
@@ -331,35 +334,22 @@ function resolveRoleDestination(
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next");
+  const next = sanitizeNextParam(requestUrl.searchParams.get("next"));
   const requestedRole = requestUrl.searchParams.get("role");
   const isPopup = requestUrl.searchParams.get("popup") === "true";
-  const openerOrigin = requestUrl.searchParams.get("origin") || requestUrl.origin;
   const validRole = requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner";
 
   if (!code) {
-    const errorMsg = "Kode verifikasi tidak ditemukan";
-    const fallbackUrl = new URL(`/login?error=${encodeURIComponent(errorMsg)}`, requestUrl.origin).toString();
-    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl, openerOrigin);
-    return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
+    return createAuthErrorResponse("Kode verifikasi tidak ditemukan", requestUrl, isPopup);
   }
   if (requestedRole && !validRole) {
-    const errorMsg = "Role akun tidak valid";
-    const fallbackUrl = new URL(`/login?error=${encodeURIComponent(errorMsg)}`, requestUrl.origin).toString();
-    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl, openerOrigin);
-    return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
+    return createAuthErrorResponse("Role akun tidak valid", requestUrl, isPopup);
   }
 
   try {
     const supabase = await createClient();
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) {
-      // Check if session was already exchanged by a concurrent/duplicate request
-      const { data: sessionData } = await supabase.auth.getUser();
-      if (!sessionData?.user) {
-        throw exchangeError;
-      }
-    }
+    if (exchangeError) throw exchangeError;
 
     const { data, error: userError } = await supabase.auth.getUser();
     if (userError || !data.user) throw userError ?? new Error("Sesi verifikasi tidak ditemukan.");
@@ -373,7 +363,7 @@ export async function GET(request: Request) {
         (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
         undefined,
       companyName: typeof data.user.user_metadata?.companyName === "string" ? data.user.user_metadata.companyName : undefined,
-      role: requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner" ? requestedRole : undefined,
+      role: validRole && requestedRole ? requestedRole : undefined,
       allowRoleFallback: true,
     });
 
@@ -398,61 +388,20 @@ export async function GET(request: Request) {
       ? `/auth/setup-password?role=${result.role}&next=${encodeURIComponent(destination)}`
       : destination;
 
+    const safeFinalDestination = safeRedirectPath(finalDestination, "/dashboard");
+
     if (isPopup) {
       return popupSuccessResponse({
         isNew: result.isNew,
         hasPassword: Boolean(result.hasPassword),
         role: result.role,
-        destination: finalDestination,
-        openerOrigin,
+        destination: safeFinalDestination,
       });
     }
 
-    return NextResponse.redirect(new URL(finalDestination, requestUrl.origin));
+    return NextResponse.redirect(new URL(safeFinalDestination, requestUrl.origin));
   } catch (error) {
     console.error("Verifikasi email gagal:", error);
-
-    // Fail-safe recovery: if somehow a ROLE_MISMATCH is still thrown, recover by syncing with existing user role
-    if (error instanceof Error && error.message.startsWith("ROLE_MISMATCH:")) {
-      try {
-        const supabase = await createClient();
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
-          const recoveredResult = await syncAuthenticatedUser(userData.user, {
-            allowRoleFallback: true,
-          });
-          const recoveredDest = resolveRoleDestination(
-            recoveredResult.role,
-            next,
-            recoveredResult.isNew,
-            recoveredResult.hasSubmittedOnboarding,
-            recoveredResult.provisioningStatus
-          );
-          const shouldRecoverPasswordSetup = recoveredResult.isNew && !recoveredResult.hasPassword;
-          const finalRecoveredDest = shouldRecoverPasswordSetup
-            ? `/auth/setup-password?role=${recoveredResult.role}&next=${encodeURIComponent(recoveredDest)}`
-            : recoveredDest;
-
-          if (isPopup) {
-            return popupSuccessResponse({
-              isNew: recoveredResult.isNew,
-              hasPassword: Boolean(recoveredResult.hasPassword),
-              role: recoveredResult.role,
-              destination: finalRecoveredDest,
-              openerOrigin,
-            });
-          }
-          return NextResponse.redirect(new URL(finalRecoveredDest, requestUrl.origin));
-        }
-      } catch (recoverErr) {
-        console.error("Gagal pemulihan peran:", recoverErr);
-      }
-    }
-
-    const fallbackUrl = new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin).toString();
-    if (isPopup) {
-      return popupErrorResponse("Verifikasi email gagal", fallbackUrl, openerOrigin);
-    }
-    return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
+    return createAuthErrorResponse("Verifikasi email gagal", requestUrl, isPopup);
   }
 }

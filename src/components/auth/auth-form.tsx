@@ -373,7 +373,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       }
       if (isPopupAvailable) {
         redirectUrl.searchParams.set("popup", "true");
-        redirectUrl.searchParams.set("origin", window.location.origin);
       }
 
       const { data, error } = await createClient().auth.signInWithOAuth({
