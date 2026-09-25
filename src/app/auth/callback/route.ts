@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 
-function safeNext(value: string | null, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
-  return value;
-}
-
 function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string }) {
   const html = `<!DOCTYPE html>
 <html lang="id">
@@ -56,15 +51,50 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
         role: ${JSON.stringify(data.role)},
         destination: ${JSON.stringify(data.destination)}
       };
+
+      var delivered = false;
+
+      // 1. Direct window.opener postMessage
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage(payload, window.location.origin);
-          setTimeout(function() { window.close(); }, 150);
-          return;
+          delivered = true;
         } catch (e) {
           console.error("postMessage error:", e);
         }
       }
+
+      // 2. BroadcastChannel cross-window sync
+      try {
+        if ("BroadcastChannel" in window) {
+          var channel = new BroadcastChannel("proofylink_oauth_channel");
+          channel.postMessage(payload);
+          channel.close();
+          delivered = true;
+        }
+      } catch (e) {
+        console.error("BroadcastChannel error:", e);
+      }
+
+      // 3. LocalStorage event cross-tab sync fallback
+      try {
+        localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
+        delivered = true;
+      } catch (e) {}
+
+      // If opener is connected, close immediately
+      if (window.opener && !window.opener.closed) {
+        setTimeout(function() { window.close(); }, 150);
+        return;
+      }
+
+      // If delivered via channel or storage, close window
+      if (delivered) {
+        setTimeout(function() { window.close(); }, 300);
+        return;
+      }
+
+      // Fallback: If not opened as popup or cannot close, redirect directly
       window.location.replace(${JSON.stringify(data.destination)});
     })();
   </script>
@@ -91,13 +121,47 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string) {
   <script>
     (function() {
       var errorMsg = ${JSON.stringify(errorMessage)};
+      var payload = {
+        type: "GOOGLE_AUTH_ERROR",
+        error: errorMsg
+      };
+
+      var delivered = false;
+
+      // 1. Direct window.opener postMessage
       if (window.opener && !window.opener.closed) {
         try {
-          window.opener.postMessage({ type: "GOOGLE_AUTH_ERROR", error: errorMsg }, window.location.origin);
-          setTimeout(function() { window.close(); }, 150);
-          return;
+          window.opener.postMessage(payload, window.location.origin);
+          delivered = true;
         } catch (e) {}
       }
+
+      // 2. BroadcastChannel
+      try {
+        if ("BroadcastChannel" in window) {
+          var channel = new BroadcastChannel("proofylink_oauth_channel");
+          channel.postMessage(payload);
+          channel.close();
+          delivered = true;
+        }
+      } catch (e) {}
+
+      // 3. LocalStorage
+      try {
+        localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
+        delivered = true;
+      } catch (e) {}
+
+      if (window.opener && !window.opener.closed) {
+        setTimeout(function() { window.close(); }, 150);
+        return;
+      }
+
+      if (delivered) {
+        setTimeout(function() { window.close(); }, 300);
+        return;
+      }
+
       window.location.replace(${JSON.stringify(fallbackUrl)});
     })();
   </script>
@@ -111,6 +175,70 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string) {
       "Cache-Control": "no-store, no-cache, must-revalidate",
     },
   });
+}
+
+function resolveRoleDestination(
+  role: string,
+  candidateNext: string | null,
+  isNew: boolean,
+  hasSubmittedOnboarding?: boolean,
+  provisioningStatus?: string
+): string {
+  if (role === "candidate") {
+    if (hasSubmittedOnboarding === false) return "/candidate/onboarding";
+    if (
+      candidateNext &&
+      candidateNext.startsWith("/") &&
+      !candidateNext.startsWith("//") &&
+      (candidateNext.startsWith("/candidate") || candidateNext.startsWith("/jobs") || ["/profile", "/messages"].includes(candidateNext))
+    ) {
+      if (hasSubmittedOnboarding === true && candidateNext.startsWith("/candidate/onboarding")) {
+        return "/candidate";
+      }
+      return candidateNext;
+    }
+    return "/candidate";
+  }
+
+  if (role === "recruiter") {
+    if (isNew || hasSubmittedOnboarding === false) return "/recruiter/onboarding";
+    if (provisioningStatus !== "active") return "/recruiter/pending";
+    if (
+      candidateNext &&
+      candidateNext.startsWith("/") &&
+      !candidateNext.startsWith("//") &&
+      (candidateNext.startsWith("/dashboard") ||
+        candidateNext.startsWith("/search") ||
+        candidateNext.startsWith("/shortlist") ||
+        candidateNext.startsWith("/talent") ||
+        candidateNext.startsWith("/recruiter") ||
+        candidateNext === "/pricing")
+    ) {
+      return candidateNext;
+    }
+    return "/dashboard";
+  }
+
+  if (role === "partner") {
+    if (isNew) return "/partner/onboarding";
+    if (provisioningStatus !== "active") return "/partner/pending";
+    if (
+      candidateNext &&
+      candidateNext.startsWith("/") &&
+      !candidateNext.startsWith("//") &&
+      candidateNext.startsWith("/partner")
+    ) {
+      return candidateNext;
+    }
+    return "/partner";
+  }
+
+  if (role === "admin") {
+    if (candidateNext && candidateNext.startsWith("/admin")) return candidateNext;
+    return "/admin";
+  }
+
+  return "/dashboard";
 }
 
 export async function GET(request: Request) {
@@ -137,35 +265,39 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) {
+      // Check if session was already exchanged by a concurrent/duplicate request
+      const { data: sessionData } = await supabase.auth.getUser();
+      if (!sessionData?.user) {
+        throw exchangeError;
+      }
+    }
 
     const { data, error: userError } = await supabase.auth.getUser();
     if (userError || !data.user) throw userError ?? new Error("Sesi verifikasi tidak ditemukan.");
 
     const metadataRole = data.user.user_metadata?.role;
+    // Allow role fallback so continuing with Google seamlessly signs in existing accounts
+    // even if a different role tab was active on the login page.
     const result = await syncAuthenticatedUser(data.user, {
-      name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : undefined,
+      name:
+        (typeof data.user.user_metadata?.full_name === "string" && data.user.user_metadata.full_name.trim()) ||
+        (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
+        undefined,
       companyName: typeof data.user.user_metadata?.companyName === "string" ? data.user.user_metadata.companyName : undefined,
       role: requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner" ? requestedRole : undefined,
+      allowRoleFallback: true,
     });
 
-    const fallback =
-      result.role === "admin"
-        ? "/admin"
-        : result.role === "candidate"
-        ? (result.isNew || result.hasSubmittedOnboarding === false ? "/candidate/onboarding" : "/candidate")
-        : result.role === "partner"
-        ? (result.isNew ? "/partner/onboarding" : result.provisioningStatus === "active" ? "/partner" : "/partner/pending")
-        : (result.isNew || result.hasSubmittedOnboarding === false ? "/recruiter/onboarding" : result.provisioningStatus === "active" ? "/dashboard" : "/recruiter/pending");
-    let destination = safeNext(next, fallback);
-    if (result.role === "candidate") {
-      if (result.hasSubmittedOnboarding === true && destination.startsWith("/candidate/onboarding")) {
-        destination = "/candidate";
-      } else if (result.hasSubmittedOnboarding === false && !destination.startsWith("/candidate/onboarding")) {
-        destination = "/candidate/onboarding";
-      }
-    }
+    const destination = resolveRoleDestination(
+      result.role,
+      next,
+      result.isNew,
+      result.hasSubmittedOnboarding,
+      result.provisioningStatus
+    );
+
     if (metadataRole !== result.role) {
       const { error: metadataError } = await supabase.auth.updateUser({
         data: { role: result.role },
@@ -192,26 +324,35 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Verifikasi email gagal:", error);
 
-    // Handle ROLE_MISMATCH specifically so the user sees which role tab to switch to
+    // Fail-safe recovery: if somehow a ROLE_MISMATCH is still thrown, recover by syncing with existing user role
     if (error instanceof Error && error.message.startsWith("ROLE_MISMATCH:")) {
-      // Sign out the session created by exchangeCodeForSession so the
-      // client-side onAuthStateChange listener doesn't auto-redirect the user
-      const supabase = await createClient();
-      await supabase.auth.signOut().catch(() => {});
-
-      const [, actualRole] = error.message.split(":");
-      const roleLabel =
-        actualRole === "candidate" ? "Talent / Candidate"
-        : actualRole === "recruiter" ? "Recruiter / Hiring"
-        : actualRole === "partner" ? "Partnership"
-        : actualRole;
-      const msg = `Akun Google ini terdaftar sebagai ${roleLabel}. Silakan pilih peran ${roleLabel} untuk masuk.`;
-      const fallbackUrl = new URL(`/login?error=${encodeURIComponent(msg)}`, requestUrl.origin).toString();
-
-      if (isPopup) {
-        return popupErrorResponse(msg, fallbackUrl);
+      try {
+        const supabase = await createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const recoveredResult = await syncAuthenticatedUser(userData.user, {
+            allowRoleFallback: true,
+          });
+          const recoveredDest = resolveRoleDestination(
+            recoveredResult.role,
+            next,
+            recoveredResult.isNew,
+            recoveredResult.hasSubmittedOnboarding,
+            recoveredResult.provisioningStatus
+          );
+          if (isPopup) {
+            return popupSuccessResponse({
+              isNew: recoveredResult.isNew,
+              hasPassword: Boolean(recoveredResult.hasPassword),
+              role: recoveredResult.role,
+              destination: recoveredDest,
+            });
+          }
+          return NextResponse.redirect(new URL(recoveredDest, requestUrl.origin));
+        }
+      } catch (recoverErr) {
+        console.error("Gagal pemulihan peran:", recoverErr);
       }
-      return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
     }
 
     const fallbackUrl = new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin).toString();
