@@ -346,6 +346,26 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setGoogleLoading(true);
     setErrorMessage(null);
 
+    // Calculate center positioning for popup window
+    const width = 500;
+    const height = 620;
+    const left = typeof window !== "undefined" ? Math.max(0, window.screenX + (window.outerWidth - width) / 2) : 100;
+    const top = typeof window !== "undefined" ? Math.max(0, window.screenY + (window.outerHeight - height) / 2) : 100;
+
+    // Open popup synchronously on user gesture to prevent popup blocking
+    let popup: Window | null = null;
+    try {
+      popup = window.open(
+        "about:blank",
+        "proofylink_google_auth",
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no`
+      );
+    } catch {
+      popup = null;
+    }
+
+    const isPopupAvailable = Boolean(popup && !popup.closed);
+
     try {
       const next = getNext();
       const redirectUrl = new URL("/auth/callback", window.location.origin);
@@ -357,19 +377,63 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (mode === "register") {
         redirectUrl.searchParams.set("mode", "register");
       }
+      if (isPopupAvailable) {
+        redirectUrl.searchParams.set("popup", "true");
+      }
 
-      const { error } = await createClient().auth.signInWithOAuth({
+      const { data, error } = await createClient().auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: redirectUrl.toString(),
+          skipBrowserRedirect: isPopupAvailable,
           queryParams: {
             prompt: "select_account",
             access_type: "offline",
           },
         },
       });
-      if (error) throw error;
+
+      if (error) {
+        if (popup && !popup.closed) popup.close();
+        throw error;
+      }
+
+      if (isPopupAvailable && popup && data?.url) {
+        popup.location.href = data.url;
+
+        // Listen for postMessage from the popup
+        const handleMessage = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          const payload = event.data;
+          if (!payload || typeof payload !== "object") return;
+
+          if (payload.type === "GOOGLE_AUTH_SUCCESS") {
+            cleanup();
+            const target = typeof payload.destination === "string" ? payload.destination : destination(payload.role ?? role, null);
+            window.location.href = target;
+          } else if (payload.type === "GOOGLE_AUTH_ERROR") {
+            cleanup();
+            setGoogleLoading(false);
+            setErrorMessage(typeof payload.error === "string" ? payload.error : "Gagal masuk dengan Google.");
+          }
+        };
+
+        const pollTimer = setInterval(() => {
+          if (popup && popup.closed) {
+            cleanup();
+            setGoogleLoading(false);
+          }
+        }, 500);
+
+        const cleanup = () => {
+          clearInterval(pollTimer);
+          window.removeEventListener("message", handleMessage);
+        };
+
+        window.addEventListener("message", handleMessage);
+      }
     } catch (error) {
+      if (popup && !popup.closed) popup.close();
       setGoogleLoading(false);
       setErrorMessage(`Tidak dapat masuk dengan Google: ${error instanceof Error ? error.message : "Coba lagi."}`);
     }
