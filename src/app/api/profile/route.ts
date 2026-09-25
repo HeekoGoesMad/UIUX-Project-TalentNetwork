@@ -51,7 +51,8 @@ export async function GET() {
       candidateProfile: candidateProfile ?? null,
       sections,
     });
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/profile Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

@@ -37,7 +37,10 @@ const allowedTransitions: Record<string, string[]> = {
   archived: [],
 };
 
-function unavailable() {
+function unavailable(error?: unknown) {
+  if (error) {
+    console.error("[/api/jobs/[jobId] Database Error]:", error);
+  }
   return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
 }
 
@@ -112,8 +115,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
 
     const job = await load(db, jobId, organizationId);
     return job ? NextResponse.json({ job }) : NextResponse.json({ error: "Job tidak ditemukan." }, { status: 404 });
-  } catch {
-    return unavailable();
+  } catch (error) {
+    return unavailable(error);
   }
 }
 
@@ -176,8 +179,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ jo
 
     const job = await load(current.db, jobId, scope.membership.organizationId);
     return NextResponse.json({ job });
-  } catch {
-    return unavailable();
+  } catch (error) {
+    return unavailable(error);
   }
 }
 
@@ -203,7 +206,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.organizationId, scope.membership.organizationId)));
 
     return NextResponse.json({ success: true, message: "Lowongan berhasil dihapus." });
-  } catch {
-    return unavailable();
+  } catch (error) {
+    return unavailable(error);
   }
 }

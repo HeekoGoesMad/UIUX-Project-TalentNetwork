@@ -40,7 +40,8 @@ export async function GET(
     }
 
     return NextResponse.json({ downloadUrl });
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/messages/[messageId]/attachment Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

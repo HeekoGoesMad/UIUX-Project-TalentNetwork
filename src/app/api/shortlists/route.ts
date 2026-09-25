@@ -9,6 +9,11 @@ const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(24),
 });
 
+function dbError(error?: unknown) {
+  if (error) console.error("[/api/shortlists Database Error]:", error);
+  return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -22,8 +27,8 @@ export async function GET(request: Request) {
 
     const result = await ShortlistService.list(current.db, scope.membership.organizationId, { page: paged.data.page, limit: paged.data.limit });
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  } catch (error) {
+    return dbError(error);
   }
 }
 
@@ -55,8 +60,8 @@ export async function POST(request: Request) {
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  } catch (error) {
+    return dbError(error);
   }
 }
 
@@ -83,8 +88,8 @@ export async function PATCH(request: Request) {
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  } catch (error) {
+    return dbError(error);
   }
 }
 
@@ -110,7 +115,7 @@ export async function DELETE(request: Request) {
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  } catch (error) {
+    return dbError(error);
   }
 }

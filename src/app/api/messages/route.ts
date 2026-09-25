@@ -51,7 +51,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/messages Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
@@ -163,7 +164,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(result, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("[POST /api/messages Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

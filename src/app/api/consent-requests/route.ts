@@ -40,7 +40,8 @@ export async function GET(request: Request) {
 
     const result = await ConsentService.getConsentRequests(current.db, current.user, scope, { page, limit, candidateProfileId });
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[GET /api/consent-requests Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("[POST /api/consent-requests Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

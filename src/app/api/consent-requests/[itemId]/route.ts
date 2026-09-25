@@ -42,7 +42,8 @@ export async function PATCH(
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[PATCH /api/consent-requests/[itemId] Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
   }
 }

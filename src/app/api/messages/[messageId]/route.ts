@@ -22,7 +22,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ messa
     if (!await getParticipant(current.db, message.conversationId, current.user.id)) return NextResponse.json({ error: "Anda bukan peserta percakapan ini." }, { status: 403 });
     const [updated] = await current.db.update(schema.messages).set({ body: parsed.data.body, editedAt: new Date() }).where(eq(schema.messages.id, messageId)).returning();
     return NextResponse.json({ message: updated });
-  } catch { return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 }); }
+  } catch (err) {
+    console.error("[PATCH /api/messages/[messageId] Database Error]:", err);
+    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  }
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ messageId: string }> }) {
@@ -36,7 +39,10 @@ export async function DELETE(_request: Request, context: { params: Promise<{ mes
     if (!await getParticipant(current.db, message.conversationId, current.user.id)) return NextResponse.json({ error: "Anda bukan peserta percakapan ini." }, { status: 403 });
     await current.db.update(schema.messages).set({ deletedAt: new Date(), body: "Pesan dihapus oleh pengirim." }).where(eq(schema.messages.id, messageId));
     return NextResponse.json({ ok: true });
-  } catch { return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 }); }
+  } catch (err) {
+    console.error("[DELETE /api/messages/[messageId] Database Error]:", err);
+    return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
+  }
 }
 
 export async function POST(request: Request, context: { params: Promise<{ messageId: string }> }) {
@@ -50,5 +56,8 @@ export async function POST(request: Request, context: { params: Promise<{ messag
     if (!message || !await getParticipant(current.db, message.conversationId, current.user.id)) return NextResponse.json({ error: "Pesan tidak ditemukan." }, { status: 404 });
     await current.db.insert(schema.messageReports).values({ conversationId: message.conversationId, messageId, reporterId: current.user.id, reason: parsed.data.reason });
     return NextResponse.json({ ok: true }, { status: 201 });
-  } catch { return NextResponse.json({ error: "Laporan belum dapat disimpan." }, { status: 503 }); }
+  } catch (err) {
+    console.error("[POST /api/messages/[messageId] Database Error]:", err);
+    return NextResponse.json({ error: "Laporan belum dapat disimpan." }, { status: 503 });
+  }
 }
