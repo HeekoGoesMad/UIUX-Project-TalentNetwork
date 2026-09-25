@@ -463,39 +463,67 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         window.addEventListener("storage", handleStorage);
 
         const pollTimer = setInterval(async () => {
+          // 1. Check if localStorage already has the auth event payload written by the popup
           if (!handled) {
             try {
-              const supabase = createClient();
-              const { data: userData } = await supabase.auth.getUser();
-              if (userData?.user) {
-                handled = true;
-                if (popup && !popup.closed) {
-                  try {
-                    popup.close();
-                  } catch {}
+              const stored = localStorage.getItem("proofylink_oauth_event");
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed && typeof parsed === "object" && typeof parsed.type === "string" && parsed.type.startsWith("GOOGLE_AUTH_")) {
+                  handleAuthPayload(parsed);
+                  return;
                 }
-                cleanup();
-                const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
-                const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
-                const userRole = (bootstrapData?.user?.role as UserRole) || role;
-                const isNewOrNoPassword = !bootstrapData?.user?.hasPassword;
-                const dest = destination(userRole, getNext(), false, bootstrapData?.user?.recruiterProvisioningStatus);
-                const target = isNewOrNoPassword
-                  ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
-                  : dest;
-                window.location.href = target;
-                return;
               }
             } catch {}
           }
 
+          // 2. Only run session fail-safe if popup was closed
           if (popup && popup.closed) {
             cleanup();
             if (!handled) {
+              // Secondary check for stored event before session check
+              try {
+                const stored = localStorage.getItem("proofylink_oauth_event");
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (parsed && typeof parsed === "object" && typeof parsed.type === "string" && parsed.type.startsWith("GOOGLE_AUTH_")) {
+                    handleAuthPayload(parsed);
+                    return;
+                  }
+                }
+              } catch {}
+
+              // Fail-safe check: Popup closed, verify if user session was established
+              try {
+                const supabase = createClient();
+                const { data: userData } = await supabase.auth.getUser();
+                if (userData?.user) {
+                  handled = true;
+                  const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
+                  const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
+                  const identity = bootstrapData?.identity;
+                  const userRole = (identity?.role as UserRole) || role;
+                  const hasPassword = Boolean(identity?.hasPassword);
+                  const dest = destination(
+                    userRole,
+                    getNext(),
+                    false,
+                    identity?.provisioningStatus,
+                    identity?.hasSubmittedOnboarding
+                  );
+                  // Setup password only if user explicitly registered and has no password
+                  const shouldSetupPassword = mode === "register" && !hasPassword;
+                  const target = shouldSetupPassword
+                    ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+                    : dest;
+                  window.location.href = target;
+                  return;
+                }
+              } catch {}
               setGoogleLoading(false);
             }
           }
-        }, 600);
+        }, 500);
 
         const cleanup = () => {
           clearInterval(pollTimer);
