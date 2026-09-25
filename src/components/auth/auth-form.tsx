@@ -365,6 +365,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       }
       if (isPopupAvailable) {
         redirectUrl.searchParams.set("popup", "true");
+        redirectUrl.searchParams.set("origin", window.location.origin);
       }
 
       const { data, error } = await createClient().auth.signInWithOAuth({
@@ -401,6 +402,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
           if (authData.type === "GOOGLE_AUTH_SUCCESS") {
             handled = true;
+            if (popup && !popup.closed) {
+              try {
+                popup.close();
+              } catch {}
+            }
             cleanup();
             const target =
               typeof authData.destination === "string"
@@ -409,6 +415,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             window.location.href = target;
           } else if (authData.type === "GOOGLE_AUTH_ERROR") {
             handled = true;
+            if (popup && !popup.closed) {
+              try {
+                popup.close();
+              } catch {}
+            }
             cleanup();
             setGoogleLoading(false);
             setErrorMessage(typeof authData.error === "string" ? authData.error : "Gagal masuk dengan Google.");
@@ -416,7 +427,20 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         };
 
         const handleMessage = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
+          const currentHost = window.location.hostname;
+          let eventHost = "";
+          try {
+            eventHost = new URL(event.origin).hostname;
+          } catch {}
+
+          const isAllowedOrigin =
+            event.origin === window.location.origin ||
+            eventHost === currentHost ||
+            (eventHost.endsWith(".vercel.app") && currentHost.endsWith(".vercel.app")) ||
+            eventHost === "localhost" ||
+            eventHost === "127.0.0.1";
+
+          if (!isAllowedOrigin) return;
           handleAuthPayload(event.data);
         };
 
@@ -439,31 +463,39 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         window.addEventListener("storage", handleStorage);
 
         const pollTimer = setInterval(async () => {
+          if (!handled) {
+            try {
+              const supabase = createClient();
+              const { data: userData } = await supabase.auth.getUser();
+              if (userData?.user) {
+                handled = true;
+                if (popup && !popup.closed) {
+                  try {
+                    popup.close();
+                  } catch {}
+                }
+                cleanup();
+                const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
+                const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
+                const userRole = (bootstrapData?.user?.role as UserRole) || role;
+                const isNewOrNoPassword = !bootstrapData?.user?.hasPassword;
+                const dest = destination(userRole, getNext(), false, bootstrapData?.user?.recruiterProvisioningStatus);
+                const target = isNewOrNoPassword
+                  ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+                  : dest;
+                window.location.href = target;
+                return;
+              }
+            } catch {}
+          }
+
           if (popup && popup.closed) {
             cleanup();
             if (!handled) {
-              // Fail-safe check: Popup closed, verify if user session was established
-              try {
-                const supabase = createClient();
-                const { data: userData } = await supabase.auth.getUser();
-                if (userData.user) {
-                  handled = true;
-                  const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
-                  const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
-                  const userRole = (bootstrapData?.user?.role as UserRole) || role;
-                  const isNewOrNoPassword = !bootstrapData?.user?.hasPassword;
-                  const dest = destination(userRole, getNext(), false, bootstrapData?.user?.recruiterProvisioningStatus);
-                  const target = isNewOrNoPassword
-                    ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
-                    : dest;
-                  window.location.href = target;
-                  return;
-                }
-              } catch {}
               setGoogleLoading(false);
             }
           }
-        }, 500);
+        }, 600);
 
         const cleanup = () => {
           clearInterval(pollTimer);

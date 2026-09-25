@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 
-function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string }) {
+function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string; openerOrigin?: string }) {
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Menghubungkan Akun Google...</title>
   <style>
     body {
@@ -21,6 +22,7 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
       color: #111827;
       text-align: center;
       padding: 24px;
+      box-sizing: border-box;
     }
     .spinner {
       width: 36px;
@@ -31,18 +33,54 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
       animation: spin 0.8s linear infinite;
       margin-bottom: 16px;
     }
+    .check-icon {
+      display: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #ECFDF5;
+      color: #059669;
+      font-size: 22px;
+      line-height: 44px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; color: #111827; }
-    p { font-size: 13px; color: #6B7280; margin: 0; }
+    h2 { font-size: 17px; font-weight: 600; margin: 0 0 8px; color: #111827; }
+    p { font-size: 13px; color: #6B7280; margin: 0 0 16px; line-height: 1.5; }
+    .btn-close {
+      display: none;
+      background: #7C3AED;
+      color: #ffffff;
+      border: none;
+      padding: 9px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      transition: background 0.15s;
+    }
+    .btn-close:hover {
+      background: #6D28D9;
+    }
   </style>
 </head>
 <body>
-  <div class="spinner"></div>
-  <h2>Menghubungkan akun Google...</h2>
-  <p>Jendela ini akan tertutup secara otomatis.</p>
+  <div id="spinner" class="spinner"></div>
+  <div id="check-icon" class="check-icon">✓</div>
+  <h2 id="status-title">Menghubungkan akun Google...</h2>
+  <p id="status-desc">Jendela ini akan tertutup secara otomatis.</p>
+  <button id="btn-close" type="button" class="btn-close" onclick="tryCloseWindow()">Tutup Jendela Ini</button>
+
   <script>
+    function tryCloseWindow() {
+      try { window.close(); } catch(e) {}
+    }
+
     (function() {
       var payload = {
         type: "GOOGLE_AUTH_SUCCESS",
@@ -52,16 +90,18 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
         destination: ${JSON.stringify(data.destination)}
       };
 
-      var delivered = false;
+      var targetOrigin = ${JSON.stringify(data.openerOrigin || "*")};
 
-      // 1. Direct window.opener postMessage
+      // 1. Direct window.opener postMessage with specific origin and fallback
       if (window.opener && !window.opener.closed) {
         try {
-          window.opener.postMessage(payload, window.location.origin);
-          delivered = true;
-        } catch (e) {
-          console.error("postMessage error:", e);
-        }
+          window.opener.postMessage(payload, targetOrigin);
+        } catch (e) {}
+        try {
+          if (targetOrigin !== "*") {
+            window.opener.postMessage(payload, window.location.origin);
+          }
+        } catch (e) {}
       }
 
       // 2. BroadcastChannel cross-window sync
@@ -70,32 +110,34 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
           var channel = new BroadcastChannel("proofylink_oauth_channel");
           channel.postMessage(payload);
           channel.close();
-          delivered = true;
         }
-      } catch (e) {
-        console.error("BroadcastChannel error:", e);
-      }
+      } catch (e) {}
 
       // 3. LocalStorage event cross-tab sync fallback
       try {
         localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
-        delivered = true;
       } catch (e) {}
 
-      // If opener is connected, close immediately
-      if (window.opener && !window.opener.closed) {
-        setTimeout(function() { window.close(); }, 150);
-        return;
-      }
+      // Attempt immediate close
+      tryCloseWindow();
+      setTimeout(tryCloseWindow, 100);
+      setTimeout(tryCloseWindow, 300);
 
-      // If delivered via channel or storage, close window
-      if (delivered) {
-        setTimeout(function() { window.close(); }, 300);
-        return;
-      }
+      // If window remains open after 600ms (e.g. browser blocked script window.close):
+      // reveal check icon and manual close button (user gesture always allows window.close)
+      setTimeout(function() {
+        var spinner = document.getElementById("spinner");
+        var checkIcon = document.getElementById("check-icon");
+        var title = document.getElementById("status-title");
+        var desc = document.getElementById("status-desc");
+        var btn = document.getElementById("btn-close");
 
-      // Fallback: If not opened as popup or cannot close, redirect directly
-      window.location.replace(${JSON.stringify(data.destination)});
+        if (spinner) spinner.style.display = "none";
+        if (checkIcon) checkIcon.style.display = "inline-block";
+        if (title) title.textContent = "Berhasil Masuk!";
+        if (desc) desc.textContent = "Akun Google Anda terhubung. Silakan klik tombol di bawah untuk kembali ke halaman utama.";
+        if (btn) btn.style.display = "inline-block";
+      }, 600);
     })();
   </script>
 </body>
@@ -110,15 +152,68 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
   });
 }
 
-function popupErrorResponse(errorMessage: string, fallbackUrl: string) {
+function popupErrorResponse(errorMessage: string, fallbackUrl: string, openerOrigin?: string) {
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gagal Menghubungkan Akun</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #F9FAFB;
+      color: #111827;
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .error-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FEF2F2;
+      color: #DC2626;
+      font-size: 22px;
+      line-height: 44px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h2 { font-size: 17px; font-weight: 600; margin: 0 0 8px; color: #111827; }
+    p { font-size: 13px; color: #6B7280; margin: 0 0 16px; line-height: 1.5; max-width: 320px; }
+    .btn-close {
+      background: #DC2626;
+      color: #ffffff;
+      border: none;
+      padding: 9px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn-close:hover {
+      background: #B91C1C;
+    }
+  </style>
 </head>
 <body>
+  <div class="error-icon">✕</div>
+  <h2>Gagal Menghubungkan Akun</h2>
+  <p>${errorMessage}</p>
+  <button type="button" class="btn-close" onclick="tryCloseWindow()">Tutup Jendela Ini</button>
+
   <script>
+    function tryCloseWindow() {
+      try { window.close(); } catch(e) {}
+    }
+
     (function() {
       var errorMsg = ${JSON.stringify(errorMessage)};
       var payload = {
@@ -126,43 +221,31 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string) {
         error: errorMsg
       };
 
-      var delivered = false;
+      var targetOrigin = ${JSON.stringify(openerOrigin || "*")};
 
-      // 1. Direct window.opener postMessage
       if (window.opener && !window.opener.closed) {
+        try { window.opener.postMessage(payload, targetOrigin); } catch (e) {}
         try {
-          window.opener.postMessage(payload, window.location.origin);
-          delivered = true;
+          if (targetOrigin !== "*") {
+            window.opener.postMessage(payload, window.location.origin);
+          }
         } catch (e) {}
       }
 
-      // 2. BroadcastChannel
       try {
         if ("BroadcastChannel" in window) {
           var channel = new BroadcastChannel("proofylink_oauth_channel");
           channel.postMessage(payload);
           channel.close();
-          delivered = true;
         }
       } catch (e) {}
 
-      // 3. LocalStorage
       try {
         localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
-        delivered = true;
       } catch (e) {}
 
-      if (window.opener && !window.opener.closed) {
-        setTimeout(function() { window.close(); }, 150);
-        return;
-      }
-
-      if (delivered) {
-        setTimeout(function() { window.close(); }, 300);
-        return;
-      }
-
-      window.location.replace(${JSON.stringify(fallbackUrl)});
+      tryCloseWindow();
+      setTimeout(tryCloseWindow, 150);
     })();
   </script>
 </body>
@@ -248,18 +331,19 @@ export async function GET(request: Request) {
   const requestedRole = requestUrl.searchParams.get("role");
   const mode = requestUrl.searchParams.get("mode");
   const isPopup = requestUrl.searchParams.get("popup") === "true";
+  const openerOrigin = requestUrl.searchParams.get("origin") || requestUrl.origin;
   const validRole = requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner";
 
   if (!code) {
     const errorMsg = "Kode verifikasi tidak ditemukan";
     const fallbackUrl = new URL(`/login?error=${encodeURIComponent(errorMsg)}`, requestUrl.origin).toString();
-    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl);
+    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl, openerOrigin);
     return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
   }
   if (requestedRole && !validRole) {
     const errorMsg = "Role akun tidak valid";
     const fallbackUrl = new URL(`/login?error=${encodeURIComponent(errorMsg)}`, requestUrl.origin).toString();
-    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl);
+    if (isPopup) return popupErrorResponse(errorMsg, fallbackUrl, openerOrigin);
     return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
   }
 
@@ -317,6 +401,7 @@ export async function GET(request: Request) {
         hasPassword: Boolean(result.hasPassword),
         role: result.role,
         destination: finalDestination,
+        openerOrigin,
       });
     }
 
@@ -346,6 +431,7 @@ export async function GET(request: Request) {
               hasPassword: Boolean(recoveredResult.hasPassword),
               role: recoveredResult.role,
               destination: recoveredDest,
+              openerOrigin,
             });
           }
           return NextResponse.redirect(new URL(recoveredDest, requestUrl.origin));
@@ -357,7 +443,7 @@ export async function GET(request: Request) {
 
     const fallbackUrl = new URL("/login?error=Verifikasi+email+gagal", requestUrl.origin).toString();
     if (isPopup) {
-      return popupErrorResponse("Verifikasi email gagal", fallbackUrl);
+      return popupErrorResponse("Verifikasi email gagal", fallbackUrl, openerOrigin);
     }
     return NextResponse.redirect(new URL(fallbackUrl, requestUrl.origin));
   }
