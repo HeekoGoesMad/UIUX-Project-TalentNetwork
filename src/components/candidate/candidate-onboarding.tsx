@@ -105,7 +105,14 @@ const careerLabels: Record<CareerStatus, string> = {
   "not-available": "Not Available",
 };
 
-const draftKey = "proofylink-onboarding-draft";
+const DRAFT_PREFIX = "proofylink-onboarding-draft";
+
+function getDraftStorageKey(email?: string | null) {
+  if (email && email.trim()) {
+    return `${DRAFT_PREFIX}:${email.trim().toLowerCase()}`;
+  }
+  return DRAFT_PREFIX;
+}
 
 const requiredLabels: Record<string, string> = {
   fullName: "Nama lengkap",
@@ -209,7 +216,8 @@ const inputClass =
 const textareaClass =
   "min-h-28 w-full resize-none rounded-md border bg-transparent px-3 py-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20";
 
-function isMeaningfulDraft(value: FormState) {
+function isMeaningfulDraft(value: FormState, step = 0) {
+  if (step > 0) return true;
   return Boolean(
     value.fullName.trim() ||
       value.headline.trim() ||
@@ -220,6 +228,8 @@ function isMeaningfulDraft(value: FormState) {
       value.skills.length ||
       value.tools.length ||
       value.softSkills.length ||
+      value.talentCategory !== "public" ||
+      value.careerStatus !== "open-to-work" ||
       value.experience.some((item) => item.company.trim() || item.role.trim() || item.dates?.trim() || item.description?.trim() || item.achievements?.some((entry) => entry.trim())) ||
       value.education.some((item) => item.school.trim() || item.program.trim() || item.dates?.trim() || item.gpa?.trim()),
   );
@@ -231,32 +241,31 @@ function isValidDraftPayload(value: unknown): value is { form: FormState; step: 
   return typeof candidate.form?.fullName === "string" && typeof candidate.form.email === "string" && typeof candidate.step === "number";
 }
 
-function getSavedDraft(): { form: FormState; step: number } | null {
+function getSavedDraft(email?: string | null): { form: FormState; step: number } | null {
   if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(draftKey);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (isValidDraftPayload(parsed) && isMeaningfulDraft(parsed.form)) {
-      if (
-        parsed.form.fullName?.includes("Nadia Utami") ||
-        parsed.form.email?.includes("nadia.utami@example.com")
-      ) {
-        window.localStorage.removeItem(draftKey);
-        return null;
-      }
-      return {
-        form: parsed.form,
-        step: typeof parsed.step === "number" ? Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1) : 0,
-      };
-    }
-  } catch {
+  const userKey = getDraftStorageKey(email);
+  const keysToTry = userKey !== DRAFT_PREFIX ? [userKey, DRAFT_PREFIX] : [DRAFT_PREFIX];
+  for (const key of keysToTry) {
     try {
-      window.localStorage.removeItem(draftKey);
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed: unknown = JSON.parse(raw);
+      if (isValidDraftPayload(parsed) && isMeaningfulDraft(parsed.form, parsed.step)) {
+        if (
+          parsed.form.fullName?.includes("Nadia Utami") ||
+          parsed.form.email?.includes("nadia.utami@example.com")
+        ) {
+          window.localStorage.removeItem(key);
+          continue;
+        }
+        return {
+          form: parsed.form,
+          step: typeof parsed.step === "number" ? Math.min(Math.max(Math.trunc(parsed.step), 0), steps.length - 1) : 0,
+        };
+      }
     } catch {
       // ignore
     }
-    return null;
   }
   return null;
 }
@@ -265,11 +274,7 @@ export function CandidateOnboarding() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, cvProfile, careerStatus, bootstrapped, saveCvProfile } = useApp();
-
-  const savedDraft = useRef<{ form: FormState; step: number } | null | undefined>(undefined);
-  if (savedDraft.current === undefined) {
-    savedDraft.current = getSavedDraft();
-  }
+  const currentDraftKey = getDraftStorageKey(user?.email);
 
   const [step, setStep] = useState<number>(() => {
     const rawParam = typeof window !== "undefined" ? searchParams?.get("step") : null;
@@ -277,16 +282,20 @@ export function CandidateOnboarding() {
     if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
       return paramStep;
     }
-    if (savedDraft.current) {
-      return savedDraft.current.step;
+    const draft = getSavedDraft();
+    if (draft) {
+      return draft.step;
     }
     return 0;
   });
 
   const [isPublishing, setIsPublishing] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(() => {
-    if (savedDraft.current) {
-      return savedDraft.current.form;
+    const draft = getSavedDraft();
+    if (draft) {
+      return draft.form;
     }
     const isDemo = isDemoCandidateProfile(cvProfile);
     const profile = isDemo ? null : (cvProfile ?? null);
@@ -309,13 +318,23 @@ export function CandidateOnboarding() {
   const [edits, setEdits] = useState(0);
 
   const formRef = useRef(form);
-  formRef.current = form;
   const stepRef = useRef(step);
-  stepRef.current = step;
-
-  const hasEditsRef = useRef(Boolean(savedDraft.current));
-  const initializedRef = useRef(Boolean(savedDraft.current));
+  const hasEditsRef = useRef(false);
+  const initializedRef = useRef(false);
   const publishedRef = useRef(false);
+
+  useEffect(() => {
+    formRef.current = form;
+    stepRef.current = step;
+  }, [form, step]);
+
+  // If candidate has already submitted/finished onboarding, redirect immediately to /candidate
+  useEffect(() => {
+    if (!bootstrapped || !user) return;
+    if (user.role === "candidate" && user.hasSubmittedOnboarding === true) {
+      router.replace("/candidate");
+    }
+  }, [bootstrapped, user, router]);
 
   const goToStep = (targetStep: number) => {
     if (targetStep < 0 || targetStep >= steps.length) return;
@@ -325,7 +344,8 @@ export function CandidateOnboarding() {
     setEducationError(null);
     setSkillsError(null);
     try {
-      window.localStorage.setItem(draftKey, JSON.stringify({ form: formRef.current, step: targetStep }));
+      window.localStorage.setItem(currentDraftKey, JSON.stringify({ form: formRef.current, step: targetStep }));
+      window.localStorage.setItem(DRAFT_PREFIX, JSON.stringify({ form: formRef.current, step: targetStep }));
     } catch {
       // ignore
     }
@@ -336,49 +356,48 @@ export function CandidateOnboarding() {
     if (!bootstrapped || !user || initializedRef.current || hasEditsRef.current) return;
 
     // Check again in case draft was written right before bootstrap completed
-    const freshDraft = getSavedDraft();
+    const freshDraft = getSavedDraft(user.email);
     if (freshDraft) {
       initializedRef.current = true;
       hasEditsRef.current = true;
-      setForm(freshDraft.form);
-      formRef.current = freshDraft.form;
+      const draftForm = freshDraft.form;
+      formRef.current = draftForm;
       const rawParam = searchParams?.get("step");
       const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
-      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
-        setStep(paramStep);
-        stepRef.current = paramStep;
-      } else {
-        setStep(freshDraft.step);
-        stepRef.current = freshDraft.step;
-      }
+      const targetStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length ? paramStep : freshDraft.step;
+      stepRef.current = targetStep;
+      queueMicrotask(() => {
+        setDraftRestored(true);
+        setForm(draftForm);
+        setStep(targetStep);
+      });
       return;
     }
 
     initializedRef.current = true;
     if (cvProfile && !isDemoCandidateProfile(cvProfile)) {
       const initial = initialForm(cvProfile, careerStatus, user.email);
-      setForm(initial);
       formRef.current = initial;
       const rawParam = searchParams?.get("step");
       const paramStep = rawParam !== null && rawParam !== undefined ? parseInt(rawParam, 10) : NaN;
-      if (!isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length) {
-        setStep(paramStep);
-        stepRef.current = paramStep;
-      } else {
-        const firstIncomplete = getFirstIncompleteStep(initial);
-        setStep(firstIncomplete);
-        stepRef.current = firstIncomplete;
-      }
+      const targetStep = !isNaN(paramStep) && paramStep >= 0 && paramStep < steps.length ? paramStep : getFirstIncompleteStep(initial);
+      stepRef.current = targetStep;
+      queueMicrotask(() => {
+        setForm(initial);
+        setStep(targetStep);
+      });
     } else {
       const isDemo = user.name === "Nadia Utami" || user.email === "nadia.utami@example.com";
-      setForm((current) => {
-        const next = {
-          ...current,
-          fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
-          email: current.email || (isDemo ? "" : user.email),
-        };
-        formRef.current = next;
-        return next;
+      queueMicrotask(() => {
+        setForm((current) => {
+          const next = {
+            ...current,
+            fullName: current.fullName || (isDemo ? "" : user.name !== "Kandidat Baru" ? user.name : ""),
+            email: current.email || (isDemo ? "" : user.email),
+          };
+          formRef.current = next;
+          return next;
+        });
       });
     }
   }, [bootstrapped, user, cvProfile, careerStatus, searchParams]);
@@ -389,9 +408,10 @@ export function CandidateOnboarding() {
       if (publishedRef.current) return;
       const currentForm = formRef.current;
       const currentStep = stepRef.current;
-      if (hasEditsRef.current || isMeaningfulDraft(currentForm)) {
+      if (hasEditsRef.current || isMeaningfulDraft(currentForm, currentStep)) {
         try {
-          window.localStorage.setItem(draftKey, JSON.stringify({ form: currentForm, step: currentStep }));
+          window.localStorage.setItem(currentDraftKey, JSON.stringify({ form: currentForm, step: currentStep }));
+          window.localStorage.setItem(DRAFT_PREFIX, JSON.stringify({ form: currentForm, step: currentStep }));
         } catch {
           // ignore
         }
@@ -413,20 +433,21 @@ export function CandidateOnboarding() {
       window.removeEventListener("pagehide", saveImmediately);
       window.removeEventListener("beforeunload", saveImmediately);
     };
-  }, []);
+  }, [currentDraftKey]);
 
   // Debounced draft autosave while typing
   useEffect(() => {
-    if (publishedRef.current || (!hasEditsRef.current && !isMeaningfulDraft(form))) return;
+    if (publishedRef.current || (!hasEditsRef.current && !isMeaningfulDraft(form, step))) return;
     const timer = window.setTimeout(() => {
       try {
-        window.localStorage.setItem(draftKey, JSON.stringify({ form, step }));
+        window.localStorage.setItem(currentDraftKey, JSON.stringify({ form, step }));
+        window.localStorage.setItem(DRAFT_PREFIX, JSON.stringify({ form, step }));
       } catch {
         return;
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [form, step, edits]);
+  }, [form, step, edits, currentDraftKey]);
 
   // Unsaved changes prompt before closing window
   useEffect(() => {
@@ -567,7 +588,7 @@ export function CandidateOnboarding() {
 
     const profile: CvProfile = {
       ...cvProfile,
-      id: cvProfile?.id ?? `cv-${Date.now()}`,
+      id: cvProfile?.id ?? "cv-profile",
       fullName: form.fullName.trim(),
       headline: form.headline.trim(),
       about: form.about.trim(),
@@ -603,14 +624,17 @@ export function CandidateOnboarding() {
     };
 
     try {
+      setPublishError(null);
       await saveCvProfile(profile);
     } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Coba lagi beberapa saat. Drafmu tetap tersimpan di perangkat ini.";
+      setPublishError(msg);
       toast.error("Gagal mempublikasikan", {
         id: toastId,
-        description:
-          err instanceof Error
-            ? err.message
-            : "Coba lagi beberapa saat. Drafmu tetap tersimpan di perangkat ini.",
+        description: msg,
       });
       setIsPublishing(false);
       return;
@@ -618,7 +642,8 @@ export function CandidateOnboarding() {
 
     publishedRef.current = true;
     try {
-      window.localStorage.removeItem(draftKey);
+      window.localStorage.removeItem(currentDraftKey);
+      window.localStorage.removeItem(DRAFT_PREFIX);
     } catch {
       // ignore
     }
@@ -787,6 +812,61 @@ export function CandidateOnboarding() {
             <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
                 <div className="mx-auto max-w-2xl animate-fade-up">
+                  {draftRestored && (
+                    <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-primary animate-fade-up shadow-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Sparkles className="size-4 shrink-0 text-primary" />
+                        <span className="truncate">Draf tersimpan dipulihkan. Anda melanjutkan dari langkah ke-{step + 1}.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftRestored(false);
+                          try {
+                            window.localStorage.removeItem(currentDraftKey);
+                            window.localStorage.removeItem(DRAFT_PREFIX);
+                          } catch {}
+                          const initial = initialForm(null, careerStatus, user?.email ?? "");
+                          setForm(initial);
+                          formRef.current = initial;
+                          goToStep(0);
+                        }}
+                        className="text-[11px] font-medium underline hover:no-underline text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+                      >
+                        Mulai dari awal
+                      </button>
+                    </div>
+                  )}
+                  {publishError && step === steps.length - 1 && (
+                    <div
+                      role="alert"
+                      className="mb-6 flex flex-col gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-destructive animate-fade-up shadow-xs"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="size-4.5 shrink-0 mt-0.5 text-destructive" />
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-sm text-destructive">Gagal Menyimpan ke Database</p>
+                          <p className="text-muted-foreground leading-relaxed">{publishError}</p>
+                          <p className="text-muted-foreground font-medium">
+                            Draf data Anda tetap tersimpan aman di perangkat ini. Silakan periksa koneksi dan coba lagi.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1 pl-7">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => void finish()}
+                          disabled={isPublishing}
+                          className="text-xs h-8"
+                        >
+                          {isPublishing ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
+                          Coba Publikasikan Lagi
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {stepError && (
                     <div
                       role="alert"
@@ -855,6 +935,10 @@ export function CandidateOnboarding() {
                     <span>Langkah 1 dari {steps.length} (Wajib)</span>
                   </div>
                 )}
+                <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+                  <Check className="size-3.5 text-emerald-500" />
+                  <span>Draf tersimpan otomatis</span>
+                </div>
                 <Button
                   type="submit"
                   size="lg"

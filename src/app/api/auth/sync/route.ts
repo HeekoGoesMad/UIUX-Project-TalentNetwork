@@ -24,18 +24,31 @@ export async function POST(request: Request) {
     if (error || !data.user?.email) return NextResponse.json({ error: "Sesi login tidak valid." }, { status: 401 });
 
     const result = await syncAuthenticatedUser(data.user, payload.data);
-    // Self-heal stale signup metadata so the client never disagrees with the DB role/status.
+    const desiredCompanyName = payload.data?.companyName || (data.user.user_metadata?.companyName as string);
+    const shouldUpdateName =
+      result.role === "recruiter" &&
+      desiredCompanyName &&
+      (!data.user.user_metadata?.name || data.user.user_metadata.name !== desiredCompanyName);
+
     if (
       data.user.user_metadata?.role !== result.role ||
-      data.user.user_metadata?.provisioningStatus !== result.provisioningStatus
+      data.user.user_metadata?.provisioningStatus !== result.provisioningStatus ||
+      shouldUpdateName
     ) {
       const { error: metadataError } = await supabase.auth.updateUser({
         data: {
           role: result.role,
           provisioningStatus: result.provisioningStatus,
+          ...(result.role === "recruiter" && desiredCompanyName
+            ? {
+                name: desiredCompanyName,
+                full_name: desiredCompanyName,
+                companyName: desiredCompanyName,
+              }
+            : {}),
         },
       });
-      if (metadataError) console.error("Gagal memperbarui metadata peran:", metadataError);
+      if (metadataError) console.error("Gagal memperbarui metadata pengguna:", metadataError);
     }
     return NextResponse.json(result);
   } catch (error) {

@@ -1,0 +1,54 @@
+name: Database Migration (Production)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "drizzle/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-migration-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply Pending Migrations to Master Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Offline migration sanity check
+        run: npm run db:check
+
+      - name: Validate database credentials are provided
+        run: |
+          if [ -z "${DATABASE_URL}" ] && [ -z "${DIRECT_URL}" ]; then
+            echo "::error::Neither MASTER_DATABASE_URL nor DATABASE_URL secret is configured for environment 'production'."
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL || secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL || secrets.DIRECT_URL }}
+
+      - name: Apply pending database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.MASTER_DATABASE_URL || secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.MASTER_DIRECT_URL || secrets.DIRECT_URL }}

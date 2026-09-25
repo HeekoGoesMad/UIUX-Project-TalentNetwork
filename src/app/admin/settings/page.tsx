@@ -26,8 +26,8 @@ export default function AdminSettingsPage() {
 
   return (
     <AdminShell
-      title="Pengaturan Sistem & Akun"
-      subtitle="Kelola aksesibilitas antarmuka, saluran notifikasi sistem, profil administrator, dan preferensi operasional konsol."
+      title="Pengaturan Sistem & Konsol"
+      subtitle="Kelola preferensi aksesibilitas antarmuka dan preferensi operasional konsol admin."
     >
       <AdminSettingsView />
     </AdminShell>

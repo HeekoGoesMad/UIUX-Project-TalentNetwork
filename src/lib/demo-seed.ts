@@ -13,6 +13,7 @@ export const DEMO_CANDIDATE_USER: DemoUser = {
   provisioningStatus: "active",
   email: "nadia@proofylink.dev",
   name: "Nadia Putri Rahayu",
+  hasSubmittedOnboarding: true,
 };
 
 export const DEMO_CANDIDATE_CV: CvProfile = {

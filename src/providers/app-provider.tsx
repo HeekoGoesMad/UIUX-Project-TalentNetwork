@@ -61,7 +61,7 @@ type BootstrapTokenAccount = { accountId: string | null; balance: number; update
 type BootstrapNotification = { id: string; type: string; title: string; body: string | null; data: Record<string, unknown>; readAt: string | null; createdAt: string };
 type BootstrapShortlist = { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; items: Array<{ id: string; candidateProfileId: string; status: string; notes: string | null; createdAt: string; candidate?: { name: string | null; role: string | null; location: string | null } }> };
 type BootstrapSection = { type: string; content: Record<string, unknown> };
-type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus; emailResent?: boolean };
+type AuthResult = { error?: string; needsConfirmation?: boolean; role?: UserRole; provisioningStatus?: ProvisioningStatus; emailResent?: boolean; hasSubmittedOnboarding?: boolean };
 
 type Context = AppState & {
   hydrated: boolean;
@@ -177,14 +177,42 @@ function remoteCvProfile(payload: { identity?: { email?: string }; profile?: Boo
 const AppContext = createContext<Context | null>(null);
 
 function parseState(value: string | null): AppState {
-  if (!value) return initial;
+  let permanentScans: string[] = [];
+  try {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("proofylink-permanent-scans-v1") : null;
+    if (stored) {
+      const arr = JSON.parse(stored);
+      if (Array.isArray(arr)) permanentScans = arr;
+    }
+  } catch {}
+
+  if (!value) {
+    return {
+      ...initial,
+      scans: permanentScans.map((id) => ({ candidateId: id, scannedAt: new Date().toISOString() })),
+    };
+  }
   try {
     const parsed = JSON.parse(value) as Partial<AppState>;
+    const scanMap = new Map<string, string>();
+    if (Array.isArray(parsed.scans)) {
+      parsed.scans.forEach((s) => {
+        if (s && s.candidateId) scanMap.set(s.candidateId, s.scannedAt || new Date().toISOString());
+      });
+    }
+    permanentScans.forEach((id) => {
+      if (!scanMap.has(id)) scanMap.set(id, new Date().toISOString());
+    });
+    const combinedScans = Array.from(scanMap.entries()).map(([candidateId, scannedAt]) => ({
+      candidateId,
+      scannedAt,
+    }));
+
     return {
       ...initial,
       ...parsed,
       tokens: typeof parsed.tokens === "number" && parsed.tokens >= 0 ? parsed.tokens : initial.tokens,
-      scans: Array.isArray(parsed.scans) ? parsed.scans : [],
+      scans: combinedScans,
       shortlisted: Array.isArray(parsed.shortlisted) ? parsed.shortlisted : [],
       notes: parsed.notes && typeof parsed.notes === "object" ? parsed.notes : {},
       recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
@@ -328,7 +356,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/app/bootstrap", { cache: "no-store" });
       const payload = (await response.json()) as {
-        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null };
+        identity?: { role?: UserRole; email?: string; name?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string | null; companyName?: string | null; hasSubmittedOnboarding?: boolean };
         profile?: BootstrapProfile | null;
         organization?: { id: string; name: string } | null;
         partnership?: { id: string; name: string } | null;
@@ -338,6 +366,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notifications?: BootstrapNotification[];
         shortlists?: BootstrapShortlist[];
         consentRequests?: Record<string, unknown>[];
+        scannedCandidateIds?: string[];
         error?: string;
       };
 
@@ -361,6 +390,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
           companyName: resolvedCompanyName ?? current?.companyName,
+          hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
         }));
       }
 
@@ -371,29 +401,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const consents = payload.consentRequests ?? [];
       setConsentRequests(consents);
       const remoteProfile = remoteCvProfile(payload);
-      setState((current) => ({
-        ...current,
-        cvProfile: remoteProfile
-          ? {
-              ...remoteProfile,
-              careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
-            }
-          : current.cvProfile,
-        careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
-        tokens: payload.token?.balance ?? 0,
-        screeningTokens: payload.token?.balance ?? 0,
-        shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
-        screeningConsents: Object.fromEntries(consents.flatMap((request) => {
-          const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
-          const status = request.status;
-          if (!candidateId || typeof status !== "string") return [];
-          const consent = CONSENT_STATE_BY_DB_STATUS[status];
-          return consent ? [[candidateId, consent]] : [];
-        })),
-      }));
+
+      const remoteScannedIds: string[] = Array.isArray(payload.scannedCandidateIds)
+        ? (payload.scannedCandidateIds as string[])
+        : [];
+
+      let permanentScans: string[] = [];
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("proofylink-permanent-scans-v1") : null;
+        if (stored) {
+          const arr = JSON.parse(stored);
+          if (Array.isArray(arr)) permanentScans = arr;
+        }
+      } catch {}
+
+      setState((current) => {
+        const allUnlockedIds = new Set([
+          ...current.scans.map((s) => s.candidateId),
+          ...remoteScannedIds,
+          ...permanentScans,
+        ]);
+
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("proofylink-permanent-scans-v1", JSON.stringify(Array.from(allUnlockedIds)));
+          }
+        } catch {}
+
+        const mergedScans = Array.from(allUnlockedIds).map((cid) => {
+          const existingScan = current.scans.find((s) => s.candidateId === cid);
+          return existingScan || { candidateId: cid, scannedAt: new Date().toISOString() };
+        });
+
+        return {
+          ...current,
+          cvProfile: remoteProfile
+            ? {
+                ...remoteProfile,
+                careerAdvisorResults: remoteProfile.careerAdvisorResults ?? current.cvProfile?.careerAdvisorResults,
+              }
+            : current.cvProfile,
+          careerStatus: remoteProfile?.careerStatus ?? current.careerStatus,
+          tokens: payload.token?.balance ?? 0,
+          screeningTokens: payload.token?.balance ?? 0,
+          scans: mergedScans,
+          shortlisted: (payload.shortlists ?? []).flatMap((shortlist) => shortlist.items.filter((item) => item.status === "active").map((item) => item.candidateProfileId)),
+          screeningConsents: Object.fromEntries(consents.flatMap((request) => {
+            const candidateId = typeof request.candidateProfileId === "string" ? request.candidateProfileId : null;
+            const status = request.status;
+            if (!candidateId || typeof status !== "string") return [];
+            const consent = CONSENT_STATE_BY_DB_STATUS[status];
+            return consent ? [[candidateId, consent]] : [];
+          })),
+        };
+      });
       setBootstrapped(true);
     } catch (error) {
-      setState({ ...initial, tokens: 0, screeningTokens: 0 });
+      setState((curr) => ({ ...curr, tokens: 0, screeningTokens: 0 }));
       setProfile(null);
       setTokenAccount({ accountId: null, balance: 0, updatedAt: null });
        setNotifications([]);
@@ -597,7 +661,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus };
+        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus; hasSubmittedOnboarding?: boolean };
         const actualRole = synced.role ?? role;
         const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" ? "active" : "pending");
         dbIdentity.current = { role: actualRole, provisioningStatus };
@@ -616,11 +680,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           email,
           name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
           companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : (actualRole === "partner" ? institutionName : undefined),
+          hasSubmittedOnboarding: synced.hasSubmittedOnboarding,
         });
         isLoggingIn.current = false;
         bootstrapUserKey.current = data.user.id;
         void loadBootstrap();
-        return { role: actualRole, provisioningStatus };
+        return { role: actualRole, provisioningStatus, hasSubmittedOnboarding: synced.hasSubmittedOnboarding };
       } catch (e) {
         isLoggingIn.current = false;
         return { error: e instanceof Error ? e.message : "Gagal masuk." };
@@ -657,6 +722,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       email: `kandidat.baru+${Date.now()}@example.com`,
       role: "candidate",
       provisioningStatus: "active",
+      hasSubmittedOnboarding: false,
     };
     setUser(freshUser);
     setState((current) => ({
@@ -696,15 +762,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
+        const effectiveCompanyName = role === "recruiter" ? (companyName || name) : companyName;
+        const effectiveDisplayName = role === "recruiter" ? effectiveCompanyName : name;
+
         const { data, error } = await withTimeout(
           supabase.auth.signUp({
             email,
             password,
             options: {
               data: {
-                name,
+                name: effectiveDisplayName,
+                full_name: effectiveDisplayName,
                 role,
-                companyName,
+                companyName: effectiveCompanyName,
                 provisioningStatus: role === "candidate" ? "active" : "pending",
               },
             },
@@ -728,16 +798,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           return { error: msg };
         }
-        if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending" };
-        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name, companyName });
-        return { role, provisioningStatus: role === "candidate" ? "active" : "pending" };
+        if (!data.session) return { needsConfirmation: true, role, provisioningStatus: role === "candidate" ? "active" : "pending", hasSubmittedOnboarding: false };
+        setUser({ role, provisioningStatus: role === "candidate" ? "active" : "pending", email, name: effectiveDisplayName || email.split("@")[0], companyName: effectiveCompanyName, hasSubmittedOnboarding: false });
+        return { role, provisioningStatus: role === "candidate" ? "active" : "pending", hasSubmittedOnboarding: false };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Gagal mendaftar." };
       }
     }
     const fallbackStatus: ProvisioningStatus = role === "candidate" ? "active" : "pending";
-    setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName });
-    return { role, provisioningStatus: fallbackStatus };
+    setUser({ name, role, email, provisioningStatus: fallbackStatus, companyName, hasSubmittedOnboarding: false });
+    return { role, provisioningStatus: fallbackStatus, hasSubmittedOnboarding: false };
   };
 
   const logout = async () => {
@@ -809,13 +879,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(activitiesKey, JSON.stringify([newActivity, ...storedActivities]));
     } catch {}
 
+    try {
+      const stored = localStorage.getItem("proofylink-permanent-scans-v1");
+      const list: string[] = stored ? JSON.parse(stored) : [];
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem("proofylink-permanent-scans-v1", JSON.stringify(list));
+      }
+    } catch {}
+
+    if (supabaseConfigured && UUID_RE.test(id)) {
+      void fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateProfileId: id }),
+      }).catch(() => {});
+    }
+
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,
       // ponytail: single-balance mirror in dbMode — scan spends the same server
       // balance as screening, so decrement both; demo keeps separate currencies.
       screeningTokens: supabaseConfigured ? current.screeningTokens - 1 : current.screeningTokens,
-      scans: [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
+      scans: current.scans.some((s) => s.candidateId === id)
+        ? current.scans
+        : [...current.scans, { candidateId: id, scannedAt: new Date().toISOString() }],
     }));
     toast.success("Profil berhasil dibuka", { description: "1 token telah digunakan." });
     return true;
@@ -946,7 +1035,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString(),
     };
     if (saved.fullName?.trim()) {
-      setUser((current) => current ? { ...current, name: saved.fullName } : null);
+      setUser((current) => current ? { ...current, name: saved.fullName, hasSubmittedOnboarding: true } : null);
     }
     setProfile((current) => current ? {
       ...current,
@@ -965,7 +1054,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         : current.partnerVerifications,
     }));
     if (supabaseConfigured) {
-      try { await syncProfile(saved); } catch (error) { toast.error("Profil tersimpan sementara", { description: error instanceof Error ? error.message : "Database belum diperbarui." }); return; }
+      try {
+        await syncProfile(saved);
+      } catch (error) {
+        toast.error("Profil tersimpan sementara", { description: error instanceof Error ? error.message : "Database belum diperbarui." });
+        throw error;
+      }
     }
     toast.success("Profil CV tersimpan", {
       description: campusVerification ? `Terhubung ke Career Center ${campusVerification.institution}` : undefined,

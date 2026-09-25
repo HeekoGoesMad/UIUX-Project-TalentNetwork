@@ -17,8 +17,9 @@ export type ImageCropDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   imageSrc: string | null;
-  aspectRatio: number; // 1 for avatar (square), 3 for banner (wide)
+  aspectRatio: number; // 1 for avatar/logo (square), 3 for banner (wide)
   cropShape?: "round" | "rect";
+  targetWidth?: number;
   title?: string;
   description?: string;
   onCropComplete: (blob: Blob) => Promise<void> | void;
@@ -28,6 +29,7 @@ function ImageCropContent({
   imageSrc,
   aspectRatio,
   cropShape = "round",
+  targetWidth,
   title,
   description,
   onClose,
@@ -36,6 +38,7 @@ function ImageCropContent({
   imageSrc: string;
   aspectRatio: number;
   cropShape?: "round" | "rect";
+  targetWidth?: number;
   title: string;
   description: string;
   onClose: () => void;
@@ -122,7 +125,8 @@ function ImageCropContent({
         const naturalH = img.naturalHeight || 1;
 
         // Target canvas resolution (high-DPI, crisp export)
-        const targetW = cropShape === "round" ? 512 : 1440;
+        const targetW =
+          targetWidth ?? (cropShape === "round" || aspectRatio === 1 ? 512 : 1440);
         const targetH = Math.round(targetW / aspectRatio);
 
         const canvas = document.createElement("canvas");
@@ -207,6 +211,10 @@ function ImageCropContent({
           {cropShape === "round" ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="size-56 sm:size-64 rounded-full border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+            </div>
+          ) : aspectRatio === 1 ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="size-56 sm:size-64 rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
             </div>
           ) : (
             <div className="pointer-events-none absolute inset-0 border-2 border-white/80 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.3)]" />
@@ -302,6 +310,7 @@ export function ImageCropDialog({
   imageSrc,
   aspectRatio,
   cropShape = "round",
+  targetWidth,
   title = "Sesuaikan Gambar",
   description = "Geser dan sesuaikan zoom untuk mengatur posisi tampilan.",
   onCropComplete,
@@ -315,6 +324,7 @@ export function ImageCropDialog({
             imageSrc={imageSrc}
             aspectRatio={aspectRatio}
             cropShape={cropShape}
+            targetWidth={targetWidth}
             title={title}
             description={description}
             onClose={() => onOpenChange(false)}

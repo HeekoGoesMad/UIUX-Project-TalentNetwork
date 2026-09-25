@@ -54,7 +54,12 @@ export function checkPasswordRequirements(password: string): PasswordRequirement
 
 export function isPasswordValid(password: string): boolean {
   const req = checkPasswordRequirements(password);
-  return req.hasMinLength && req.hasUppercase && req.hasLowercase && req.hasNumber;
+  return (
+    req.hasMinLength &&
+    req.hasUppercase &&
+    req.hasLowercase &&
+    req.hasNumber
+  );
 }
 
 export interface FieldErrors {
@@ -167,6 +172,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentModalStep, setConsentModalStep] = useState<1 | 2>(1);
   const [consentAgreed, setConsentAgreed] = useState(false);
   const [pendingGoogleAuth, setPendingGoogleAuth] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{
@@ -268,7 +274,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (newFieldErrors.name) document.getElementById("full-name")?.focus();
       else if (newFieldErrors.email) document.getElementById("email")?.focus();
       else if (newFieldErrors.password) document.getElementById("password")?.focus();
-      else if (newFieldErrors.terms) setConsentModalOpen(true);
+      else if (newFieldErrors.terms) {
+        setConsentModalStep(1);
+        setConsentModalOpen(true);
+      }
       return;
     }
 
@@ -310,7 +319,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       result.role ?? role,
       getNext(),
       false,
-      result.provisioningStatus
+      result.provisioningStatus,
+      result.hasSubmittedOnboarding
     );
     window.location.href = dest;
   };
@@ -328,6 +338,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
 
     setPendingGoogleAuth(true);
+    setConsentModalStep(1);
     setConsentModalOpen(true);
   };
 
@@ -338,8 +349,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     try {
       const next = getNext();
       const redirectUrl = new URL("/auth/callback", window.location.origin);
-      if (next && next.startsWith("/") && !next.startsWith("//")) redirectUrl.searchParams.set("next", next);
+      const effectiveNext = next || (mode === "register" ? registrationDest(role) : null);
+      if (effectiveNext && effectiveNext.startsWith("/") && !effectiveNext.startsWith("//")) {
+        redirectUrl.searchParams.set("next", effectiveNext);
+      }
       redirectUrl.searchParams.set("role", role);
+      if (mode === "register") {
+        redirectUrl.searchParams.set("mode", "register");
+      }
 
       const { error } = await createClient().auth.signInWithOAuth({
         provider: "google",
@@ -552,6 +569,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           </p>
         )}
 
+        {mode === "login" && (
+          <div className="flex justify-end mt-2">
+            <Link
+              href={`/reset-password${emailValue.trim() ? `?email=${encodeURIComponent(emailValue.trim())}` : ""}${role ? `${emailValue.trim() ? "&" : "?"}role=${role}` : ""}`}
+              className="text-xs font-medium text-[#7C3AED] hover:text-[#6D28D9] hover:underline transition-colors"
+            >
+              Lupa Kata Sandi?
+            </Link>
+          </div>
+        )}
+
         {mode === "register" && (
           <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-600 transition-all">
             <div className="flex items-center justify-between">
@@ -593,6 +621,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               onChange={(e) => {
                 if (fieldErrors.terms) setFieldErrors((prev) => ({ ...prev, terms: undefined }));
                 if (!consentAgreed) {
+                  setConsentModalStep(1);
                   setConsentModalOpen(true);
                 } else {
                   setConsentAgreed(e.target.checked);
@@ -606,17 +635,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
+                  setConsentModalStep(1);
                   setConsentModalOpen(true);
                 }}
                 className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
               >
-                Syarat &amp; Ketentuan Akses Data
+                Ketentuan Penggunaan Layanan
               </button>{" "}
               serta{" "}
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
+                  setConsentModalStep(2);
                   setConsentModalOpen(true);
                 }}
                 className="font-medium text-[#7C3AED] hover:underline underline-offset-2 cursor-pointer"
@@ -629,7 +660,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {consentAgreed && (
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 pl-6.5">
               <CheckCircle2 className="size-3.5 shrink-0" />
-              <span>Ketentuan &amp; akses data telah disetujui</span>
+              <span>
+                Ketentuan penggunaan layanan &amp; privasi telah disetujui
+              </span>
             </div>
           )}
           {fieldErrors.terms && (
@@ -805,7 +838,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   role: pendingRegistration.role,
-                  name: pendingRegistration.name || pendingRegistration.email.split("@")[0],
+                  name: pendingRegistration.companyName || pendingRegistration.name || undefined,
                   companyName: pendingRegistration.companyName || undefined,
                 }),
               }).catch(() => null);
@@ -824,6 +857,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <ConsentModal
         isOpen={consentModalOpen}
+        initialStep={consentModalStep}
+        role={role}
         actionTitle={pendingGoogleAuth ? "Daftar dengan Google" : undefined}
         onClose={() => {
           setConsentModalOpen(false);
@@ -845,10 +880,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
 const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus) {
+function destination(role: UserRole, next: string | null, isRegistration = false, provisioningStatus?: ProvisioningStatus, hasSubmittedOnboarding?: boolean) {
   if (role === "candidate") {
+    // If onboarding is completed, never redirect back to onboarding
+    if (hasSubmittedOnboarding === true) {
+      if (next && !next.startsWith("/candidate/onboarding") && (next.startsWith("/candidate") || next.startsWith("/jobs") || ["/profile", "/messages"].includes(next))) {
+        return next;
+      }
+      return "/candidate";
+    }
+    // If registering or onboarding not submitted yet, route to onboarding
+    if (isRegistration || hasSubmittedOnboarding === false) return "/candidate/onboarding";
     if (next?.startsWith("/candidate") || next?.startsWith("/jobs") || (next !== null && ["/profile", "/messages"].includes(next))) return next;
-    return isRegistration ? "/candidate/onboarding" : "/candidate";
+    return "/candidate";
   }
   if (role === "partner") {
     if (isRegistration) return "/partner/onboarding";
@@ -857,7 +901,7 @@ function destination(role: UserRole, next: string | null, isRegistration = false
     return "/partner";
   }
   if (role === "recruiter") {
-    if (isRegistration) return "/recruiter/onboarding";
+    if (isRegistration || hasSubmittedOnboarding === false) return "/recruiter/onboarding";
     if (provisioningStatus !== "active") return "/recruiter/pending";
     if (next?.startsWith("/dashboard") || next?.startsWith("/search") || next?.startsWith("/shortlist") || next?.startsWith("/talent") || next?.startsWith("/recruiter") || next === "/pricing") return next;
     return "/dashboard";

@@ -19,10 +19,34 @@ Concise operational procedures for ProofyLink Talent Network (deployed on Vercel
 
 Schema changes are forward-only, applied via generated SQL — **never `drizzle push`**.
 
-1. Edit `src/db/schema.ts`, then run `npm run db:generate` locally to generate migration SQL into `drizzle/`.
-2. Review the generated SQL in `drizzle/` and commit it.
-3. Apply with `npm run db:migrate` against **staging first**, verify, then apply to the **production DB** — always **before** promoting the code deploy that depends on it.
-4. Validate with `npm run db:check`.
+### Developer Workflow
+
+```bash
+# 1. Modify schema in src/db/schema.ts
+
+# 2. Generate migration SQL and snapshot metadata
+npm run db:generate
+
+# 3. Verify snapshot integrity offline
+npm run db:check
+
+# 4. Test against local / development database
+npm run db:migrate
+```
+
+Then commit the schema and migration artifacts together:
+```text
+src/db/schema.ts
+drizzle/<new migration>.sql
+drizzle/meta/_journal.json
+drizzle/meta/<new snapshot>.json
+```
+
+### Production Automation
+
+Merging into `master` triggers `.github/workflows/database-migration.yml` whenever `drizzle/**` changes. GitHub Actions runs:
+1. `npm run db:check` (validates migration snapshot consistency)
+2. `npm run db:migrate` (applies pending migrations to the master/production database using secret `MASTER_DATABASE_URL` under the `production` environment)
 
 ## Rollback
 

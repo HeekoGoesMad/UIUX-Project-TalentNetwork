@@ -1,5 +1,6 @@
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 export const MAX_BANNER_BYTES = 8 * 1024 * 1024;
+export const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
 export const ALLOWED_IMAGE_MIME = [
   "image/jpeg",
@@ -8,7 +9,15 @@ export const ALLOWED_IMAGE_MIME = [
   "image/webp",
 ] as const;
 
+export const ALLOWED_LOGO_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/svg+xml",
+] as const;
+
 export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME)[number];
+export type AllowedLogoMime = (typeof ALLOWED_LOGO_MIME)[number];
 
 export function detectImageMime(bytes: Uint8Array): AllowedImageMime | null {
   if (
@@ -81,6 +90,52 @@ export function validateProfileImage(input: {
   return { ok: true, mime, sizeBytes: input.bytes.length };
 }
 
+export function isSvgBytes(bytes: Uint8Array): boolean {
+  if (bytes.length < 4) return false;
+  try {
+    const head = new TextDecoder().decode(bytes.slice(0, Math.min(bytes.length, 512))).trimStart();
+    return head.startsWith("<svg") || (head.startsWith("<?xml") && head.includes("<svg"));
+  } catch {
+    return false;
+  }
+}
+
+export function detectLogoMime(bytes: Uint8Array): AllowedLogoMime | null {
+  const raster = detectImageMime(bytes);
+  if (raster && raster !== "image/gif") {
+    return raster;
+  }
+  if (isSvgBytes(bytes)) {
+    return "image/svg+xml";
+  }
+  return null;
+}
+
+export function validateLogoImage(input: {
+  bytes: Uint8Array;
+}):
+  | { ok: true; mime: AllowedLogoMime; sizeBytes: number }
+  | { ok: false; error: string; status: 413 | 415 } {
+  if (input.bytes.length > MAX_LOGO_BYTES) {
+    return {
+      ok: false,
+      error: "Ukuran berkas logo maksimal 5 MB.",
+      status: 413,
+    };
+  }
+
+  const mime = detectLogoMime(input.bytes);
+  if (!mime) {
+    return {
+      ok: false,
+      error: "Format berkas logo tidak didukung. Gunakan PNG, JPEG, WebP, atau SVG.",
+      status: 415,
+    };
+  }
+
+  return { ok: true, mime, sizeBytes: input.bytes.length };
+}
+
 export function sanitizeMediaName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
   const clean = base.replace(/[\x00-\x1f\x7f]/g, "").trim();
@@ -124,8 +179,12 @@ export function extractStorageKey(
     return key && key.length > 0 ? decodeURIComponent(key) : null;
   }
 
-  // Check if it starts directly with folder prefixes avatars/ or banners/
-  if (trimmed.startsWith("avatars/") || trimmed.startsWith("banners/")) {
+  // Check if it starts directly with folder prefixes avatars/, banners/, or logos/
+  if (
+    trimmed.startsWith("avatars/") ||
+    trimmed.startsWith("banners/") ||
+    trimmed.startsWith("logos/")
+  ) {
     const key = trimmed.split("?")[0]?.trim();
     return key && key.length > 0 ? decodeURIComponent(key) : null;
   }

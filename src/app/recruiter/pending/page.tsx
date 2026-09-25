@@ -46,9 +46,13 @@ export default function RecruiterPendingPage() {
       const res = await fetch("/api/app/bootstrap", { cache: "no-store" });
       if (res.ok) {
         const data = (await res.json()) as {
-          identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string };
-          organization?: { name?: string };
+          identity?: { role?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string; hasSubmittedOnboarding?: boolean };
+          organization?: { name?: string; nibDocumentUrl?: string | null; npwpDocumentUrl?: string | null };
         };
+        if (data.identity?.role === "recruiter" && data.identity?.hasSubmittedOnboarding === false) {
+          router.replace("/recruiter/onboarding");
+          return;
+        }
         if (data.organization?.name) {
           setLocalCompanyName(data.organization.name);
         } else if (data.identity?.companyName) {
@@ -98,8 +102,13 @@ export default function RecruiterPendingPage() {
 
       fetch("/api/app/bootstrap", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { identity?: { provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string }; organization?: { name?: string } } | null) => {
+        .then((data: { identity?: { role?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string; hasSubmittedOnboarding?: boolean }; organization?: { name?: string } } | null) => {
           if (!active) return;
+          if (data?.identity?.role === "recruiter" && data?.identity?.hasSubmittedOnboarding === false) {
+            active = false;
+            router.replace("/recruiter/onboarding");
+            return;
+          }
           if (data?.organization?.name) {
             setLocalCompanyName(data.organization.name);
           } else if (data?.identity?.companyName) {
@@ -288,7 +297,7 @@ export default function RecruiterPendingPage() {
 
                   <div className="pt-2 flex flex-wrap items-center gap-3">
                     <Button
-                      onClick={() => router.push("/recruiter/onboarding")}
+                      onClick={() => router.push("/recruiter/onboarding?step=2")}
                       className="bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs h-9 shadow-xs"
                     >
                       Perbaiki &amp; Unggah Ulang Dokumen <ArrowRight className="size-3.5 ml-1.5" />

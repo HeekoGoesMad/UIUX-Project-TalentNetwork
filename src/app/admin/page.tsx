@@ -337,10 +337,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* ─── 3. Asymmetric Workstation (60% Verification Triage + 40% Live Audit Feed) ─── */}
-        <div className="grid gap-6 lg:grid-cols-12 items-start">
-          {/* Left Column (7 cols): Antrean Verifikasi Perusahaan */}
-          <Card className="lg:col-span-7 border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
+        {/* ─── 3. Operational Workstation (Stacked Vertically) ─── */}
+        <div className="space-y-6">
+          {/* Antrean Verifikasi Perusahaan */}
+          <Card className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-slate-50/50">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-bold text-slate-900">
@@ -418,8 +418,8 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Right Column (5 cols): Jejak Audit Real-time */}
-          <Card className="lg:col-span-5 border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
+          {/* Jejak Audit Real-time */}
+          <Card className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-slate-50/50">
               <CardTitle className="text-sm font-bold text-slate-900">
                 Jejak Audit Real-time
@@ -432,9 +432,9 @@ export default function AdminDashboardPage() {
               </Link>
             </CardHeader>
 
-            <CardContent className="p-4">
+            <CardContent className="p-0">
               {data?.recentActivities && data.recentActivities.length > 0 ? (
-                <div className="space-y-4">
+                <div className="divide-y divide-slate-100">
                   {data.recentActivities.slice(0, 5).map((log) => {
                     const meta = AUDIT_ACTION_MAP[log.action] || {
                       label: log.action,
@@ -443,7 +443,10 @@ export default function AdminDashboardPage() {
                     };
 
                     return (
-                      <div key={log.id} className="flex items-start gap-3">
+                      <div
+                        key={log.id}
+                        className="flex items-start gap-3 p-4 hover:bg-slate-50/60 transition-colors"
+                      >
                         <div
                           className={cn(
                             "size-2 rounded-full mt-1.5 shrink-0",

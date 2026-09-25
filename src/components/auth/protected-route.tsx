@@ -19,6 +19,12 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
       return;
     }
     if (user.role === "recruiter" && user.provisioningStatus !== "active") {
+      if (user.hasSubmittedOnboarding === false) {
+        if (pathname !== "/recruiter/onboarding") {
+          router.replace("/recruiter/onboarding");
+        }
+        return;
+      }
       // Allow recruiter to access onboarding to fill company data, or stay at pending page
       if (pathname !== "/recruiter/pending" && pathname !== "/recruiter/onboarding") {
         router.replace("/recruiter/pending");
@@ -32,12 +38,17 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
       }
       return;
     }
-    if (user.role === "candidate" && (!cvProfile || !cvProfile.fullName?.trim())) {
-      // Require candidate to complete minimum onboarding profile before accessing workspace
-      if (pathname !== "/candidate/onboarding") {
-        router.replace("/candidate/onboarding");
+    if (user.role === "candidate") {
+      if (user.hasSubmittedOnboarding === false) {
+        if (pathname !== "/candidate/onboarding") {
+          router.replace("/candidate/onboarding");
+        }
+        return;
       }
-      return;
+      if (user.hasSubmittedOnboarding === true && pathname === "/candidate/onboarding") {
+        router.replace("/candidate");
+        return;
+      }
     }
     if (user.role !== role) {
       const target = user.role === "candidate" ? "/candidate" : user.role === "partner" ? "/partner" : "/dashboard";
@@ -66,7 +77,8 @@ export function ProtectedRoute({ children, role }: { children: ReactNode; role: 
     user.role !== role ||
     (role === "recruiter" && user.provisioningStatus !== "active" && pathname !== "/recruiter/onboarding") ||
     (role === "partner" && user.provisioningStatus !== "active" && pathname !== "/partner/onboarding") ||
-    (role === "candidate" && (!cvProfile || !cvProfile.fullName?.trim()) && pathname !== "/candidate/onboarding")
+    (role === "candidate" && user.hasSubmittedOnboarding === false && pathname !== "/candidate/onboarding") ||
+    (role === "candidate" && user.hasSubmittedOnboarding === true && pathname === "/candidate/onboarding")
   ) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center">

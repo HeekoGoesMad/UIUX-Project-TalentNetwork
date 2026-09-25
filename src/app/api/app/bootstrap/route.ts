@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
@@ -76,6 +76,7 @@ export async function GET() {
       consentResult,
       screeningSummaryRaw,
       token,
+      scannedCandidateIds,
     ] = await Promise.all([
       candidateProfile
         ? current.db.select().from(schema.candidateProfileSections).where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile.id))
@@ -102,6 +103,34 @@ export async function GET() {
       activeOrgId
         ? getRecruiterTokenAccount(current.db, activeOrgId)
         : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
+      activeOrgId
+        ? Promise.all([
+            current.db
+              .select({ candidateProfileId: schema.screeningRuns.candidateProfileId })
+              .from(schema.screeningRuns)
+              .where(
+                and(
+                  eq(schema.screeningRuns.organizationId, activeOrgId),
+                  or(
+                    eq(schema.screeningRuns.status, "completed"),
+                    eq(schema.screeningRuns.status, "approved")
+                  )
+                )
+              ),
+            current.db
+              .select({ candidateProfileId: schema.applications.candidateProfileId })
+              .from(schema.applications)
+              .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
+              .where(eq(schema.jobs.organizationId, activeOrgId)),
+          ]).then(([runs, apps]) =>
+            Array.from(
+              new Set([
+                ...runs.map((r) => r.candidateProfileId).filter(Boolean),
+                ...apps.map((a) => a.candidateProfileId).filter(Boolean),
+              ])
+            )
+          )
+        : Promise.resolve([]),
     ]);
 
     const organization = organizationFromMember ?? organizationByCreator ?? null;
@@ -159,6 +188,11 @@ export async function GET() {
         provisioningStatus,
         provisioningReason,
         companyName,
+        hasSubmittedOnboarding: isRecruiter
+          ? Boolean(organization?.nibDocumentUrl && organization?.npwpDocumentUrl)
+          : isCandidate
+          ? Boolean(candidateProfile && candidateProfile.isPublished)
+          : true,
       },
       organization,
       partnership,
@@ -174,6 +208,7 @@ export async function GET() {
         pending: Number(screeningSummaryRaw?.pending ?? 0),
         completed: Number(screeningSummaryRaw?.completed ?? 0),
       },
+      scannedCandidateIds: scannedCandidateIds || [],
     });
   } catch (err) {
     console.error("Error in /api/app/bootstrap:", err);

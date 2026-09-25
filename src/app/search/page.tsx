@@ -361,7 +361,28 @@ function SearchPageContent() {
   const urlTimerRef = useRef<number | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const unlockedSet = useMemo(() => new Set(scans.map((s) => s.candidateId)), [scans]);
+  const unlockedSet = useMemo(() => {
+    const set = new Set(scans.map((s) => s.candidateId));
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("proofylink-permanent-scans-v1");
+        if (stored) {
+          const arr = JSON.parse(stored);
+          if (Array.isArray(arr)) arr.forEach((id: string) => set.add(id));
+        }
+      } catch {}
+      try {
+        const ops = localStorage.getItem("proofylink-demo-recruiter-operations");
+        if (ops) {
+          const parsed = JSON.parse(ops);
+          if (parsed && Array.isArray(parsed.candidates)) {
+            parsed.candidates.forEach((c: { id: string }) => set.add(c.id));
+          }
+        }
+      } catch {}
+    }
+    return set;
+  }, [scans]);
   const shortlistedSet = useMemo(() => new Set(shortlisted), [shortlisted]);
 
   useEffect(() => {
