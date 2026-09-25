@@ -387,36 +387,97 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (isPopupAvailable && popup && data?.url) {
         popup.location.href = data.url;
 
-        // Listen for postMessage from the popup
-        const handleMessage = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
-          const payload = event.data;
-          if (!payload || typeof payload !== "object") return;
+        let handled = false;
+        let channel: BroadcastChannel | null = null;
 
-          if (payload.type === "GOOGLE_AUTH_SUCCESS") {
+        const handleAuthPayload = (payload: unknown) => {
+          if (!payload || typeof payload !== "object" || handled) return;
+          const authData = payload as {
+            type?: string;
+            destination?: string;
+            role?: UserRole;
+            error?: string;
+          };
+
+          if (authData.type === "GOOGLE_AUTH_SUCCESS") {
+            handled = true;
             cleanup();
-            const target = typeof payload.destination === "string" ? payload.destination : destination(payload.role ?? role, null);
+            const target =
+              typeof authData.destination === "string"
+                ? authData.destination
+                : destination(authData.role ?? role, null);
             window.location.href = target;
-          } else if (payload.type === "GOOGLE_AUTH_ERROR") {
+          } else if (authData.type === "GOOGLE_AUTH_ERROR") {
+            handled = true;
             cleanup();
             setGoogleLoading(false);
-            setErrorMessage(typeof payload.error === "string" ? payload.error : "Gagal masuk dengan Google.");
+            setErrorMessage(typeof authData.error === "string" ? authData.error : "Gagal masuk dengan Google.");
           }
         };
 
-        const pollTimer = setInterval(() => {
+        const handleMessage = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          handleAuthPayload(event.data);
+        };
+
+        const handleStorage = (event: StorageEvent) => {
+          if (event.key === "proofylink_oauth_event" && event.newValue) {
+            try {
+              handleAuthPayload(JSON.parse(event.newValue));
+            } catch {}
+          }
+        };
+
+        try {
+          if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+            channel = new BroadcastChannel("proofylink_oauth_channel");
+            channel.onmessage = (event) => handleAuthPayload(event.data);
+          }
+        } catch {}
+
+        window.addEventListener("message", handleMessage);
+        window.addEventListener("storage", handleStorage);
+
+        const pollTimer = setInterval(async () => {
           if (popup && popup.closed) {
             cleanup();
-            setGoogleLoading(false);
+            if (!handled) {
+              // Fail-safe check: Popup closed, verify if user session was established
+              try {
+                const supabase = createClient();
+                const { data: userData } = await supabase.auth.getUser();
+                if (userData.user) {
+                  handled = true;
+                  const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
+                  const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
+                  const userRole = (bootstrapData?.user?.role as UserRole) || role;
+                  const isNewOrNoPassword = !bootstrapData?.user?.hasPassword;
+                  const dest = destination(userRole, getNext(), false, bootstrapData?.user?.recruiterProvisioningStatus);
+                  const target = isNewOrNoPassword
+                    ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+                    : dest;
+                  window.location.href = target;
+                  return;
+                }
+              } catch {}
+              setGoogleLoading(false);
+            }
           }
         }, 500);
 
         const cleanup = () => {
           clearInterval(pollTimer);
           window.removeEventListener("message", handleMessage);
+          window.removeEventListener("storage", handleStorage);
+          if (channel) {
+            try {
+              channel.close();
+            } catch {}
+          }
+          try {
+            localStorage.removeItem("proofylink_oauth_event");
+          } catch {}
         };
-
-        window.addEventListener("message", handleMessage);
       }
     } catch (error) {
       if (popup && !popup.closed) popup.close();
@@ -797,6 +858,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {googleLoading ? <Loader2 className="size-4.5 animate-spin text-slate-500" /> : <GoogleLogo className="size-4.5 shrink-0" />}
             <span>{googleLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google"}</span>
           </Button>
+          {mode === "login" && (
+            <p className="text-[11px] text-center text-slate-500 leading-relaxed px-1">
+              Belum memiliki akun? Melanjutkan dengan Google akan otomatis membuat akun baru Anda sesuai peran yang dipilih.
+            </p>
+          )}
         </>
       )}
 

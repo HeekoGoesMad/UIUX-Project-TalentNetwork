@@ -87,7 +87,18 @@ export async function syncAuthenticatedUser(
     // (e.g. Google OAuth name should never overwrite a name the user chose during onboarding)
     const [existingProfile] = await tx.select({
       displayName: schema.profiles.displayName,
+      avatarUrl: schema.profiles.avatarUrl,
     }).from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
+
+    const googleName =
+      (typeof authUser.user_metadata?.full_name === "string" && authUser.user_metadata.full_name.trim()) ||
+      (typeof authUser.user_metadata?.name === "string" && authUser.user_metadata.name.trim()) ||
+      undefined;
+
+    const googleAvatar =
+      (typeof authUser.user_metadata?.avatar_url === "string" && authUser.user_metadata.avatar_url.trim()) ||
+      (typeof authUser.user_metadata?.picture === "string" && authUser.user_metadata.picture.trim()) ||
+      undefined;
 
     const isRecruiterCompanyInput = role === "recruiter" && Boolean(input.companyName);
     const providedName = isRecruiterCompanyInput ? undefined : input.name?.trim();
@@ -95,20 +106,23 @@ export async function syncAuthenticatedUser(
       existingProfile?.displayName?.trim() && existingProfile.displayName !== input.companyName
         ? existingProfile.displayName
         : providedName ||
-          (role === "recruiter"
+          (googleName && googleName !== input.companyName
+            ? googleName
+            : role === "recruiter"
             ? null
-            : typeof authUser.user_metadata?.name === "string" &&
-              authUser.user_metadata.name !== input.companyName
-            ? authUser.user_metadata.name
             : authEmail.split("@")[0]);
+
+    const resolvedAvatar = existingProfile?.avatarUrl || googleAvatar || null;
 
     await tx.insert(schema.profiles).values({
       userId: user.id,
       displayName: resolvedName,
+      avatarUrl: resolvedAvatar,
     }).onConflictDoUpdate({
       target: schema.profiles.userId,
       set: {
         ...(resolvedName !== undefined ? { displayName: resolvedName } : {}),
+        ...(resolvedAvatar ? { avatarUrl: resolvedAvatar } : {}),
         updatedAt: new Date(),
       },
     });
@@ -144,6 +158,22 @@ export async function syncAuthenticatedUser(
             name: input.companyName?.trim() || `${input.name?.trim() || authEmail.split("@")[0]} Recruiter`,
             slug,
             createdBy: user.id,
+          }).onConflictDoUpdate({
+            target: schema.organizations.slug,
+            set: { updatedAt: new Date() },
+          }).returning({ id: schema.organizations.id });
+          organizationId = organization.id;
+          await tx.insert(schema.organizationMembers).values({ organizationId: organization.id, userId: user.id, role: "owner" }).onConflictDoNothing();
+          await tx.insert(schema.tokenAccounts).values({ organizationId: organization.id }).onConflictDoNothing();
+        } else {
+          // Provision placeholder organization for new recruiter registering via Google without company name
+          const defaultOrgName = `${resolvedName || authEmail.split("@")[0]} (Organization)`;
+          const slug = `org-${authUser.id}`;
+          const [organization] = await tx.insert(schema.organizations).values({
+            name: defaultOrgName,
+            slug,
+            createdBy: user.id,
+            verificationStatus: "pending",
           }).onConflictDoUpdate({
             target: schema.organizations.slug,
             set: { updatedAt: new Date() },

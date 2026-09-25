@@ -56,15 +56,49 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
         role: ${JSON.stringify(data.role)},
         destination: ${JSON.stringify(data.destination)}
       };
+
+      var delivered = false;
+
+      // 1. Direct window.opener postMessage
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage(payload, window.location.origin);
-          setTimeout(function() { window.close(); }, 150);
-          return;
+          delivered = true;
         } catch (e) {
           console.error("postMessage error:", e);
         }
       }
+
+      // 2. BroadcastChannel cross-window sync
+      try {
+        if ("BroadcastChannel" in window) {
+          var channel = new BroadcastChannel("proofylink_oauth_channel");
+          channel.postMessage(payload);
+          channel.close();
+          delivered = true;
+        }
+      } catch (e) {
+        console.error("BroadcastChannel error:", e);
+      }
+
+      // 3. LocalStorage event cross-tab sync fallback
+      try {
+        localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
+        delivered = true;
+      } catch (e) {}
+
+      // If opener is connected, close immediately
+      if (window.opener && !window.opener.closed) {
+        setTimeout(function() { window.close(); }, 150);
+        return;
+      }
+
+      // If delivered via channel or storage, close window
+      if (delivered) {
+        setTimeout(function() { window.close(); }, 300);
+      }
+
+      // Fallback: If not opened as popup or cannot close, redirect directly
       window.location.replace(${JSON.stringify(data.destination)});
     })();
   </script>
@@ -91,13 +125,46 @@ function popupErrorResponse(errorMessage: string, fallbackUrl: string) {
   <script>
     (function() {
       var errorMsg = ${JSON.stringify(errorMessage)};
+      var payload = {
+        type: "GOOGLE_AUTH_ERROR",
+        error: errorMsg
+      };
+
+      var delivered = false;
+
+      // 1. Direct window.opener postMessage
       if (window.opener && !window.opener.closed) {
         try {
-          window.opener.postMessage({ type: "GOOGLE_AUTH_ERROR", error: errorMsg }, window.location.origin);
-          setTimeout(function() { window.close(); }, 150);
-          return;
+          window.opener.postMessage(payload, window.location.origin);
+          delivered = true;
         } catch (e) {}
       }
+
+      // 2. BroadcastChannel
+      try {
+        if ("BroadcastChannel" in window) {
+          var channel = new BroadcastChannel("proofylink_oauth_channel");
+          channel.postMessage(payload);
+          channel.close();
+          delivered = true;
+        }
+      } catch (e) {}
+
+      // 3. LocalStorage
+      try {
+        localStorage.setItem("proofylink_oauth_event", JSON.stringify(Object.assign({}, payload, { timestamp: Date.now() })));
+        delivered = true;
+      } catch (e) {}
+
+      if (window.opener && !window.opener.closed) {
+        setTimeout(function() { window.close(); }, 150);
+        return;
+      }
+
+      if (delivered) {
+        setTimeout(function() { window.close(); }, 300);
+      }
+
       window.location.replace(${JSON.stringify(fallbackUrl)});
     })();
   </script>
@@ -145,7 +212,10 @@ export async function GET(request: Request) {
 
     const metadataRole = data.user.user_metadata?.role;
     const result = await syncAuthenticatedUser(data.user, {
-      name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : undefined,
+      name:
+        (typeof data.user.user_metadata?.full_name === "string" && data.user.user_metadata.full_name.trim()) ||
+        (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
+        undefined,
       companyName: typeof data.user.user_metadata?.companyName === "string" ? data.user.user_metadata.companyName : undefined,
       role: requestedRole === "candidate" || requestedRole === "recruiter" || requestedRole === "partner" ? requestedRole : undefined,
     });
