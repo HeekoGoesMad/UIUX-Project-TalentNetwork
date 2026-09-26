@@ -1258,20 +1258,10 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                   {arrangementLabels[job.workArrangement]}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
                 <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
                   {statusLabels[job.status]}
                 </span>
-                <Button asChild variant="outline">
-                  <Link href={`/recruiter/jobs/${job.id}/edit`}>
-                    <Pencil className="size-4 mr-1.5" /> Edit Lowongan
-                  </Link>
-                </Button>
-                <Button asChild>
-                  <Link href={`/recruiter/jobs/${job.id}/pipeline`}>
-                    <Workflow className="size-4 mr-1.5" /> Pipeline Pelamar
-                  </Link>
-                </Button>
               </div>
             </div>
 
