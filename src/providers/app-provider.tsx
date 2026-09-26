@@ -88,7 +88,7 @@ type Context = AppState & {
   loginAsFreshCandidate: () => void;
   loginAsDemoPartner: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
   scan: (id: string) => boolean;
   toggleShortlist: (id: string) => void;
   saveNote: (id: string, note: string) => void;
@@ -811,7 +811,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { role, provisioningStatus: fallbackStatus, hasSubmittedOnboarding: false };
   };
 
-  const logout = async () => {
+  const logout = async (redirectPath?: string) => {
     if (supabaseConfigured) {
       const supabase = createClient();
       try { await supabase.auth.signOut(); } catch {}
@@ -831,6 +831,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         root.removeAttribute("data-relaxed-spacing");
       }
     } catch {}
+    if (redirectPath && typeof window !== "undefined") {
+      window.location.href = redirectPath;
+    }
   };
 
   const scan = (id: string) => {
@@ -1321,7 +1324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loginAsFreshCandidate: () => actionsRef.current.loginAsFreshCandidate(),
     loginAsDemoPartner: () => actionsRef.current.loginAsDemoPartner(),
     register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => actionsRef.current.register(name, role, email, password, companyName),
-    logout: () => actionsRef.current.logout(),
+    logout: (redirectPath?: string) => actionsRef.current.logout(redirectPath),
     scan: (id: string) => actionsRef.current.scan(id),
     toggleShortlist: (id: string) => actionsRef.current.toggleShortlist(id),
     saveNote: (id: string, note: string) => actionsRef.current.saveNote(id, note),

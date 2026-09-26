@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Bell,
@@ -36,10 +36,17 @@ import { cn } from "@/lib/utils";
 export function SiteHeader() {
   const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+
+  const handleLogout = async () => {
+    setOpen(false);
+    await logout();
+    router.push("/login");
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -341,7 +348,7 @@ export function SiteHeader() {
               size="icon"
               className="hidden md:flex rounded-full shrink-0 text-foreground hover:bg-slate-100"
               aria-label="Keluar dari akun"
-              onClick={logout}
+              onClick={handleLogout}
             >
               <LogOut className="size-4" />
             </Button>
@@ -590,10 +597,7 @@ export function SiteHeader() {
               <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    logout();
-                  }}
+                  onClick={handleLogout}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-red-50/60 py-2.5 text-sm font-semibold text-destructive hover:bg-red-100/80 transition-colors cursor-pointer dark:border-red-900/40 dark:bg-red-950/20"
                 >
                   <LogOut className="size-4" />
@@ -647,10 +651,7 @@ export function SiteHeader() {
                 <div className="mt-2 border-t pt-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      logout();
-                    }}
+                    onClick={handleLogout}
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-red-50/60 py-2.5 text-sm font-semibold text-destructive hover:bg-red-100/80 transition-colors cursor-pointer"
                   >
                     <LogOut className="size-4" />
