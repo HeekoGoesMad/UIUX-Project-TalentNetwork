@@ -3,7 +3,34 @@ import { createClient } from "@/lib/supabase/server";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 import { safeRedirectPath, sanitizeNextParam } from "@/lib/auth/redirect";
 
-function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role: string; destination: string }) {
+function popupSuccessResponse(data: {
+  isNew: boolean;
+  hasPassword: boolean;
+  role: string;
+  provisioningStatus?: string;
+  hasSubmittedOnboarding?: boolean;
+}) {
+  const safeRole =
+    data.role === "candidate" || data.role === "recruiter" || data.role === "partner" || data.role === "admin"
+      ? data.role
+      : "candidate";
+
+  const safeProvisioning = data.provisioningStatus === "active" ? "active" : "pending";
+
+  const payload = {
+    type: "GOOGLE_AUTH_SUCCESS",
+    isNew: Boolean(data.isNew),
+    hasPassword: Boolean(data.hasPassword),
+    role: safeRole,
+    provisioningStatus: safeProvisioning,
+    hasSubmittedOnboarding: Boolean(data.hasSubmittedOnboarding),
+  };
+
+  const safePayloadJson = JSON.stringify(payload)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\//g, "\\u002f");
+
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -77,20 +104,15 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
   <p id="status-desc">Jendela ini akan tertutup secara otomatis.</p>
   <button id="btn-close" type="button" class="btn-close" onclick="tryCloseWindow()">Tutup Jendela Ini</button>
 
+  <script id="auth-payload" type="application/json">${safePayloadJson}</script>
   <script>
     function tryCloseWindow() {
       try { window.close(); } catch(e) {}
     }
 
     (function() {
-      var payload = {
-        type: "GOOGLE_AUTH_SUCCESS",
-        isNew: ${data.isNew},
-        hasPassword: ${data.hasPassword},
-        role: ${JSON.stringify(data.role)},
-        destination: ${JSON.stringify(data.destination)}
-      };
-
+      var payloadNode = document.getElementById("auth-payload");
+      var payload = payloadNode ? JSON.parse(payloadNode.textContent) : { type: "GOOGLE_AUTH_SUCCESS" };
       var targetOrigin = window.location.origin;
 
       // 1. Direct window.opener postMessage strictly to same origin
@@ -151,6 +173,19 @@ function popupSuccessResponse(data: { isNew: boolean; hasPassword: boolean; role
 }
 
 function popupErrorResponse(errorMessage: string) {
+  const safeErrorMessage =
+    errorMessage === "Kode verifikasi tidak ditemukan" || errorMessage === "Role akun tidak valid"
+      ? errorMessage
+      : "Verifikasi email gagal";
+
+  const safeErrorPayload = JSON.stringify({
+    type: "GOOGLE_AUTH_ERROR",
+    error: safeErrorMessage,
+  })
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\//g, "\\u002f");
+
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -204,21 +239,18 @@ function popupErrorResponse(errorMessage: string) {
 <body>
   <div class="error-icon">✕</div>
   <h2>Gagal Menghubungkan Akun</h2>
-  <p>${errorMessage}</p>
+  <p>${safeErrorMessage}</p>
   <button type="button" class="btn-close" onclick="tryCloseWindow()">Tutup Jendela Ini</button>
 
+  <script id="auth-error-payload" type="application/json">${safeErrorPayload}</script>
   <script>
     function tryCloseWindow() {
       try { window.close(); } catch(e) {}
     }
 
     (function() {
-      var errorMsg = ${JSON.stringify(errorMessage)};
-      var payload = {
-        type: "GOOGLE_AUTH_ERROR",
-        error: errorMsg
-      };
-
+      var errNode = document.getElementById("auth-error-payload");
+      var payload = errNode ? JSON.parse(errNode.textContent) : { type: "GOOGLE_AUTH_ERROR", error: "Verifikasi email gagal" };
       var targetOrigin = window.location.origin;
 
       if (window.opener && !window.opener.closed) {
@@ -395,7 +427,8 @@ export async function GET(request: Request) {
         isNew: result.isNew,
         hasPassword: Boolean(result.hasPassword),
         role: result.role,
-        destination: safeFinalDestination,
+        provisioningStatus: result.provisioningStatus,
+        hasSubmittedOnboarding: result.hasSubmittedOnboarding,
       });
     }
 

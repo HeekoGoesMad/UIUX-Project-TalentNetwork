@@ -404,6 +404,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             type?: string;
             destination?: string;
             role?: UserRole;
+            isNew?: boolean;
+            hasPassword?: boolean;
+            provisioningStatus?: ProvisioningStatus;
+            hasSubmittedOnboarding?: boolean;
             error?: string;
           };
 
@@ -415,10 +419,23 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               } catch {}
             }
             cleanup();
-            const target =
-              typeof authData.destination === "string"
-                ? authData.destination
-                : destination(authData.role ?? role, null);
+
+            const userRole = (authData.role as UserRole) || role;
+            const isNew = Boolean(authData.isNew);
+            const hasPassword = Boolean(authData.hasPassword);
+            const next = getNext();
+            const dest = destination(
+              userRole,
+              next,
+              isNew,
+              authData.provisioningStatus,
+              authData.hasSubmittedOnboarding
+            );
+            const shouldSetupPassword = isNew && !hasPassword;
+            const target = shouldSetupPassword
+              ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+              : (typeof authData.destination === "string" ? authData.destination : dest);
+
             window.location.href = safeRedirectPath(target, "/dashboard");
           } else if (authData.type === "GOOGLE_AUTH_ERROR") {
             handled = true;
@@ -502,13 +519,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               }
               cleanup();
 
-              // If localStorage has the server-calculated destination, use it
+              // If localStorage has the auth event payload written by the popup, use it
               try {
                 const stored = localStorage.getItem("proofylink_oauth_event");
                 if (stored) {
                   const parsed = JSON.parse(stored);
-                  if (parsed && typeof parsed === "object" && typeof parsed.destination === "string") {
-                    window.location.href = safeRedirectPath(parsed.destination, "/dashboard");
+                  if (parsed && typeof parsed === "object" && parsed.type === "GOOGLE_AUTH_SUCCESS") {
+                    handleAuthPayload(parsed);
                     return;
                   }
                 }
