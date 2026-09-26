@@ -143,6 +143,7 @@ const defaultForm: RecruiterOnboardingData = {
   picPhone: "",
   picEmail: "",
   companyName: "",
+  companyPhone: "",
   industry: "",
   companySize: "",
   description: "",
@@ -271,6 +272,7 @@ export function RecruiterOnboarding() {
               picPhone: draft?.picPhone || dbForm.picPhone || prev.picPhone || "",
               picEmail: draft?.picEmail || dbForm.picEmail || prev.picEmail || user?.email || "",
               companyName: registeredCompany,
+              companyPhone: draft?.companyPhone || dbForm.companyPhone || prev.companyPhone || "",
               industry: draft?.industry || dbForm.industry || prev.industry || "",
               companySize: draft?.companySize || dbForm.companySize || prev.companySize || "",
               description: draft?.description || dbForm.description || prev.description || "",
@@ -461,6 +463,14 @@ export function RecruiterOnboarding() {
         errs.picPhone = "Nomor WhatsApp / telepon wajib diisi.";
       } else if (digits.length < 8) {
         errs.picPhone = "Nomor telepon minimal 8 digit angka.";
+      }
+      const companyDigits = extractIndonesianLocalPhone(form.companyPhone || "");
+      if (!companyDigits) {
+        errs.companyPhone = "Nomor telepon kantor / perusahaan wajib diisi.";
+      } else if (companyDigits.length < 6) {
+        errs.companyPhone = "Nomor telepon kantor minimal 6 digit angka.";
+      } else if (companyDigits.length > 15) {
+        errs.companyPhone = "Nomor telepon kantor maksimal 15 digit angka.";
       }
       if (!form.description.trim()) errs.description = "Deskripsi operasional bisnis wajib diisi.";
       if (!form.city.trim()) errs.city = "Domisili kota operasional kantor wajib diisi.";
@@ -860,20 +870,47 @@ export function RecruiterOnboarding() {
                           </Field>
 
                           <Field
-                            label="Nomor WhatsApp / Telepon PIC"
+                            label="Nomor Telepon Kantor / Perusahaan"
                             required
-                            id="picPhone"
-                            error={errors.picPhone}
-                            hint="Nomor aktif kontak perwakilan untuk komunikasi verifikasi."
+                            id="companyPhone"
+                            error={errors.companyPhone}
+                            hint="Nomor telepon operasional kantor resmi perusahaan."
+                            extraBadge={
+                              form.picPhone && form.picPhone !== form.companyPhone ? (
+                                <button
+                                  type="button"
+                                  onClick={() => update("companyPhone", form.picPhone)}
+                                  className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                                >
+                                  Gunakan nomor PIC
+                                </button>
+                              ) : undefined
+                            }
                           >
                             <IndonesianPhoneInput
-                              id="input-picPhone"
-                              error={Boolean(errors.picPhone)}
-                              value={form.picPhone}
-                              onChange={(val) => update("picPhone", val)}
+                              id="input-companyPhone"
+                              error={Boolean(errors.companyPhone)}
+                              value={form.companyPhone || ""}
+                              onChange={(val) => update("companyPhone", val)}
+                              placeholder="361-555-0148 atau 812-3456-7890"
                             />
                           </Field>
                         </div>
+
+                        <Field
+                          label="Nomor WhatsApp / Telepon PIC"
+                          required
+                          id="picPhone"
+                          error={errors.picPhone}
+                          hint="Nomor aktif kontak perwakilan untuk komunikasi verifikasi."
+                        >
+                          <IndonesianPhoneInput
+                            id="input-picPhone"
+                            error={Boolean(errors.picPhone)}
+                            value={form.picPhone}
+                            onChange={(val) => update("picPhone", val)}
+                          />
+                        </Field>
 
                         <Field
                           label="Deskripsi Singkat Operasional Bisnis"
@@ -1198,6 +1235,7 @@ export function RecruiterOnboarding() {
                           <div className="grid gap-5 p-6 sm:grid-cols-2 border-b">
                             <Summary label="PIC & Jabatan" value={`${form.picName} (${form.picTitle})`} />
                             <Summary label="Kontak PIC" value={`${form.picEmail} • ${form.picPhone}`} />
+                            <Summary label="Telepon Kantor Perusahaan" value={form.companyPhone || "-"} />
                             <Summary label="Kategori Industri" value={form.industry} />
                             <Summary label="Skala Perusahaan" value={`${form.companySize} Karyawan`} />
                             <Summary label="Website & Media Sosial" value={`${form.websiteUrl || "-"} • ${form.linkedinUrl || "-"}`} />

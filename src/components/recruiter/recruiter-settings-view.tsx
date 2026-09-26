@@ -267,6 +267,45 @@ export function RecruiterSettingsView() {
               } catch {}
             }
 
+            // Autofill Nomor Telepon / WhatsApp PIC jika belum terisi dari server: fallback ke draft onboarding di localStorage
+            if (!next.picPhone) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.picPhone === "string" && draft.form.picPhone.trim()) {
+                    next.picPhone = draft.form.picPhone.trim();
+                  }
+                }
+              } catch {}
+            }
+
+            // Fallback nama PIC dari draft onboarding jika belum ada
+            if (!next.picName) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.picName === "string" && draft.form.picName.trim()) {
+                    next.picName = draft.form.picName.trim();
+                  }
+                }
+              } catch {}
+            }
+
+            // Fallback nomor telepon kantor jika ada di draft
+            if (!next.companyPhone) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.companyPhone === "string" && draft.form.companyPhone.trim()) {
+                    next.companyPhone = draft.form.companyPhone.trim();
+                  }
+                }
+              } catch {}
+            }
+
             return next;
           });
         }
@@ -369,9 +408,14 @@ export function RecruiterSettingsView() {
       }
     }
 
-    // Nomor Telepon Kantor Resmi (Opsional, jika diisi min 6 karakter)
-    if (form.companyPhone.trim() && form.companyPhone.trim().length < 6) {
-      errs.companyPhone = "Nomor telepon kantor minimal 6 karakter.";
+    // Nomor Telepon Kantor Resmi (Wajib, minimal 6 digit angka)
+    const companyPhoneDigits = extractIndonesianLocalPhone(form.companyPhone);
+    if (!companyPhoneDigits) {
+      errs.companyPhone = "Nomor telepon kantor resmi wajib diisi.";
+    } else if (companyPhoneDigits.length < 6) {
+      errs.companyPhone = "Nomor telepon kantor minimal 6 digit angka.";
+    } else if (companyPhoneDigits.length > 15) {
+      errs.companyPhone = "Nomor telepon kantor maksimal 15 digit angka.";
     }
 
     if (!form.officeAddress.trim()) {
@@ -959,13 +1003,24 @@ export function RecruiterSettingsView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="companyPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
-                    <Phone className="size-3.5 text-primary" />
-                    <span>Telepon / Kontak Kantor Resmi</span>
-                    <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
-                      Opsional
-                    </span>
-                  </label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="companyPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                      <Phone className="size-3.5 text-primary" />
+                      <span>Telepon / Kontak Kantor Resmi</span>
+                      <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                        Wajib
+                      </span>
+                    </label>
+                    {form.picPhone && form.picPhone !== form.companyPhone && (
+                      <button
+                        type="button"
+                        onClick={() => handleChangeField("companyPhone", form.picPhone)}
+                        className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                      >
+                        Gunakan nomor PIC
+                      </button>
+                    )}
+                  </div>
                   <IndonesianPhoneInput
                     id="companyPhone"
                     name="companyPhone"

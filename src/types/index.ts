@@ -209,6 +209,7 @@ export type RecruiterOnboardingData = {
   companyName: string;
   industry: string;
   companySize: string;
+  companyPhone?: string;
   description: string;
   websiteUrl: string;
   linkedinUrl: string;
