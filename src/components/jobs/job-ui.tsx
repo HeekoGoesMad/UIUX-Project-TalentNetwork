@@ -5,12 +5,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   Award,
   Banknote,
   BriefcaseBusiness,
   Building2,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   ExternalLink,
@@ -24,6 +27,7 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -55,7 +59,7 @@ import {
 } from "@/components/ui/dialog";
 import { ApplyForm, useApplications } from "@/components/applications/application-ui";
 
-const PAGE_LIMIT = 24;
+const PAGE_LIMIT = 100;
 
 type JobsPayload = { jobs?: Job[]; hasMore?: boolean; error?: string };
 
@@ -72,8 +76,25 @@ function useJobs() {
     let active = true;
     setPage(1);
     if (!dbMode) {
-      const stored = localStorage.getItem("proofylink-demo-jobs");
-      const parsed = stored ? (JSON.parse(stored) as Job[]) : DEMO_JOBS;
+      let parsed = DEMO_JOBS;
+      try {
+        const stored = localStorage.getItem("proofylink-demo-jobs");
+        if (stored) {
+          const loaded = JSON.parse(stored) as Job[];
+          if (Array.isArray(loaded) && loaded.length >= DEMO_JOBS.length) {
+            parsed = loaded;
+          } else {
+            const existingMap = new Map((loaded || []).map((j) => [j.id, j]));
+            parsed = DEMO_JOBS.map((dj) => existingMap.get(dj.id) ?? dj);
+            localStorage.setItem("proofylink-demo-jobs", JSON.stringify(parsed));
+          }
+        } else {
+          localStorage.setItem("proofylink-demo-jobs", JSON.stringify(DEMO_JOBS));
+        }
+      } catch {
+        parsed = DEMO_JOBS;
+      }
+
       if (active) {
         setJobs(parsed.filter((job) => job.status === "published"));
         setHasMore(false);
@@ -166,7 +187,21 @@ function CompanyAvatar({
   );
 }
 
-function JobCard({ job }: { job: Job }) {
+function getPageItems(totalPages: number, currentPage: number): (number | "gap")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const wanted = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const pages = [...wanted].filter((n) => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+  const items: (number | "gap")[] = [];
+  let prev = 0;
+  for (const n of pages) {
+    if (n - prev > 1) items.push("gap");
+    items.push(n);
+    prev = n;
+  }
+  return items;
+}
+
+export function JobRowCard({ job }: { job: Job }) {
   const salaryText = formatSalaryDisplay(job);
   const companyName = job.organization?.name || job.organizationName || "Perusahaan Mitra";
   const isApproved = job.organization?.verificationStatus === "approved";
@@ -177,118 +212,152 @@ function JobCard({ job }: { job: Job }) {
     ? educationLabels[job.minEducation as EducationLevel] ?? job.minEducation
     : null;
 
-  return (
-    <Card className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-      <CardHeader className="gap-3 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <CompanyAvatar
-              name={companyName}
-              logoUrl={job.organization?.logoUrl}
-              size="md"
-            />
-            <div className="min-w-0 flex-1">
-              <Link href={`/jobs/${job.id}`} className="block group/link">
-                {/* Nama Perusahaan (PT) */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span
-                    className="text-xs sm:text-[13px] font-semibold text-foreground/90 group-hover/link:text-primary transition-colors line-clamp-2 leading-snug break-words"
-                    title={companyName}
-                  >
-                    {companyName}
-                  </span>
-                  {isApproved && (
-                    <span
-                      title="Perusahaan Terverifikasi Resmi ProofyLink"
-                      className="inline-flex items-center text-primary shrink-0"
-                    >
-                      <ShieldCheck className="size-3.5 fill-primary/15 text-primary" />
-                    </span>
-                  )}
-                </div>
+  const arrangementStyle =
+    job.workArrangement === "remote"
+      ? "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+      : job.workArrangement === "hybrid"
+      ? "bg-purple-50 text-purple-800 border-purple-200/80"
+      : "bg-slate-100 text-slate-800 border-slate-200/80";
 
-                {/* Judul Posisi Pekerjaan */}
-                <CardTitle
-                  className="mt-1 text-base font-bold text-foreground group-hover/link:text-primary transition-colors line-clamp-2 leading-snug break-words"
-                  title={job.title}
-                >
-                  {job.title}
-                </CardTitle>
-              </Link>
-            </div>
+  return (
+    <article
+      tabIndex={0}
+      className="group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl border border-border/80 bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      {/* Kolom Kiri: Avatar & Detail Utama */}
+      <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
+        <CompanyAvatar
+          name={companyName}
+          logoUrl={job.organization?.logoUrl}
+          size="md"
+        />
+
+        <div className="min-w-0 flex-1 space-y-1.5">
+          {/* Perusahaan & Status Verifikasi */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className="text-xs sm:text-[13px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors"
+              title={companyName}
+            >
+              {companyName}
+            </span>
+            {isApproved && (
+              <span
+                title="Perusahaan Terverifikasi Resmi ProofyLink"
+                className="inline-flex items-center text-primary shrink-0"
+              >
+                <ShieldCheck className="size-3.5 fill-primary/15 text-primary" />
+              </span>
+            )}
           </div>
 
-          <span className="shrink-0 self-start rounded-full bg-slate-100 border border-slate-200/60 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
-            {arrangementLabels[job.workArrangement]}
-          </span>
-        </div>
-      </CardHeader>
+          {/* Judul Posisi Pekerjaan */}
+          <Link href={`/jobs/${job.id}`} className="block focus:outline-none">
+            <h2
+              className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors leading-snug line-clamp-1 break-words"
+              title={job.title}
+            >
+              {job.title}
+            </h2>
+          </Link>
 
-      <CardContent className="space-y-3.5 pt-0">
-        {/* Highlight Gaji ala Glints */}
-        <div className="flex items-center gap-2 rounded-lg bg-emerald-50/80 border border-emerald-200/70 px-3 py-1.5 text-xs font-semibold text-emerald-800 w-fit">
+          {/* Metadata Badges: Lokasi, Tipe Kerja, Pengalaman, Pendidikan */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-xs">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                arrangementStyle
+              )}
+            >
+              {arrangementLabels[job.workArrangement]}
+            </span>
+
+            <span className="inline-flex items-center rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-foreground">
+              {employmentLabels[job.employmentType]}
+            </span>
+
+            {job.location && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <MapPin className="size-3 text-muted-foreground/80 shrink-0" />
+                <span className="line-clamp-1 max-w-[180px] sm:max-w-[260px]">{job.location}</span>
+              </span>
+            )}
+
+            {expLabel && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200/60 bg-indigo-50/70 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                <BriefcaseBusiness className="size-3 shrink-0" />
+                <span>{expLabel}</span>
+              </span>
+            )}
+
+            {eduLabel && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/70 px-2 py-0.5 text-[11px] font-medium text-purple-700">
+                <GraduationCap className="size-3 shrink-0" />
+                <span>{eduLabel}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Kolom Tengah: Highlight Gaji & Skill Tags */}
+      <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end justify-between md:justify-center gap-2 md:gap-2.5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border/60">
+        {/* Rentang Gaji Transparan */}
+        <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50/90 border border-emerald-200/80 px-2.5 py-1 text-xs font-semibold text-emerald-800 font-mono tracking-tight shrink-0">
           <Banknote className="size-3.5 text-emerald-600 shrink-0" />
           <span>{salaryText}</span>
         </div>
 
-        {/* Kriteria Penting (Pengalaman, Pendidikan, Lokasi) */}
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-          {job.location && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-medium text-foreground">
-              <MapPin className="size-3 text-muted-foreground" />
-              {job.location}
-            </span>
-          )}
-          <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-foreground">
-            {employmentLabels[job.employmentType]}
-          </span>
-          {expLabel && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 font-medium text-indigo-700 px-2 py-0.5">
-              <BriefcaseBusiness className="size-3" />
-              {expLabel}
-            </span>
-          )}
-          {eduLabel && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 font-medium text-purple-700 px-2 py-0.5">
-              <GraduationCap className="size-3" />
-              {eduLabel}
-            </span>
-          )}
-        </div>
+        {/* Skill Badges (Maks 3 + N) */}
+        {job.requirements && job.requirements.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 md:justify-end">
+            {job.requirements.slice(0, 3).map((req) => (
+              <span
+                key={req.id}
+                className="rounded-md border border-border/70 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+              >
+                {req.name}
+              </span>
+            ))}
+            {job.requirements.length > 3 && (
+              <span
+                title={job.requirements.slice(3).map((r) => r.name).join(", ")}
+                className="rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+              >
+                +{job.requirements.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
-        {/* Cuplikan Deskripsi */}
-        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{job.description}</p>
+      {/* Kolom Kanan: Status Penerimaan & Action Button */}
+      <div className="flex items-center md:flex-col items-end justify-between md:justify-center gap-2 shrink-0 md:min-w-[130px] pt-2 md:pt-0">
+        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Clock className="size-3 text-muted-foreground/70 shrink-0" />
+          <span>Aktif menerima pelamar</span>
+        </span>
 
-        {/* Skill tags */}
-        <div className="flex flex-wrap gap-1">
-          {job.requirements.slice(0, 4).map((req) => (
-            <span
-              key={req.id}
-              className="rounded-md border border-border/80 bg-slate-50 px-2 py-0.5 text-[11px] text-muted-foreground"
-            >
-              {req.name}
-            </span>
-          ))}
-          {job.requirements.length > 4 && (
-            <span className="px-1 py-0.5 text-[11px] text-muted-foreground">+{job.requirements.length - 4}</span>
-          )}
-        </div>
-
-        <div className="border-t border-border/60 pt-3 flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <Clock className="size-3" />
-            <span>Aktif menerima pelamar</span>
-          </span>
-          <Button asChild size="sm" variant="default" className="rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white">
-            <Link href={`/jobs/${job.id}`}>
-              Lihat Detail &amp; Apply <span aria-hidden="true">&rarr;</span>
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        <Button
+          asChild
+          size="sm"
+          variant="default"
+          className="rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white shadow-xs group-hover:shadow-sm transition-all"
+        >
+          <Link href={`/jobs/${job.id}`}>
+            Lihat Detail
+            <ArrowRight className="size-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </Button>
+      </div>
+    </article>
   );
 }
+
+// Kompatibilitas alias jika ada penggunaan terdahulu
+export const JobCard = JobRowCard;
+
+const PAGE_SIZE = 10;
 
 export function PublicJobsPage() {
   const router = useRouter();
@@ -300,7 +369,10 @@ export function PublicJobsPage() {
       ? rawArrangement
       : "all";
 
-  const { jobs, loading, loadingMore, error, hasMore, loadMore } = useJobs();
+  const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
+  const currentPage = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+
+  const { jobs, loading, error } = useJobs();
 
   const filtered = useMemo(() => {
     return jobs.filter((job) => {
@@ -317,116 +389,245 @@ export function PublicJobsPage() {
     });
   }, [jobs, query, arrangement]);
 
-  const syncParams = (nextQuery: string, nextArrangement: string) => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
+    return filtered.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filtered, safeCurrentPage]);
+
+  const pageItems = useMemo(
+    () => getPageItems(totalPages, safeCurrentPage),
+    [totalPages, safeCurrentPage]
+  );
+
+  const syncParams = (nextQuery: string, nextArrangement: string, nextPage: number = 1) => {
     const params = new URLSearchParams();
     if (nextQuery) params.set("q", nextQuery);
-    if (nextArrangement !== "all") params.set("arrangement", nextArrangement);
+    if (nextArrangement && nextArrangement !== "all") params.set("arrangement", nextArrangement);
+    if (nextPage > 1) params.set("page", String(nextPage));
     const qs = params.toString();
     router.replace(qs ? `/jobs?${qs}` : "/jobs", { scroll: false });
   };
 
+  const goToPage = (pageNumber: number) => {
+    syncParams(query, arrangement, pageNumber);
+    const container = document.getElementById("jobs-list-container");
+    if (container) {
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const startItem = filtered.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(safeCurrentPage * PAGE_SIZE, filtered.length);
+
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8 sm:py-12">
-      {/* Header Eksplorasi Glints Style */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#201C45] via-[#311b5e] to-[#7C3AED] p-6 sm:p-10 text-white shadow-lg relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-xs px-3 py-1 text-xs font-semibold text-purple-200">
-            <Sparkles className="size-3.5 text-pink-400" />
-            <span>Jaringan Karir Terverifikasi ProofyLink</span>
-          </div>
-          <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-4xl text-white">
-            Temukan Lowongan Kerja Impian
+      {/* Header Eksplorasi Lowongan */}
+      <header className="rounded-2xl bg-[#181433] p-6 sm:p-8 text-white border border-white/10 shadow-xs">
+        <div className="max-w-2xl space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-white">
+            Lowongan Kerja
           </h1>
-          <p className="mt-2 text-sm text-purple-100/90 leading-6">
-            Jelajahi peluang karir transparan dengan rentang gaji jelas, kriteria terukur, dan profil perusahaan resmi
-            yang telah diverifikasi.
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Peluang karir terverifikasi dengan rentang gaji transparan, kriteria terukur, dan profil perusahaan resmi di ekosistem ProofyLink.
           </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 text-xs text-purple-200">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+              100% Gaji Transparan
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+              Perusahaan Terkurasi
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+              Akses Langsung ke Rekruter
+            </span>
+          </div>
         </div>
-
-        {/* Background glow circle */}
-        <div className="absolute -right-16 -top-16 size-72 rounded-full bg-pink-500/20 blur-3xl pointer-events-none" />
-      </div>
+      </header>
 
       {/* Filter & Search Bar */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
-        <label className="flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-1.5 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="sr-only">Cari lowongan</span>
-          <input
-            value={query}
-            onChange={(event) => syncParams(event.target.value, arrangement)}
-            placeholder="Cari posisi pekerjaan, keahlian, atau nama perusahaan (contoh: Product Designer, React, Fintech)..."
-            className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </label>
+      <div className="mt-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <label className="flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-2 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">Cari lowongan</span>
+            <input
+              value={query}
+              onChange={(event) => syncParams(event.target.value, arrangement, 1)}
+              placeholder="Cari posisi, keahlian, atau nama perusahaan (contoh: Product Designer, React, Golang)..."
+              className="h-7 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => syncParams("", arrangement, 1)}
+                className="text-muted-foreground hover:text-foreground p-0.5 transition-colors"
+                aria-label="Hapus kata kunci pencarian"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </label>
+        </div>
 
-        <select
-          aria-label="Filter tipe kerja"
-          value={arrangement}
-          onChange={(event) => syncParams(query, event.target.value)}
-          className="h-12 rounded-xl border border-input bg-card px-4 text-sm font-medium text-foreground shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-        >
-          <option value="all">Semua Penempatan</option>
-          <option value="remote">100% Remote</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="onsite">On-site (Kantor)</option>
-        </select>
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            aria-label="Filter tipe kerja"
+            value={arrangement}
+            onChange={(event) => syncParams(query, event.target.value, 1)}
+            className="h-11 rounded-xl border border-input bg-card px-3.5 text-sm font-medium text-foreground shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+          >
+            <option value="all">Semua Penempatan</option>
+            <option value="remote">100% Remote</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="onsite">On-site (Kantor)</option>
+          </select>
+        </div>
       </div>
 
-      {/* Stats counter */}
-      <div className="mt-6 flex items-center justify-between">
+      {/* Stats counter & active state */}
+      <div id="jobs-list-container" className="mt-6 flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-foreground">
-          Menampilkan <span className="text-primary">{filtered.length}</span> lowongan pekerjaan tersedia
+          {loading ? (
+            "Memuat lowongan pekerjaan..."
+          ) : (
+            <>
+              Menampilkan{" "}
+              <span className="text-primary font-bold">
+                {filtered.length === 0 ? "0" : `${startItem}–${endItem}`}
+              </span>{" "}
+              dari <span className="text-primary font-bold">{filtered.length}</span> lowongan pekerjaan tersedia
+            </>
+          )}
         </p>
+
+        {(query || arrangement !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => syncParams("", "all", 1)}
+            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Reset filter
+          </Button>
+        )}
       </div>
 
-      {/* Grid Lowongan */}
+      {/* Daftar Lowongan: One-Row-Per-Job */}
       {loading ? (
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="rounded-xl border border-border/80 p-5 space-y-4">
-              <div className="flex gap-3">
-                <Skeleton className="size-12 rounded-xl" />
+        <div className="mt-4 space-y-3" role="status" aria-label="Memuat lowongan pekerjaan">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-5"
+            >
+              <div className="flex items-start gap-4 min-w-0 flex-1">
+                <Skeleton className="size-12 rounded-xl shrink-0" />
                 <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-5 w-64 max-w-full" />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Skeleton className="h-5 w-20 rounded-md" />
+                    <Skeleton className="h-5 w-24 rounded-md" />
+                    <Skeleton className="h-5 w-28 rounded-md" />
+                  </div>
                 </div>
               </div>
-              <Skeleton className="h-8 w-2/3 rounded-lg" />
-              <Skeleton className="h-4 w-full" />
-              <div className="flex gap-2">
-                <Skeleton className="h-5 w-16 rounded" />
-                <Skeleton className="h-5 w-16 rounded" />
+              <div className="flex md:flex-col items-end gap-2.5 shrink-0 pt-2 md:pt-0">
+                <Skeleton className="h-7 w-36 rounded-lg" />
+                <Skeleton className="h-8 w-28 rounded-lg" />
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       ) : error ? (
-        <State text={error} error />
+        <div className="mt-8">
+          <State text={error} error />
+        </div>
       ) : filtered.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border bg-card p-12 text-center">
           <BriefcaseBusiness className="mx-auto size-10 text-muted-foreground/60" />
-          <h3 className="mt-3 text-base font-bold text-foreground">Tidak Ada Lowongan yang Cocok</h3>
+          <h2 className="mt-3 text-base font-bold text-foreground">Tidak Ada Lowongan yang Cocok</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Coba ubah kata kunci pencarian atau ganti filter pengaturan kerja Anda.
           </p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={() => syncParams("", "all")}>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => syncParams("", "all", 1)}>
             Reset Semua Filter
           </Button>
         </div>
       ) : (
         <>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((job) => (
-              <JobCard key={job.id} job={job} />
+          <div className="mt-4 space-y-3">
+            {paginatedJobs.map((job) => (
+              <JobRowCard key={job.id} job={job} />
             ))}
           </div>
-          {hasMore && (
-            <div className="mt-8 flex justify-center">
-              <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="rounded-xl px-6">
-                {loadingMore ? "Memuat lebih banyak..." : "Muat Lowongan Lainnya"}
-              </Button>
-            </div>
+
+          {/* Navigasi Pagination */}
+          {totalPages > 1 && (
+            <nav
+              aria-label="Navigasi halaman lowongan"
+              className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/80 pt-6"
+            >
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Halaman <span className="font-semibold text-foreground">{safeCurrentPage}</span> dari{" "}
+                <span className="font-semibold text-foreground">{totalPages}</span>
+              </p>
+
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => goToPage(safeCurrentPage - 1)}
+                  className="h-8 rounded-lg px-2.5 text-xs font-medium gap-1"
+                  aria-label="Halaman sebelumnya"
+                >
+                  <ChevronLeft className="size-3.5" />
+                  <span className="hidden sm:inline">Sebelumnya</span>
+                </Button>
+
+                {pageItems.map((item, idx) =>
+                  item === "gap" ? (
+                    <span
+                      key={`gap-${idx}`}
+                      className="px-1.5 text-xs text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={item}
+                      variant={item === safeCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(item)}
+                      className="size-8 rounded-lg p-0 text-xs font-medium"
+                      aria-current={item === safeCurrentPage ? "page" : undefined}
+                    >
+                      {item}
+                    </Button>
+                  )
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => goToPage(safeCurrentPage + 1)}
+                  className="h-8 rounded-lg px-2.5 text-xs font-medium gap-1"
+                  aria-label="Halaman berikutnya"
+                >
+                  <span className="hidden sm:inline">Selanjutnya</span>
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </div>
+            </nav>
           )}
         </>
       )}
