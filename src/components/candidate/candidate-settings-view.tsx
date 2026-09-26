@@ -538,7 +538,7 @@ export function CandidateSettingsView({
                   </CardHeader>
                   <CardContent className="pt-5 space-y-4">
                     {/* In-App Toggle */}
-                    <div className="flex items-start justify-between gap-4 pb-4 border-b border-border/60">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5">
                         <label
                           htmlFor="toggle-in-app"
@@ -556,29 +556,6 @@ export function CandidateSettingsView({
                         checked={notifPrefs.inAppEnabled}
                         onChange={(checked) =>
                           setNotifPrefs({ ...notifPrefs, inAppEnabled: checked })
-                        }
-                      />
-                    </div>
-
-                    {/* Email Toggle */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-0.5">
-                        <label
-                          htmlFor="toggle-email"
-                          className="text-sm font-semibold text-foreground cursor-pointer"
-                        >
-                          Notifikasi Email
-                        </label>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Kirimkan email ke <span className="font-medium text-foreground">{email}</span> saat rekruter mengajukan permintaan screening atau mengirim pesan.
-                        </p>
-                      </div>
-                      <ToggleSwitch
-                        id="toggle-email"
-                        label="Notifikasi email"
-                        checked={notifPrefs.emailEnabled}
-                        onChange={(checked) =>
-                          setNotifPrefs({ ...notifPrefs, emailEnabled: checked })
                         }
                       />
                     </div>
