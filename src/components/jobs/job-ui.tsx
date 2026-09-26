@@ -937,9 +937,9 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
           {/* Main Layout: Left Document Specification, Right Sticky Action & Company Card */}
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
             {/* Left Column: Unified Document Container */}
-            <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-xs space-y-8 divide-y divide-border/60">
+            <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-xs divide-y divide-border/60">
               {/* Seksi 1: Deskripsi Pekerjaan */}
-              <section className="space-y-3">
+              <section className="py-8 first:pt-0 last:pb-0 space-y-3">
                 <h2 className="text-base sm:text-lg font-bold text-foreground">
                   Deskripsi Pekerjaan
                 </h2>
@@ -950,7 +950,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
 
               {/* Seksi 2: Tanggung Jawab Utama */}
               {job.responsibilities && (
-                <section className="pt-8 space-y-3">
+                <section className="py-8 first:pt-0 last:pb-0 space-y-3">
                   <h2 className="text-base sm:text-lg font-bold text-foreground">
                     Tanggung Jawab Utama
                   </h2>
@@ -960,7 +960,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
 
               {/* Seksi 3: Kualifikasi & Persyaratan */}
               {job.qualifications && (
-                <section className="pt-8 space-y-3">
+                <section className="py-8 first:pt-0 last:pb-0 space-y-3">
                   <h2 className="text-base sm:text-lg font-bold text-foreground">
                     Kualifikasi &amp; Persyaratan
                   </h2>
@@ -970,7 +970,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
 
               {/* Seksi 4: Keahlian yang Dibutuhkan */}
               {job.requirements && job.requirements.length > 0 && (
-                <section className="pt-8 space-y-4">
+                <section className="py-8 first:pt-0 last:pb-0 space-y-4">
                   <h2 className="text-base sm:text-lg font-bold text-foreground">
                     Keahlian yang Dibutuhkan
                   </h2>
@@ -1021,7 +1021,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
 
               {/* Seksi 5: Fasilitas & Tunjangan */}
               {job.benefits && job.benefits.length > 0 && (
-                <section className="pt-8 space-y-4">
+                <section className="py-8 first:pt-0 last:pb-0 space-y-4">
                   <h2 className="text-base sm:text-lg font-bold text-foreground">
                     Fasilitas &amp; Tunjangan
                   </h2>
@@ -1095,11 +1095,6 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                         </Link>
                       </Button>
                     )}
-                  </div>
-
-                  <div className="border-t border-border/60 pt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-                    <ShieldCheck className="size-3.5 text-primary shrink-0" />
-                    <span>Proses seleksi langsung oleh HR resmi</span>
                   </div>
                 </div>
 
