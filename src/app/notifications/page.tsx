@@ -400,12 +400,6 @@ export default function NotificationsPage() {
                         checked={preferences.inAppEnabled}
                         onChange={(checked) => setPreferences((curr) => ({ ...curr, inAppEnabled: checked }))}
                       />
-                      <PreferenceToggle
-                        icon={<Mail className="size-4 text-muted-foreground" />}
-                        label="Notifikasi Email Ringkasan"
-                        checked={preferences.emailEnabled}
-                        onChange={(checked) => setPreferences((curr) => ({ ...curr, emailEnabled: checked }))}
-                      />
                     </div>
 
                     <div className="rounded-xl border bg-muted/30 p-3.5 space-y-2.5">
@@ -460,7 +454,7 @@ export default function NotificationsPage() {
           </Dialog>
 
           <Button variant="ghost" size="sm" asChild className="text-xs text-muted-foreground hover:text-foreground">
-            <Link href="/candidate/settings?tab=notif">
+            <Link href={user?.role === "recruiter" ? "/recruiter/settings" : "/candidate/settings?tab=notif"}>
               <Settings2 className="mr-1.5 size-3.5" /> Kelola di Pengaturan
             </Link>
           </Button>

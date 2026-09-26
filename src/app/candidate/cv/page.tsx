@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { CvWorkspace } from "@/components/candidate/cv-workspace";
 
@@ -15,7 +16,9 @@ export default function CandidateCvPage() {
         </div>
 
         {/* 2-Column Side-by-Side Workspace */}
-        <CvWorkspace />
+        <Suspense fallback={null}>
+          <CvWorkspace />
+        </Suspense>
       </div>
     </ProtectedRoute>
   );

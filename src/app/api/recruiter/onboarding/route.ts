@@ -76,6 +76,7 @@ export async function GET() {
     picPhone: profile?.phone || "",
     picEmail: org?.companyEmail || user.email || "",
     companyName: initialCompanyName,
+    companyPhone: org?.companyPhone || "",
     industry: org?.industry || "",
     companySize: org?.companyScale || "",
     description: org?.description || "",
@@ -155,6 +156,7 @@ const onboardingSchema = z.object({
   picPosition: z.string().trim().optional(),
   picTitle: z.string().trim().optional(),
   companyName: z.string().trim().min(2),
+  companyPhone: z.string().trim().min(6, "Nomor telepon kantor minimal 6 digit.").optional().or(z.literal("")),
   description: z.string().trim().optional(),
   industry: z.string().trim().optional(),
   companySize: z.string().trim().optional(),
@@ -237,6 +239,7 @@ export async function POST(request: Request) {
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
+            companyPhone: data.companyPhone || null,
             website: data.websiteUrl || data.website || null,
             linkedinUrl: data.linkedinUrl || null,
             description: data.description || null,
@@ -268,6 +271,7 @@ export async function POST(request: Request) {
             city: data.city || null,
             officeAddress: data.officeAddress || null,
             companyEmail: data.picEmail,
+            ...(data.companyPhone !== undefined ? { companyPhone: data.companyPhone || null } : {}),
             website: data.websiteUrl || data.website || null,
             linkedinUrl: data.linkedinUrl || null,
             description: data.description || null,
@@ -290,16 +294,17 @@ export async function POST(request: Request) {
       return { success: true, organizationId: orgId };
     });
 
-    if (data.picTitle || data.picPosition) {
+    if (data.picTitle || data.picPosition || data.picPhone) {
       try {
         const supabase = await createClient();
         await supabase.auth.updateUser({
           data: {
-            picTitle: data.picTitle || data.picPosition,
+            ...(data.picTitle || data.picPosition ? { picTitle: data.picTitle || data.picPosition } : {}),
+            ...(data.picPhone ? { picPhone: data.picPhone, phone: data.picPhone } : {}),
           },
         });
       } catch (err) {
-        console.error("Gagal memperbarui picTitle ke Supabase auth metadata:", err);
+        console.error("Gagal memperbarui metadata ke Supabase auth metadata:", err);
       }
     }
 

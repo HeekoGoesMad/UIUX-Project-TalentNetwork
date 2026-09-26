@@ -155,14 +155,19 @@ export async function GET() {
           .limit(1)
       : [null];
 
-    // Ambil picTitle dari Supabase auth user metadata (disimpan saat onboarding)
+    // Ambil picTitle dan picPhone dari Supabase auth user metadata (disimpan saat onboarding)
     let picTitle: string | null = null;
+    let authPhone: string | null = null;
     try {
       const supabase = await createClient();
       const { data: authData } = await supabase.auth.getUser();
       picTitle =
         (typeof authData.user?.user_metadata?.picTitle === "string" ? authData.user.user_metadata.picTitle : "") ||
         (typeof authData.user?.user_metadata?.picPosition === "string" ? authData.user.user_metadata.picPosition : "") ||
+        null;
+      authPhone =
+        (typeof authData.user?.user_metadata?.picPhone === "string" ? authData.user.user_metadata.picPhone : "") ||
+        (typeof authData.user?.user_metadata?.phone === "string" ? authData.user.user_metadata.phone : "") ||
         null;
     } catch {}
 
@@ -171,7 +176,7 @@ export async function GET() {
         picName: profile?.displayName ?? user.email.split("@")[0] ?? null,
         picEmail: user.email,
         picTitle: picTitle,
-        picPhone: profile?.phone ?? null,
+        picPhone: profile?.phone ?? authPhone ?? null,
         companyName: org?.name ?? null,
         industry: org?.industry ?? null,
         companySize: org?.companyScale ?? null,
@@ -240,17 +245,18 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Perbarui picTitle ke Supabase auth user metadata jika dikirim
-    if (data.picTitle !== undefined) {
+    // Perbarui picTitle dan picPhone ke Supabase auth user metadata jika dikirim
+    if (data.picTitle !== undefined || data.picPhone !== undefined) {
       try {
         const supabase = await createClient();
         await supabase.auth.updateUser({
           data: {
-            picTitle: data.picTitle,
+            ...(data.picTitle !== undefined ? { picTitle: data.picTitle } : {}),
+            ...(data.picPhone !== undefined ? { picPhone: data.picPhone, phone: data.picPhone } : {}),
           },
         });
       } catch (err) {
-        console.error("Gagal memperbarui picTitle ke Supabase auth metadata:", err);
+        console.error("Gagal memperbarui metadata ke Supabase auth metadata:", err);
       }
     }
 

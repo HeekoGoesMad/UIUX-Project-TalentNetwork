@@ -35,13 +35,49 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useUnsavedNavigationGuard } from "@/hooks/use-unsaved-navigation-guard";
 import { CvDownload } from "./cv-download";
 import { CvUnsavedBar } from "./cv-unsaved-bar";
 import { PersonalityModal } from "./personality-modal";
 import { ProfessionalSummaryModal } from "./professional-summary-modal";
+
+export function parseSectionFromUrl(sectionParam?: string | null, hash?: string | null): SectionId | null {
+  const target = (sectionParam || hash || "").toLowerCase().replace(/^#/, "").trim();
+  if (!target) return null;
+  if (
+    target === "skills" ||
+    target === "kompetensi" ||
+    target === "competencies" ||
+    target === "sec-skills" ||
+    target === "portfolio" ||
+    target === "portofolio" ||
+    target === "sec-portfolio"
+  ) {
+    return "skills";
+  }
+  if (
+    target === "basic" ||
+    target === "basic-info" ||
+    target === "sec-basic" ||
+    target === "target-role" ||
+    target === "identitas"
+  ) {
+    return "basic";
+  }
+  if (target === "summary" || target === "about" || target === "sec-summary" || target === "ringkasan") {
+    return "summary";
+  }
+  if (target === "experience" || target === "sec-experience" || target === "pengalaman") {
+    return "experience";
+  }
+  if (target === "education" || target === "sec-education" || target === "pendidikan") {
+    return "education";
+  }
+  return null;
+}
 
 function blank(email = "", fullName = ""): CvProfile {
   return {
@@ -294,7 +330,45 @@ export function CvWorkspace() {
     }
   }
 
-  const [activeSection, setActiveSection] = useState<SectionId>("basic");
+  const searchParams = useSearchParams();
+  const [activeSection, setActiveSection] = useState<SectionId>(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const matched = parseSectionFromUrl(sp.get("section"), window.location.hash);
+      if (matched) return matched;
+    }
+    return "basic";
+  });
+
+  useEffect(() => {
+    const handleUrlNavigation = () => {
+      const sectionFromParam = searchParams?.get("section");
+      const hash = typeof window !== "undefined" ? window.location.hash : "";
+      const matched = parseSectionFromUrl(sectionFromParam, hash);
+      if (matched) {
+        setActiveSection(matched);
+        const isPortfolioTarget =
+          sectionFromParam === "portfolio" ||
+          sectionFromParam === "portofolio" ||
+          hash === "#portfolio" ||
+          hash === "#sec-portfolio" ||
+          hash === "#portofolio";
+        setTimeout(() => {
+          const el = isPortfolioTarget
+            ? document.getElementById("sec-portfolio") || document.getElementById(`sec-${matched}`)
+            : document.getElementById(`sec-${matched}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 120);
+      }
+    };
+
+    handleUrlNavigation();
+
+    window.addEventListener("hashchange", handleUrlNavigation);
+    return () => window.removeEventListener("hashchange", handleUrlNavigation);
+  }, [searchParams]);
   const [viewAll, setViewAll] = useState(false);
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
@@ -918,7 +992,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 1: Identitas & Kontak ── */}
             {(viewAll || activeSection === "basic") && (
-              <div id="sec-basic" className="space-y-5">
+              <div id="sec-basic" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center gap-2 border-b border-border/60 pb-2">
                     <User className="size-4 text-primary" />
@@ -1089,7 +1163,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 2: Ringkasan & Persona ── */}
             {(viewAll || activeSection === "summary") && (
-              <div id="sec-summary" className="space-y-5">
+              <div id="sec-summary" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center gap-2 border-b border-border/60 pb-2 pt-2">
                     <Sparkles className="size-4 text-primary" />
@@ -1170,7 +1244,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 3: Pengalaman Kerja ── */}
             {(viewAll || activeSection === "experience") && (
-              <div id="sec-experience" className="space-y-4">
+              <div id="sec-experience" className="space-y-4 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1395,7 +1469,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 4: Pendidikan & Studi ── */}
             {(viewAll || activeSection === "education") && (
-              <div id="sec-education" className="space-y-4">
+              <div id="sec-education" className="space-y-4 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1572,7 +1646,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 5: Kompetensi & Portofolio ── */}
             {(viewAll || activeSection === "skills") && (
-              <div id="sec-skills" className="space-y-5">
+              <div id="sec-skills" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1635,7 +1709,7 @@ export function CvWorkspace() {
                 </Field>
 
                 {/* Portfolio Links */}
-                <div className="space-y-3 border-t border-border/60 pt-4">
+                <div id="sec-portfolio" className="space-y-3 border-t border-border/60 pt-4 scroll-mt-24">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-semibold text-foreground">Tautan Portofolio &amp; Karya</span>

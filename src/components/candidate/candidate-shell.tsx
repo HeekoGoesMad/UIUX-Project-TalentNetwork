@@ -63,7 +63,7 @@ export function CandidateShell({ children }: { children: React.ReactNode }) {
     ? (cvProfile?.fullName?.trim() || user?.name || "Kandidat Profesional")
     : "Kandidat Profesional";
   const candidateRole = hydrated
-    ? (cvProfile?.targetRole || cvProfile?.headline || "Talent Network Member")
+    ? (cvProfile?.headline?.trim() || cvProfile?.targetRole?.trim() || "Talent Network Member")
     : "Talent Network Member";
   const candidateLocation = hydrated
     ? (cvProfile?.location || "Indonesia")

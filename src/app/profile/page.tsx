@@ -29,7 +29,7 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
@@ -103,7 +103,28 @@ import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 export default function ProfilePage() {
   const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+        setStatusOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [statusOpen]);
 
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
@@ -304,8 +325,8 @@ export default function ProfilePage() {
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="relative rounded-xl border border-border/70 bg-card shadow-xs overflow-hidden">
-              <div className="relative h-36 sm:h-44 w-full overflow-hidden bg-muted">
+            <section className="relative z-20 rounded-xl border border-border/70 bg-card shadow-xs">
+              <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-t-xl bg-muted">
                 {/* Banner Photo Overlay */}
                 {p.bannerUrl ? (
                   <img
@@ -439,7 +460,7 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Career Status Selector */}
-                  <div className="relative mt-3.5">
+                  <div className="relative mt-3.5" ref={statusRef}>
                     <button
                       id="career-status-btn"
                       onClick={() => setStatusOpen((prev) => !prev)}
@@ -460,7 +481,7 @@ export default function ProfilePage() {
                       <div
                         role="listbox"
                         aria-label="Pilih status karier"
-                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border bg-card p-1 shadow-md"
+                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border bg-card p-1 shadow-lg"
                       >
                         {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
                           const cfg = CAREER_STATUS_CONFIG[key];
@@ -682,6 +703,11 @@ export default function ProfilePage() {
                       <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
                     </a>
                   ))}
+                  <div className="pt-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs" asChild>
+                      <Link href="/candidate/cv?section=skills">Tambah portofolio</Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <EmptyState
@@ -690,7 +716,7 @@ export default function ProfilePage() {
                   description="Tambahkan case study terbaikmu."
                   action={
                     <Button variant="outline" size="sm" asChild>
-                      <Link href="/candidate">Tambah portofolio</Link>
+                      <Link href="/candidate/cv?section=skills">Tambah portofolio</Link>
                     </Button>
                   }
                   className="rounded-lg border-dashed bg-transparent p-5 shadow-none"
