@@ -262,6 +262,7 @@ export function JobMultiSelectDropdown({
                 return (
                   <label
                     key={opt.value}
+                    title={isDeadEnd ? "Belum ada lowongan untuk opsi ini dengan filter saat ini" : undefined}
                     onClick={() => {
                       if (!isDeadEnd) toggleOption(opt.value);
                     }}
@@ -475,6 +476,7 @@ export function JobSalaryDropdown({
                   key={preset.value}
                   type="button"
                   disabled={isDeadEnd}
+                  title={isDeadEnd ? "Belum ada lowongan pada rentang gaji ini dengan filter saat ini" : undefined}
                   onClick={() => setDraftSalary(preset.value)}
                   className={cn(
                     "w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors text-left select-none",
@@ -501,19 +503,23 @@ export function JobSalaryDropdown({
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-border/60">
-            <label
-              onClick={() => {
-                if (negotiableCount !== 0 || draftNegotiable) {
-                  setDraftNegotiable((prev) => !prev);
-                }
-              }}
-              className={cn(
-                "flex items-center justify-between gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium select-none transition-colors",
-                negotiableCount === 0 && !draftNegotiable
-                  ? "opacity-35 cursor-not-allowed text-muted-foreground"
-                  : "cursor-pointer hover:bg-slate-100"
-              )}
-            >
+            {(() => {
+              const isDeadEndNegotiable = (negotiableCount === 0 || negotiableCount === undefined) && !draftNegotiable;
+              return (
+                <label
+                  title={isDeadEndNegotiable ? "Belum ada lowongan dengan gaji negosiasi dengan filter saat ini" : undefined}
+                  onClick={() => {
+                    if (!isDeadEndNegotiable) {
+                      setDraftNegotiable((prev) => !prev);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center justify-between gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium select-none transition-colors",
+                    isDeadEndNegotiable
+                      ? "opacity-35 cursor-not-allowed text-muted-foreground"
+                      : "cursor-pointer hover:bg-slate-100"
+                  )}
+                >
               <div className="flex items-center gap-2.5">
                 <div
                   className={cn(
@@ -533,6 +539,8 @@ export function JobSalaryDropdown({
                 </span>
               )}
             </label>
+              );
+            })()}
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between gap-2">
@@ -811,55 +819,141 @@ export function JobActiveFilterChips({
   );
 }
 
+export const STANDARD_LOCATION_PRESETS = [
+  { value: "remote", label: "100% Remote (Seluruh Indonesia)" },
+  { value: "jakarta selatan", label: "Jakarta Selatan, DKI Jakarta" },
+  { value: "jakarta pusat", label: "Jakarta Pusat, DKI Jakarta" },
+  { value: "jakarta barat", label: "Jakarta Barat, DKI Jakarta" },
+  { value: "jakarta timur", label: "Jakarta Timur, DKI Jakarta" },
+  { value: "jakarta utara", label: "Jakarta Utara, DKI Jakarta" },
+  { value: "bandung", label: "Bandung, Jawa Barat" },
+  { value: "surabaya", label: "Surabaya, Jawa Timur" },
+  { value: "yogyakarta", label: "D.I. Yogyakarta" },
+  { value: "tangerang", label: "Tangerang / BSD City, Banten" },
+  { value: "bali", label: "Denpasar / Bali" },
+  { value: "semarang", label: "Semarang, Jawa Tengah" },
+  { value: "malang", label: "Malang, Jawa Timur" },
+  { value: "medan", label: "Medan, Sumatera Utara" },
+  { value: "batam", label: "Batam, Kepulauan Riau" },
+  { value: "makassar", label: "Makassar, Sulawesi Selatan" },
+  { value: "balikpapan", label: "Balikpapan, Kalimantan Timur" },
+  { value: "palembang", label: "Palembang, Sumatera Selatan" },
+] as const;
+
+export const STANDARD_TECH_SKILLS = [
+  "React",
+  "TypeScript",
+  "Next.js",
+  "Node.js",
+  "Golang",
+  "Python",
+  "Figma",
+  "UI/UX",
+  "PostgreSQL",
+  "Docker",
+  "Tailwind CSS",
+  "Product Design",
+  "Product Management",
+  "Apache Kafka",
+  "Java",
+  "Flutter",
+  "Kotlin",
+  "Kubernetes",
+  "QA / Testing",
+  "Machine Learning",
+  "Data Analysis",
+  "Scrum / Agile",
+  "GraphQL",
+  "Redis",
+] as const;
+
 /**
- * Dynamically extract unique cities from active jobs (Dead-End Free)
+ * Hybrid Locations List:
+ * - Keeps all standard recognized Indonesian locations visible
+ * - Dynamically includes any additional cities from posted jobs
+ * - Calculates active job count for each location
+ * - Sorts active locations (count > 0) to top, followed by other locations with (0)
  */
 export function extractUniqueLocations(jobs: Job[]): FilterOption[] {
   const map = new Map<string, { label: string; count: number }>();
 
-  // Add 100% Remote if any jobs are remote
+  // 1. Initialize with standard Indonesian presets
+  STANDARD_LOCATION_PRESETS.forEach((preset) => {
+    map.set(preset.value, { label: preset.label, count: 0 });
+  });
+
+  // 2. Count 100% remote jobs
   const remoteJobsCount = jobs.filter((j) => j.workArrangement === "remote").length;
-  if (remoteJobsCount > 0) {
-    map.set("remote", { label: "100% Remote (Seluruh Indonesia)", count: remoteJobsCount });
+  const remoteEntry = map.get("remote");
+  if (remoteEntry) {
+    remoteEntry.count = remoteJobsCount;
   }
 
+  // 3. Match and count locations from active jobs
   jobs.forEach((job) => {
     if (!job.location) return;
-    // Clean note annotations like "(Remote Seluruh Indonesia)" or "(Hybrid BSD)"
     const cleaned = job.location.replace(/\s*\(.*?\)\s*/g, "").trim();
     const parts = cleaned.split(",");
     const city = parts[0]?.trim();
-    if (city && city.toLowerCase() !== "remote") {
-      const key = city;
-      const existing = map.get(key);
+    if (!city || city.toLowerCase() === "remote") return;
+
+    const lowerCity = city.toLowerCase();
+    let matchedKey: string | null = null;
+    for (const key of map.keys()) {
+      if (key !== "remote" && (lowerCity.includes(key) || key.includes(lowerCity))) {
+        matchedKey = key;
+        break;
+      }
+    }
+
+    if (matchedKey) {
+      const entry = map.get(matchedKey)!;
+      entry.count += 1;
+    } else {
+      const existing = map.get(lowerCity);
       if (existing) {
         existing.count += 1;
       } else {
-        map.set(key, { label: city, count: 1 });
+        map.set(lowerCity, { label: city, count: 1 });
       }
     }
   });
 
+  // 4. Return all locations with active ones sorted first
   return Array.from(map.entries())
     .map(([key, data]) => ({
       value: key,
       label: data.label,
       count: data.count,
     }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    .sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count || a.label.localeCompare(b.label);
+    });
 }
 
 /**
- * Dynamically extract unique skills from active jobs' requirements (Dead-End Free)
+ * Hybrid Skills List:
+ * - Keeps standard recognized industry skills visible
+ * - Dynamically includes any additional skills from posted jobs
+ * - Calculates active job count for each skill
+ * - Sorts in-demand skills (count > 0) to top
  */
 export function extractUniqueSkills(jobs: Job[]): FilterOption[] {
   const map = new Map<string, { label: string; count: number }>();
 
+  // 1. Initialize with standard skills
+  STANDARD_TECH_SKILLS.forEach((skill) => {
+    map.set(skill.toLowerCase(), { label: skill, count: 0 });
+  });
+
+  // 2. Count occurrences from jobs requirements & add any job-specific skills
   jobs.forEach((job) => {
     job.requirements.forEach((req) => {
       const name = req.name.trim();
       if (!name) return;
-      const key = name;
+      const key = name.toLowerCase();
       const existing = map.get(key);
       if (existing) {
         existing.count += 1;
@@ -869,13 +963,18 @@ export function extractUniqueSkills(jobs: Job[]): FilterOption[] {
     });
   });
 
+  // 3. Return all skills with active ones sorted first
   return Array.from(map.entries())
     .map(([key, data]) => ({
       value: key,
       label: data.label,
       count: data.count,
     }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    .sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count || a.label.localeCompare(b.label);
+    });
 }
 
 /**
@@ -985,6 +1084,31 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterValues): Job[] {
 
     return true;
   });
+}
+
+/**
+ * Helper to get a subset of jobs with all active filters applied EXCEPT for one dimension,
+ * enabling dead-end-free faceted counting and disjunctive multi-selection.
+ */
+export function getJobsExcludingFilter(
+  jobs: Job[],
+  filters: JobFilterValues,
+  dimension: keyof JobFilterValues
+): Job[] {
+  const partialFilters: JobFilterValues = {
+    ...filters,
+    ...(dimension === "types" ? { types: [] } : {}),
+    ...(dimension === "arrangements" ? { arrangements: [] } : {}),
+    ...(dimension === "categories" ? { categories: [] } : {}),
+    ...(dimension === "skills" ? { skills: [] } : {}),
+    ...(dimension === "experience" ? { experience: [] } : {}),
+    ...(dimension === "education" ? { education: [] } : {}),
+    ...(dimension === "minSalary" ? { minSalary: 0, negotiableOnly: false } : {}),
+    ...(dimension === "negotiableOnly" ? { negotiableOnly: false } : {}),
+    ...(dimension === "locations" ? { locations: [] } : {}),
+    ...(dimension === "verifiedOnly" ? { verifiedOnly: false } : {}),
+  };
+  return applyJobFilters(jobs, partialFilters);
 }
 
 /**

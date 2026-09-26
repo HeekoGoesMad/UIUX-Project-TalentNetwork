@@ -65,6 +65,7 @@ import {
   JobSortDropdown,
   JobActiveFilterChips,
   applyJobFilters,
+  getJobsExcludingFilter,
   sortJobs,
   INITIAL_JOB_FILTERS,
   SALARY_PRESETS,
@@ -460,70 +461,122 @@ export function PublicJobsPage() {
 
   const { jobs, loading, error } = useJobs();
 
-  // Dead-End Free: dynamic match counts & only available options
+  // Faceted subsets: evaluate each dimension against jobs matching ALL other active filters
+  const jobsForTypes = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "types"),
+    [jobs, currentFilters]
+  );
+  const jobsForArrangements = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "arrangements"),
+    [jobs, currentFilters]
+  );
+  const jobsForCategories = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "categories"),
+    [jobs, currentFilters]
+  );
+  const jobsForSkills = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "skills"),
+    [jobs, currentFilters]
+  );
+  const jobsForExperience = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "experience"),
+    [jobs, currentFilters]
+  );
+  const jobsForEducation = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "education"),
+    [jobs, currentFilters]
+  );
+  const jobsForLocations = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "locations"),
+    [jobs, currentFilters]
+  );
+  const jobsForSalary = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "minSalary"),
+    [jobs, currentFilters]
+  );
+
+  // Hybrid Dead-End Free: all options retained, active ones prioritized, 0-match disabled
   const typeOptions = useMemo(() => {
     return EMPLOYMENT_TYPES.map((t) => ({
       value: t,
       label: employmentLabels[t],
-      count: jobs.filter((j) => j.employmentType === t).length,
-    })).filter((opt) => opt.count > 0);
-  }, [jobs]);
+      count: jobsForTypes.filter((j) => j.employmentType === t).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count;
+    });
+  }, [jobsForTypes]);
 
   const arrangementOptions = useMemo(() => {
     return WORK_ARRANGEMENTS.map((a) => ({
       value: a,
       label: arrangementLabels[a],
-      count: jobs.filter((j) => j.workArrangement === a).length,
-    })).filter((opt) => opt.count > 0);
-  }, [jobs]);
+      count: jobsForArrangements.filter((j) => j.workArrangement === a).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count;
+    });
+  }, [jobsForArrangements]);
 
   const categoryOptions = useMemo(() => {
     return JOB_CATEGORIES.map((c) => ({
       value: c,
       label: categoryLabels[c],
-      count: jobs.filter((j) => j.jobCategory === c).length,
-    })).filter((opt) => opt.count > 0);
-  }, [jobs]);
+      count: jobsForCategories.filter((j) => j.jobCategory === c).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count || a.label.localeCompare(b.label);
+    });
+  }, [jobsForCategories]);
 
   const skillOptions = useMemo(() => {
-    return extractUniqueSkills(jobs);
-  }, [jobs]);
+    return extractUniqueSkills(jobsForSkills);
+  }, [jobsForSkills]);
 
   const experienceOptions = useMemo(() => {
     return EXPERIENCE_LEVELS.map((e) => ({
       value: e,
       label: experienceLabels[e],
-      count: jobs.filter((j) => j.experienceLevel === e).length,
-    })).filter((opt) => opt.count > 0);
-  }, [jobs]);
+      count: jobsForExperience.filter((j) => j.experienceLevel === e).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return 0;
+    });
+  }, [jobsForExperience]);
 
   const educationOptions = useMemo(() => {
     return EDUCATION_LEVELS.map((ed) => ({
       value: ed,
       label: educationLabels[ed],
-      count: jobs.filter((j) => j.minEducation === ed).length,
-    })).filter((opt) => opt.count > 0);
-  }, [jobs]);
+      count: jobsForEducation.filter((j) => j.minEducation === ed).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return 0;
+    });
+  }, [jobsForEducation]);
 
-  // Dead-End Free: Dynamically extracted cities from active jobs
   const locationOptions = useMemo(() => {
-    return extractUniqueLocations(jobs);
-  }, [jobs]);
+    return extractUniqueLocations(jobsForLocations);
+  }, [jobsForLocations]);
 
-  // Dead-End Free Salary Options
   const salaryPresets = useMemo(() => {
     return SALARY_PRESETS.map((preset) => ({
       ...preset,
       count:
         preset.value === 0
-          ? jobs.length
-          : jobs.filter((j) => (j.salaryMax || j.salaryMin || 0) >= preset.value).length,
-    })).filter((preset) => preset.count > 0);
-  }, [jobs]);
+          ? jobsForSalary.length
+          : jobsForSalary.filter((j) => (j.salaryMax || j.salaryMin || 0) >= preset.value).length,
+    }));
+  }, [jobsForSalary]);
 
   const negotiableCount = useMemo(() => {
-    return jobs.filter((j) => j.isSalaryNegotiable).length;
-  }, [jobs]);
+    return jobsForSalary.filter((j) => j.isSalaryNegotiable).length;
+  }, [jobsForSalary]);
 
   // Evaluated & sorted jobs
   const filteredAndSorted = useMemo(() => {
