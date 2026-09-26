@@ -16,13 +16,17 @@ import {
   Copy,
   ExternalLink,
   GraduationCap,
+  Laptop,
+  Layers,
   Mail,
   MapPin,
   Phone,
+  RotateCcw,
   Search,
   Send,
   Share2,
   ShieldCheck,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -34,18 +38,42 @@ import { useApp } from "@/providers/app-provider";
 import { cn } from "@/lib/utils";
 import {
   DEMO_JOBS,
+  EMPLOYMENT_TYPES,
+  WORK_ARRANGEMENTS,
+  EXPERIENCE_LEVELS,
+  EDUCATION_LEVELS,
+  JOB_CATEGORIES,
   arrangementLabels,
   educationLabels,
   employmentLabels,
   experienceLabels,
+  categoryLabels,
   formatOfficeAddress,
   formatPhoneDisplay,
   formatSalaryDisplay,
   statusLabels,
   type EducationLevel,
   type ExperienceLevel,
+  type EmploymentType,
+  type WorkArrangement,
+  type JobCategory,
   type Job,
 } from "@/lib/jobs";
+import {
+  JobMultiSelectDropdown,
+  JobSalaryDropdown,
+  JobSortDropdown,
+  JobActiveFilterChips,
+  applyJobFilters,
+  getJobsExcludingFilter,
+  sortJobs,
+  INITIAL_JOB_FILTERS,
+  SALARY_PRESETS,
+  extractUniqueLocations,
+  extractUniqueSkills,
+  type JobFilterValues,
+  type JobSortOption,
+} from "./job-filters";
 import {
   Dialog,
   DialogContent,
@@ -358,65 +386,291 @@ const PAGE_SIZE = 10;
 export function PublicJobsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // URL parameters parsing
   const query = searchParams.get("q") ?? "";
-  const rawArrangement = searchParams.get("arrangement");
-  const arrangement =
-    rawArrangement === "remote" || rawArrangement === "hybrid" || rawArrangement === "onsite"
-      ? rawArrangement
-      : "all";
+
+  const rawTypes = searchParams.get("types");
+  const types = useMemo(() => {
+    return rawTypes ? (rawTypes.split(",").filter(Boolean) as EmploymentType[]) : [];
+  }, [rawTypes]);
+
+  const rawArrangements = searchParams.get("arrangements");
+  const oldArrangement = searchParams.get("arrangement");
+  const arrangements = useMemo(() => {
+    if (rawArrangements) {
+      return rawArrangements.split(",").filter(Boolean) as WorkArrangement[];
+    }
+    if (oldArrangement && oldArrangement !== "all") {
+      return [oldArrangement as WorkArrangement];
+    }
+    return [];
+  }, [rawArrangements, oldArrangement]);
+
+  const rawCategories = searchParams.get("categories");
+  const categories = useMemo(() => {
+    return rawCategories ? (rawCategories.split(",").filter(Boolean) as JobCategory[]) : [];
+  }, [rawCategories]);
+
+  const rawSkills = searchParams.get("skills");
+  const skills = useMemo(() => {
+    return rawSkills ? rawSkills.split(",").filter(Boolean) : [];
+  }, [rawSkills]);
+
+  const rawExperience = searchParams.get("experience");
+  const experience = useMemo(() => {
+    return rawExperience ? (rawExperience.split(",").filter(Boolean) as ExperienceLevel[]) : [];
+  }, [rawExperience]);
+
+  const rawEducation = searchParams.get("education");
+  const education = useMemo(() => {
+    return rawEducation ? (rawEducation.split(",").filter(Boolean) as EducationLevel[]) : [];
+  }, [rawEducation]);
+
+  const minSalary = parseInt(searchParams.get("minSalary") ?? "0", 10) || 0;
+  const negotiableOnly = searchParams.get("negotiable") === "true" || searchParams.get("negotiable") === "1";
+
+  const rawLocations = searchParams.get("locations");
+  const locations = useMemo(() => {
+    return rawLocations ? rawLocations.split(",").filter(Boolean) : [];
+  }, [rawLocations]);
+
+  const verifiedOnly = searchParams.get("verified") === "true" || searchParams.get("verified") === "1";
+  const sort = (searchParams.get("sort") as JobSortOption) || "newest";
 
   const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
   const currentPage = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
 
+  const currentFilters: JobFilterValues = useMemo(
+    () => ({
+      q: query,
+      types,
+      arrangements,
+      categories,
+      skills,
+      experience,
+      education,
+      minSalary,
+      negotiableOnly,
+      locations,
+      verifiedOnly,
+      sort,
+    }),
+    [query, types, arrangements, categories, skills, experience, education, minSalary, negotiableOnly, locations, verifiedOnly, sort]
+  );
+
   const { jobs, loading, error } = useJobs();
 
-  const filtered = useMemo(() => {
-    return jobs.filter((job) => {
-      const matchQuery =
-        !query ||
-        `${job.title} ${job.organization?.name || job.organizationName} ${job.description} ${
-          job.location || ""
-        } ${job.requirements.map((r) => r.name).join(" ")}`
-          .toLowerCase()
-          .includes(query.toLowerCase());
+  // Faceted subsets: evaluate each dimension against jobs matching ALL other active filters
+  const jobsForTypes = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "types"),
+    [jobs, currentFilters]
+  );
+  const jobsForArrangements = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "arrangements"),
+    [jobs, currentFilters]
+  );
+  const jobsForCategories = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "categories"),
+    [jobs, currentFilters]
+  );
+  const jobsForSkills = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "skills"),
+    [jobs, currentFilters]
+  );
+  const jobsForExperience = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "experience"),
+    [jobs, currentFilters]
+  );
+  const jobsForEducation = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "education"),
+    [jobs, currentFilters]
+  );
+  const jobsForLocations = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "locations"),
+    [jobs, currentFilters]
+  );
+  const jobsForSalary = useMemo(
+    () => getJobsExcludingFilter(jobs, currentFilters, "minSalary"),
+    [jobs, currentFilters]
+  );
 
-      const matchArrangement = arrangement === "all" || job.workArrangement === arrangement;
-      return matchQuery && matchArrangement;
+  // Hybrid Dead-End Free: all options retained, active ones prioritized, 0-match disabled
+  const typeOptions = useMemo(() => {
+    return EMPLOYMENT_TYPES.map((t) => ({
+      value: t,
+      label: employmentLabels[t],
+      count: jobsForTypes.filter((j) => j.employmentType === t).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count;
     });
-  }, [jobs, query, arrangement]);
+  }, [jobsForTypes]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const arrangementOptions = useMemo(() => {
+    return WORK_ARRANGEMENTS.map((a) => ({
+      value: a,
+      label: arrangementLabels[a],
+      count: jobsForArrangements.filter((j) => j.workArrangement === a).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count;
+    });
+  }, [jobsForArrangements]);
+
+  const categoryOptions = useMemo(() => {
+    return JOB_CATEGORIES.map((c) => ({
+      value: c,
+      label: categoryLabels[c],
+      count: jobsForCategories.filter((j) => j.jobCategory === c).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return b.count - a.count || a.label.localeCompare(b.label);
+    });
+  }, [jobsForCategories]);
+
+  const skillOptions = useMemo(() => {
+    return extractUniqueSkills(jobsForSkills);
+  }, [jobsForSkills]);
+
+  const experienceOptions = useMemo(() => {
+    return EXPERIENCE_LEVELS.map((e) => ({
+      value: e,
+      label: experienceLabels[e],
+      count: jobsForExperience.filter((j) => j.experienceLevel === e).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return 0;
+    });
+  }, [jobsForExperience]);
+
+  const educationOptions = useMemo(() => {
+    return EDUCATION_LEVELS.map((ed) => ({
+      value: ed,
+      label: educationLabels[ed],
+      count: jobsForEducation.filter((j) => j.minEducation === ed).length,
+    })).sort((a, b) => {
+      if (a.count > 0 && b.count === 0) return -1;
+      if (a.count === 0 && b.count > 0) return 1;
+      return 0;
+    });
+  }, [jobsForEducation]);
+
+  const locationOptions = useMemo(() => {
+    return extractUniqueLocations(jobsForLocations);
+  }, [jobsForLocations]);
+
+  const salaryPresets = useMemo(() => {
+    return SALARY_PRESETS.map((preset) => ({
+      ...preset,
+      count:
+        preset.value === 0
+          ? jobsForSalary.length
+          : jobsForSalary.filter((j) => (j.salaryMax || j.salaryMin || 0) >= preset.value).length,
+    }));
+  }, [jobsForSalary]);
+
+  const negotiableCount = useMemo(() => {
+    return jobsForSalary.filter((j) => j.isSalaryNegotiable).length;
+  }, [jobsForSalary]);
+
+  // Evaluated & sorted jobs
+  const filteredAndSorted = useMemo(() => {
+    const matched = applyJobFilters(jobs, currentFilters);
+    return sortJobs(matched, currentFilters.sort);
+  }, [jobs, currentFilters]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedJobs = useMemo(() => {
     const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
-    return filtered.slice(startIndex, startIndex + PAGE_SIZE);
-  }, [filtered, safeCurrentPage]);
+    return filteredAndSorted.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredAndSorted, safeCurrentPage]);
 
   const pageItems = useMemo(
     () => getPageItems(totalPages, safeCurrentPage),
     [totalPages, safeCurrentPage]
   );
 
-  const syncParams = (nextQuery: string, nextArrangement: string, nextPage: number = 1) => {
+  // Synchronization with URL Query Parameters
+  const syncFilterParams = (nextFilters: JobFilterValues, nextPage: number = 1) => {
     const params = new URLSearchParams();
-    if (nextQuery) params.set("q", nextQuery);
-    if (nextArrangement && nextArrangement !== "all") params.set("arrangement", nextArrangement);
+    if (nextFilters.q) params.set("q", nextFilters.q);
+    if (nextFilters.types.length > 0) params.set("types", nextFilters.types.join(","));
+    if (nextFilters.arrangements.length > 0) params.set("arrangements", nextFilters.arrangements.join(","));
+    if (nextFilters.categories.length > 0) params.set("categories", nextFilters.categories.join(","));
+    if (nextFilters.skills.length > 0) params.set("skills", nextFilters.skills.join(","));
+    if (nextFilters.experience.length > 0) params.set("experience", nextFilters.experience.join(","));
+    if (nextFilters.education.length > 0) params.set("education", nextFilters.education.join(","));
+    if (nextFilters.minSalary > 0) params.set("minSalary", String(nextFilters.minSalary));
+    if (nextFilters.negotiableOnly) params.set("negotiable", "true");
+    if (nextFilters.locations.length > 0) params.set("locations", nextFilters.locations.join(","));
+    if (nextFilters.verifiedOnly) params.set("verified", "true");
+    if (nextFilters.sort && nextFilters.sort !== "newest") params.set("sort", nextFilters.sort);
     if (nextPage > 1) params.set("page", String(nextPage));
+
     const qs = params.toString();
     router.replace(qs ? `/jobs?${qs}` : "/jobs", { scroll: false });
   };
 
+  const updateSingleFilter = <K extends keyof JobFilterValues>(key: K, value: JobFilterValues[K]) => {
+    syncFilterParams(
+      {
+        ...currentFilters,
+        [key]: value,
+      },
+      1
+    );
+  };
+
+  const handleRemoveFilter = (key: keyof JobFilterValues, val?: string) => {
+    if (Array.isArray(currentFilters[key])) {
+      const arr = (currentFilters[key] as string[]).filter((item) => item !== val);
+      updateSingleFilter(key, arr as never);
+    } else if (key === "minSalary") {
+      updateSingleFilter("minSalary", 0);
+    } else if (key === "negotiableOnly") {
+      updateSingleFilter("negotiableOnly", false);
+    } else if (key === "verifiedOnly") {
+      updateSingleFilter("verifiedOnly", false);
+    } else if (key === "q") {
+      updateSingleFilter("q", "");
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    syncFilterParams(INITIAL_JOB_FILTERS, 1);
+  };
+
   const goToPage = (pageNumber: number) => {
-    syncParams(query, arrangement, pageNumber);
+    syncFilterParams(currentFilters, pageNumber);
     const container = document.getElementById("jobs-list-container");
     if (container) {
       container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
-  const startItem = filtered.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
-  const endItem = Math.min(safeCurrentPage * PAGE_SIZE, filtered.length);
+  const hasActiveFilters = Boolean(
+    currentFilters.q ||
+      currentFilters.types.length > 0 ||
+      currentFilters.arrangements.length > 0 ||
+      currentFilters.categories.length > 0 ||
+      currentFilters.skills.length > 0 ||
+      currentFilters.experience.length > 0 ||
+      currentFilters.education.length > 0 ||
+      currentFilters.minSalary > 0 ||
+      currentFilters.negotiableOnly ||
+      currentFilters.locations.length > 0 ||
+      currentFilters.verifiedOnly
+  );
+
+  const startItem = filteredAndSorted.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(safeCurrentPage * PAGE_SIZE, filteredAndSorted.length);
 
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8 sm:py-12">
@@ -446,23 +700,24 @@ export function PublicJobsPage() {
         </div>
       </header>
 
-      {/* Filter & Search Bar */}
-      <div className="mt-6 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <label className="flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-2 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+      {/* Filter & Search Bar Section */}
+      <section aria-label="Filter lowongan pekerjaan" className="mt-6 space-y-3">
+        {/* Row 1: Search Input */}
+        <div className="relative">
+          <label className="flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-2.5 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="sr-only">Cari lowongan</span>
             <input
               value={query}
-              onChange={(event) => syncParams(event.target.value, arrangement, 1)}
+              onChange={(e) => updateSingleFilter("q", e.target.value)}
               placeholder="Cari posisi, keahlian, atau nama perusahaan (contoh: Product Designer, React, Golang)..."
               className="h-7 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             {query && (
               <button
                 type="button"
-                onClick={() => syncParams("", arrangement, 1)}
-                className="text-muted-foreground hover:text-foreground p-0.5 transition-colors"
+                onClick={() => updateSingleFilter("q", "")}
+                className="text-muted-foreground hover:text-foreground p-0.5 transition-colors cursor-pointer"
                 aria-label="Hapus kata kunci pencarian"
               >
                 <X className="size-3.5" />
@@ -471,20 +726,133 @@ export function PublicJobsPage() {
           </label>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <select
-            aria-label="Filter tipe kerja"
-            value={arrangement}
-            onChange={(event) => syncParams(query, event.target.value, 1)}
-            className="h-11 rounded-xl border border-input bg-card px-3.5 text-sm font-medium text-foreground shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-          >
-            <option value="all">Semua Penempatan</option>
-            <option value="remote">100% Remote</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="onsite">On-site (Kantor)</option>
-          </select>
+        {/* Row 2: Comprehensive Multi-Select Dropdown Pills */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Tipe Kerja */}
+            <JobMultiSelectDropdown
+              label="Tipe Kerja"
+              icon={BriefcaseBusiness}
+              options={typeOptions}
+              selectedValues={currentFilters.types}
+              onChange={(values) => updateSingleFilter("types", values as EmploymentType[])}
+            />
+
+            {/* 2. Penempatan Kerja */}
+            <JobMultiSelectDropdown
+              label="Penempatan"
+              icon={Laptop}
+              options={arrangementOptions}
+              selectedValues={currentFilters.arrangements}
+              onChange={(values) => updateSingleFilter("arrangements", values as WorkArrangement[])}
+            />
+
+            {/* 3. Rentang Gaji */}
+            <JobSalaryDropdown
+              minSalary={currentFilters.minSalary}
+              negotiableOnly={currentFilters.negotiableOnly}
+              presets={salaryPresets}
+              negotiableCount={negotiableCount}
+              onChange={(salary, negotiable) => {
+                syncFilterParams(
+                  {
+                    ...currentFilters,
+                    minSalary: salary,
+                    negotiableOnly: negotiable,
+                  },
+                  1
+                );
+              }}
+            />
+
+            {/* 4. Kategori Bidang */}
+            <JobMultiSelectDropdown
+              label="Bidang Kerja"
+              icon={Layers}
+              options={categoryOptions}
+              selectedValues={currentFilters.categories}
+              onChange={(values) => updateSingleFilter("categories", values as JobCategory[])}
+              searchable
+              searchPlaceholder="Cari bidang pekerjaan..."
+            />
+
+            {/* 5. Keahlian / Tech Stack */}
+            <JobMultiSelectDropdown
+              label="Keahlian"
+              icon={Sparkles}
+              options={skillOptions}
+              selectedValues={currentFilters.skills}
+              onChange={(values) => updateSingleFilter("skills", values)}
+              searchable
+              searchPlaceholder="Cari keahlian / tech stack (React, Figma, Golang)..."
+            />
+
+            {/* 6. Pengalaman */}
+            <JobMultiSelectDropdown
+              label="Pengalaman"
+              icon={Clock}
+              options={experienceOptions}
+              selectedValues={currentFilters.experience}
+              onChange={(values) => updateSingleFilter("experience", values as ExperienceLevel[])}
+            />
+
+            {/* 7. Pendidikan */}
+            <JobMultiSelectDropdown
+              label="Pendidikan"
+              icon={GraduationCap}
+              options={educationOptions}
+              selectedValues={currentFilters.education}
+              onChange={(values) => updateSingleFilter("education", values as EducationLevel[])}
+            />
+
+            {/* 8. Lokasi Kota (Dead-End Free) */}
+            <JobMultiSelectDropdown
+              label="Lokasi"
+              icon={MapPin}
+              options={locationOptions}
+              selectedValues={currentFilters.locations}
+              onChange={(values) => updateSingleFilter("locations", values)}
+              searchable
+              searchPlaceholder="Cari kota penempatan..."
+            />
+
+            {/* 8. Verified Company Toggle */}
+            <button
+              type="button"
+              onClick={() => updateSingleFilter("verifiedOnly", !currentFilters.verifiedOnly)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold shadow-2xs transition-all cursor-pointer select-none shrink-0",
+                currentFilters.verifiedOnly
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300/40"
+                  : "border-input bg-card text-foreground hover:bg-muted/60 hover:border-border"
+              )}
+            >
+              <ShieldCheck
+                className={cn(
+                  "size-3.5 shrink-0",
+                  currentFilters.verifiedOnly ? "text-emerald-700" : "text-muted-foreground"
+                )}
+              />
+              <span>Terverifikasi Resmi</span>
+            </button>
+          </div>
+
+          {/* 9. Urutkan Berdasarkan (Sort) */}
+          <div className="shrink-0 ml-auto">
+            <JobSortDropdown
+              value={currentFilters.sort}
+              onChange={(newSort) => updateSingleFilter("sort", newSort)}
+            />
+          </div>
         </div>
-      </div>
+
+        {/* Row 3: Active Filter Chips Ribbon */}
+        <JobActiveFilterChips
+          filters={currentFilters}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={handleClearAllFilters}
+        />
+      </section>
 
       {/* Stats counter & active state */}
       <div id="jobs-list-container" className="mt-6 flex items-center justify-between gap-3">
@@ -495,21 +863,22 @@ export function PublicJobsPage() {
             <>
               Menampilkan{" "}
               <span className="text-primary font-bold">
-                {filtered.length === 0 ? "0" : `${startItem}–${endItem}`}
+                {filteredAndSorted.length === 0 ? "0" : `${startItem}–${endItem}`}
               </span>{" "}
-              dari <span className="text-primary font-bold">{filtered.length}</span> lowongan pekerjaan tersedia
+              dari <span className="text-primary font-bold">{filteredAndSorted.length}</span> lowongan pekerjaan tersedia
             </>
           )}
         </p>
 
-        {(query || arrangement !== "all") && (
+        {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => syncParams("", "all", 1)}
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleClearAllFilters}
+            className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1 cursor-pointer"
           >
-            Reset filter
+            <RotateCcw className="size-3" />
+            <span>Reset filter</span>
           </Button>
         )}
       </div>
@@ -545,15 +914,21 @@ export function PublicJobsPage() {
         <div className="mt-8">
           <State text={error} error />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filteredAndSorted.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border bg-card p-12 text-center">
           <BriefcaseBusiness className="mx-auto size-10 text-muted-foreground/60" />
-          <h2 className="mt-3 text-base font-bold text-foreground">Tidak Ada Lowongan yang Cocok</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Coba ubah kata kunci pencarian atau ganti filter pengaturan kerja Anda.
+          <h2 className="mt-3 text-base font-bold text-foreground">Tidak Ada Lowongan yang Sesuai Filter</h2>
+          <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Tidak ada lowongan kerja yang cocok dengan kriteria pencarian dan filter yang Anda pilih. Coba kurangi filter atau reset untuk melihat semua lowongan.
           </p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={() => syncParams("", "all", 1)}>
-            Reset Semua Filter
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1.5 cursor-pointer"
+            onClick={handleClearAllFilters}
+          >
+            <RotateCcw className="size-3.5" />
+            <span>Reset Semua Filter</span>
           </Button>
         </div>
       ) : (

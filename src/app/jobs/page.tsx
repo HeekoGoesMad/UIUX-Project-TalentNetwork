@@ -17,10 +17,14 @@ export default function JobsPage() {
             </div>
           </div>
 
-          {/* Search bar skeleton */}
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <Skeleton className="h-11 flex-1 rounded-xl" />
-            <Skeleton className="h-11 w-44 rounded-xl" />
+          {/* Search bar and filter pills skeleton */}
+          <div className="mt-6 space-y-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <Skeleton key={i} className="h-9 w-28 rounded-xl" />
+              ))}
+            </div>
           </div>
 
           {/* Row skeletons */}
