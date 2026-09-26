@@ -35,6 +35,7 @@ export interface JobFilterValues {
   types: EmploymentType[];
   arrangements: WorkArrangement[];
   categories: JobCategory[];
+  skills: string[];
   experience: ExperienceLevel[];
   education: EducationLevel[];
   minSalary: number;
@@ -49,6 +50,7 @@ export const INITIAL_JOB_FILTERS: JobFilterValues = {
   types: [],
   arrangements: [],
   categories: [],
+  skills: [],
   experience: [],
   education: [],
   minSalary: 0,
@@ -73,20 +75,11 @@ export const SORT_OPTIONS: { value: JobSortOption; label: string }[] = [
   { value: "vacancies", label: "Kuota Penerimaan Terbanyak" },
 ];
 
-export const POPULAR_LOCATIONS = [
-  { value: "jakarta", label: "DKI Jakarta / Jabodetabek" },
-  { value: "bandung", label: "Bandung, Jawa Barat" },
-  { value: "surabaya", label: "Surabaya, Jawa Timur" },
-  { value: "yogyakarta", label: "D.I. Yogyakarta" },
-  { value: "tangerang", label: "Tangerang / BSD City" },
-  { value: "bali", label: "Denpasar / Bali" },
-  { value: "batam", label: "Batam, Kep. Riau" },
-];
-
-interface FilterOption {
+export interface FilterOption {
   value: string;
   label: string;
   count?: number;
+  disabled?: boolean;
 }
 
 interface JobMultiSelectDropdownProps {
@@ -105,6 +98,7 @@ interface JobMultiSelectDropdownProps {
  * - Keeps local draft while open to prevent UI flicker / jumping while selecting multiple items
  * - Footer provides explicit "Reset" and "Terapkan (N)" buttons
  * - Auto-applies changes when clicking outside or pressing Escape so no choices are lost
+ * - Dead-End Free: Options with 0 matching items cannot be selected
  */
 export function JobMultiSelectDropdown({
   label,
@@ -138,7 +132,6 @@ export function JobMultiSelectDropdown({
 
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        // Auto-apply current draft values on click outside
         onChange(draftValues);
         setIsOpen(false);
       }
@@ -255,8 +248,8 @@ export function JobMultiSelectDropdown({
             </div>
           )}
 
-          {/* Options Checklist */}
-          <div className="mt-2 max-h-56 overflow-y-auto space-y-1 pr-1">
+          {/* Options Checklist (Dead-End Free) */}
+          <div className="mt-2 max-h-60 overflow-y-auto space-y-1 pr-1">
             {filteredOptions.length === 0 ? (
               <p className="py-4 text-center text-xs text-muted-foreground">
                 Tidak ada opsi yang sesuai
@@ -264,13 +257,22 @@ export function JobMultiSelectDropdown({
             ) : (
               filteredOptions.map((opt) => {
                 const isChecked = draftValues.includes(opt.value);
+                const isDeadEnd = opt.count === 0 && !isChecked;
+
                 return (
                   <label
                     key={opt.value}
-                    onClick={() => toggleOption(opt.value)}
+                    onClick={() => {
+                      if (!isDeadEnd) toggleOption(opt.value);
+                    }}
                     className={cn(
-                      "flex items-center justify-between gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors select-none",
-                      isChecked ? "bg-primary/8 text-primary" : "text-foreground hover:bg-slate-100"
+                      "flex items-center justify-between gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium select-none transition-colors",
+                      isDeadEnd
+                        ? "opacity-35 cursor-not-allowed text-muted-foreground"
+                        : "cursor-pointer",
+                      isChecked
+                        ? "bg-primary/8 text-primary font-semibold"
+                        : !isDeadEnd && "text-foreground hover:bg-slate-100"
                     )}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -279,17 +281,22 @@ export function JobMultiSelectDropdown({
                           "size-4 rounded-md border flex items-center justify-center transition-colors shrink-0",
                           isChecked
                             ? "bg-primary border-primary text-white"
+                            : isDeadEnd
+                            ? "border-slate-200 bg-slate-100"
                             : "border-slate-300 bg-white"
                         )}
                       >
                         {isChecked && <Check className="size-3 stroke-[2.5]" />}
                       </div>
-                      <span className={cn("truncate", isChecked && "font-semibold")}>
-                        {opt.label}
-                      </span>
+                      <span className="truncate">{opt.label}</span>
                     </div>
                     {opt.count !== undefined && (
-                      <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+                      <span
+                        className={cn(
+                          "text-[11px] font-mono shrink-0",
+                          isDeadEnd ? "text-slate-400" : "text-muted-foreground"
+                        )}
+                      >
                         {opt.count}
                       </span>
                     )}
@@ -326,18 +333,29 @@ export function JobMultiSelectDropdown({
   );
 }
 
+interface SalaryPresetWithCount {
+  value: number;
+  label: string;
+  count?: number;
+}
+
 /**
  * Custom Dropdown for Salary Filter:
- * - Minimum monthly salary presets
+ * - Minimum monthly salary presets with live count
  * - Checkbox for negotiable salary only
+ * - Dead-End Free: Presets with 0 available jobs are disabled
  */
 export function JobSalaryDropdown({
   minSalary,
   negotiableOnly,
+  presets = SALARY_PRESETS,
+  negotiableCount,
   onChange,
 }: {
   minSalary: number;
   negotiableOnly: boolean;
+  presets?: readonly SalaryPresetWithCount[] | SalaryPresetWithCount[];
+  negotiableCount?: number;
   onChange: (salary: number, negotiable: boolean) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -448,21 +466,34 @@ export function JobSalaryDropdown({
           </div>
 
           <div className="mt-2 space-y-1">
-            {SALARY_PRESETS.map((preset) => {
+            {presets.map((preset) => {
               const isSelected = draftSalary === preset.value;
+              const isDeadEnd = preset.count === 0 && !isSelected;
+
               return (
                 <button
                   key={preset.value}
                   type="button"
+                  disabled={isDeadEnd}
                   onClick={() => setDraftSalary(preset.value)}
                   className={cn(
-                    "w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors text-left",
+                    "w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors text-left select-none",
+                    isDeadEnd
+                      ? "opacity-35 cursor-not-allowed text-muted-foreground"
+                      : "cursor-pointer",
                     isSelected
                       ? "bg-emerald-50 text-emerald-800 font-semibold"
-                      : "text-foreground hover:bg-slate-100"
+                      : !isDeadEnd && "text-foreground hover:bg-slate-100"
                   )}
                 >
-                  <span>{preset.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{preset.label}</span>
+                    {preset.count !== undefined && (
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        ({preset.count})
+                      </span>
+                    )}
+                  </div>
                   {isSelected && <Check className="size-3.5 text-emerald-600 stroke-[2.5]" />}
                 </button>
               );
@@ -471,20 +502,36 @@ export function JobSalaryDropdown({
 
           <div className="mt-3 pt-2.5 border-t border-border/60">
             <label
-              onClick={() => setDraftNegotiable((prev) => !prev)}
-              className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-100 transition-colors select-none"
+              onClick={() => {
+                if (negotiableCount !== 0 || draftNegotiable) {
+                  setDraftNegotiable((prev) => !prev);
+                }
+              }}
+              className={cn(
+                "flex items-center justify-between gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium select-none transition-colors",
+                negotiableCount === 0 && !draftNegotiable
+                  ? "opacity-35 cursor-not-allowed text-muted-foreground"
+                  : "cursor-pointer hover:bg-slate-100"
+              )}
             >
-              <div
-                className={cn(
-                  "size-4 rounded-md border flex items-center justify-center transition-colors shrink-0",
-                  draftNegotiable
-                    ? "bg-emerald-600 border-emerald-600 text-white"
-                    : "border-slate-300 bg-white"
-                )}
-              >
-                {draftNegotiable && <Check className="size-3 stroke-[2.5]" />}
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={cn(
+                    "size-4 rounded-md border flex items-center justify-center transition-colors shrink-0",
+                    draftNegotiable
+                      ? "bg-emerald-600 border-emerald-600 text-white"
+                      : "border-slate-300 bg-white"
+                  )}
+                >
+                  {draftNegotiable && <Check className="size-3 stroke-[2.5]" />}
+                </div>
+                <span className="text-foreground">Hanya yang dapat dinegosiasi</span>
               </div>
-              <span className="text-foreground">Hanya yang dapat dinegosiasi</span>
+              {negotiableCount !== undefined && (
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  ({negotiableCount})
+                </span>
+              )}
             </label>
           </div>
 
@@ -640,7 +687,7 @@ export function JobActiveFilterChips({
     chips.push({
       key: "arrangements",
       val: arr,
-      prefix: "Lokasi",
+      prefix: "Penempatan",
       label: arrangementLabels[arr] || arr,
     });
   });
@@ -652,6 +699,16 @@ export function JobActiveFilterChips({
       val: cat,
       prefix: "Bidang",
       label: categoryLabels[cat] || cat,
+    });
+  });
+
+  // Keahlian / Tech Stack
+  filters.skills.forEach((skill) => {
+    chips.push({
+      key: "skills",
+      val: skill,
+      prefix: "Keahlian",
+      label: skill,
     });
   });
 
@@ -695,12 +752,11 @@ export function JobActiveFilterChips({
 
   // Lokasi Kota
   filters.locations.forEach((loc) => {
-    const found = POPULAR_LOCATIONS.find((p) => p.value === loc);
     chips.push({
       key: "locations",
       val: loc,
-      prefix: "Kota",
-      label: found ? found.label.split(",")[0] : loc,
+      prefix: "Lokasi",
+      label: loc === "remote" ? "100% Remote" : loc,
     });
   });
 
@@ -756,6 +812,73 @@ export function JobActiveFilterChips({
 }
 
 /**
+ * Dynamically extract unique cities from active jobs (Dead-End Free)
+ */
+export function extractUniqueLocations(jobs: Job[]): FilterOption[] {
+  const map = new Map<string, { label: string; count: number }>();
+
+  // Add 100% Remote if any jobs are remote
+  const remoteJobsCount = jobs.filter((j) => j.workArrangement === "remote").length;
+  if (remoteJobsCount > 0) {
+    map.set("remote", { label: "100% Remote (Seluruh Indonesia)", count: remoteJobsCount });
+  }
+
+  jobs.forEach((job) => {
+    if (!job.location) return;
+    // Clean note annotations like "(Remote Seluruh Indonesia)" or "(Hybrid BSD)"
+    const cleaned = job.location.replace(/\s*\(.*?\)\s*/g, "").trim();
+    const parts = cleaned.split(",");
+    const city = parts[0]?.trim();
+    if (city && city.toLowerCase() !== "remote") {
+      const key = city;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, { label: city, count: 1 });
+      }
+    }
+  });
+
+  return Array.from(map.entries())
+    .map(([key, data]) => ({
+      value: key,
+      label: data.label,
+      count: data.count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/**
+ * Dynamically extract unique skills from active jobs' requirements (Dead-End Free)
+ */
+export function extractUniqueSkills(jobs: Job[]): FilterOption[] {
+  const map = new Map<string, { label: string; count: number }>();
+
+  jobs.forEach((job) => {
+    job.requirements.forEach((req) => {
+      const name = req.name.trim();
+      if (!name) return;
+      const key = name;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, { label: name, count: 1 });
+      }
+    });
+  });
+
+  return Array.from(map.entries())
+    .map(([key, data]) => ({
+      value: key,
+      label: data.label,
+      count: data.count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/**
  * Filter evaluation engine
  */
 export function applyJobFilters(jobs: Job[], filters: JobFilterValues): Job[] {
@@ -797,21 +920,32 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterValues): Job[] {
       }
     }
 
-    // 5. Pengalaman Kerja (Experience Level)
+    // 5. Keahlian / Tech Stack (Skills)
+    if (filters.skills.length > 0) {
+      const jobSkills = job.requirements.map((r) => r.name.toLowerCase());
+      const hasMatchingSkill = filters.skills.some((skill) =>
+        jobSkills.includes(skill.toLowerCase())
+      );
+      if (!hasMatchingSkill) {
+        return false;
+      }
+    }
+
+    // 6. Pengalaman Kerja (Experience Level)
     if (filters.experience.length > 0) {
       if (!job.experienceLevel || !filters.experience.includes(job.experienceLevel as ExperienceLevel)) {
         return false;
       }
     }
 
-    // 6. Pendidikan Minimal (Minimum Education)
+    // 7. Pendidikan Minimal (Minimum Education)
     if (filters.education.length > 0) {
       if (!job.minEducation || !filters.education.includes(job.minEducation as EducationLevel)) {
         return false;
       }
     }
 
-    // 7. Rentang Gaji Minimal
+    // 8. Rentang Gaji Minimal
     if (filters.minSalary > 0) {
       const salaryEffective = job.salaryMax || job.salaryMin || 0;
       if (salaryEffective < filters.minSalary) {
@@ -819,35 +953,30 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterValues): Job[] {
       }
     }
 
-    // 8. Hanya Gaji yang Bisa Dinegosiasi
+    // 9. Hanya Gaji yang Bisa Dinegosiasi
     if (filters.negotiableOnly) {
       if (!job.isSalaryNegotiable) {
         return false;
       }
     }
 
-    // 9. Lokasi / Kota
+    // 10. Lokasi / Kota (Dead-End Free: matches dynamic city or remote)
     if (filters.locations.length > 0) {
       const jobLoc = (job.location || "").toLowerCase();
       const matchesAnyLocation = filters.locations.some((loc) => {
-        if (loc === "jakarta") return jobLoc.includes("jakarta") || jobLoc.includes("dki");
-        if (loc === "bandung") return jobLoc.includes("bandung");
-        if (loc === "surabaya") return jobLoc.includes("surabaya");
-        if (loc === "yogyakarta") return jobLoc.includes("yogyakarta") || jobLoc.includes("jogja");
-        if (loc === "tangerang") return jobLoc.includes("tangerang") || jobLoc.includes("bsd");
-        if (loc === "bali") return jobLoc.includes("bali") || jobLoc.includes("denpasar");
-        if (loc === "batam") return jobLoc.includes("batam");
-        return jobLoc.includes(loc.toLowerCase());
+        const locLower = loc.toLowerCase();
+        if (locLower === "remote") {
+          return job.workArrangement === "remote" || jobLoc.includes("remote");
+        }
+        return jobLoc.includes(locLower);
       });
 
-      // If job is 100% remote, it also satisfies location filter unless user selected specific city only
-      const isRemote = job.workArrangement === "remote";
-      if (!matchesAnyLocation && !isRemote) {
+      if (!matchesAnyLocation) {
         return false;
       }
     }
 
-    // 10. Perusahaan Terverifikasi Resmi
+    // 11. Perusahaan Terverifikasi Resmi
     if (filters.verifiedOnly) {
       if (job.organization?.verificationStatus !== "approved") {
         return false;

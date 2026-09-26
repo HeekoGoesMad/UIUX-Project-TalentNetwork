@@ -26,6 +26,7 @@ import {
   Send,
   Share2,
   ShieldCheck,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -66,7 +67,9 @@ import {
   applyJobFilters,
   sortJobs,
   INITIAL_JOB_FILTERS,
-  POPULAR_LOCATIONS,
+  SALARY_PRESETS,
+  extractUniqueLocations,
+  extractUniqueSkills,
   type JobFilterValues,
   type JobSortOption,
 } from "./job-filters";
@@ -408,6 +411,11 @@ export function PublicJobsPage() {
     return rawCategories ? (rawCategories.split(",").filter(Boolean) as JobCategory[]) : [];
   }, [rawCategories]);
 
+  const rawSkills = searchParams.get("skills");
+  const skills = useMemo(() => {
+    return rawSkills ? rawSkills.split(",").filter(Boolean) : [];
+  }, [rawSkills]);
+
   const rawExperience = searchParams.get("experience");
   const experience = useMemo(() => {
     return rawExperience ? (rawExperience.split(",").filter(Boolean) as ExperienceLevel[]) : [];
@@ -438,6 +446,7 @@ export function PublicJobsPage() {
       types,
       arrangements,
       categories,
+      skills,
       experience,
       education,
       minSalary,
@@ -446,18 +455,18 @@ export function PublicJobsPage() {
       verifiedOnly,
       sort,
     }),
-    [query, types, arrangements, categories, experience, education, minSalary, negotiableOnly, locations, verifiedOnly, sort]
+    [query, types, arrangements, categories, skills, experience, education, minSalary, negotiableOnly, locations, verifiedOnly, sort]
   );
 
   const { jobs, loading, error } = useJobs();
 
-  // Dynamic match counts for dropdown options
+  // Dead-End Free: dynamic match counts & only available options
   const typeOptions = useMemo(() => {
     return EMPLOYMENT_TYPES.map((t) => ({
       value: t,
       label: employmentLabels[t],
       count: jobs.filter((j) => j.employmentType === t).length,
-    }));
+    })).filter((opt) => opt.count > 0);
   }, [jobs]);
 
   const arrangementOptions = useMemo(() => {
@@ -465,7 +474,7 @@ export function PublicJobsPage() {
       value: a,
       label: arrangementLabels[a],
       count: jobs.filter((j) => j.workArrangement === a).length,
-    }));
+    })).filter((opt) => opt.count > 0);
   }, [jobs]);
 
   const categoryOptions = useMemo(() => {
@@ -473,7 +482,11 @@ export function PublicJobsPage() {
       value: c,
       label: categoryLabels[c],
       count: jobs.filter((j) => j.jobCategory === c).length,
-    }));
+    })).filter((opt) => opt.count > 0);
+  }, [jobs]);
+
+  const skillOptions = useMemo(() => {
+    return extractUniqueSkills(jobs);
   }, [jobs]);
 
   const experienceOptions = useMemo(() => {
@@ -481,7 +494,7 @@ export function PublicJobsPage() {
       value: e,
       label: experienceLabels[e],
       count: jobs.filter((j) => j.experienceLevel === e).length,
-    }));
+    })).filter((opt) => opt.count > 0);
   }, [jobs]);
 
   const educationOptions = useMemo(() => {
@@ -489,27 +502,27 @@ export function PublicJobsPage() {
       value: ed,
       label: educationLabels[ed],
       count: jobs.filter((j) => j.minEducation === ed).length,
-    }));
+    })).filter((opt) => opt.count > 0);
   }, [jobs]);
 
+  // Dead-End Free: Dynamically extracted cities from active jobs
   const locationOptions = useMemo(() => {
-    return POPULAR_LOCATIONS.map((loc) => {
-      const count = jobs.filter((j) => {
-        const jl = (j.location || "").toLowerCase();
-        if (loc.value === "jakarta") return jl.includes("jakarta") || jl.includes("dki");
-        if (loc.value === "bandung") return jl.includes("bandung");
-        if (loc.value === "surabaya") return jl.includes("surabaya");
-        if (loc.value === "yogyakarta") return jl.includes("yogyakarta") || jl.includes("jogja");
-        if (loc.value === "tangerang") return jl.includes("tangerang") || jl.includes("bsd");
-        if (loc.value === "bali") return jl.includes("bali") || jl.includes("denpasar");
-        if (loc.value === "batam") return jl.includes("batam");
-        return jl.includes(loc.value);
-      }).length;
-      return {
-        ...loc,
-        count,
-      };
-    });
+    return extractUniqueLocations(jobs);
+  }, [jobs]);
+
+  // Dead-End Free Salary Options
+  const salaryPresets = useMemo(() => {
+    return SALARY_PRESETS.map((preset) => ({
+      ...preset,
+      count:
+        preset.value === 0
+          ? jobs.length
+          : jobs.filter((j) => (j.salaryMax || j.salaryMin || 0) >= preset.value).length,
+    })).filter((preset) => preset.count > 0);
+  }, [jobs]);
+
+  const negotiableCount = useMemo(() => {
+    return jobs.filter((j) => j.isSalaryNegotiable).length;
   }, [jobs]);
 
   // Evaluated & sorted jobs
@@ -538,6 +551,7 @@ export function PublicJobsPage() {
     if (nextFilters.types.length > 0) params.set("types", nextFilters.types.join(","));
     if (nextFilters.arrangements.length > 0) params.set("arrangements", nextFilters.arrangements.join(","));
     if (nextFilters.categories.length > 0) params.set("categories", nextFilters.categories.join(","));
+    if (nextFilters.skills.length > 0) params.set("skills", nextFilters.skills.join(","));
     if (nextFilters.experience.length > 0) params.set("experience", nextFilters.experience.join(","));
     if (nextFilters.education.length > 0) params.set("education", nextFilters.education.join(","));
     if (nextFilters.minSalary > 0) params.set("minSalary", String(nextFilters.minSalary));
@@ -593,6 +607,7 @@ export function PublicJobsPage() {
       currentFilters.types.length > 0 ||
       currentFilters.arrangements.length > 0 ||
       currentFilters.categories.length > 0 ||
+      currentFilters.skills.length > 0 ||
       currentFilters.experience.length > 0 ||
       currentFilters.education.length > 0 ||
       currentFilters.minSalary > 0 ||
@@ -683,6 +698,8 @@ export function PublicJobsPage() {
             <JobSalaryDropdown
               minSalary={currentFilters.minSalary}
               negotiableOnly={currentFilters.negotiableOnly}
+              presets={salaryPresets}
+              negotiableCount={negotiableCount}
               onChange={(salary, negotiable) => {
                 syncFilterParams(
                   {
@@ -706,7 +723,18 @@ export function PublicJobsPage() {
               searchPlaceholder="Cari bidang pekerjaan..."
             />
 
-            {/* 5. Pengalaman */}
+            {/* 5. Keahlian / Tech Stack */}
+            <JobMultiSelectDropdown
+              label="Keahlian"
+              icon={Sparkles}
+              options={skillOptions}
+              selectedValues={currentFilters.skills}
+              onChange={(values) => updateSingleFilter("skills", values)}
+              searchable
+              searchPlaceholder="Cari keahlian / tech stack (React, Figma, Golang)..."
+            />
+
+            {/* 6. Pengalaman */}
             <JobMultiSelectDropdown
               label="Pengalaman"
               icon={Clock}
@@ -715,7 +743,7 @@ export function PublicJobsPage() {
               onChange={(values) => updateSingleFilter("experience", values as ExperienceLevel[])}
             />
 
-            {/* 6. Pendidikan */}
+            {/* 7. Pendidikan */}
             <JobMultiSelectDropdown
               label="Pendidikan"
               icon={GraduationCap}
@@ -724,7 +752,7 @@ export function PublicJobsPage() {
               onChange={(values) => updateSingleFilter("education", values as EducationLevel[])}
             />
 
-            {/* 7. Lokasi Kota */}
+            {/* 8. Lokasi Kota (Dead-End Free) */}
             <JobMultiSelectDropdown
               label="Lokasi"
               icon={MapPin}
@@ -732,7 +760,7 @@ export function PublicJobsPage() {
               selectedValues={currentFilters.locations}
               onChange={(values) => updateSingleFilter("locations", values)}
               searchable
-              searchPlaceholder="Cari kota..."
+              searchPlaceholder="Cari kota penempatan..."
             />
 
             {/* 8. Verified Company Toggle */}
