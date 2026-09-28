@@ -3049,15 +3049,17 @@ Besar harapan saya untuk dapat mendiskusikan lebih lanjut bagaimana kompetensi d
             <Banknote className="size-3.5 text-primary" />
             <span>Ekspektasi Gaji Bulanan</span>
           </label>
-          <div className="mt-1.5 relative">
-            <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-medium">Rp</span>
+          <div className="mt-1.5 relative flex items-center">
+            <span className="absolute left-3 text-xs text-muted-foreground font-semibold pointer-events-none z-10">
+              Rp
+            </span>
             <input
               type="number"
               step={500000}
               min={1000000}
               value={expectedSalary || ""}
               onChange={(e) => setExpectedSalary(Number(e.target.value) || 0)}
-              className="field pl-9 h-9 text-xs font-semibold text-foreground"
+              className="w-full rounded-xl border border-input bg-background pl-10 pr-3 h-10 text-xs font-semibold text-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none"
               placeholder="Contoh: 20000000"
             />
           </div>
@@ -3080,7 +3082,7 @@ Besar harapan saya untuk dapat mendiskusikan lebih lanjut bagaimana kompetensi d
           <select
             value={availability}
             onChange={(e) => setAvailability(e.target.value)}
-            className="field mt-1.5 h-9 text-xs text-foreground cursor-pointer"
+            className="w-full mt-1.5 rounded-xl border border-input bg-background px-3 h-10 text-xs font-medium text-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none cursor-pointer"
           >
             <option value="immediate">Segera (Immediate)</option>
             <option value="1_month">1 Bulan (1-month notice)</option>
