@@ -561,12 +561,14 @@ export const applications = pgTable("applications", {
   coverNote: text("cover_note"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [
   unique("applications_job_candidate_unique").on(table.jobId, table.candidateProfileId),
   index("applications_job_status_idx").on(table.jobId, table.status),
   index("applications_candidate_status_idx").on(table.candidateProfileId, table.status),
+  index("applications_job_unlocked_idx").on(table.jobId, table.unlockedAt),
 ]);
 
 export const applicationStageHistory = pgTable("application_stage_history", {
