@@ -29,6 +29,7 @@ export const PARTNER_CAMPUSES = [
   "Institut Teknologi Sepuluh Nopember",
   "Universitas Airlangga",
   "Universitas Padjadjaran",
+  "Dicoding Indonesia",
 ] as const;
 
 export type PartnerCampus = typeof PARTNER_CAMPUSES[number];
@@ -40,6 +41,8 @@ export type CampusVerification = {
   status: "pending" | "verified" | "rejected";
   verifiedAt?: string;
   verifiedBy?: string;
+  requestedAt?: string;
+  proofDocumentUrl?: string;
 };
 
 export type Candidate = {
