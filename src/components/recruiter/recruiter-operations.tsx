@@ -2201,9 +2201,15 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                         </div>
                       ) : (
                         stageCandidates.map((candidate, idx) => {
-                          const candidateInterviews = data.interviews.filter(
-                            (i) => i.candidateId === candidate.id || (candidate.applicationId && i.candidateId === candidate.applicationId)
-                          );
+                          const candidateInterviews = data.interviews
+                            .filter(
+                              (i) => i.candidateId === candidate.id || (candidate.applicationId && i.candidateId === candidate.applicationId)
+                            )
+                            .sort((a, b) => {
+                              const timeB = b.date ? new Date(b.date).getTime() : 0;
+                              const timeA = a.date ? new Date(a.date).getTime() : 0;
+                              return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                            });
                           const isDragging = draggingCandidateId === candidate.id;
                           const isHired = candidate.stage === "hired";
                           const isLocked = candidate.unlocked === false;

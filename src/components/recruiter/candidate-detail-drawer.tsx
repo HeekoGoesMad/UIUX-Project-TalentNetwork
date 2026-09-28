@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -10,6 +10,8 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   DollarSign,
   GitCommit,
@@ -165,15 +167,28 @@ export function CandidateDetailDrawer({
   const [newInterviewType, setNewInterviewType] = useState("Technical & System Design");
   const [newMeetingUrl, setNewMeetingUrl] = useState("https://meet.google.com/new");
   const [isAddingInterview, setIsAddingInterview] = useState(false);
+  const [showPastInterviews, setShowPastInterviews] = useState(false);
+  const candidateInterviews = useMemo(() => {
+    if (!candidate) return [];
+    return interviews
+      .filter(
+        (i) =>
+          i.candidateId === candidate.id ||
+          (candidate.applicationId &&
+            (i.candidateId === candidate.applicationId || (i as { applicationId?: string }).applicationId === candidate.applicationId))
+      )
+      .sort((a, b) => {
+        const timeB = b.date ? new Date(b.date).getTime() : 0;
+        const timeA = a.date ? new Date(a.date).getTime() : 0;
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+  }, [interviews, candidate]);
+
+  const latestInterview = candidateInterviews[0];
+  const pastInterviews = candidateInterviews.slice(1);
 
   if (!open || !candidate) return null;
 
-  const candidateInterviews = interviews.filter(
-    (i) =>
-      i.candidateId === candidate.id ||
-      (candidate.applicationId &&
-        (i.candidateId === candidate.applicationId || (i as { applicationId?: string }).applicationId === candidate.applicationId))
-  );
   const isHired = candidate.stage === "hired";
   const isOfferOrAbove = candidate.stage === "offer" || candidate.stage === "hired";
 
@@ -466,10 +481,21 @@ export function CandidateDetailDrawer({
                   )}
                 >
                   Wawancara
-                  {candidateInterviews.length > 0 && (
-                    <span className="size-4.5 rounded-full bg-purple-100 text-[#7C3AED] text-[10px] font-bold flex items-center justify-center">
-                      {candidateInterviews.length}
-                    </span>
+                  {latestInterview && (
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        latestInterview.status === "Permintaan Reschedule" || latestInterview.status === "reschedule_requested"
+                          ? "bg-amber-500"
+                          : latestInterview.status === "Ditolak Kandidat" || latestInterview.status === "declined"
+                          ? "bg-amber-600"
+                          : latestInterview.status === "Terjadwal (Terkonfirmasi)" || latestInterview.status === "confirmed"
+                          ? "bg-emerald-500"
+                          : latestInterview.status === "Selesai" || latestInterview.status === "Dibatalkan"
+                          ? "bg-slate-400"
+                          : "bg-[#7C3AED]"
+                      )}
+                    />
                   )}
                 </button>
                 <button
@@ -810,9 +836,14 @@ export function CandidateDetailDrawer({
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Jadwal Sesi Wawancara</h3>
+                  {latestInterview && (
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Sesi Terbaru
+                    </span>
+                  )}
                 </div>
 
-                {candidateInterviews.length === 0 ? (
+                {!latestInterview ? (
                   <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center bg-slate-50">
                     <Calendar className="size-8 text-slate-300 mx-auto" />
                     <p className="text-xs font-semibold text-slate-700 mt-2">Belum ada sesi wawancara</p>
@@ -821,8 +852,10 @@ export function CandidateDetailDrawer({
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {candidateInterviews.map((iv) => {
+                  <div className="space-y-4">
+                    {/* Only Render The Latest Single Interview Session */}
+                    {(() => {
+                      const iv = latestInterview;
                       const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
                       const effectiveStatus: string =
                         iv.status === "Dibatalkan"
@@ -838,13 +871,18 @@ export function CandidateDetailDrawer({
                                   : "Terjadwal";
 
                       return (
-                        <Card key={iv.id} className="border-slate-200 shadow-2xs">
-                          <CardContent className="p-4 space-y-2">
-                            <div className="flex items-start justify-between">
+                        <Card className="border-purple-200/80 bg-white shadow-2xs ring-1 ring-purple-100">
+                          <CardContent className="p-4 space-y-2.5">
+                            <div className="flex items-start justify-between gap-2">
                               <div>
-                                <p className="text-xs font-bold text-slate-900">{iv.type}</p>
-                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                                  <Clock className="size-3.5 text-purple-600" />
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-bold text-slate-900">{iv.type}</p>
+                                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                                    Sesi Utama
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                                  <Clock className="size-3.5 text-[#7C3AED]" />
                                   {formatInterviewDateTime(iv.date)}
                                 </p>
                               </div>
@@ -992,7 +1030,72 @@ export function CandidateDetailDrawer({
                           </CardContent>
                         </Card>
                       );
-                    })}
+                    })()}
+
+                    {/* Collapsible Past Interviews Accordion */}
+                    {pastInterviews.length > 0 && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowPastInterviews(!showPastInterviews)}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-slate-50/80 hover:bg-slate-100/80 transition-colors text-xs font-semibold text-slate-600"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Clock className="size-3.5 text-slate-400" />
+                            Riwayat Sesi Sebelumnya ({pastInterviews.length})
+                          </span>
+                          {showPastInterviews ? (
+                            <ChevronUp className="size-4 text-slate-500" />
+                          ) : (
+                            <ChevronDown className="size-4 text-slate-500" />
+                          )}
+                        </button>
+
+                        {showPastInterviews && (
+                          <div className="mt-2 space-y-2 pt-1 animate-in fade-in-50 duration-150">
+                            {pastInterviews.map((iv) => {
+                              const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
+                              const pastEffectiveStatus =
+                                iv.status === "Dibatalkan"
+                                  ? "Dibatalkan"
+                                  : iv.status === "Selesai" || (isPastDate && !["Permintaan Reschedule", "Ditolak Kandidat"].includes(iv.status))
+                                  ? "Selesai"
+                                  : iv.status;
+
+                              return (
+                                <div
+                                  key={iv.id}
+                                  className="rounded-lg border border-slate-200/70 bg-white p-3 text-xs space-y-1.5 opacity-80 hover:opacity-100 transition-opacity"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <p className="font-semibold text-slate-800 text-[11px]">{iv.type}</p>
+                                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                      {pastEffectiveStatus}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="size-3 text-slate-400" />
+                                      {formatInterviewDateTime(iv.date)}
+                                    </span>
+                                    {iv.meetingUrl && (
+                                      <a
+                                        href={iv.meetingUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[10px] text-purple-600 hover:underline flex items-center gap-0.5"
+                                      >
+                                        <Video className="size-3" /> Link Temu
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

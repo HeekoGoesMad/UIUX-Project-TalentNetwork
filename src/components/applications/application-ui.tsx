@@ -1230,6 +1230,19 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
 
   // Hiring Flow: Interviews & Offers
   const [interviews, setInterviews] = useState<Array<{ id: string; title: string; scheduledAt: string; timezone: string; durationMinutes: number; meetingUrl: string | null; status: string }>>([]);
+  const [showPastInterviews, setShowPastInterviews] = useState(false);
+
+  const sortedInterviews = useMemo(() => {
+    return [...interviews].sort((a, b) => {
+      const timeB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+      const timeA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
+  }, [interviews]);
+
+  const latestInterview = sortedInterviews[0];
+  const pastInterviews = sortedInterviews.slice(1);
+
   const [offers, setOffers] = useState<Array<{ id: string; salary: number; currency: string; startDate: string; expirationDate: string; benefits: string | null; notes: string | null; status: string }>>([]);
   const [actingOfferId, setActingOfferId] = useState<string | null>(null);
   const [offerNotice, setOfferNotice] = useState<string | null>(null);
@@ -2227,21 +2240,28 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             })()}
 
             {/* Scheduled Interviews Panel with Two-Way Actions */}
-            {interviews.length > 0 && (
+            {/* Scheduled Interviews Panel with Single Latest Session & Collapsible History */}
+            {latestInterview && (
               <Card className="border-border/80 bg-card shadow-xs">
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock3 className="size-4 text-primary" /> Jadwal Wawancara Anda
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Clock3 className="size-4 text-primary" /> Jadwal Wawancara Anda
+                    </CardTitle>
+                    <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                      Sesi Terbaru
+                    </span>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {interviews.map((interview) => {
+                  {(() => {
+                    const interview = latestInterview;
                     const isConfirmed = interview.status === "confirmed";
                     const isRescheduleRequested = interview.status === "reschedule_requested";
                     const isDeclined = interview.status === "declined";
 
                     return (
-                      <div key={interview.id} className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+                      <div className="flex flex-col gap-3 rounded-xl border border-purple-200/80 bg-card p-4 shadow-2xs">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -2343,7 +2363,55 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                         )}
                       </div>
                     );
-                  })}
+                  })()}
+
+                  {/* Past Interviews Collapsible Accordion */}
+                  {pastInterviews.length > 0 && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPastInterviews(!showPastInterviews)}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-border/80 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-muted-foreground"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Clock3 className="size-3.5 text-muted-foreground" />
+                          Riwayat Sesi Wawancara Sebelumnya ({pastInterviews.length})
+                        </span>
+                        {showPastInterviews ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        )}
+                      </button>
+
+                      {showPastInterviews && (
+                        <div className="mt-2 space-y-2 pt-1 animate-in fade-in-50 duration-150">
+                          {pastInterviews.map((pastIv) => (
+                            <div
+                              key={pastIv.id}
+                              className="rounded-lg border border-border/60 bg-card p-3 text-xs space-y-1 opacity-75 hover:opacity-100 transition-opacity"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="font-semibold text-foreground text-[11px]">{pastIv.title}</p>
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                  {pastIv.status === "confirmed"
+                                    ? "Terkonfirmasi"
+                                    : pastIv.status === "declined"
+                                    ? "Ditolak"
+                                    : pastIv.status === "reschedule_requested"
+                                    ? "Diajukan Reschedule"
+                                    : "Selesai"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {formatDate(pastIv.scheduledAt)} ({pastIv.durationMinutes} menit) · {pastIv.timezone}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
