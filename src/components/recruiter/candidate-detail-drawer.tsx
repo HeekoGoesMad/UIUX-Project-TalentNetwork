@@ -18,7 +18,6 @@ import {
   MessageSquare,
   Send,
   ShieldAlert,
-  Sparkles,
   Undo2,
   Unlock,
   Video,
@@ -308,7 +307,7 @@ export function CandidateDetailDrawer({
 
             {/* Inbound Triage Banner if candidate is locked */}
             {candidate.unlocked === false && (
-              <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/80 p-3 text-xs space-y-2">
+              <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/80 p-3 text-xs space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-purple-900">
                   <Lock className="size-3.5 text-[#7C3AED]" />
                   <span>Lamaran Inbound · Profil Terkunci</span>
@@ -316,23 +315,6 @@ export function CandidateDetailDrawer({
                 <p className="text-purple-700 leading-relaxed text-[11px]">
                   Kandidat melamar secara mandiri. Buka profil lengkap untuk mengakses kontak langsung, riwayat kerja, dokumen CV, dan memicu evaluasi Role-Fit AI (Biaya: 1 Token).
                 </p>
-                <div className="flex items-center gap-2 pt-0.5">
-                  <Button
-                    size="sm"
-                    onClick={() => onUnlockCandidate?.(candidate)}
-                    className="h-7 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold gap-1.5 shadow-2xs"
-                  >
-                    <Unlock className="size-3" /> Buka Profil Sekarang (1 Token)
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
-                    className="h-7 text-xs border-slate-300 text-slate-600 hover:text-rose-600 hover:border-rose-300"
-                  >
-                    Tolak (0 Token)
-                  </Button>
-                </div>
               </div>
             )}
 
@@ -583,8 +565,7 @@ export function CandidateDetailDrawer({
                 {candidate.coverNote && (
                   <Card className="border-purple-200/80 bg-purple-50/20">
                     <CardContent className="p-4 space-y-1.5">
-                      <h4 className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
-                        <Sparkles className="size-3.5 text-[#7C3AED]" />
+                      <h4 className="text-xs font-bold text-purple-950">
                         Surat Lamaran / Cover Note
                       </h4>
                       <p className="text-xs text-slate-700 leading-relaxed italic whitespace-pre-line">
@@ -601,43 +582,70 @@ export function CandidateDetailDrawer({
                   role={candidate.role}
                   score={candidate.score}
                   feedback={candidate.feedback}
+                  isUnlocked={candidate.unlocked !== false}
+                  onUnlock={() => onUnlockCandidate?.(candidate)}
                 />
 
                 {/* 3. AKSI LANJUTAN REKRUTER (Context-Aware) */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
                   <h4 className="text-xs font-semibold text-slate-800">Aksi Lanjutan Rekruter</h4>
 
-                  {candidate.stage === "screening" && (
+                  {candidate.unlocked === false ? (
                     <>
                       <p className="text-xs text-slate-500">
-                        {!candidate.jobId || candidate.jobId === "talent-pool"
-                          ? "Kandidat berada di Talent Pool. Tugaskan ke salah satu lowongan aktif terlebih dahulu untuk memulai tahapan seleksi."
-                          : "Kandidat memenuhi kualifikasi awal. Lanjutkan ke sesi wawancara atau terbitkan surat penawaran."}
+                        Profil kandidat masih terkunci. Buka profil untuk mengakses kontak langsung, CV, menjadwalkan wawancara, atau menerbitkan surat penawaran.
                       </p>
                       <div className="pt-2 flex flex-wrap gap-2">
-                        {candidate.jobId && candidate.jobId !== "talent-pool" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8 font-medium bg-white text-slate-700"
-                              onClick={() => setActiveTab("interview")}
-                            >
-                              <Calendar className="size-3.5 mr-1 text-purple-600" /> Atur Sesi Wawancara
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8 font-medium bg-white text-[#7C3AED] border-purple-200 hover:bg-purple-50"
-                              onClick={() => onOpenOfferModal(candidate)}
-                            >
-                              <DollarSign className="size-3.5 mr-1" /> Terbitkan Penawaran
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          size="sm"
+                          className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs"
+                          onClick={() => onUnlockCandidate?.(candidate)}
+                        >
+                          <Unlock className="size-3.5 mr-1" /> Buka Profil Sekarang (1 Token)
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8 font-medium bg-white text-rose-600 border-slate-200 hover:bg-rose-50 hover:border-rose-300"
+                          onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
+                        >
+                          <X className="size-3.5 mr-1" /> Tolak Lamaran (0 Token)
+                        </Button>
                       </div>
                     </>
-                  )}
+                  ) : (
+                    <>
+                      {candidate.stage === "screening" && (
+                        <>
+                          <p className="text-xs text-slate-500">
+                            {!candidate.jobId || candidate.jobId === "talent-pool"
+                              ? "Kandidat berada di Talent Pool. Tugaskan ke salah satu lowongan aktif terlebih dahulu untuk memulai tahapan seleksi."
+                              : "Kandidat memenuhi kualifikasi awal. Lanjutkan ke sesi wawancara atau terbitkan surat penawaran."}
+                          </p>
+                          <div className="pt-2 flex flex-wrap gap-2">
+                            {candidate.jobId && candidate.jobId !== "talent-pool" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-8 font-medium bg-white text-slate-700"
+                                  onClick={() => setActiveTab("interview")}
+                                >
+                                  <Calendar className="size-3.5 mr-1 text-purple-600" /> Atur Sesi Wawancara
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-8 font-medium bg-white text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                                  onClick={() => onOpenOfferModal(candidate)}
+                                >
+                                  <DollarSign className="size-3.5 mr-1" /> Terbitkan Penawaran
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
 
                   {candidate.stage === "interview" && (
                     <>
@@ -732,7 +740,9 @@ export function CandidateDetailDrawer({
                       Kandidat ditandai tidak lolos untuk posisi ini.
                     </p>
                   )}
-                </div>
+                </>
+              )}
+            </div>
               </div>
             )}
 

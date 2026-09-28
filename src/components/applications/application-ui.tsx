@@ -13,19 +13,23 @@ import {
   Calendar,
   CalendarClock,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Clock3,
   Copy,
   ExternalLink,
   Eye,
   FileQuestion,
+  Lock,
   MessageSquare,
   Send,
   ShieldCheck,
   Sparkles,
+  Unlock,
   UserRound,
   X,
 } from "lucide-react";
@@ -66,7 +70,20 @@ export const applicationStatuses = [
   "withdrawn",
 ] as const;
 export type ApplicationStatus = (typeof applicationStatuses)[number];
-export type Application = { id: string; jobId: string; candidateProfileId?: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
+export type Application = {
+  id: string;
+  jobId: string;
+  candidateProfileId?: string;
+  status: ApplicationStatus;
+  source?: string | null;
+  unlockedAt?: string | null;
+  coverNote: string | null;
+  submittedAt: string;
+  withdrawnAt: string | null;
+  updatedAt: string;
+  job?: { id: string; title: string; organizationName: string };
+  candidate?: { name: string | null; headline: string | null; location: string | null } | null;
+};
 type History = { id: string; fromStatus: ApplicationStatus | null; toStatus: ApplicationStatus; reason: string | null; changedBy: string; createdAt: string };
 const labels: Record<ApplicationStatus, string> = {
   new: "Baru",
@@ -103,6 +120,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-001",
     jobId: "demo-job-1",
     status: "interview",
+    source: "self_applied",
+    unlockedAt: "2026-09-15T09:00:00.000Z",
     coverNote: "Tertarik berkontribusi pada pengembangan sistem pembayaran digital dan UX research.",
     submittedAt: "2026-09-14T08:30:00.000Z",
     withdrawnAt: null,
@@ -122,6 +141,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-002",
     jobId: "demo-job-2",
     status: "assessment",
+    source: "self_applied",
+    unlockedAt: "2026-09-12T10:30:00.000Z",
     coverNote: "Fokus pada riset pengguna dan penguatan standardisasi design system di sektor perbankan.",
     submittedAt: "2026-09-10T14:20:00.000Z",
     withdrawnAt: null,
@@ -141,6 +162,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-003",
     jobId: "demo-job-3",
     status: "review",
+    source: "self_applied",
+    unlockedAt: "2026-09-10T11:00:00.000Z",
     coverNote: "Memiliki keahlian mendalam dalam tokenisasi design token dan komponen multi-brand.",
     submittedAt: "2026-09-08T09:00:00.000Z",
     withdrawnAt: null,
@@ -160,6 +183,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-004",
     jobId: "demo-job-4",
     status: "offer",
+    source: "self_applied",
+    unlockedAt: "2026-09-05T14:00:00.000Z",
     coverNote: "Pengalaman 5+ tahun dalam merancang solusi e-commerce dan merchant center.",
     submittedAt: "2026-09-01T11:15:00.000Z",
     withdrawnAt: null,
@@ -179,6 +204,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-005",
     jobId: "demo-job-5",
     status: "hired",
+    source: "self_applied",
+    unlockedAt: "2026-08-25T08:30:00.000Z",
     coverNote: "Tertarik memimpin perancangan interaksi produk digital inovatif di Djoin.",
     submittedAt: "2026-08-20T10:00:00.000Z",
     withdrawnAt: null,
@@ -198,6 +225,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-006",
     jobId: "demo-job-6",
     status: "rejected",
+    source: "self_applied",
+    unlockedAt: null,
     coverNote: "Melamar posisi product design.",
     submittedAt: "2026-08-10T14:00:00.000Z",
     withdrawnAt: null,
@@ -206,6 +235,27 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
       id: "demo-job-6",
       title: "Junior UI Designer",
       organizationName: "PT Global Tiket Network (Tiket.com)",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
+  {
+    id: "demo-app-007",
+    jobId: "demo-job-7",
+    status: "new",
+    source: "self_applied",
+    unlockedAt: null,
+    coverNote: "Tertarik membangun antarmuka web modern bertenaga AI dengan performa tinggi dan desain terintegrasi.",
+    submittedAt: "2026-09-26T11:00:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-26T11:00:00.000Z",
+    job: {
+      id: "demo-job-7",
+      title: "AI Frontend Developer",
+      organizationName: "PT Proofy Teknologi Nusantara",
     },
     candidate: {
       name: "Nadia Putri Rahayu",
@@ -235,6 +285,26 @@ export function saveDemoApplication(application: Application) {
 
 function statusBadge(status: ApplicationStatus) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>;
+}
+
+function transparencyBadge(application: Application) {
+  if (application.unlockedAt) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <CheckCircle2 className="size-3 text-emerald-600" />
+        Profil Dibuka Rekruter
+      </span>
+    );
+  }
+  if (application.status === "new" || application.status === "screening") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+        <Clock className="size-3 text-slate-500" />
+        Antrean Triage
+      </span>
+    );
+  }
+  return null;
 }
 
 function State({ text, error = false }: { text: string; error?: boolean }) {
@@ -655,7 +725,10 @@ export function CandidateApplicationsPage() {
                           </div>
 
                           <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end shrink-0">
-                            {statusBadge(application.status)}
+                            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                              {statusBadge(application.status)}
+                              {transparencyBadge(application)}
+                            </div>
                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
                               Detail
                               <ArrowRight className="size-3.5" />
@@ -1693,10 +1766,18 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   // Modern human-centric pipeline milestones for candidate visualization
   const PIPELINE_PHASES = [
     {
+      key: "submitted",
+      label: "Lamaran Terkirim",
+      desc: "Berkas lamaran diterima di antrean inbound seleksi",
+      statuses: ["new"],
+    },
+    {
       key: "review",
-      label: "Peninjauan Berkas",
-      desc: "Profil & portofolio ditinjau oleh tim rekruter",
-      statuses: ["new", "shortlisted", "screening", "review", "assessment"],
+      label: "Profil Dibuka & Peninjauan",
+      desc: application?.unlockedAt
+        ? `Profil dibuka rekruter pada ${formatDate(application.unlockedAt)}`
+        : "Menunggu pembukaan profil oleh tim rekruter",
+      statuses: ["shortlisted", "screening", "review", "assessment"],
     },
     {
       key: "interview",
@@ -1720,9 +1801,10 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
 
   const currentPhaseIndex = useMemo(() => {
     if (!application) return 0;
-    if (["hired", "rejected", "offer_declined", "withdrawn"].includes(application.status)) return 3;
-    if (application.status === "offer") return 2;
-    if (application.status === "interview") return 1;
+    if (["hired", "rejected", "offer_declined", "withdrawn"].includes(application.status)) return 4;
+    if (application.status === "offer") return 3;
+    if (application.status === "interview") return 2;
+    if (application.unlockedAt || ["shortlisted", "screening", "review", "assessment"].includes(application.status)) return 1;
     return 0;
   }, [application]);
 
@@ -1842,6 +1924,71 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
+            {/* Status Transparansi Rekruter & Privasi Pelamar */}
+            <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6 overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                      application.status === "rejected" || application.status === "offer_declined"
+                        ? "bg-slate-100 text-slate-600"
+                        : application.status === "hired"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : application.unlockedAt
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-purple-100 text-purple-700"
+                    }`}
+                  >
+                    {application.status === "rejected" || application.status === "offer_declined" ? (
+                      <Building2 className="size-5" />
+                    ) : application.status === "hired" ? (
+                      <Check className="size-5" />
+                    ) : application.unlockedAt ? (
+                      <Unlock className="size-5" />
+                    ) : (
+                      <Lock className="size-5" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-sm font-bold text-foreground">
+                        {application.status === "rejected"
+                          ? "Proses Seleksi Selesai (Tidak Lolos)"
+                          : application.status === "hired"
+                          ? "Selamat! Anda Resmi Diterima (Hired)"
+                          : application.unlockedAt
+                          ? "Profil Lengkap Anda Telah Dibuka Rekruter"
+                          : "Lamaran Berada dalam Antrean Seleksi"}
+                      </h2>
+                      {application.unlockedAt ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="size-3" /> Akses Terbuka
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Lock className="size-3" /> Privasi Terproteksi
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                      {application.status === "rejected"
+                        ? `Terima kasih atas waktu dan partisipasi Anda. Untuk posisi ini, tim rekruter belum dapat melanjutkan proses Anda. Profil Anda tetap tersimpan aktif di ProofyLink Talent Network untuk peluang karir lain yang cocok.`
+                        : application.status === "hired"
+                        ? `Selamat atas pencapaian Anda! Proses seleksi resmi telah rampung dan tim rekruter siap menyambut Anda.`
+                        : application.unlockedAt
+                        ? `Tim rekruter dari ${application.job?.organizationName || "perusahaan"} telah membuka profil profesional, CV, dan detail kontak Anda pada ${formatDate(application.unlockedAt)}. Lamaran Anda kini sedang dievaluasi secara mendalam.`
+                        : `Lamaran Anda telah diterima oleh ${application.job?.organizationName || "perusahaan"}. Kontak pribadi dan CV lengkap Anda tetap terlindungi hingga tim rekruter membuka profil Anda untuk memulai peninjauan komprehensif.`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0 hidden sm:block">
+                  <p className="text-[11px] font-medium text-muted-foreground">ID Lamaran</p>
+                  <p className="font-mono text-xs font-semibold text-foreground mt-0.5">{application.id.slice(0, 12)}</p>
+                </div>
+              </div>
+            </Card>
+
             {/* Modern Candidate Journey Tracker */}
             <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6 overflow-hidden">
               <div className="space-y-4">
@@ -1862,7 +2009,7 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-1">
                   {PIPELINE_PHASES.map((phase, idx) => {
                     const isPassed = idx < currentPhaseIndex;
                     const isCurrent = idx === currentPhaseIndex;
@@ -2537,6 +2684,8 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
           id: `demo-application-${Date.now()}`,
           jobId: job.id,
           status: "new",
+          source: "self_applied",
+          unlockedAt: null,
           coverNote: coverNote.trim(),
           submittedAt: now,
           withdrawnAt: null,
@@ -2567,13 +2716,13 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
           <div>
             <p className="font-bold text-sm text-emerald-950">Lamaran Berhasil Terkirim</p>
             <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-              Profil Anda telah diteruskan ke tim rekruter. Anda dapat memantau status lamaran di menu aplikasi saya.
+              Profil Anda telah diteruskan ke antrean seleksi rekruter. Anda dapat memantau transparansi proses seleksi dan notifikasi saat rekruter membuka profil lengkap Anda di menu Lamaran Saya.
             </p>
             <Link
               href="/candidate/applications"
               className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
             >
-              Buka Aplikasi Saya &rarr;
+              Buka Lamaran Saya &rarr;
             </Link>
           </div>
         </div>
@@ -2618,6 +2767,17 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
         />
         <p id="cover-note-help" className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
           CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter saat lamaran dikirim.
+        </p>
+      </div>
+
+      {/* Informative notice on candidate privacy and recruiter triage */}
+      <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3 text-xs text-purple-900 space-y-1">
+        <div className="flex items-center gap-1.5 font-semibold text-purple-950">
+          <ShieldCheck className="size-3.5 text-[#7C3AED]" />
+          <span>Transparansi &amp; Proteksi Kontak Pelamar</span>
+        </div>
+        <p className="text-[11px] text-purple-800/90 leading-relaxed">
+          Lamaran Anda akan masuk ke antrean triage rekruter. Nomor telepon, email pribadi, dan CV mentah Anda terproteksi hingga rekruter membuka profil Anda untuk memproses ke tahapan seleksi.
         </p>
       </div>
 

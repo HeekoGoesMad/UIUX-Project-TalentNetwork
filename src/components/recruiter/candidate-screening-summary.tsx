@@ -1,7 +1,8 @@
 "use client";
 
-import { CheckCircle2, HelpCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, HelpCircle, Lock, ShieldCheck, Sparkles, Unlock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 
@@ -11,6 +12,8 @@ interface CandidateScreeningSummaryProps {
   role: string;
   score?: number;
   feedback?: string;
+  isUnlocked?: boolean;
+  onUnlock?: () => void;
 }
 
 export function CandidateScreeningSummary({
@@ -19,9 +22,90 @@ export function CandidateScreeningSummary({
   role,
   score = 4.2,
   feedback,
+  isUnlocked = true,
+  onUnlock,
 }: CandidateScreeningSummaryProps) {
   const { screeningResults } = useApp();
   const savedResult = screeningResults[candidateId];
+
+  // If candidate is locked (inbound triage), screening results are hidden until unlocked
+  if (isUnlocked === false) {
+    return (
+      <Card className="border-purple-200/80 bg-white shadow-2xs overflow-hidden">
+        <CardContent className="p-4 space-y-3.5">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <Sparkles className="size-3.5 text-[#7C3AED]" />
+              <span>Hasil AI Screening</span>
+            </div>
+            <Badge
+              variant="outline"
+              className="bg-purple-50 text-[#7C3AED] border-purple-200 text-[10px] font-semibold py-0.5 px-2.5 flex items-center gap-1"
+            >
+              <Lock className="size-2.5 text-[#7C3AED]" /> Terkunci
+            </Badge>
+          </div>
+
+          {/* Locked State Teaser */}
+          <div className="rounded-xl border border-dashed border-purple-200 bg-purple-50/40 p-4 text-center space-y-2.5">
+            <div className="size-8 rounded-full bg-purple-100 text-[#7C3AED] flex items-center justify-center mx-auto ring-4 ring-purple-50/80">
+              <Lock className="size-3.5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-900">
+                Evaluasi AI Screening Belum Terbuka
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
+                Hasil evaluasi kecocokan peran, deteksi kekuatan utama, dan panduan wawancara AI akan otomatis ditampilkan setelah profil dibuka.
+              </p>
+            </div>
+
+            {onUnlock && (
+              <div className="pt-0.5">
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={onUnlock}
+                  className="h-7 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium gap-1.5 shadow-2xs"
+                >
+                  <Unlock className="size-3" /> Buka Profil untuk Lihat Hasil (1 Token)
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Feature Points Preview (Locked) */}
+          <div className="space-y-1.5 pt-0.5 opacity-60">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Komponen yang Akan Terbuka
+            </p>
+            <div className="space-y-1 text-[11px] text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="size-3 text-purple-600 shrink-0" />
+                <span>Analisis keselarasan kompetensi inti dan riwayat pelamar</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="size-3 text-purple-600 shrink-0" />
+                <span>Rangkuman 3 kekuatan utama pelamar berbasis bukti portofolio</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="size-3 text-purple-600 shrink-0" />
+                <span>Rekomendasi topik uji kompetensi untuk sesi wawancara</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="size-3 text-slate-400" /> Model Evaluasi v2.4
+            </span>
+            <span>Akses Terproteksi · 1 Token</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Kualifikasi kecocokan kualitatif murni tanpa angka skor
   const isHighFit = savedResult?.insight?.score
