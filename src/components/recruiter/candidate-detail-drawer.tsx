@@ -18,7 +18,9 @@ import {
   MessageSquare,
   Send,
   ShieldAlert,
+  Sparkles,
   Undo2,
+  Unlock,
   Video,
   X,
 } from "lucide-react";
@@ -41,6 +43,7 @@ import {
   getDefaultStatusHistory,
   type StatusHistoryItem,
 } from "@/components/recruiter/candidate-status-git-graph";
+import { maskName } from "@/lib/candidate-display";
 import { cn } from "@/lib/utils";
 
 export type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
@@ -64,6 +67,10 @@ export type Candidate = {
   jobTitle?: string;
   avatarUrl?: string;
   statusHistory?: StatusHistoryItem[];
+  source?: "candidate" | "recruiter_invitation";
+  unlocked?: boolean;
+  unlockedAt?: string | null;
+  coverNote?: string | null;
 };
 
 export type Interview = {
@@ -96,6 +103,7 @@ interface CandidateDetailDrawerProps {
   availableJobs?: Array<{ id: string; title: string }>;
   onAssignJob?: (candidateId: string, jobId: string, jobTitle: string) => void;
   onOpenScheduleModal?: (candidate: Candidate) => void;
+  onUnlockCandidate?: (candidate: Candidate) => Promise<void> | void;
 }
 
 const STAGE_OPTIONS: Array<{ id: Stage; label: string; color: string }> = [
@@ -134,6 +142,7 @@ export function CandidateDetailDrawer({
   availableJobs = [],
   onAssignJob,
   onOpenScheduleModal,
+  onUnlockCandidate,
 }: CandidateDetailDrawerProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "interview" | "offer" | "notes">("overview");
   const [feedbackText, setFeedbackText] = useState("");
@@ -270,13 +279,19 @@ export function CandidateDetailDrawer({
                 />
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 leading-tight">
-                    {candidate.name}
+                    {candidate.unlocked !== false ? candidate.name : maskName(candidate.name)}
                   </h2>
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-xs text-slate-500">{candidate.role}</p>
                     {(!candidate.jobId || candidate.jobId === "talent-pool") && (
                       <span className="inline-flex text-[10px] font-semibold px-2 py-0.2 rounded-full bg-purple-100 text-[#7C3AED]">
                         Talent Pool
+                      </span>
+                    )}
+                    {candidate.unlocked === false && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.2 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                        <Lock className="size-2.5 text-[#7C3AED]" />
+                        Inbound Terkunci
                       </span>
                     )}
                   </div>
@@ -290,6 +305,36 @@ export function CandidateDetailDrawer({
                 <X className="size-5" />
               </button>
             </div>
+
+            {/* Inbound Triage Banner if candidate is locked */}
+            {candidate.unlocked === false && (
+              <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/80 p-3 text-xs space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-purple-900">
+                  <Lock className="size-3.5 text-[#7C3AED]" />
+                  <span>Lamaran Inbound · Profil Terkunci</span>
+                </div>
+                <p className="text-purple-700 leading-relaxed text-[11px]">
+                  Kandidat melamar secara mandiri. Buka profil lengkap untuk mengakses kontak langsung, riwayat kerja, dokumen CV, dan memicu evaluasi Role-Fit AI (Biaya: 1 Token).
+                </p>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Button
+                    size="sm"
+                    onClick={() => onUnlockCandidate?.(candidate)}
+                    className="h-7 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold gap-1.5 shadow-2xs"
+                  >
+                    <Unlock className="size-3" /> Buka Profil Sekarang (1 Token)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
+                    className="h-7 text-xs border-slate-300 text-slate-600 hover:text-rose-600 hover:border-rose-300"
+                  >
+                    Tolak (0 Token)
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Stage Selector Pill */}
             <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-slate-200/60">
@@ -314,7 +359,10 @@ export function CandidateDetailDrawer({
                       let isDisabled = false;
                       let labelSuffix = "";
 
-                      if (
+                      if (candidate.unlocked === false && (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")) {
+                        isDisabled = true;
+                        labelSuffix = " (Perlu Buka Profil)";
+                      } else if (
                         isTalentPool &&
                         (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
                       ) {
@@ -344,32 +392,52 @@ export function CandidateDetailDrawer({
             </div>
 
             {/* Quick Actions (State-Aware) */}
-            <div className="mt-3 flex items-center gap-2">
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className={cn(
-                  "h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50 hover:text-[#6D28D9] gap-1.5",
-                  isOfferOrAbove || candidate.stage === "rejected" ? "w-full" : "flex-1"
-                )}
-              >
-                <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
-                  <MessageSquare className="size-3.5" /> Kirim Pesan
-                </Link>
-              </Button>
-
-              {/* Buat Penawaran only visible if candidate is not in offer, hired, or rejected */}
-              {!isOfferOrAbove && candidate.stage !== "rejected" && (
+            {candidate.unlocked === false ? (
+              <div className="mt-3 flex items-center gap-2">
                 <Button
                   size="sm"
                   className="flex-1 h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1.5"
-                  onClick={() => onOpenOfferModal(candidate)}
+                  onClick={() => onUnlockCandidate?.(candidate)}
                 >
-                  <DollarSign className="size-3.5" /> Buat Penawaran
+                  <Unlock className="size-3.5" /> Buka Profil (1 Token)
                 </Button>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-8 text-xs font-semibold border-slate-300 text-slate-700 hover:text-rose-600 hover:border-rose-300 gap-1.5"
+                  onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
+                >
+                  <X className="size-3.5" /> Tolak (0 Token)
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-3 flex items-center gap-2">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50 hover:text-[#6D28D9] gap-1.5",
+                    isOfferOrAbove || candidate.stage === "rejected" ? "w-full" : "flex-1"
+                  )}
+                >
+                  <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
+                    <MessageSquare className="size-3.5" /> Kirim Pesan
+                  </Link>
+                </Button>
+
+                {/* Buat Penawaran only visible if candidate is not in offer, hired, or rejected */}
+                {!isOfferOrAbove && candidate.stage !== "rejected" && (
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1.5"
+                    onClick={() => onOpenOfferModal(candidate)}
+                  >
+                    <DollarSign className="size-3.5" /> Buat Penawaran
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tab Navigation (When Hired: Only Overview and Notes) */}
@@ -510,6 +578,21 @@ export function CandidateDetailDrawer({
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Cover Note Section */}
+                {candidate.coverNote && (
+                  <Card className="border-purple-200/80 bg-purple-50/20">
+                    <CardContent className="p-4 space-y-1.5">
+                      <h4 className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                        <Sparkles className="size-3.5 text-[#7C3AED]" />
+                        Surat Lamaran / Cover Note
+                      </h4>
+                      <p className="text-xs text-slate-700 leading-relaxed italic whitespace-pre-line">
+                        &ldquo;{candidate.coverNote}&rdquo;
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* 2. RINGKASAN HASIL AI SCREENING (Merged from /recruiter/screenings) */}
                 <CandidateScreeningSummary
