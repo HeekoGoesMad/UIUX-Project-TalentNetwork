@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
+  Banknote,
   Bookmark,
   Briefcase,
   Building2,
@@ -24,6 +25,7 @@ import {
   ExternalLink,
   Eye,
   FileQuestion,
+  FileText,
   Lock,
   MessageSquare,
   Send,
@@ -78,6 +80,8 @@ export type Application = {
   source?: string | null;
   unlockedAt?: string | null;
   coverNote: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
   submittedAt: string;
   withdrawnAt: string | null;
   updatedAt: string;
@@ -2449,17 +2453,59 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
-            {/* Cover Note Section */}
+            {/* Application Submission Overview (Cover Note & Preferences) */}
             <Card className="border-border/80 bg-card shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">
-                  Surat Pengantar (Cover Note)
-                </CardTitle>
+              <CardHeader className="pb-3 border-b border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base font-bold text-foreground">
+                    Rincian Lamaran &amp; Surat Pengantar
+                  </CardTitle>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    Dikirim pada {formatDate(application.submittedAt)}
+                  </span>
+                </div>
               </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-muted-foreground">
-                  {application.coverNote || "Tidak ada catatan pengantar yang dilampirkan."}
-                </p>
+              <CardContent className="space-y-4 pt-4">
+                {(application.expectedSalary || application.availability) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border/70 bg-muted/20 text-xs">
+                    {application.expectedSalary && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                          <Banknote className="size-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-muted-foreground block">Ekspektasi Gaji Pelamar</span>
+                          <span className="font-semibold text-foreground">
+                            Rp {Number(application.expectedSalary).toLocaleString("id-ID")} / bulan
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {application.availability && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                          <Clock className="size-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-muted-foreground block">Ketersediaan Bergabung</span>
+                          <span className="font-semibold text-foreground">
+                            {application.availability}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-primary" />
+                    <span>Catatan Pembuka / Cover Note:</span>
+                  </p>
+                  <p className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-muted-foreground bg-muted/30 p-3.5 rounded-xl border border-border/50">
+                    {application.coverNote || "Tidak ada catatan pengantar yang dilampirkan."}
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -2651,14 +2697,120 @@ export function RecruiterPipelinePage({ jobId }: { jobId: string }) {
   return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-7xl px-4 py-8 sm:py-12"><Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Jobs</Link><div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter workspace</p><h1 className="mt-2 text-3xl font-bold">Pipeline</h1><p className="mt-2 text-muted-foreground">{job?.title ?? "Job"} {job?.organizationName ? `· ${job.organizationName}` : ""}</p></div><div className="flex items-center gap-2 text-sm text-muted-foreground"><UserRound className="size-4" /> {visible.length} kandidat</div></div><label className="mt-6 block max-w-xl text-sm font-semibold">Alasan perubahan tahap<span className="ml-2 text-xs font-normal text-muted-foreground">(opsional)<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="field mt-2 min-h-20 py-2" placeholder="Catatan untuk histori aplikasi" /></span></label>{loading ? <div className="mt-6"><State text="Memuat pipeline..." /></div> : error ? <div className="mt-6"><State text={error} error /></div> : visible.length === 0 ? <div className="mt-6"><State text="Belum ada aplikasi untuk job ini. Kandidat yang melamar akan muncul di sini." /></div> : <div className="mt-6 grid gap-4 lg:grid-cols-3">{grouped.map((group) => <section key={group.status} className="rounded-2xl border bg-muted/30 p-3"><div className="flex items-center justify-between px-2 py-2"><h2 className="font-semibold">{labels[group.status]}</h2><span className="text-xs text-muted-foreground">{group.items.length}</span></div><div className="space-y-3">{group.items.map((application) => <Card key={application.id}><CardContent className="p-4"><div className="flex items-start gap-3"><div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRound className="size-4" /></div><div className="min-w-0"><p className="font-semibold">{application.candidate?.name ?? "Kandidat"}</p><p className="mt-1 text-xs text-muted-foreground">{application.candidate?.headline ?? "Profil kandidat"}</p>{application.candidate?.location && <p className="mt-1 text-xs text-muted-foreground">{application.candidate.location}</p>}</div></div><div className="mt-4 flex flex-wrap gap-2"><select aria-label={`Pindahkan aplikasi ${application.id}`} value={application.status} disabled={updating === application.id} onChange={(event) => void transition(application, event.target.value as ApplicationStatus)} className="field h-9 text-xs">{applicationStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select><span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3" /> Histori tersimpan</span></div></CardContent></Card>)}</div></section>)}</div>}</main></ProtectedRoute>;
 }
 
-export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?: boolean }) {
-  const { dbMode } = useApp();
-  const { applications } = useApplications();
+export function ApplyForm({
+  job,
+  withoutCard = false,
+  onClose,
+}: {
+  job: Job;
+  withoutCard?: boolean;
+  onClose?: () => void;
+}) {
+  const { dbMode, cvProfile } = useApp();
+  const { applications, setApplications } = useApplications();
+  const candidate = cvProfile || DEMO_CANDIDATE_CV;
+
   const [coverNote, setCoverNote] = useState("");
+  const [expectedSalary, setExpectedSalary] = useState<number>(() => {
+    if (job.salaryMin && job.salaryMax) {
+      return Math.round((job.salaryMin + job.salaryMax) / 2);
+    }
+    return 20000000;
+  });
+  const [isSalaryNegotiable, setIsSalaryNegotiable] = useState(true);
+  const [availability, setAvailability] = useState("immediate");
   const [status, setStatus] = useState<"idle" | "saving" | "success">("idle");
+  const [receiptCode, setReceiptCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   const duplicate = applications.find((item) => item.jobId === job.id);
+
+  // Skill Match Calculation
+  const skillMatchData = useMemo(() => {
+    const candidateSkills = (candidate.skills || []).map((s) => s.toLowerCase());
+    const candidateTools = (candidate.tools || []).map((t) => t.toLowerCase());
+    const candidateHard = (candidate.hardCompetencies || []).map((h) => h.toLowerCase());
+    const allCandidateCompetencies = [...candidateSkills, ...candidateTools, ...candidateHard];
+
+    const requirements = job.requirements || [];
+    if (requirements.length === 0) {
+      return {
+        score: 92,
+        matched: (candidate.skills || []).slice(0, 4),
+        missing: [] as string[],
+        total: 4,
+      };
+    }
+
+    const matched: string[] = [];
+    const missing: string[] = [];
+
+    requirements.forEach((req) => {
+      const reqLower = req.name.toLowerCase();
+      const isMatch = allCandidateCompetencies.some(
+        (skill) => skill.includes(reqLower) || reqLower.includes(skill)
+      );
+      if (isMatch) {
+        matched.push(req.name);
+      } else {
+        missing.push(req.name);
+      }
+    });
+
+    const calculatedScore = Math.min(
+      100,
+      Math.max(45, Math.round((matched.length / Math.max(1, requirements.length)) * 100))
+    );
+
+    return {
+      score: calculatedScore,
+      matched,
+      missing,
+      total: requirements.length,
+    };
+  }, [candidate, job.requirements]);
+
+  // AI Prompt Chips Generator
+  const handleApplyChip = (type: "experience" | "skills" | "motivation") => {
+    let snippet = "";
+    if (type === "experience") {
+      const headlineRole = candidate.headline?.split("|")[0]?.trim() || "Product Designer";
+      snippet = `Dengan rekam jejak sebagai ${headlineRole}, saya memiliki pengalaman solid dalam mengelola siklus perancangan dari riset kebutuhan pengguna hingga eksekusi akhir. Posisi ${job.title} di ${job.organizationName} sangat sesuai dengan kompetensi dan portofolio yang telah saya bangun.`;
+    } else if (type === "skills") {
+      const topSkills = (candidate.skills || []).slice(0, 4).join(", ") || "UI/UX Design, Design Systems";
+      const topTools = (candidate.tools || []).slice(0, 3).join(", ") || "Figma, Notion";
+      snippet = `Keahlian utama saya di bidang ${topSkills} serta penguasaan tools seperti ${topTools} memungkinkan saya untuk langsung beradaptasi secara tangkas dan memperkuat standar deliverable di tim ${job.title}.`;
+    } else if (type === "motivation") {
+      snippet = `Saya sangat antusias dengan visi dan dampak inovasi yang dihadirkan oleh ${job.organizationName}. Menjadi bagian dari tim ${job.title} merupakan langkah selaras bagi saya untuk memberikan kontribusi nyata dan profesional bagi pertumbuhan bisnis perusahaan.`;
+    }
+
+    setCoverNote((prev) => {
+      if (!prev.trim()) return snippet;
+      return `${prev.trim()}\n\n${snippet}`;
+    });
+  };
+
+  const handleGenerateFullAiDraft = () => {
+    setIsAiGenerating(true);
+    setTimeout(() => {
+      const headlineRole = candidate.headline?.split("|")[0]?.trim() || "Product Designer";
+      const topSkills = (candidate.skills || []).slice(0, 4).join(", ") || "UI/UX, Design Systems, UX Research";
+      const topTools = (candidate.tools || []).slice(0, 3).join(", ") || "Figma, Notion, Jira";
+
+      const fullDraft = `Yth. Tim Rekruter ${job.organizationName},
+
+Saya tertarik untuk mengajukan diri pada posisi ${job.title}. Dengan pengalaman profesional sebagai ${headlineRole}, saya telah memimpin beragam inisiatif perancangan produk digital yang berfokus pada efisiensi alur pengguna dan peningkatan konversi bisnis.
+
+Secara teknis, saya menguasai ${topSkills} didukung alur kerja terstruktur menggunakan ${topTools}. Kualifikasi ini sejalan dengan tanggung jawab yang dibutuhkan pada posisi ini, sehingga saya yakin dapat segera memberikan dampak positif bagi sasaran tim ${job.organizationName}.
+
+Besar harapan saya untuk dapat mendiskusikan lebih lanjut bagaimana kompetensi dan portofolio saya dapat mendukung kesuksesan proyek-proyek di ${job.organizationName}. Terima kasih atas perhatian dan kesempatan yang diberikan.`;
+
+      setCoverNote(fullDraft);
+      setIsAiGenerating(false);
+      toast.success("Draf cover note AI berhasil digenerate!");
+    }, 400);
+  };
 
   const apply = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -2670,34 +2822,53 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
     }
     setStatus("saving");
     try {
+      const availabilityLabel =
+        availability === "immediate"
+          ? "Segera (Immediate)"
+          : availability === "1_month"
+          ? "1 Bulan (1-month notice)"
+          : availability === "2_weeks"
+          ? "2 Minggu"
+          : "Fleksibel / Masih Bekerja";
+
       if (dbMode) {
         const response = await fetch("/api/applications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobId: job.id, coverNote: coverNote.trim() }),
+          body: JSON.stringify({
+            jobId: job.id,
+            coverNote: coverNote.trim(),
+            expectedSalary: expectedSalary || undefined,
+            availability: availabilityLabel,
+          }),
         });
-        const payload = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "Lamaran belum dapat dikirim.");
+        const payload = (await response.json()) as { application?: Application; error?: string };
+        if (!response.ok || !payload.application) throw new Error(payload.error ?? "Lamaran belum dapat dikirim.");
       } else {
         const now = new Date().toISOString();
-        saveDemoApplication({
+        const demoApp: Application = {
           id: `demo-application-${Date.now()}`,
           jobId: job.id,
           status: "new",
           source: "self_applied",
           unlockedAt: null,
           coverNote: coverNote.trim(),
+          expectedSalary: expectedSalary || null,
+          availability: availabilityLabel,
           submittedAt: now,
           withdrawnAt: null,
           updatedAt: now,
           job: { id: job.id, title: job.title, organizationName: job.organizationName },
           candidate: {
-            name: DEMO_CANDIDATE_CV.fullName,
-            headline: DEMO_CANDIDATE_CV.headline,
-            location: DEMO_CANDIDATE_CV.location,
+            name: candidate.fullName,
+            headline: candidate.headline,
+            location: candidate.location,
           },
-        });
+        };
+        saveDemoApplication(demoApp);
+        setApplications((prev) => [...prev.filter((i) => i.id !== demoApp.id), demoApp]);
       }
+      setReceiptCode(`APP-${job.id.slice(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
       setStatus("success");
       toast.success("Lamaran berhasil dikirim!");
     } catch (reason: unknown) {
@@ -2707,24 +2878,93 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
   };
 
   if (status === "success") {
+    const refCode = receiptCode || `APP-${job.id.slice(0, 4).toUpperCase()}-SENT`;
+    const availabilityLabel =
+      availability === "immediate"
+        ? "Segera (Immediate)"
+        : availability === "1_month"
+        ? "1 Bulan (1-month notice)"
+        : availability === "2_weeks"
+        ? "2 Minggu"
+        : "Fleksibel / Masih Bekerja";
+
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900">
-        <div className="flex items-start gap-3">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 mt-0.5">
-            <Check className="size-4" />
+      <div className="space-y-4">
+        {/* Digital Receipt Header Card */}
+        <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-5 text-emerald-950">
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="size-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-sm text-emerald-950">
+                  Lamaran Berhasil Terkirim ke Rekruter
+                </span>
+                <span className="font-mono text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                  {refCode}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-emerald-850 leading-relaxed">
+                Berkas Anda untuk posisi <strong>{job.title}</strong> di <strong>{job.organizationName}</strong> telah tercatat di antrean seleksi rekruter.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-sm text-emerald-950">Lamaran Berhasil Terkirim</p>
-            <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-              Profil Anda telah diteruskan ke antrean seleksi rekruter. Anda dapat memantau transparansi proses seleksi dan notifikasi saat rekruter membuka profil lengkap Anda di menu Lamaran Saya.
-            </p>
-            <Link
-              href="/candidate/applications"
-              className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+
+          {/* Receipt Details Grid */}
+          <div className="mt-4 pt-3.5 border-t border-emerald-200/80 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Status Awal</span>
+              <span className="font-semibold text-emerald-950 inline-flex items-center gap-1 mt-0.5">
+                <Clock className="size-3 text-emerald-700" /> Antrean Triage
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Ekspektasi Gaji</span>
+              <span className="font-semibold text-emerald-950 block mt-0.5">
+                Rp {expectedSalary.toLocaleString("id-ID")}
+                {isSalaryNegotiable && <span className="text-[10px] text-emerald-700 font-normal ml-1">(Nego)</span>}
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Ketersediaan</span>
+              <span className="font-semibold text-emerald-950 block mt-0.5 truncate">
+                {availabilityLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* SLA Notice & Privacy Information */}
+        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-purple-950">
+            <ShieldCheck className="size-4 text-[#7C3AED]" />
+            <span>Transparansi Proses &amp; SLA Respon</span>
+          </div>
+          <p className="text-xs text-purple-900/90 leading-relaxed">
+            Rata-rata tim rekruter mereview berkas pelamar dalam <strong>3–5 hari kerja</strong>. Nomor telepon pribadi dan email langsung Anda tetap terenkripsi hingga profil Anda dibuka oleh rekruter untuk lanjut ke tahap seleksi berikutnya.
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+          <Link
+            href="/candidate/applications"
+            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-xl bg-primary text-white font-semibold text-xs shadow-xs hover:bg-primary/90 transition"
+          >
+            <span>Pantau di Menu Lamaran Saya</span>
+            <ArrowRight className="size-3.5" />
+          </Link>
+          {onClose && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-semibold"
             >
-              Buka Lamaran Saya &rarr;
-            </Link>
-          </div>
+              Tutup
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -2746,38 +2986,186 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
 
   const formContent = (
     <form onSubmit={apply} className="space-y-4">
-      <div>
-        <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
-          <label htmlFor="cover-note" className="text-foreground">
-            Cover note / Catatan Pembuka
+      {/* Profile & Skill Match Snapshot Card */}
+      <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {candidate.avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={candidate.avatarUrl}
+                alt={candidate.fullName}
+                className="size-11 rounded-full object-cover border border-border shadow-2xs"
+              />
+            ) : (
+              <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                {candidate.fullName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-foreground">{candidate.fullName}</h4>
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                  Profil Terverifikasi
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-1">{candidate.headline}</p>
+            </div>
+          </div>
+
+          {/* Skill Match Score Pill */}
+          <div className="shrink-0 text-right">
+            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200">
+              <Sparkles className="size-3 text-[#7C3AED]" />
+              {skillMatchData.score}% Cocok
+            </span>
+            <span className="text-[10px] text-muted-foreground block mt-0.5">
+              {skillMatchData.matched.length} dari {skillMatchData.total} kriteria cocok
+            </span>
+          </div>
+        </div>
+
+        {/* Skills Breakdown Tags */}
+        {skillMatchData.matched.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/60">
+            <span className="text-[11px] text-muted-foreground font-medium mr-1">Skill Sesuai:</span>
+            {skillMatchData.matched.slice(0, 5).map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+              >
+                <Check className="size-3" />
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Application Preferences: Expected Salary & Availability */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border/70 bg-muted/20">
+        <div>
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Banknote className="size-3.5 text-primary" />
+            <span>Ekspektasi Gaji Bulanan</span>
           </label>
-          <span className="text-[11px] text-muted-foreground font-normal">
+          <div className="mt-1.5 relative">
+            <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-medium">Rp</span>
+            <input
+              type="number"
+              step={500000}
+              min={1000000}
+              value={expectedSalary || ""}
+              onChange={(e) => setExpectedSalary(Number(e.target.value) || 0)}
+              className="field pl-9 h-9 text-xs font-semibold text-foreground"
+              placeholder="Contoh: 20000000"
+            />
+          </div>
+          <label className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSalaryNegotiable}
+              onChange={(e) => setIsSalaryNegotiable(e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary size-3.5"
+            />
+            <span>Dapat dinegosiasikan (Negotiable)</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Clock className="size-3.5 text-primary" />
+            <span>Ketersediaan Bergabung</span>
+          </label>
+          <select
+            value={availability}
+            onChange={(e) => setAvailability(e.target.value)}
+            className="field mt-1.5 h-9 text-xs text-foreground cursor-pointer"
+          >
+            <option value="immediate">Segera (Immediate)</option>
+            <option value="1_month">1 Bulan (1-month notice)</option>
+            <option value="2_weeks">2 Minggu</option>
+            <option value="flexible">Fleksibel / Masih Bekerja</option>
+          </select>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Bantu rekruter memperkirakan jadwal orientasi kerja.
+          </p>
+        </div>
+      </div>
+
+      {/* Cover Note Section with AI Prompt Chips */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <label htmlFor="cover-note" className="font-semibold text-foreground flex items-center gap-1.5">
+            <FileText className="size-3.5 text-primary" />
+            <span>Catatan Pembuka / Cover Note</span>
+          </label>
+          <span className="text-[11px] text-muted-foreground font-mono">
             {coverNote.length}/4.000 karakter
           </span>
         </div>
+
+        {/* Quick Prompt Chips */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">
+            <Sparkles className="size-3 text-[#7C3AED]" />
+            <span>Sisipkan Cepat:</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("experience")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Sorot Pengalaman
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("skills")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Kesesuaian Skill
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("motivation")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Motivasi Perusahaan
+          </button>
+          <button
+            type="button"
+            disabled={isAiGenerating}
+            onClick={handleGenerateFullAiDraft}
+            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-primary/10 text-primary hover:bg-primary/15 transition cursor-pointer"
+          >
+            <Sparkles className="size-3" />
+            {isAiGenerating ? "Menyusun Draf..." : "Draf Lengkap AI"}
+          </button>
+        </div>
+
         <textarea
           id="cover-note"
           value={coverNote}
           onChange={(event) => setCoverNote(event.target.value)}
-          className="field min-h-28 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 transition-all rounded-xl focus:ring-2 focus:ring-primary/20"
-          placeholder="Ceritakan secara singkat alasan kamu tertarik dan cocok untuk posisi ini..."
+          className="field min-h-32 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 transition-all rounded-xl focus:ring-2 focus:ring-primary/20 leading-relaxed"
+          placeholder={`Ceritakan alasan kamu cocok dan antusias untuk posisi ${job.title} di ${job.organizationName}...`}
           required
           maxLength={4000}
           aria-describedby="cover-note-help"
         />
-        <p id="cover-note-help" className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
+        <p id="cover-note-help" className="text-[11px] text-muted-foreground">
           CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter saat lamaran dikirim.
         </p>
       </div>
 
       {/* Informative notice on candidate privacy and recruiter triage */}
-      <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3 text-xs text-purple-900 space-y-1">
+      <div className="rounded-xl border border-purple-200/80 bg-purple-50/50 p-3 text-xs text-purple-950 space-y-1">
         <div className="flex items-center gap-1.5 font-semibold text-purple-950">
           <ShieldCheck className="size-3.5 text-[#7C3AED]" />
-          <span>Transparansi &amp; Proteksi Kontak Pelamar</span>
+          <span>Talent Privacy Shield Terpasang</span>
         </div>
-        <p className="text-[11px] text-purple-800/90 leading-relaxed">
-          Lamaran Anda akan masuk ke antrean triage rekruter. Nomor telepon, email pribadi, dan CV mentah Anda terproteksi hingga rekruter membuka profil Anda untuk memproses ke tahapan seleksi.
+        <p className="text-[11px] text-purple-900/90 leading-relaxed">
+          Nomor telepon, email pribadi, dan CV mentah Anda tetap terproteksi. Rekruter hanya melihat ringkasan kualifikasi teranonim hingga profil Anda dibuka untuk proses wawancara.
         </p>
       </div>
 
@@ -2787,14 +3175,26 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
         </p>
       )}
 
-      <Button
-        type="submit"
-        disabled={status === "saving"}
-        className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-10 shadow-xs cursor-pointer gap-2 transition-all"
-      >
-        {status === "saving" ? "Mengirim Lamaran..." : "Kirim Lamaran Sekarang"}
-        <Send className="size-3.5" />
-      </Button>
+      <div className="flex items-center justify-end gap-2 pt-2">
+        {onClose && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="rounded-xl text-xs font-semibold h-10 px-4"
+          >
+            Batal
+          </Button>
+        )}
+        <Button
+          type="submit"
+          disabled={status === "saving" || isAiGenerating}
+          className="flex-1 sm:flex-initial rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-10 shadow-xs cursor-pointer gap-2 transition-all px-6"
+        >
+          {status === "saving" ? "Mengirim Lamaran..." : "Kirim Lamaran Sekarang"}
+          <Send className="size-3.5" />
+        </Button>
+      </div>
     </form>
   );
 

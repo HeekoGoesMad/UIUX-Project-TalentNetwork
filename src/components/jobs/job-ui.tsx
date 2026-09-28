@@ -1592,18 +1592,18 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
       {/* Dialog Modal Kirim Lamaran */}
       {job && (
         <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
-          <DialogContent className="max-w-lg p-6 rounded-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl">
             <DialogHeader className="pb-3 border-b border-border/60">
               <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
                 <Send className="size-4 text-primary" />
                 <span>Kirim Lamaran Anda</span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-1">
-                Lamar posisi <strong>{job.title}</strong> di <strong>{companyName}</strong>. CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter.
+                Lamar posisi <strong>{job.title}</strong> di <strong>{companyName}</strong>. Data profil dan CV tersimpan akan otomatis disertakan ke antrean rekruter.
               </DialogDescription>
             </DialogHeader>
             <div className="pt-4">
-              <ApplyForm job={job} withoutCard />
+              <ApplyForm job={job} withoutCard onClose={() => setApplyModalOpen(false)} />
             </div>
           </DialogContent>
         </Dialog>
