@@ -120,12 +120,6 @@ const STAGES: Array<{ id: Stage; label: string; bg: string; border: string; text
   { id: "rejected", label: "Tidak Lolos", bg: "bg-slate-50/70", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-400" },
 ];
 
-const defaultJobs = [
-  { id: "job-1", title: "Senior Product Designer" },
-  { id: "job-2", title: "Frontend Architect" },
-  { id: "job-3", title: "Product Manager" },
-  { id: "job-4", title: "Backend Engineer (Go/Node)" },
-];
 
 export const SUPABASE_AVATARS: Record<string, string> = {
   "candidate-adrienne": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
@@ -159,8 +153,8 @@ const initialCandidates: Candidate[] = [
     availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
-    jobId: "job-1",
-    jobTitle: "Product Management Intern",
+    jobId: "d7ce6147-6f60-4f20-b2b0-cdcd4f5ab835",
+    jobTitle: "AI Engineering",
   },
   {
     id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
@@ -179,13 +173,13 @@ const initialCandidates: Candidate[] = [
     availability: "2 Minggu",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Alga Ramandika Praba"],
-    jobId: "job-2",
-    jobTitle: "Frontend Architect",
+    jobId: "d7ce6147-6f60-4f20-b2b0-cdcd4f5ab835",
+    jobTitle: "AI Engineering",
   },
   {
     id: "1b1c3dcd-4251-44cb-a594-2fc57ee00533",
     name: "Ariel Oka",
-    role: "Software Engineer",
+    role: "Product Designer",
     location: "Bali, Denpasar",
     stage: "screening",
     owner: "Sari Wijaya",
@@ -199,8 +193,8 @@ const initialCandidates: Candidate[] = [
     availability: "Segera (Immediate)",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Ariel Oka"],
-    jobId: "talent-pool",
-    jobTitle: "Talent Pool",
+    jobId: "42393879-3464-4719-9002-623d9993d99c",
+    jobTitle: "Product Designer",
   },
   {
     id: "383de31e-01c2-4d02-b3e4-b563af72ab32",
@@ -219,13 +213,13 @@ const initialCandidates: Candidate[] = [
     availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Hasyim Kipuw"],
-    jobId: "job-4",
-    jobTitle: "Backend Engineer (Go/Node)",
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
   },
   {
     id: "64781ee2-f82f-40c0-9178-4a76860b6f56",
     name: "Muhammad Adi Firmansyahah",
-    role: "Human Capital Specialist",
+    role: "Product Designer",
     location: "Bali",
     stage: "interview",
     owner: "Dimas Nugroho",
@@ -239,8 +233,8 @@ const initialCandidates: Candidate[] = [
     availability: "Fleksibel",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Muhammad Adi Firmansyahah"],
-    jobId: "job-1",
-    jobTitle: "Senior Product Designer",
+    jobId: "42393879-3464-4719-9002-623d9993d99c",
+    jobTitle: "Product Designer",
   },
 ];
 
@@ -264,7 +258,15 @@ export function getStoredJobAssignments(): Record<string, StoredJobAssignment> {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem(JOB_ASSIGNMENTS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, StoredJobAssignment>;
+    const cleaned: Record<string, StoredJobAssignment> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      if (val && val.jobId && !val.jobId.startsWith("job-")) {
+        cleaned[key] = val;
+      }
+    }
+    return cleaned;
   } catch {
     return {};
   }
@@ -292,7 +294,7 @@ function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews:
   const assignments = getStoredJobAssignments();
   const applyOverrides = (c: Candidate): Candidate => {
     const override = assignments[c.id];
-    if (override) {
+    if (override && override.jobId && !override.jobId.startsWith("job-")) {
       const existingHistory =
         c.statusHistory && c.statusHistory.length > 0
           ? c.statusHistory
@@ -442,22 +444,20 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">(() => (initialJobId ? "jobs" : "all"));
   const [prevInitialJobId, setPrevInitialJobId] = useState(initialJobId);
   const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !dbMode) {
       try {
         const stored = localStorage.getItem("proofylink-demo-jobs");
         if (stored) {
           const parsed = JSON.parse(stored) as Array<{ id: string; title: string }>;
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const map = new Map(defaultJobs.map((j) => [j.id, j]));
-            for (const j of parsed) {
-              if (j.id && j.title) map.set(j.id, { id: j.id, title: j.title });
-            }
-            return Array.from(map.values());
+            return parsed
+              .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
+              .map((j) => ({ id: j.id, title: j.title }));
           }
         }
       } catch {}
     }
-    return defaultJobs;
+    return [];
   });
 
   // Inbound Unlock modal state
@@ -516,24 +516,21 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   useEffect(() => {
     let active = true;
 
-    fetch("/api/jobs")
+    fetch("/api/jobs?limit=100", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: { jobs?: Array<{ id: string; title: string }> } | null) => {
-        if (active && payload?.jobs && payload.jobs.length > 0) {
-          setAvailableJobs((prev) => {
-            const map = new Map(prev.map((j) => [j.id, j]));
-            for (const j of payload.jobs!) {
-              if (j.id && j.title) map.set(j.id, { id: j.id, title: j.title });
-            }
-            return Array.from(map.values());
-          });
+        if (active && payload?.jobs) {
+          const liveJobs = payload.jobs
+            .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
+            .map((j) => ({ id: j.id, title: j.title }));
+          setAvailableJobs(liveJobs);
         }
       })
       .catch(() => {});
 
     // If initialJobId is provided, also fetch that single job specifically to ensure title is available immediately
     if (initialJobId && initialJobId !== "talent-pool") {
-      fetch(`/api/jobs/${initialJobId}`)
+      fetch(`/api/jobs/${initialJobId}`, { cache: "no-store" })
         .then((res) => (res.ok ? res.json() : null))
         .then((payload: { job?: { id: string; title: string } } | null) => {
           if (active && payload?.job?.title) {
@@ -728,8 +725,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
               const candId = app.candidateProfileId || app.id;
               const override = storedAssignments[candId];
-              const finalJobId = override ? override.jobId : app.jobId;
-              const finalJobTitle = override ? override.jobTitle : app.job?.title;
+              const validOverride = override && override.jobId && !override.jobId.startsWith("job-") ? override : undefined;
+              const finalJobId = validOverride ? validOverride.jobId : app.jobId;
+              const finalJobTitle = validOverride ? validOverride.jobTitle : app.job?.title;
 
               const candObj: Candidate = {
                 id: candId,
@@ -774,8 +772,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         for (const cand of remoteCandList) {
           if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
             const override = storedAssignments[cand.id];
-            const finalJobId = override ? override.jobId : "talent-pool";
-            const finalJobTitle = override ? override.jobTitle : "Talent Pool";
+            const validOverride = override && override.jobId && !override.jobId.startsWith("job-") ? override : undefined;
+            const finalJobId = validOverride ? validOverride.jobId : "talent-pool";
+            const finalJobTitle = validOverride ? validOverride.jobTitle : "Talent Pool";
 
             const poolCand: Candidate = {
               id: cand.id,
@@ -974,12 +973,15 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
       const matchScope =
         scopeFilter === "all" ? true : scopeFilter === "pool" ? isPool : !isPool;
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
           ? isPool
-          : candidate.jobId === jobFilter || candidate.role === jobFilter;
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
       return matchSearch && matchScope && matchJob;
     });
 
@@ -999,7 +1001,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     const locked = base.filter((c) => c.unlocked === false).length;
 
     return { all, sla, interview, locked };
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, data.interviews]);
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, data.interviews]);
 
   // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
@@ -1019,12 +1021,15 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           ? isPool
           : !isPool;
 
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
           ? isPool
-          : candidate.jobId === jobFilter || candidate.role === jobFilter;
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
 
       if (!matchSearch || !matchScope || !matchJob) return false;
 
@@ -1045,7 +1050,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
       return true;
     });
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, triageFilter, data.interviews]);
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, triageFilter, data.interviews]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -1514,16 +1519,19 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           ? isPool
           : !isPool;
 
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
           ? isPool
-          : candidate.jobId === jobFilter || candidate.role === jobFilter;
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
 
       return matchScope && matchJob;
     });
-  }, [activeCandidates, scopeFilter, jobFilter]);
+  }, [activeCandidates, scopeFilter, jobFilter, availableJobs]);
 
   // KPI Metrics reflects candidates currently visible in the active scope/job
   const metrics = useMemo(() => {
@@ -2328,23 +2336,21 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
             <div className="flex items-center gap-2 justify-end overflow-x-auto">
               {/* Job Opening Filter */}
-              {availableJobs.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <select
-                    value={jobFilter}
-                    onChange={(e) => setJobFilter(e.target.value)}
-                    className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                  >
-                    <option value="all">Semua Lowongan</option>
-                    <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
-                    {availableJobs.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <select
+                  value={jobFilter}
+                  onChange={(e) => setJobFilter(e.target.value)}
+                  className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                >
+                  <option value="all">Semua Lowongan</option>
+                  <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
+                  {availableJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {initialJobId && jobFilter !== initialJobId && (
                 <Button
