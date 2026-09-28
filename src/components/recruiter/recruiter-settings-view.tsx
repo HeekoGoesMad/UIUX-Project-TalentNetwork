@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  Bell,
   Building2,
   CheckCircle2,
   ExternalLink,
@@ -28,6 +30,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
+import {
+  NotificationSettings,
+  type NotificationPrefs,
+} from "@/components/settings/notification-settings";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { cn, extractIndonesianLocalPhone } from "@/lib/utils";
 
@@ -78,8 +84,54 @@ const EMPTY_FORM = {
   verificationStatus: "",
 };
 
-export function RecruiterSettingsView() {
-  const [activeTab, setActiveTab] = useState<"profile" | "accessibility" | "security">("profile");
+export type RecruiterSettingsTab =
+  | "profile"
+  | "notifications"
+  | "accessibility"
+  | "security";
+
+const TAB_PARAMS: Record<RecruiterSettingsTab, string> = {
+  profile: "profile",
+  notifications: "notif",
+  accessibility: "a11y",
+  security: "security",
+};
+
+function parseSettingsTab(value: string | null): RecruiterSettingsTab {
+  if (value === "notif" || value === "notifications") return "notifications";
+  if (value === "a11y" || value === "accessibility") return "accessibility";
+  if (value === "security") return "security";
+  return "profile";
+}
+
+type RecruiterSettingsViewProps = {
+  initialPreferences?: NotificationPrefs | null;
+};
+
+export function RecruiterSettingsView({
+  initialPreferences,
+}: RecruiterSettingsViewProps = {}) {
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<RecruiterSettingsTab>(() =>
+    parseSettingsTab(searchParams?.get("tab") ?? null)
+  );
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTab(
+        parseSettingsTab(new URLSearchParams(window.location.search).get("tab"))
+      );
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const changeTab = (tab: RecruiterSettingsTab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -510,6 +562,15 @@ export function RecruiterSettingsView() {
         }
       } catch {}
 
+      // Kirim sinyal broadcast real-time ke konsol admin dan tab lain
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("proofylink_company_updates");
+          bc.postMessage({ type: "PROFILE_SAVED" });
+          bc.close();
+        } catch {}
+      }
+
       if (data?.isDemo) {
         toast.success("Tersimpan sebagai demo (tanpa database).");
       } else {
@@ -553,7 +614,7 @@ export function RecruiterSettingsView() {
           Pengaturan Akun &amp; Perusahaan
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Kelola informasi perwakilan PIC, profil entitas bisnis, aksesibilitas antarmuka, dan keamanan akun.
+          Kelola informasi perwakilan PIC, profil entitas bisnis, preferensi notifikasi, aksesibilitas antarmuka, dan keamanan akun.
         </p>
       </div>
 
@@ -576,9 +637,10 @@ export function RecruiterSettingsView() {
       {/* Tabs Navigasi */}
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border/80 pb-3">
         {[
-          { id: "profile", label: "Profil & Perusahaan", icon: Building2 },
-          { id: "accessibility", label: "Aksesibilitas", icon: Sliders },
-          { id: "security", label: "Keamanan & Sandi", icon: Lock },
+          { id: "profile" as const, label: "Profil & Perusahaan", icon: Building2 },
+          { id: "notifications" as const, label: "Notifikasi & Privasi", icon: Bell },
+          { id: "accessibility" as const, label: "Aksesibilitas", icon: Sliders },
+          { id: "security" as const, label: "Keamanan & Sandi", icon: Lock },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -586,7 +648,7 @@ export function RecruiterSettingsView() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as "profile" | "accessibility" | "security")}
+              onClick={() => changeTab(tab.id)}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 active
                   ? "bg-primary text-white shadow-xs"
@@ -1295,10 +1357,15 @@ export function RecruiterSettingsView() {
         </form>
       )}
 
-      {/* Konten Tab 2: Aksesibilitas */}
+      {/* Konten Tab 2: Notifikasi & Privasi */}
+      {activeTab === "notifications" && (
+        <NotificationSettings initialPreferences={initialPreferences} role="recruiter" />
+      )}
+
+      {/* Konten Tab 3: Aksesibilitas */}
       {activeTab === "accessibility" && <AccessibilitySettings />}
 
-      {/* Konten Tab 3: Keamanan & Sandi */}
+      {/* Konten Tab 4: Keamanan & Sandi */}
       {activeTab === "security" && <SecuritySettings />}
 
       {/* Dialog Crop & Kompresi Logo Perusahaan (Rasio 1:1, Max 512x512 WebP) */}

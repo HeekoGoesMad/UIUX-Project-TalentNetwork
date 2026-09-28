@@ -454,7 +454,7 @@ export default function NotificationsPage() {
           </Dialog>
 
           <Button variant="ghost" size="sm" asChild className="text-xs text-muted-foreground hover:text-foreground">
-            <Link href={user?.role === "recruiter" ? "/recruiter/settings" : "/candidate/settings?tab=notif"}>
+            <Link href={user?.role === "recruiter" ? "/recruiter/settings?tab=notif" : "/candidate/settings?tab=notif"}>
               <Settings2 className="mr-1.5 size-3.5" /> Kelola di Pengaturan
             </Link>
           </Button>
