@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  ArrowLeft,
   BarChart3,
   Briefcase,
   Calendar,
+  ChevronRight,
   Clock,
   DollarSign,
   Download,
+  Eye,
   GripVertical,
   Kanban,
   Keyboard,
@@ -21,6 +24,7 @@ import {
   Sparkles,
   Table as TableIcon,
   Unlock,
+  Workflow,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -440,7 +444,24 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   const [jobFilter, setJobFilter] = useState(() => initialJobId || "all");
   const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">(() => (initialJobId ? "jobs" : "all"));
   const [prevInitialJobId, setPrevInitialJobId] = useState(initialJobId);
-  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(defaultJobs);
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("proofylink-demo-jobs");
+        if (stored) {
+          const parsed = JSON.parse(stored) as Array<{ id: string; title: string }>;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const map = new Map(defaultJobs.map((j) => [j.id, j]));
+            for (const j of parsed) {
+              if (j.id && j.title) map.set(j.id, { id: j.id, title: j.title });
+            }
+            return Array.from(map.values());
+          }
+        }
+      } catch {}
+    }
+    return defaultJobs;
+  });
 
   // Inbound Unlock modal state
   const [unlockModalCandidate, setUnlockModalCandidate] = useState<Candidate | null>(null);
@@ -491,15 +512,44 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Load available job openings
   useEffect(() => {
+    let active = true;
+
     fetch("/api/jobs")
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: { jobs?: Array<{ id: string; title: string }> } | null) => {
-        if (payload?.jobs && payload.jobs.length > 0) {
-          setAvailableJobs(payload.jobs.map((j) => ({ id: j.id, title: j.title })));
+        if (active && payload?.jobs && payload.jobs.length > 0) {
+          setAvailableJobs((prev) => {
+            const map = new Map(prev.map((j) => [j.id, j]));
+            for (const j of payload.jobs!) {
+              if (j.id && j.title) map.set(j.id, { id: j.id, title: j.title });
+            }
+            return Array.from(map.values());
+          });
         }
       })
       .catch(() => {});
-  }, []);
+
+    // If initialJobId is provided, also fetch that single job specifically to ensure title is available immediately
+    if (initialJobId && initialJobId !== "talent-pool") {
+      fetch(`/api/jobs/${initialJobId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((payload: { job?: { id: string; title: string } } | null) => {
+          if (active && payload?.job?.title) {
+            setAvailableJobs((prev) => {
+              if (!prev.some((j) => j.id === payload.job!.id)) {
+                return [...prev, { id: payload.job!.id, title: payload.job!.title }];
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [initialJobId]);
 
   // Enrich candidate avatars from live Supabase /api/candidates query
   useEffect(() => {
@@ -539,6 +589,18 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   const activeCandidates = useMemo(() => {
     return data.candidates;
   }, [data.candidates]);
+
+  // Resolve current active job title for scoped pipeline views
+  const currentJobTitle = useMemo(() => {
+    const targetId = jobFilter !== "all" ? jobFilter : initialJobId;
+    if (!targetId || targetId === "all") return null;
+    if (targetId === "talent-pool") return "Talent Pool";
+    const found = availableJobs.find((j) => j.id === targetId);
+    if (found) return found.title;
+    const fromCand = data.candidates.find((c) => c.jobId === targetId)?.jobTitle;
+    if (fromCand) return fromCand;
+    return "Lowongan Kerja";
+  }, [initialJobId, jobFilter, availableJobs, data.candidates]);
 
   // Unlock Inbound candidate handler (1 token deduction)
   const handleUnlockCandidate = useCallback(
@@ -1206,15 +1268,39 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     setIsBatchAssigning(false);
   };
 
-  // KPI Metrics
+  // Scope and Job Filtered Candidates for Metrics
+  const scopedCandidates = useMemo(() => {
+    return activeCandidates.filter((candidate) => {
+      const isPool =
+        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+
+      const matchScope =
+        scopeFilter === "all"
+          ? true
+          : scopeFilter === "pool"
+          ? isPool
+          : !isPool;
+
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? isPool
+          : candidate.jobId === jobFilter || candidate.role === jobFilter;
+
+      return matchScope && matchJob;
+    });
+  }, [activeCandidates, scopeFilter, jobFilter]);
+
+  // KPI Metrics reflects candidates currently visible in the active scope/job
   const metrics = useMemo(() => {
-    const total = activeCandidates.length;
-    const screening = activeCandidates.filter((c) => c.stage === "screening").length;
-    const interview = activeCandidates.filter((c) => c.stage === "interview").length;
-    const offer = activeCandidates.filter((c) => c.stage === "offer").length;
-    const hired = activeCandidates.filter((c) => c.stage === "hired").length;
+    const total = scopedCandidates.length;
+    const screening = scopedCandidates.filter((c) => c.stage === "screening").length;
+    const interview = scopedCandidates.filter((c) => c.stage === "interview").length;
+    const offer = scopedCandidates.filter((c) => c.stage === "offer").length;
+    const hired = scopedCandidates.filter((c) => c.stage === "hired").length;
     return { total, screening, interview, offer, hired };
-  }, [activeCandidates]);
+  }, [scopedCandidates]);
 
   // 5-Second Safety Undo Buffer Handler
   const handleUndo = useCallback(() => {
@@ -1734,81 +1820,179 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         {/* Top Header */}
         <div className="border-b border-slate-200 bg-white sticky top-0 z-20 shadow-2xs">
           <div className="container mx-auto px-4 sm:px-6 py-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
-                {initialJobId && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
-                      <Briefcase className="size-3 text-[#7C3AED]" />
-                      Lowongan: {availableJobs.find((j) => j.id === jobFilter)?.title || "Lowongan Terpilih"}
-                    </span>
+            {initialJobId ? (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  {/* Breadcrumb Navigation */}
+                  <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
                     <Link
                       href="/recruiter/jobs"
-                      className="text-[11px] text-slate-500 hover:text-slate-800 underline underline-offset-2"
+                      className="hover:text-slate-900 transition-colors flex items-center gap-1 font-medium"
                     >
-                      Kembali ke Daftar Lowongan
+                      <ArrowLeft className="size-3.5 text-slate-400" />
+                      <span>Daftar Lowongan</span>
                     </Link>
-                  </div>
-                )}
-              </div>
+                    <ChevronRight className="size-3 text-slate-400" />
+                    <Link
+                      href={`/recruiter/jobs/${initialJobId}`}
+                      className="hover:text-slate-900 transition-colors font-medium text-slate-700 max-w-[220px] truncate"
+                      title={currentJobTitle || "Detail Lowongan"}
+                    >
+                      {currentJobTitle || "Detail Lowongan"}
+                    </Link>
+                    <ChevronRight className="size-3 text-slate-400" />
+                    <span className="font-semibold text-[#7C3AED] bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      Pipeline Pelamar
+                    </span>
+                  </nav>
 
-              {/* View Switcher & Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                {/* View Switcher */}
-                <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                  <button
-                    onClick={() => setViewMode("kanban")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                      viewMode === "kanban"
-                        ? "bg-white text-slate-900 shadow-2xs"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    <Kanban className="size-3.5" /> Papan
-                  </button>
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                      viewMode === "table"
-                        ? "bg-white text-slate-900 shadow-2xs"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    <TableIcon className="size-3.5" /> Tabel
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                      Pipeline: {currentJobTitle || "Lowongan Terpilih"}
+                    </h1>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                      <Workflow className="size-3 text-[#7C3AED]" />
+                      Lowongan Khusus
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Evaluasi pelamar, jadwal wawancara, dan penawaran kerja khusus untuk lowongan ini.
+                  </p>
                 </div>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={exportCsv}
-                  className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
-                >
-                  <Download className="size-3.5" /> Export
-                </Button>
+                {/* View Switcher & Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Link href={`/recruiter/jobs/${initialJobId}`}>
+                      <Eye className="size-3.5 text-slate-500" /> Detail Lowongan
+                    </Link>
+                  </Button>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShortcutsModalOpen(true)}
-                  className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
-                  title="Pintasan Keyboard (Tekan ?)"
-                >
-                  <Keyboard className="size-3.5" /> Pintasan
-                </Button>
+                  {/* View Switcher */}
+                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                    <button
+                      onClick={() => setViewMode("kanban")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "kanban"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Kanban className="size-3.5" /> Papan
+                    </button>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "table"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <TableIcon className="size-3.5" /> Tabel
+                    </button>
+                  </div>
 
-                <Button
-                  size="sm"
-                  onClick={() => setReportModalOpen(true)}
-                  className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
-                >
-                  <BarChart3 className="size-3.5" /> Laporan HR
-                </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportCsv}
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Download className="size-3.5" /> Export
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShortcutsModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                    title="Pintasan Keyboard (Tekan ?)"
+                  >
+                    <Keyboard className="size-3.5" /> Pintasan
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setReportModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                  >
+                    <BarChart3 className="size-3.5" /> Laporan HR
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Kelola seluruh siklus rekrutmen talenta, penjadwalan interview, dan penawaran kerja terpadu.
+                  </p>
+                </div>
+
+                {/* View Switcher & Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View Switcher */}
+                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                    <button
+                      onClick={() => setViewMode("kanban")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "kanban"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Kanban className="size-3.5" /> Papan
+                    </button>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "table"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <TableIcon className="size-3.5" /> Tabel
+                    </button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportCsv}
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Download className="size-3.5" /> Export
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShortcutsModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                    title="Pintasan Keyboard (Tekan ?)"
+                  >
+                    <Keyboard className="size-3.5" /> Pintasan
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setReportModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                  >
+                    <BarChart3 className="size-3.5" /> Laporan HR
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* KPI Metric Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
@@ -1929,6 +2113,20 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                 </div>
               )}
 
+              {initialJobId && jobFilter !== initialJobId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setJobFilter(initialJobId);
+                    setScopeFilter("jobs");
+                  }}
+                  className="h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                >
+                  Fokus ke Lowongan Ini
+                </Button>
+              )}
+
               {(searchQuery || jobFilter !== "all" || scopeFilter !== "all") && (
                 <Button
                   size="sm"
@@ -1940,7 +2138,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                   }}
                   className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
                 >
-                  Reset
+                  Reset Filter
                 </Button>
               )}
             </div>
