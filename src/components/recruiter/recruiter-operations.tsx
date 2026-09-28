@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Banknote,
   BarChart3,
   Briefcase,
@@ -15,6 +16,7 @@ import {
   DollarSign,
   Download,
   Eye,
+  Filter,
   GripVertical,
   Kanban,
   Keyboard,
@@ -26,6 +28,7 @@ import {
   Sparkles,
   Table as TableIcon,
   Unlock,
+  UserX,
   Workflow,
   X,
 } from "lucide-react";
@@ -471,7 +474,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   // Batch actions states
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [batchTargetJobId, setBatchTargetJobId] = useState<string>("");
+  const [batchTargetStage, setBatchTargetStage] = useState<string>("");
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
+  const [isBatchUpdatingStage, setIsBatchUpdatingStage] = useState(false);
+
+  // 1-Click Smart Triage Filter State
+  const [triageFilter, setTriageFilter] = useState<"all" | "sla" | "interview" | "locked">("all");
 
   // Modals & Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -955,7 +963,45 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     return { total, pool, jobs };
   }, [activeCandidates]);
 
-  // Filtered candidates
+  // Smart Triage Counts (respecting current search, scope, and job filters)
+  const triageCounts = useMemo(() => {
+    const base = activeCandidates.filter((candidate) => {
+      const matchSearch =
+        searchQuery.trim() === "" ||
+        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      const isPool =
+        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+      const matchScope =
+        scopeFilter === "all" ? true : scopeFilter === "pool" ? isPool : !isPool;
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? isPool
+          : candidate.jobId === jobFilter || candidate.role === jobFilter;
+      return matchSearch && matchScope && matchJob;
+    });
+
+    const all = base.length;
+    const sla = base.filter((c) => {
+      const days = getDaysInCurrentStage(c);
+      return c.stage === "screening" ? days >= 3 : days >= 7;
+    }).length;
+    const interview = base.filter((c) => {
+      const hasPending = data.interviews.some(
+        (iv) =>
+          (iv.candidateId === c.id || iv.candidateId === c.applicationId) &&
+          (iv.status === "Permintaan Reschedule" || iv.status === "Ditolak Kandidat")
+      );
+      return c.stage === "interview" || hasPending;
+    }).length;
+    const locked = base.filter((c) => c.unlocked === false).length;
+
+    return { all, sla, interview, locked };
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, data.interviews]);
+
+  // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
     return activeCandidates.filter((candidate) => {
       const matchSearch =
@@ -979,9 +1025,27 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           : jobFilter === "talent-pool"
           ? isPool
           : candidate.jobId === jobFilter || candidate.role === jobFilter;
-      return matchSearch && matchScope && matchJob;
+
+      if (!matchSearch || !matchScope || !matchJob) return false;
+
+      // Smart Triage Filter Logic
+      if (triageFilter === "sla") {
+        const days = getDaysInCurrentStage(candidate);
+        if (!(candidate.stage === "screening" ? days >= 3 : days >= 7)) return false;
+      } else if (triageFilter === "interview") {
+        const hasPending = data.interviews.some(
+          (iv) =>
+            (iv.candidateId === candidate.id || iv.candidateId === candidate.applicationId) &&
+            (iv.status === "Permintaan Reschedule" || iv.status === "Ditolak Kandidat")
+        );
+        if (candidate.stage !== "interview" && !hasPending) return false;
+      } else if (triageFilter === "locked") {
+        if (candidate.unlocked !== false) return false;
+      }
+
+      return true;
     });
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter]);
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, triageFilter, data.interviews]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -1264,6 +1328,177 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     setSelectedCandidateIds([]);
     setBatchTargetJobId("");
     setIsBatchAssigning(false);
+  };
+
+  // Batch stage change for selected candidates
+  const handleBatchStageChange = async () => {
+    if (!batchTargetStage || selectedCandidateIds.length === 0) return;
+    setIsBatchUpdatingStage(true);
+    try {
+      const targetStage = batchTargetStage as Stage;
+      const targetIds = new Set(selectedCandidateIds);
+      const stageLabel = STAGES.find((s) => s.id === targetStage)?.label || targetStage;
+
+      const updatedCandidates = data.candidates.map((c) => {
+        if (targetIds.has(c.id)) {
+          const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
+          const histItem: StatusHistoryItem = {
+            id: `hist-batch-stage-${c.id}-${Date.now()}`,
+            stage: targetStage,
+            title: `Perubahan Tahap Massal ke ${stageLabel}`,
+            actionType: "recruiter",
+            timestamp: new Date().toISOString(),
+            actor: recruiterName,
+            actorRole: "Recruiter Lead",
+            notes: `Dipindahkan secara massal bersama ${selectedCandidateIds.length} kandidat lainnya.`,
+          };
+          return {
+            ...c,
+            stage: targetStage,
+            statusHistory: [...existingHist, histItem],
+          };
+        }
+        return c;
+      });
+
+      const nextData = { ...data, candidates: updatedCandidates };
+      setData(nextData);
+
+      if (selectedCandidate && targetIds.has(selectedCandidate.id)) {
+        const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
+        if (updated) setSelectedCandidate(updated);
+      }
+
+      try {
+        const opsRaw = localStorage.getItem(storageKey);
+        const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
+      } catch {}
+
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+      } catch {}
+
+      // Sync demo applications
+      try {
+        const demoAppKey = "proofylink-demo-applications-v1";
+        const demoAppsRaw = localStorage.getItem(demoAppKey);
+        if (demoAppsRaw) {
+          const apps = JSON.parse(demoAppsRaw);
+          if (Array.isArray(apps)) {
+            for (const candId of selectedCandidateIds) {
+              const appIdx = apps.findIndex(
+                (a: { candidateProfileId?: string; id?: string }) =>
+                  a.candidateProfileId === candId || a.id === `demo-app-${candId}`
+              );
+              if (appIdx >= 0) {
+                apps[appIdx].status = targetStage;
+                apps[appIdx].updatedAt = new Date().toISOString();
+              }
+            }
+            localStorage.setItem(demoAppKey, JSON.stringify(apps));
+          }
+        }
+      } catch {}
+
+      // Sync live DB if applicable
+      if (dbMode) {
+        await Promise.allSettled(
+          selectedCandidateIds.map(async (cid) => {
+            const cand = data.candidates.find((c) => c.id === cid);
+            if (cand?.applicationId) {
+              await fetch(`/api/applications/${cand.applicationId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: targetStage }),
+              });
+            }
+          })
+        );
+      }
+
+      toast.success(`${selectedCandidateIds.length} kandidat berhasil dipindahkan ke tahap ${stageLabel}!`);
+      setSelectedCandidateIds([]);
+      setBatchTargetStage("");
+    } catch {
+      toast.error("Gagal memperbarui tahap kandidat secara massal.");
+    } finally {
+      setIsBatchUpdatingStage(false);
+    }
+  };
+
+  // Batch reject & archive to pool (0 Token)
+  const handleBatchRejectToPool = async () => {
+    if (selectedCandidateIds.length === 0) return;
+    setIsBatchUpdatingStage(true);
+    try {
+      const targetIds = new Set(selectedCandidateIds);
+      const updatedCandidates = data.candidates.map((c) => {
+        if (targetIds.has(c.id)) {
+          const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
+          const histItem: StatusHistoryItem = {
+            id: `hist-batch-reject-${c.id}-${Date.now()}`,
+            stage: "rejected",
+            title: "Ditolak & Disimpan ke Talent Pool",
+            actionType: "recruiter",
+            timestamp: new Date().toISOString(),
+            actor: recruiterName,
+            actorRole: "Recruiter Lead",
+            notes: "Kandidat tidak lolos untuk lowongan ini dan diarsipkan ke Talent Pool umum tanpa biaya token.",
+          };
+          return {
+            ...c,
+            stage: "rejected" as Stage,
+            jobId: "talent-pool",
+            jobTitle: "Talent Pool",
+            statusHistory: [...existingHist, histItem],
+          };
+        }
+        return c;
+      });
+
+      const nextData = { ...data, candidates: updatedCandidates };
+      setData(nextData);
+
+      if (selectedCandidate && targetIds.has(selectedCandidate.id)) {
+        const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
+        if (updated) setSelectedCandidate(updated);
+      }
+
+      try {
+        const opsRaw = localStorage.getItem(storageKey);
+        const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
+      } catch {}
+
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+      } catch {}
+
+      if (dbMode) {
+        await Promise.allSettled(
+          selectedCandidateIds.map(async (cid) => {
+            const cand = data.candidates.find((c) => c.id === cid);
+            if (cand?.applicationId) {
+              await fetch(`/api/applications/${cand.applicationId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "rejected" }),
+              });
+            }
+          })
+        );
+      }
+
+      toast.success(`${selectedCandidateIds.length} kandidat ditolak dan disimpan ke Talent Pool (0 Token).`);
+      setSelectedCandidateIds([]);
+    } catch {
+      toast.error("Gagal melakukan aksi tolak massal.");
+    } finally {
+      setIsBatchUpdatingStage(false);
+    }
   };
 
   // Scope and Job Filtered Candidates for Metrics
@@ -2143,6 +2378,107 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           </div>
         </div>
 
+        {/* 1-Click Smart Triage Filter Chips (Strictly No Emojis, Clean SVG Icons) */}
+        <div className="container mx-auto px-4 sm:px-6 pt-1 pb-3">
+          <div className="flex flex-wrap items-center gap-2 bg-white/70 backdrop-blur-xs p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1.5">
+              <Filter className="size-3.5 text-slate-500" />
+              Triage Cepat:
+            </span>
+
+            {/* Chip: Semua */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("all")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "all"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <span>Semua</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "all" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"
+                )}
+              >
+                {triageCounts.all}
+              </span>
+            </button>
+
+            {/* Chip: Perlu Tindakan SLA */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("sla")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "sla"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                  : "bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100"
+              )}
+            >
+              <Clock className="size-3.5" />
+              <span>Perlu Tindakan SLA</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "sla" ? "bg-amber-700 text-white" : "bg-amber-200/80 text-amber-900"
+                )}
+              >
+                {triageCounts.sla}
+              </span>
+            </button>
+
+            {/* Chip: Wawancara Butuh Respon */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("interview")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "interview"
+                  ? "bg-fuchsia-700 text-white border-fuchsia-700 shadow-2xs"
+                  : "bg-fuchsia-50/80 text-fuchsia-800 border-fuchsia-200 hover:bg-fuchsia-100"
+              )}
+            >
+              <CalendarClock className="size-3.5" />
+              <span>Wawancara Butuh Respon</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "interview" ? "bg-fuchsia-800 text-white" : "bg-fuchsia-200/80 text-fuchsia-900"
+                )}
+              >
+                {triageCounts.interview}
+              </span>
+            </button>
+
+            {/* Chip: Inbound Terkunci */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("locked")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "locked"
+                  ? "bg-purple-700 text-white border-purple-700 shadow-2xs"
+                  : "bg-purple-50/80 text-purple-800 border-purple-200 hover:bg-purple-100"
+              )}
+            >
+              <Lock className="size-3.5" />
+              <span>Inbound Terkunci</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "locked" ? "bg-purple-800 text-white" : "bg-purple-200/80 text-purple-900"
+                )}
+              >
+                {triageCounts.locked}
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Main Content Area */}
         <div className="container mx-auto px-4 sm:px-6">
           {viewMode === "kanban" ? (
@@ -2772,9 +3108,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           )}
         </div>
 
-        {/* Floating Batch Assignment Action Bar */}
+        {/* Floating Batch Assignment & Pipeline Action Bar */}
         {selectedCandidateIds.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-slate-200/90 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-slate-200/90 shadow-2xl rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-bottom-4 duration-200 max-w-[95vw]">
             <div className="flex items-center gap-2">
               <span className="size-6 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold">
                 {selectedCandidateIds.length}
@@ -2782,13 +3118,45 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
               <span className="text-xs font-semibold text-slate-900">Kandidat Terpilih</span>
             </div>
 
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
-            <div className="flex items-center gap-2">
+            {/* Aksi 1: Pindahkan Tahap Massal */}
+            <div className="flex items-center gap-1.5">
+              <select
+                value={batchTargetStage}
+                onChange={(e) => setBatchTargetStage(e.target.value)}
+                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+              >
+                <option value="">Pindahkan Tahap Massal...</option>
+                <option value="screening">Review Profil</option>
+                <option value="interview">Wawancara</option>
+                <option value="offer">Penawaran (Offer)</option>
+                <option value="hired">Diterima (Hired)</option>
+              </select>
+
+              <Button
+                size="sm"
+                disabled={!batchTargetStage || isBatchUpdatingStage}
+                onClick={handleBatchStageChange}
+                className="h-8 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-2xs gap-1 px-3"
+              >
+                {isBatchUpdatingStage ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ArrowRight className="size-3.5" />
+                )}
+                <span>Ubah Tahap</span>
+              </Button>
+            </div>
+
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Aksi 2: Penugasan Lowongan */}
+            <div className="flex items-center gap-1.5">
               <select
                 value={batchTargetJobId}
                 onChange={(e) => setBatchTargetJobId(e.target.value)}
-                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden max-w-[180px] truncate"
               >
                 <option value="">Pilih Lowongan Tujuan...</option>
                 <option value="talent-pool">Talent Pool (Pindahkan ke Pool)</option>
@@ -2803,18 +3171,33 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                 size="sm"
                 disabled={!batchTargetJobId || isBatchAssigning}
                 onClick={handleBatchAssign}
-                className="h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                className="h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5 px-3"
               >
                 <Briefcase className="size-3.5" />
-                {isBatchAssigning ? "Menugaskan..." : "Tugaskan ke Lowongan"}
+                <span>{isBatchAssigning ? "Menugaskan..." : "Tugaskan"}</span>
               </Button>
             </div>
+
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Aksi 3: Tolak & Simpan ke Pool Massal */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isBatchUpdatingStage}
+              onClick={handleBatchRejectToPool}
+              className="h-8 text-xs font-semibold border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-300 rounded-xl gap-1.5 px-3"
+              title="Tolak kandidat untuk lowongan saat ini dan simpan ke Talent Pool (0 Token)"
+            >
+              <UserX className="size-3.5" />
+              <span>Tolak &amp; Simpan ke Pool</span>
+            </Button>
 
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setSelectedCandidateIds([])}
-              className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
+              className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800 px-2"
             >
               Batal
             </Button>

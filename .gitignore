@@ -91,5 +91,5 @@ next-env.d.ts
 .vscode
 
 scripts/
-
+docs/
 mock-talentNetwork.code-workspace

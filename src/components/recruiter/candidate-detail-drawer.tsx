@@ -9,10 +9,12 @@ import {
   Briefcase,
   Calendar,
   CalendarClock,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
+  Copy,
   DollarSign,
   GitCommit,
   Lock,
@@ -74,6 +76,8 @@ export type Candidate = {
   coverNote?: string | null;
   expectedSalary?: number | null;
   availability?: string | null;
+  skills?: string[];
+  matchScore?: number;
 };
 
 export type Interview = {
@@ -168,6 +172,7 @@ export function CandidateDetailDrawer({
   const [newMeetingUrl, setNewMeetingUrl] = useState("https://meet.google.com/new");
   const [isAddingInterview, setIsAddingInterview] = useState(false);
   const [showPastInterviews, setShowPastInterviews] = useState(false);
+  const [copiedBrief, setCopiedBrief] = useState(false);
   const candidateInterviews = useMemo(() => {
     if (!candidate) return [];
     return interviews
@@ -202,6 +207,34 @@ export function CandidateDetailDrawer({
       setIsSavingFeedback(false);
       toast.success("Catatan evaluasi berhasil disimpan");
     }, 300);
+  };
+
+  const handleCopyExecutiveBrief = () => {
+    const scoreVal = candidate.matchScore ?? candidate.score;
+    const matchScoreText = scoreVal ? `${scoreVal}%` : "Belum dihitung";
+    const salaryText = candidate.expectedSalary 
+      ? `Rp ${Number(candidate.expectedSalary).toLocaleString("id-ID")} / bulan` 
+      : candidate.compensation || "Sesuai kesepakatan";
+    const availabilityText = candidate.availability || "Segera (Immediate)";
+    const stageLabel = STAGE_OPTIONS.find((s) => s.id === candidate.stage)?.label || candidate.stage;
+    
+    const briefText = [
+      `[RINGKASAN KANDIDAT - PROOFYLINK]`,
+      `Nama: ${candidate.unlocked !== false ? candidate.name : maskName(candidate.name)}`,
+      `Posisi: ${candidate.jobTitle || candidate.role || "Talent Pool"}`,
+      `Ekspektasi Gaji: ${salaryText}`,
+      `Ketersediaan: ${availabilityText}`,
+      `Skor Kecocokan: ${matchScoreText}`,
+      `Tahap Saat Ini: ${stageLabel}`,
+      candidate.skills && candidate.skills.length > 0 ? `Keahlian Utama: ${candidate.skills.slice(0, 5).join(", ")}` : null,
+      latestInterview ? `Sesi Wawancara: ${latestInterview.type} (${formatInterviewDateTime(latestInterview.date)} - ${latestInterview.status})` : null,
+      typeof window !== "undefined" ? `Tautan Profil: ${window.location.origin}/talent/${candidate.id}` : null,
+    ].filter(Boolean).join("\n");
+
+    navigator.clipboard.writeText(briefText);
+    setCopiedBrief(true);
+    toast.success("Ringkasan profil berhasil disalin ke papan klip!");
+    setTimeout(() => setCopiedBrief(false), 2000);
   };
 
   const handleCreateInterview = async (e: React.FormEvent) => {
@@ -359,86 +392,174 @@ export function CandidateDetailDrawer({
                     size="sm"
                     variant="outline"
                     className="h-9 px-3.5 text-xs font-semibold border-slate-200 bg-white text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/60 gap-1.5 transition-colors"
-                    onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
+                    onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage dan disimpan ke Talent Pool" })}
                   >
-                    <X className="size-3.5" /> Tolak (0 Token)
+                    <X className="size-3.5" /> Tolak &amp; Simpan ke Pool (0 Token)
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Stage Selector Pill */}
-            <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-slate-200/60">
-              <span className="text-xs font-medium text-slate-500">Tahap Saat Ini:</span>
-              <div className="flex items-center gap-1.5">
-                {candidate.unlocked === false ? (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 text-xs font-semibold">
-                    <Lock className="size-3 text-[#7C3AED]" />
-                    <span>Inbound Triage (Terkunci)</span>
-                  </div>
-                ) : isHired ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                    <Lock className="size-3.5 text-emerald-600" />
-                    <span>Diterima (Hired) · Final</span>
-                  </div>
-                ) : (
-                  <select
-                    value={candidate.stage}
-                    onChange={(e) => onStageChange(candidate.id, e.target.value as Stage)}
-                    className="text-xs font-semibold rounded-lg px-2.5 py-1.5 border border-slate-300 bg-white shadow-2xs focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden cursor-pointer"
-                  >
-                    {STAGE_OPTIONS.map((opt) => {
-                      const isTalentPool =
-                        !candidate.jobId ||
-                        candidate.jobId === "talent-pool" ||
-                        candidate.jobTitle === "Talent Pool";
-                      let isDisabled = false;
-                      let labelSuffix = "";
-
-                      if (
-                        isTalentPool &&
-                        (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
-                      ) {
-                        isDisabled = true;
-                        labelSuffix = " (Perlu Lowongan)";
-                      } else if (opt.id === "hired" && candidate.stage !== "offer") {
-                        isDisabled = true;
-                        labelSuffix = " (Melalui Offer)";
-                      } else if (
-                        candidate.stage === "rejected" &&
-                        (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
-                      ) {
-                        isDisabled = true;
-                        labelSuffix = " (Aktifkan ke Screening)";
-                      }
-
-                      return (
-                        <option key={opt.id} value={opt.id} disabled={isDisabled}>
-                          {opt.label}
-                          {labelSuffix}
-                        </option>
-                      );
-                    })}
-                  </select>
-                )}
+            {/* Interactive Visual Stage Stepper or Rejection / Locked Banner */}
+            {candidate.unlocked === false ? (
+              <div className="mt-3.5 flex items-center justify-between p-3 rounded-xl border border-purple-200 bg-purple-50/70">
+                <span className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
+                  <Lock className="size-3.5 text-[#7C3AED]" />
+                  Status: Inbound Triage (Terkunci)
+                </span>
+                <span className="text-[11px] text-purple-700 font-medium">Buka profil untuk memproses tahap</span>
               </div>
-            </div>
+            ) : candidate.stage === "rejected" ? (
+              <div className="mt-3.5 p-3 rounded-xl border border-rose-200 bg-rose-50/70 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-rose-900">Kandidat Tidak Lolos (Arsip Pool)</p>
+                  <p className="text-[11px] text-rose-700 mt-0.5">Lamaran diarsipkan dari alur aktif.</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onStageChange(candidate.id, "screening")}
+                  className="h-7 text-[11px] font-semibold bg-white border-rose-300 text-rose-700 hover:bg-rose-100 gap-1 shadow-2xs"
+                >
+                  <Undo2 className="size-3" /> Aktifkan Lagi
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-3.5 pt-3 border-t border-slate-200/70">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Alur Tahapan Rekrutmen
+                  </span>
+                  {candidate.stage === "hired" ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="size-3" /> Rekrutmen Selesai
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-[#7C3AED]">
+                      Tahap {["screening", "interview", "offer", "hired"].indexOf(candidate.stage) + 1} dari 4
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative flex items-center justify-between px-1">
+                  {/* Progress Connector Track */}
+                  <div className="absolute left-4 right-4 top-3.5 h-0.5 bg-slate-200 -z-0">
+                    <div
+                      className="h-full bg-[#7C3AED] transition-all duration-300"
+                      style={{
+                        width:
+                          candidate.stage === "screening"
+                            ? "0%"
+                            : candidate.stage === "interview"
+                            ? "33%"
+                            : candidate.stage === "offer"
+                            ? "66%"
+                            : "100%",
+                      }}
+                    />
+                  </div>
+
+                  {/* 4 Step Nodes */}
+                  {[
+                    { id: "screening", label: "Review Profil" },
+                    { id: "interview", label: "Wawancara" },
+                    { id: "offer", label: "Penawaran" },
+                    { id: "hired", label: "Diterima" },
+                  ].map((step, idx) => {
+                    const stageOrder = ["screening", "interview", "offer", "hired"];
+                    const currentIdx = stageOrder.indexOf(candidate.stage);
+                    const isCompleted = currentIdx > idx;
+                    const isCurrent = currentIdx === idx;
+
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        disabled={isHired && step.id !== "hired"}
+                        onClick={() => {
+                          if (step.id === "hired" && candidate.stage !== "offer") {
+                            toast.error("Tahap Diterima hanya dapat diaktifkan setelah penawaran kerja diterbitkan.");
+                            return;
+                          }
+                          if (step.id !== candidate.stage) {
+                            onStageChange(candidate.id, step.id as Stage);
+                            if (step.id === "interview") setActiveTab("interview");
+                            if (step.id === "offer") setActiveTab("offer");
+                            toast.success(`Kandidat dipindahkan ke tahap ${step.label}.`);
+                          }
+                        }}
+                        className={cn(
+                          "relative z-10 flex flex-col items-center group cursor-pointer transition-transform active:scale-95 disabled:cursor-not-allowed",
+                          isCurrent ? "scale-105" : ""
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-2xs border-2",
+                            isCurrent
+                              ? "bg-[#7C3AED] text-white border-purple-200 ring-4 ring-purple-100"
+                              : isCompleted
+                              ? "bg-[#7C3AED] text-white border-purple-300"
+                              : "bg-white text-slate-400 border-slate-300 group-hover:border-purple-300"
+                          )}
+                        >
+                          {isCompleted ? (
+                            <Check className="size-3.5 stroke-[3]" />
+                          ) : (
+                            <span>{idx + 1}</span>
+                          )}
+                        </div>
+                        <span
+                          className={cn(
+                            "text-[10px] mt-1.5 font-semibold transition-colors text-center leading-tight whitespace-nowrap",
+                            isCurrent
+                              ? "text-[#7C3AED] font-bold"
+                              : isCompleted
+                              ? "text-slate-700"
+                              : "text-slate-400 group-hover:text-slate-600"
+                          )}
+                        >
+                          {step.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Quick Actions (Only rendered when candidate is UNLOCKED) */}
             {candidate.unlocked !== false && (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3.5 flex items-center gap-2">
                 <Button
                   asChild
                   size="sm"
                   variant="outline"
                   className={cn(
                     "h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50 hover:text-[#6D28D9] gap-1.5",
-                    isOfferOrAbove || candidate.stage === "rejected" ? "w-full" : "flex-1"
+                    isOfferOrAbove || candidate.stage === "rejected" ? "flex-1" : "flex-1"
                   )}
                 >
                   <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
                     <MessageSquare className="size-3.5" /> Kirim Pesan
                   </Link>
+                </Button>
+
+                {/* Salin Executive Brief */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyExecutiveBrief}
+                  className="h-8 px-3 text-xs font-semibold border-slate-200 bg-white text-slate-700 hover:bg-slate-50 gap-1.5 shadow-2xs"
+                  title="Salin Ringkasan Profil untuk Hiring Manager"
+                >
+                  {copiedBrief ? (
+                    <Check className="size-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="size-3.5 text-slate-500" />
+                  )}
+                  <span>{copiedBrief ? "Tersalin" : "Salin Brief"}</span>
                 </Button>
 
                 {/* Buat Penawaran only visible if candidate is not in offer, hired, or rejected */}
