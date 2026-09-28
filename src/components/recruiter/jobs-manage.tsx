@@ -206,11 +206,18 @@ function JobCard({ job, manage = false }: { job: Job; manage?: boolean }) {
         </div>
 
         {manage ? (
-          <Button asChild variant="outline" className="w-full">
-            <Link href={`/recruiter/jobs/${job.id}`}>
-              Kelola Lowongan <span aria-hidden="true">&rarr;</span>
-            </Link>
-          </Button>
+          <div className="grid grid-cols-2 gap-2 w-full pt-1">
+            <Button asChild variant="outline" size="sm" className="w-full text-xs font-semibold">
+              <Link href={`/recruiter/jobs/${job.id}`}>
+                Kelola Detail
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="w-full text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1">
+              <Link href={`/recruiter/jobs/${job.id}/pipeline`}>
+                <Workflow className="size-3.5" /> Pipeline
+              </Link>
+            </Button>
+          </div>
         ) : (
           <Button asChild variant="outline" className="w-full">
             <Link href={`/jobs/${job.id}`}>

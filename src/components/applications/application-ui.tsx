@@ -7,25 +7,31 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
+  Banknote,
   Bookmark,
   Briefcase,
   Building2,
   Calendar,
   CalendarClock,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Clock3,
   Copy,
   ExternalLink,
   Eye,
   FileQuestion,
+  FileText,
+  Lock,
   MessageSquare,
   Send,
   ShieldCheck,
   Sparkles,
+  Unlock,
   UserRound,
   X,
 } from "lucide-react";
@@ -65,8 +71,27 @@ export const applicationStatuses = [
   "offer_declined",
   "withdrawn",
 ] as const;
+
+function isApplicationStatus(value: string): value is ApplicationStatus {
+  return (applicationStatuses as readonly string[]).includes(value);
+}
 export type ApplicationStatus = (typeof applicationStatuses)[number];
-export type Application = { id: string; jobId: string; candidateProfileId?: string; status: ApplicationStatus; coverNote: string | null; submittedAt: string; withdrawnAt: string | null; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
+export type Application = {
+  id: string;
+  jobId: string;
+  candidateProfileId?: string;
+  status: ApplicationStatus;
+  source?: string | null;
+  unlockedAt?: string | null;
+  coverNote: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
+  submittedAt: string;
+  withdrawnAt: string | null;
+  updatedAt: string;
+  job?: { id: string; title: string; organizationName: string };
+  candidate?: { name: string | null; headline: string | null; location: string | null } | null;
+};
 type History = { id: string; fromStatus: ApplicationStatus | null; toStatus: ApplicationStatus; reason: string | null; changedBy: string; createdAt: string };
 const labels: Record<ApplicationStatus, string> = {
   new: "Baru",
@@ -103,6 +128,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-001",
     jobId: "demo-job-1",
     status: "interview",
+    source: "self_applied",
+    unlockedAt: "2026-09-15T09:00:00.000Z",
     coverNote: "Tertarik berkontribusi pada pengembangan sistem pembayaran digital dan UX research.",
     submittedAt: "2026-09-14T08:30:00.000Z",
     withdrawnAt: null,
@@ -122,6 +149,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-002",
     jobId: "demo-job-2",
     status: "assessment",
+    source: "self_applied",
+    unlockedAt: "2026-09-12T10:30:00.000Z",
     coverNote: "Fokus pada riset pengguna dan penguatan standardisasi design system di sektor perbankan.",
     submittedAt: "2026-09-10T14:20:00.000Z",
     withdrawnAt: null,
@@ -141,6 +170,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-003",
     jobId: "demo-job-3",
     status: "review",
+    source: "self_applied",
+    unlockedAt: "2026-09-10T11:00:00.000Z",
     coverNote: "Memiliki keahlian mendalam dalam tokenisasi design token dan komponen multi-brand.",
     submittedAt: "2026-09-08T09:00:00.000Z",
     withdrawnAt: null,
@@ -160,6 +191,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-004",
     jobId: "demo-job-4",
     status: "offer",
+    source: "self_applied",
+    unlockedAt: "2026-09-05T14:00:00.000Z",
     coverNote: "Pengalaman 5+ tahun dalam merancang solusi e-commerce dan merchant center.",
     submittedAt: "2026-09-01T11:15:00.000Z",
     withdrawnAt: null,
@@ -179,6 +212,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-005",
     jobId: "demo-job-5",
     status: "hired",
+    source: "self_applied",
+    unlockedAt: "2026-08-25T08:30:00.000Z",
     coverNote: "Tertarik memimpin perancangan interaksi produk digital inovatif di Djoin.",
     submittedAt: "2026-08-20T10:00:00.000Z",
     withdrawnAt: null,
@@ -198,6 +233,8 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-006",
     jobId: "demo-job-6",
     status: "rejected",
+    source: "self_applied",
+    unlockedAt: null,
     coverNote: "Melamar posisi product design.",
     submittedAt: "2026-08-10T14:00:00.000Z",
     withdrawnAt: null,
@@ -213,28 +250,101 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
       location: "Jakarta Selatan",
     },
   },
+  {
+    id: "demo-app-007",
+    jobId: "demo-job-7",
+    status: "new",
+    source: "self_applied",
+    unlockedAt: null,
+    coverNote: "Tertarik membangun antarmuka web modern bertenaga AI dengan performa tinggi dan desain terintegrasi.",
+    submittedAt: "2026-09-26T11:00:00.000Z",
+    withdrawnAt: null,
+    updatedAt: "2026-09-26T11:00:00.000Z",
+    job: {
+      id: "demo-job-7",
+      title: "AI Frontend Developer",
+      organizationName: "PT Proofy Teknologi Nusantara",
+    },
+    candidate: {
+      name: "Nadia Putri Rahayu",
+      headline: "Senior Product Designer | UX Research & Design Systems",
+      location: "Jakarta Selatan",
+    },
+  },
 ];
 
+export function normalizeSafeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
+
+function encodeStorage(val: string): string {
+  try {
+    return btoa(encodeURIComponent(val));
+  } catch {
+    return val;
+  }
+}
+
+function decodeStorage(val: string): string {
+  try {
+    return decodeURIComponent(atob(val));
+  } catch {
+    return val;
+  }
+}
+
 export function demoApplications(): Application[] {
+  if (typeof window === "undefined") return DEFAULT_DEMO_APPLICATIONS;
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) {
-      localStorage.setItem(storageKey, JSON.stringify(DEFAULT_DEMO_APPLICATIONS));
+      localStorage.setItem(storageKey, encodeStorage(JSON.stringify(DEFAULT_DEMO_APPLICATIONS)));
       return DEFAULT_DEMO_APPLICATIONS;
     }
-    const parsed = JSON.parse(raw) as Application[];
-    return parsed.length > 0 ? parsed : DEFAULT_DEMO_APPLICATIONS;
+    const decoded = raw.startsWith("[") ? raw : decodeStorage(raw);
+    const parsed = JSON.parse(decoded) as Application[];
+    const sanitized = parsed
+      .map((item) => {
+        const safeId = normalizeSafeId(item?.id) ?? `demo-application-${Date.now().toString(36)}`;
+        return { ...item, id: safeId };
+      });
+    return sanitized.length > 0 ? sanitized : DEFAULT_DEMO_APPLICATIONS;
   } catch {
     return DEFAULT_DEMO_APPLICATIONS;
   }
 }
 
 export function saveDemoApplication(application: Application) {
-  localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application]));
+  if (typeof window === "undefined") return;
+  const safeId = normalizeSafeId(application.id) ?? `demo-application-${Date.now().toString(36)}`;
+  const safeApplication = { ...application, id: safeId };
+  const list = [...demoApplications().filter((item) => item.id !== safeApplication.id), safeApplication];
+  localStorage.setItem(storageKey, encodeStorage(JSON.stringify(list)));
 }
 
 function statusBadge(status: ApplicationStatus) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stageColors[status]}`}>{labels[status]}</span>;
+}
+
+function transparencyBadge(application: Application) {
+  if (application.unlockedAt || ["interview", "offer", "hired"].includes(application.status)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <CheckCircle2 className="size-3 text-emerald-600" />
+        Profil Dibuka Rekruter
+      </span>
+    );
+  }
+  if (["new", "screening", "review", "shortlisted"].includes(application.status)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+        <Clock className="size-3 text-slate-500" />
+        Antrean Triage
+      </span>
+    );
+  }
+  return null;
 }
 
 function State({ text, error = false }: { text: string; error?: boolean }) {
@@ -636,9 +746,15 @@ export function CandidateApplicationsPage() {
             ) : (
               <div className="space-y-3.5">
                 <div className="grid gap-3.5">
-                  {paginatedApps.map((application) => (
-                    <Link key={application.id} href={`/candidate/applications/${application.id}`} className="block group">
-                      <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
+                  {paginatedApps.map((application) => {
+                    const safeAppId = normalizeSafeId(application.id);
+                    return (
+                      <Link
+                        key={application.id}
+                        href={safeAppId ? `/candidate/applications/${safeAppId}` : "/candidate/applications"}
+                        className="block group"
+                      >
+                        <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
                         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -655,7 +771,10 @@ export function CandidateApplicationsPage() {
                           </div>
 
                           <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end shrink-0">
-                            {statusBadge(application.status)}
+                            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                              {statusBadge(application.status)}
+                              {transparencyBadge(application)}
+                            </div>
                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
                               Detail
                               <ArrowRight className="size-3.5" />
@@ -664,7 +783,8 @@ export function CandidateApplicationsPage() {
                         </CardContent>
                       </Card>
                     </Link>
-                  ))}
+                  );
+                })}
                 </div>
 
                 {/* Pagination Controls */}
@@ -1153,6 +1273,19 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
 
   // Hiring Flow: Interviews & Offers
   const [interviews, setInterviews] = useState<Array<{ id: string; title: string; scheduledAt: string; timezone: string; durationMinutes: number; meetingUrl: string | null; status: string }>>([]);
+  const [showPastInterviews, setShowPastInterviews] = useState(false);
+
+  const sortedInterviews = useMemo(() => {
+    return [...interviews].sort((a, b) => {
+      const timeB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+      const timeA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
+  }, [interviews]);
+
+  const latestInterview = sortedInterviews[0];
+  const pastInterviews = sortedInterviews.slice(1);
+
   const [offers, setOffers] = useState<Array<{ id: string; salary: number; currency: string; startDate: string; expirationDate: string; benefits: string | null; notes: string | null; status: string }>>([]);
   const [actingOfferId, setActingOfferId] = useState<string | null>(null);
   const [offerNotice, setOfferNotice] = useState<string | null>(null);
@@ -1693,10 +1826,18 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   // Modern human-centric pipeline milestones for candidate visualization
   const PIPELINE_PHASES = [
     {
+      key: "submitted",
+      label: "Lamaran Terkirim",
+      desc: "Berkas lamaran diterima di antrean inbound seleksi",
+      statuses: ["new"],
+    },
+    {
       key: "review",
-      label: "Peninjauan Berkas",
-      desc: "Profil & portofolio ditinjau oleh tim rekruter",
-      statuses: ["new", "shortlisted", "screening", "review", "assessment"],
+      label: "Profil Dibuka & Peninjauan",
+      desc: application?.unlockedAt
+        ? `Profil dibuka rekruter pada ${formatDate(application.unlockedAt)}`
+        : "Menunggu pembukaan profil oleh tim rekruter",
+      statuses: ["shortlisted", "screening", "review", "assessment"],
     },
     {
       key: "interview",
@@ -1720,9 +1861,10 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
 
   const currentPhaseIndex = useMemo(() => {
     if (!application) return 0;
-    if (["hired", "rejected", "offer_declined", "withdrawn"].includes(application.status)) return 3;
-    if (application.status === "offer") return 2;
-    if (application.status === "interview") return 1;
+    if (["hired", "rejected", "offer_declined", "withdrawn"].includes(application.status)) return 4;
+    if (application.status === "offer") return 3;
+    if (application.status === "interview") return 2;
+    if (application.unlockedAt || ["shortlisted", "screening", "review", "assessment"].includes(application.status)) return 1;
     return 0;
   }, [application]);
 
@@ -1842,6 +1984,71 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
+            {/* Status Transparansi Rekruter & Privasi Pelamar */}
+            <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6 overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                      application.status === "rejected" || application.status === "offer_declined"
+                        ? "bg-slate-100 text-slate-600"
+                        : application.status === "hired"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : application.unlockedAt
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-purple-100 text-purple-700"
+                    }`}
+                  >
+                    {application.status === "rejected" || application.status === "offer_declined" ? (
+                      <Building2 className="size-5" />
+                    ) : application.status === "hired" ? (
+                      <Check className="size-5" />
+                    ) : application.unlockedAt ? (
+                      <Unlock className="size-5" />
+                    ) : (
+                      <Lock className="size-5" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-sm font-bold text-foreground">
+                        {application.status === "rejected"
+                          ? "Proses Seleksi Selesai (Tidak Lolos)"
+                          : application.status === "hired"
+                          ? "Selamat! Anda Resmi Diterima (Hired)"
+                          : application.unlockedAt
+                          ? "Profil Lengkap Anda Telah Dibuka Rekruter"
+                          : "Lamaran Berada dalam Antrean Seleksi"}
+                      </h2>
+                      {application.unlockedAt ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="size-3" /> Akses Terbuka
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Lock className="size-3" /> Privasi Terproteksi
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                      {application.status === "rejected"
+                        ? `Terima kasih atas waktu dan partisipasi Anda. Untuk posisi ini, tim rekruter belum dapat melanjutkan proses Anda. Profil Anda tetap tersimpan aktif di ProofyLink Talent Network untuk peluang karir lain yang cocok.`
+                        : application.status === "hired"
+                        ? `Selamat atas pencapaian Anda! Proses seleksi resmi telah rampung dan tim rekruter siap menyambut Anda.`
+                        : application.unlockedAt
+                        ? `Tim rekruter dari ${application.job?.organizationName || "perusahaan"} telah membuka profil profesional, CV, dan detail kontak Anda pada ${formatDate(application.unlockedAt)}. Lamaran Anda kini sedang dievaluasi secara mendalam.`
+                        : `Lamaran Anda telah diterima oleh ${application.job?.organizationName || "perusahaan"}. Kontak pribadi dan CV lengkap Anda tetap terlindungi hingga tim rekruter membuka profil Anda untuk memulai peninjauan komprehensif.`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0 hidden sm:block">
+                  <p className="text-[11px] font-medium text-muted-foreground">ID Lamaran</p>
+                  <p className="font-mono text-xs font-semibold text-foreground mt-0.5">{application.id.slice(0, 12)}</p>
+                </div>
+              </div>
+            </Card>
+
             {/* Modern Candidate Journey Tracker */}
             <Card className="border-border/80 bg-card p-5 shadow-xs sm:p-6 overflow-hidden">
               <div className="space-y-4">
@@ -1862,7 +2069,7 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-1">
                   {PIPELINE_PHASES.map((phase, idx) => {
                     const isPassed = idx < currentPhaseIndex;
                     const isCurrent = idx === currentPhaseIndex;
@@ -2076,21 +2283,28 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
             })()}
 
             {/* Scheduled Interviews Panel with Two-Way Actions */}
-            {interviews.length > 0 && (
+            {/* Scheduled Interviews Panel with Single Latest Session & Collapsible History */}
+            {latestInterview && (
               <Card className="border-border/80 bg-card shadow-xs">
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock3 className="size-4 text-primary" /> Jadwal Wawancara Anda
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Clock3 className="size-4 text-primary" /> Jadwal Wawancara Anda
+                    </CardTitle>
+                    <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                      Sesi Terbaru
+                    </span>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {interviews.map((interview) => {
+                  {(() => {
+                    const interview = latestInterview;
                     const isConfirmed = interview.status === "confirmed";
                     const isRescheduleRequested = interview.status === "reschedule_requested";
                     const isDeclined = interview.status === "declined";
 
                     return (
-                      <div key={interview.id} className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+                      <div className="flex flex-col gap-3 rounded-xl border border-purple-200/80 bg-card p-4 shadow-2xs">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -2192,7 +2406,55 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                         )}
                       </div>
                     );
-                  })}
+                  })()}
+
+                  {/* Past Interviews Collapsible Accordion */}
+                  {pastInterviews.length > 0 && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPastInterviews(!showPastInterviews)}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-border/80 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-muted-foreground"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Clock3 className="size-3.5 text-muted-foreground" />
+                          Riwayat Sesi Wawancara Sebelumnya ({pastInterviews.length})
+                        </span>
+                        {showPastInterviews ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        )}
+                      </button>
+
+                      {showPastInterviews && (
+                        <div className="mt-2 space-y-2 pt-1 animate-in fade-in-50 duration-150">
+                          {pastInterviews.map((pastIv) => (
+                            <div
+                              key={pastIv.id}
+                              className="rounded-lg border border-border/60 bg-card p-3 text-xs space-y-1 opacity-75 hover:opacity-100 transition-opacity"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="font-semibold text-foreground text-[11px]">{pastIv.title}</p>
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                  {pastIv.status === "confirmed"
+                                    ? "Terkonfirmasi"
+                                    : pastIv.status === "declined"
+                                    ? "Ditolak"
+                                    : pastIv.status === "reschedule_requested"
+                                    ? "Diajukan Reschedule"
+                                    : "Selesai"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {formatDate(pastIv.scheduledAt)} ({pastIv.durationMinutes} menit) · {pastIv.timezone}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -2302,17 +2564,59 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
               </CardContent>
             </Card>
 
-            {/* Cover Note Section */}
+            {/* Application Submission Overview (Cover Note & Preferences) */}
             <Card className="border-border/80 bg-card shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">
-                  Surat Pengantar (Cover Note)
-                </CardTitle>
+              <CardHeader className="pb-3 border-b border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base font-bold text-foreground">
+                    Rincian Lamaran &amp; Surat Pengantar
+                  </CardTitle>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    Dikirim pada {formatDate(application.submittedAt)}
+                  </span>
+                </div>
               </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-muted-foreground">
-                  {application.coverNote || "Tidak ada catatan pengantar yang dilampirkan."}
-                </p>
+              <CardContent className="space-y-4 pt-4">
+                {(application.expectedSalary || application.availability) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border/70 bg-muted/20 text-xs">
+                    {application.expectedSalary && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                          <Banknote className="size-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-muted-foreground block">Ekspektasi Gaji Pelamar</span>
+                          <span className="font-semibold text-foreground">
+                            Rp {Number(application.expectedSalary).toLocaleString("id-ID")} / bulan
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {application.availability && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                          <Clock className="size-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-muted-foreground block">Ketersediaan Bergabung</span>
+                          <span className="font-semibold text-foreground">
+                            {application.availability}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-primary" />
+                    <span>Catatan Pembuka / Cover Note:</span>
+                  </p>
+                  <p className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-muted-foreground bg-muted/30 p-3.5 rounded-xl border border-border/50">
+                    {application.coverNote || "Tidak ada catatan pengantar yang dilampirkan."}
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -2501,17 +2805,123 @@ export function RecruiterPipelinePage({ jobId }: { jobId: string }) {
   useEffect(() => { if (!dbMode) { setJob(DEMO_JOBS.find((item) => item.id === jobId) ?? null); return; } fetch(`/api/jobs/${jobId}`, { cache: "no-store" }).then(async (response) => { const payload = await response.json() as { job?: Job }; if (!response.ok || !payload.job) throw new Error("Job tidak ditemukan."); setJob(payload.job); }).catch(() => setJob(null)); }, [dbMode, jobId]);
   const visible = useMemo(() => applications.filter((item) => item.jobId === jobId), [applications, jobId]); const grouped = activeStatuses.map((status) => ({ status, items: visible.filter((item) => item.status === status) })).filter((group) => group.items.length > 0);
   const transition = async (application: Application, status: ApplicationStatus) => { setUpdating(application.id); try { if (dbMode) { const response = await fetch(`/api/applications/${application.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, reason: reason || undefined }) }); const payload = await response.json() as { application?: Application; error?: string }; if (!response.ok || !payload.application) throw new Error(payload.error ?? "Status belum dapat diubah."); setApplications((current) => current.map((item) => item.id === application.id ? { ...item, ...payload.application } : item)); } else { const next = { ...application, status, updatedAt: new Date().toISOString() }; saveDemoApplication(next); setApplications((current) => current.map((item) => item.id === application.id ? next : item)); } setReason(""); } catch (reasonError: unknown) { window.alert(reasonError instanceof Error ? reasonError.message : "Status belum dapat diubah."); } finally { setUpdating(null); } };
-  return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-7xl px-4 py-8 sm:py-12"><Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Jobs</Link><div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter workspace</p><h1 className="mt-2 text-3xl font-bold">Pipeline</h1><p className="mt-2 text-muted-foreground">{job?.title ?? "Job"} {job?.organizationName ? `· ${job.organizationName}` : ""}</p></div><div className="flex items-center gap-2 text-sm text-muted-foreground"><UserRound className="size-4" /> {visible.length} kandidat</div></div><label className="mt-6 block max-w-xl text-sm font-semibold">Alasan perubahan tahap<span className="ml-2 text-xs font-normal text-muted-foreground">(opsional)<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="field mt-2 min-h-20 py-2" placeholder="Catatan untuk histori aplikasi" /></span></label>{loading ? <div className="mt-6"><State text="Memuat pipeline..." /></div> : error ? <div className="mt-6"><State text={error} error /></div> : visible.length === 0 ? <div className="mt-6"><State text="Belum ada aplikasi untuk job ini. Kandidat yang melamar akan muncul di sini." /></div> : <div className="mt-6 grid gap-4 lg:grid-cols-3">{grouped.map((group) => <section key={group.status} className="rounded-2xl border bg-muted/30 p-3"><div className="flex items-center justify-between px-2 py-2"><h2 className="font-semibold">{labels[group.status]}</h2><span className="text-xs text-muted-foreground">{group.items.length}</span></div><div className="space-y-3">{group.items.map((application) => <Card key={application.id}><CardContent className="p-4"><div className="flex items-start gap-3"><div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRound className="size-4" /></div><div className="min-w-0"><p className="font-semibold">{application.candidate?.name ?? "Kandidat"}</p><p className="mt-1 text-xs text-muted-foreground">{application.candidate?.headline ?? "Profil kandidat"}</p>{application.candidate?.location && <p className="mt-1 text-xs text-muted-foreground">{application.candidate.location}</p>}</div></div><div className="mt-4 flex flex-wrap gap-2"><select aria-label={`Pindahkan aplikasi ${application.id}`} value={application.status} disabled={updating === application.id} onChange={(event) => void transition(application, event.target.value as ApplicationStatus)} className="field h-9 text-xs">{applicationStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select><span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3" /> Histori tersimpan</span></div></CardContent></Card>)}</div></section>)}</div>}</main></ProtectedRoute>;
+  return <ProtectedRoute role="recruiter"><main className="container mx-auto max-w-7xl px-4 py-8 sm:py-12"><Link href="/recruiter/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Jobs</Link><div className="mt-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="font-mono text-xs uppercase tracking-widest text-primary">Recruiter workspace</p><h1 className="mt-2 text-3xl font-bold">Pipeline</h1><p className="mt-2 text-muted-foreground">{job?.title ?? "Job"} {job?.organizationName ? `· ${job.organizationName}` : ""}</p></div><div className="flex items-center gap-2 text-sm text-muted-foreground"><UserRound className="size-4" /> {visible.length} kandidat</div></div><label className="mt-6 block max-w-xl text-sm font-semibold">Alasan perubahan tahap<span className="ml-2 text-xs font-normal text-muted-foreground">(opsional)<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="field mt-2 min-h-20 py-2" placeholder="Catatan untuk histori aplikasi" /></span></label>{loading ? <div className="mt-6"><State text="Memuat pipeline..." /></div> : error ? <div className="mt-6"><State text={error} error /></div> : visible.length === 0 ? <div className="mt-6"><State text="Belum ada aplikasi untuk job ini. Kandidat yang melamar akan muncul di sini." /></div> : <div className="mt-6 grid gap-4 lg:grid-cols-3">{grouped.map((group) => <section key={group.status} className="rounded-2xl border bg-muted/30 p-3"><div className="flex items-center justify-between px-2 py-2"><h2 className="font-semibold">{labels[group.status]}</h2><span className="text-xs text-muted-foreground">{group.items.length}</span></div><div className="space-y-3">{group.items.map((application) => <Card key={application.id}><CardContent className="p-4"><div className="flex items-start gap-3"><div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRound className="size-4" /></div><div className="min-w-0"><p className="font-semibold">{application.candidate?.name ?? "Kandidat"}</p><p className="mt-1 text-xs text-muted-foreground">{application.candidate?.headline ?? "Profil kandidat"}</p>{application.candidate?.location && <p className="mt-1 text-xs text-muted-foreground">{application.candidate.location}</p>}</div></div><div className="mt-4 flex flex-wrap gap-2"><select aria-label={`Pindahkan aplikasi ${application.id}`} value={application.status} disabled={updating === application.id} onChange={(event) => { const nextStatus = event.target.value; if (isApplicationStatus(nextStatus)) { void transition(application, nextStatus); } }} className="field h-9 text-xs">{applicationStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select><span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3" /> Histori tersimpan</span></div></CardContent></Card>)}</div></section>)}</div>}</main></ProtectedRoute>;
 }
 
-export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?: boolean }) {
-  const { dbMode } = useApp();
-  const { applications } = useApplications();
+export function ApplyForm({
+  job,
+  withoutCard = false,
+  onClose,
+}: {
+  job: Job;
+  withoutCard?: boolean;
+  onClose?: () => void;
+}) {
+  const { dbMode, cvProfile } = useApp();
+  const { applications, setApplications } = useApplications();
+  const candidate = cvProfile || DEMO_CANDIDATE_CV;
+
   const [coverNote, setCoverNote] = useState("");
+  const [expectedSalary, setExpectedSalary] = useState<number>(() => {
+    if (job.salaryMin && job.salaryMax) {
+      return Math.round((job.salaryMin + job.salaryMax) / 2);
+    }
+    return 20000000;
+  });
+  const [isSalaryNegotiable, setIsSalaryNegotiable] = useState(true);
+  const [availability, setAvailability] = useState("immediate");
   const [status, setStatus] = useState<"idle" | "saving" | "success">("idle");
+  const [receiptCode, setReceiptCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   const duplicate = applications.find((item) => item.jobId === job.id);
+
+  // Skill Match Calculation
+  const skillMatchData = useMemo(() => {
+    const candidateSkills = (candidate.skills || []).map((s) => s.toLowerCase());
+    const candidateTools = (candidate.tools || []).map((t) => t.toLowerCase());
+    const candidateHard = (candidate.hardCompetencies || []).map((h) => h.toLowerCase());
+    const allCandidateCompetencies = [...candidateSkills, ...candidateTools, ...candidateHard];
+
+    const requirements = job.requirements || [];
+    if (requirements.length === 0) {
+      return {
+        score: 92,
+        matched: (candidate.skills || []).slice(0, 4),
+        missing: [] as string[],
+        total: 4,
+      };
+    }
+
+    const matched: string[] = [];
+    const missing: string[] = [];
+
+    requirements.forEach((req) => {
+      const reqLower = req.name.toLowerCase();
+      const isMatch = allCandidateCompetencies.some(
+        (skill) => skill.includes(reqLower) || reqLower.includes(skill)
+      );
+      if (isMatch) {
+        matched.push(req.name);
+      } else {
+        missing.push(req.name);
+      }
+    });
+
+    const calculatedScore = Math.min(
+      100,
+      Math.max(45, Math.round((matched.length / Math.max(1, requirements.length)) * 100))
+    );
+
+    return {
+      score: calculatedScore,
+      matched,
+      missing,
+      total: requirements.length,
+    };
+  }, [candidate, job.requirements]);
+
+  // AI Prompt Chips Generator
+  const handleApplyChip = (type: "experience" | "skills" | "motivation") => {
+    let snippet = "";
+    if (type === "experience") {
+      const headlineRole = candidate.headline?.split("|")[0]?.trim() || "Product Designer";
+      snippet = `Dengan rekam jejak sebagai ${headlineRole}, saya memiliki pengalaman solid dalam mengelola siklus perancangan dari riset kebutuhan pengguna hingga eksekusi akhir. Posisi ${job.title} di ${job.organizationName} sangat sesuai dengan kompetensi dan portofolio yang telah saya bangun.`;
+    } else if (type === "skills") {
+      const topSkills = (candidate.skills || []).slice(0, 4).join(", ") || "UI/UX Design, Design Systems";
+      const topTools = (candidate.tools || []).slice(0, 3).join(", ") || "Figma, Notion";
+      snippet = `Keahlian utama saya di bidang ${topSkills} serta penguasaan tools seperti ${topTools} memungkinkan saya untuk langsung beradaptasi secara tangkas dan memperkuat standar deliverable di tim ${job.title}.`;
+    } else if (type === "motivation") {
+      snippet = `Saya sangat antusias dengan visi dan dampak inovasi yang dihadirkan oleh ${job.organizationName}. Menjadi bagian dari tim ${job.title} merupakan langkah selaras bagi saya untuk memberikan kontribusi nyata dan profesional bagi pertumbuhan bisnis perusahaan.`;
+    }
+
+    setCoverNote((prev) => {
+      if (!prev.trim()) return snippet;
+      return `${prev.trim()}\n\n${snippet}`;
+    });
+  };
+
+  const handleGenerateFullAiDraft = () => {
+    setIsAiGenerating(true);
+    setTimeout(() => {
+      const headlineRole = candidate.headline?.split("|")[0]?.trim() || "Product Designer";
+      const topSkills = (candidate.skills || []).slice(0, 4).join(", ") || "UI/UX, Design Systems, UX Research";
+      const topTools = (candidate.tools || []).slice(0, 3).join(", ") || "Figma, Notion, Jira";
+
+      const fullDraft = `Yth. Tim Rekruter ${job.organizationName},
+
+Saya tertarik untuk mengajukan diri pada posisi ${job.title}. Dengan pengalaman profesional sebagai ${headlineRole}, saya telah memimpin beragam inisiatif perancangan produk digital yang berfokus pada efisiensi alur pengguna dan peningkatan konversi bisnis.
+
+Secara teknis, saya menguasai ${topSkills} didukung alur kerja terstruktur menggunakan ${topTools}. Kualifikasi ini sejalan dengan tanggung jawab yang dibutuhkan pada posisi ini, sehingga saya yakin dapat segera memberikan dampak positif bagi sasaran tim ${job.organizationName}.
+
+Besar harapan saya untuk dapat mendiskusikan lebih lanjut bagaimana kompetensi dan portofolio saya dapat mendukung kesuksesan proyek-proyek di ${job.organizationName}. Terima kasih atas perhatian dan kesempatan yang diberikan.`;
+
+      setCoverNote(fullDraft);
+      setIsAiGenerating(false);
+      toast.success("Draf cover note AI berhasil digenerate!");
+    }, 400);
+  };
 
   const apply = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -2523,32 +2933,53 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
     }
     setStatus("saving");
     try {
+      const availabilityLabel =
+        availability === "immediate"
+          ? "Segera (Immediate)"
+          : availability === "1_month"
+          ? "1 Bulan (1-month notice)"
+          : availability === "2_weeks"
+          ? "2 Minggu"
+          : "Fleksibel / Masih Bekerja";
+
       if (dbMode) {
         const response = await fetch("/api/applications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobId: job.id, coverNote: coverNote.trim() }),
+          body: JSON.stringify({
+            jobId: job.id,
+            coverNote: coverNote.trim(),
+            expectedSalary: expectedSalary || undefined,
+            availability: availabilityLabel,
+          }),
         });
-        const payload = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "Lamaran belum dapat dikirim.");
+        const payload = (await response.json()) as { application?: Application; error?: string };
+        if (!response.ok || !payload.application) throw new Error(payload.error ?? "Lamaran belum dapat dikirim.");
       } else {
         const now = new Date().toISOString();
-        saveDemoApplication({
+        const demoApp: Application = {
           id: `demo-application-${Date.now()}`,
           jobId: job.id,
           status: "new",
+          source: "self_applied",
+          unlockedAt: null,
           coverNote: coverNote.trim(),
+          expectedSalary: expectedSalary || null,
+          availability: availabilityLabel,
           submittedAt: now,
           withdrawnAt: null,
           updatedAt: now,
           job: { id: job.id, title: job.title, organizationName: job.organizationName },
           candidate: {
-            name: DEMO_CANDIDATE_CV.fullName,
-            headline: DEMO_CANDIDATE_CV.headline,
-            location: DEMO_CANDIDATE_CV.location,
+            name: candidate.fullName,
+            headline: candidate.headline,
+            location: candidate.location,
           },
-        });
+        };
+        saveDemoApplication(demoApp);
+        setApplications((prev) => [...prev.filter((i) => i.id !== demoApp.id), demoApp]);
       }
+      setReceiptCode(`APP-${job.id.slice(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
       setStatus("success");
       toast.success("Lamaran berhasil dikirim!");
     } catch (reason: unknown) {
@@ -2558,36 +2989,109 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
   };
 
   if (status === "success") {
+    const refCode = receiptCode || `APP-${job.id.slice(0, 4).toUpperCase()}-SENT`;
+    const availabilityLabel =
+      availability === "immediate"
+        ? "Segera (Immediate)"
+        : availability === "1_month"
+        ? "1 Bulan (1-month notice)"
+        : availability === "2_weeks"
+        ? "2 Minggu"
+        : "Fleksibel / Masih Bekerja";
+
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900">
-        <div className="flex items-start gap-3">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 mt-0.5">
-            <Check className="size-4" />
+      <div className="space-y-4">
+        {/* Digital Receipt Header Card */}
+        <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-5 text-emerald-950">
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="size-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-sm text-emerald-950">
+                  Lamaran Berhasil Terkirim ke Rekruter
+                </span>
+                <span className="font-mono text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                  {refCode}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-emerald-850 leading-relaxed">
+                Berkas Anda untuk posisi <strong>{job.title}</strong> di <strong>{job.organizationName}</strong> telah tercatat di antrean seleksi rekruter.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-sm text-emerald-950">Lamaran Berhasil Terkirim</p>
-            <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-              Profil Anda telah diteruskan ke tim rekruter. Anda dapat memantau status lamaran di menu aplikasi saya.
-            </p>
-            <Link
-              href="/candidate/applications"
-              className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+
+          {/* Receipt Details Grid */}
+          <div className="mt-4 pt-3.5 border-t border-emerald-200/80 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Status Awal</span>
+              <span className="font-semibold text-emerald-950 inline-flex items-center gap-1 mt-0.5">
+                <Clock className="size-3 text-emerald-700" /> Antrean Triage
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Ekspektasi Gaji</span>
+              <span className="font-semibold text-emerald-950 block mt-0.5">
+                Rp {expectedSalary.toLocaleString("id-ID")}
+                {isSalaryNegotiable && <span className="text-[10px] text-emerald-700 font-normal ml-1">(Nego)</span>}
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-emerald-800/80 block">Ketersediaan</span>
+              <span className="font-semibold text-emerald-950 block mt-0.5 truncate">
+                {availabilityLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* SLA Notice & Privacy Information */}
+        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-purple-950">
+            <ShieldCheck className="size-4 text-[#7C3AED]" />
+            <span>Transparansi Proses &amp; SLA Respon</span>
+          </div>
+          <p className="text-xs text-purple-900/90 leading-relaxed">
+            Rata-rata tim rekruter mereview berkas pelamar dalam <strong>3–5 hari kerja</strong>. Nomor telepon pribadi dan email langsung Anda tetap terenkripsi hingga profil Anda dibuka oleh rekruter untuk lanjut ke tahap seleksi berikutnya.
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+          <Link
+            href="/candidate/applications"
+            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-xl bg-primary text-white font-semibold text-xs shadow-xs hover:bg-primary/90 transition"
+          >
+            <span>Pantau di Menu Lamaran Saya</span>
+            <ArrowRight className="size-3.5" />
+          </Link>
+          {onClose && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-semibold"
             >
-              Buka Aplikasi Saya &rarr;
-            </Link>
-          </div>
+              Tutup
+            </Button>
+          )}
         </div>
       </div>
     );
   }
 
   if (duplicate) {
+    const safeDupId = normalizeSafeId(duplicate.id);
     return (
       <div className="rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground">
         <p className="font-semibold text-foreground">Anda sudah melamar posisi ini.</p>
         <p className="mt-1">
           Pantau proses dan feedback rekruter melalui{" "}
-          <Link href={`/candidate/applications/${duplicate.id}`} className="font-semibold text-primary hover:underline">
+          <Link
+            href={safeDupId ? `/candidate/applications/${safeDupId}` : "/candidate/applications"}
+            className="font-semibold text-primary hover:underline"
+          >
             halaman lamaran Anda &rarr;
           </Link>
         </p>
@@ -2597,27 +3101,188 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
 
   const formContent = (
     <form onSubmit={apply} className="space-y-4">
-      <div>
-        <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
-          <label htmlFor="cover-note" className="text-foreground">
-            Cover note / Catatan Pembuka
+      {/* Profile & Skill Match Snapshot Card */}
+      <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {candidate.avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={candidate.avatarUrl}
+                alt={candidate.fullName}
+                className="size-11 rounded-full object-cover border border-border shadow-2xs"
+              />
+            ) : (
+              <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                {candidate.fullName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-foreground">{candidate.fullName}</h4>
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                  Profil Terverifikasi
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-1">{candidate.headline}</p>
+            </div>
+          </div>
+
+          {/* Skill Match Score Pill */}
+          <div className="shrink-0 text-right">
+            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200">
+              <Sparkles className="size-3 text-[#7C3AED]" />
+              {skillMatchData.score}% Cocok
+            </span>
+            <span className="text-[10px] text-muted-foreground block mt-0.5">
+              {skillMatchData.matched.length} dari {skillMatchData.total} kriteria cocok
+            </span>
+          </div>
+        </div>
+
+        {/* Skills Breakdown Tags */}
+        {skillMatchData.matched.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/60">
+            <span className="text-[11px] text-muted-foreground font-medium mr-1">Skill Sesuai:</span>
+            {skillMatchData.matched.slice(0, 5).map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+              >
+                <Check className="size-3" />
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Application Preferences: Expected Salary & Availability */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border/70 bg-muted/20">
+        <div>
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Banknote className="size-3.5 text-primary" />
+            <span>Ekspektasi Gaji Bulanan</span>
           </label>
-          <span className="text-[11px] text-muted-foreground font-normal">
+          <div className="mt-1.5 relative flex items-center">
+            <span className="absolute left-3 text-xs text-muted-foreground font-semibold pointer-events-none z-10">
+              Rp
+            </span>
+            <input
+              type="number"
+              step={500000}
+              min={1000000}
+              value={expectedSalary || ""}
+              onChange={(e) => setExpectedSalary(Number(e.target.value) || 0)}
+              className="w-full rounded-xl border border-input bg-background pl-10 pr-3 h-10 text-xs font-semibold text-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none"
+              placeholder="Contoh: 20000000"
+            />
+          </div>
+          <label className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSalaryNegotiable}
+              onChange={(e) => setIsSalaryNegotiable(e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary size-3.5"
+            />
+            <span>Dapat dinegosiasikan (Negotiable)</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Clock className="size-3.5 text-primary" />
+            <span>Ketersediaan Bergabung</span>
+          </label>
+          <select
+            value={availability}
+            onChange={(e) => setAvailability(e.target.value)}
+            className="w-full mt-1.5 rounded-xl border border-input bg-background px-3 h-10 text-xs font-medium text-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none cursor-pointer"
+          >
+            <option value="immediate">Segera (Immediate)</option>
+            <option value="1_month">1 Bulan (1-month notice)</option>
+            <option value="2_weeks">2 Minggu</option>
+            <option value="flexible">Fleksibel / Masih Bekerja</option>
+          </select>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Bantu rekruter memperkirakan jadwal orientasi kerja.
+          </p>
+        </div>
+      </div>
+
+      {/* Cover Note Section with AI Prompt Chips */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <label htmlFor="cover-note" className="font-semibold text-foreground flex items-center gap-1.5">
+            <FileText className="size-3.5 text-primary" />
+            <span>Catatan Pembuka / Cover Note</span>
+          </label>
+          <span className="text-[11px] text-muted-foreground font-mono">
             {coverNote.length}/4.000 karakter
           </span>
         </div>
+
+        {/* Quick Prompt Chips */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">
+            <Sparkles className="size-3 text-[#7C3AED]" />
+            <span>Sisipkan Cepat:</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("experience")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Sorot Pengalaman
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("skills")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Kesesuaian Skill
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplyChip("motivation")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition cursor-pointer"
+          >
+            + Motivasi Perusahaan
+          </button>
+          <button
+            type="button"
+            disabled={isAiGenerating}
+            onClick={handleGenerateFullAiDraft}
+            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-primary/10 text-primary hover:bg-primary/15 transition cursor-pointer"
+          >
+            <Sparkles className="size-3" />
+            {isAiGenerating ? "Menyusun Draf..." : "Draf Lengkap AI"}
+          </button>
+        </div>
+
         <textarea
           id="cover-note"
           value={coverNote}
           onChange={(event) => setCoverNote(event.target.value)}
-          className="field min-h-28 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 transition-all rounded-xl focus:ring-2 focus:ring-primary/20"
-          placeholder="Ceritakan secara singkat alasan kamu tertarik dan cocok untuk posisi ini..."
+          className="field min-h-32 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 transition-all rounded-xl focus:ring-2 focus:ring-primary/20 leading-relaxed"
+          placeholder={`Ceritakan alasan kamu cocok dan antusias untuk posisi ${job.title} di ${job.organizationName}...`}
           required
           maxLength={4000}
           aria-describedby="cover-note-help"
         />
-        <p id="cover-note-help" className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
+        <p id="cover-note-help" className="text-[11px] text-muted-foreground">
           CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter saat lamaran dikirim.
+        </p>
+      </div>
+
+      {/* Informative notice on candidate privacy and recruiter triage */}
+      <div className="rounded-xl border border-purple-200/80 bg-purple-50/50 p-3 text-xs text-purple-950 space-y-1">
+        <div className="flex items-center gap-1.5 font-semibold text-purple-950">
+          <ShieldCheck className="size-3.5 text-[#7C3AED]" />
+          <span>Talent Privacy Shield Terpasang</span>
+        </div>
+        <p className="text-[11px] text-purple-900/90 leading-relaxed">
+          Nomor telepon, email pribadi, dan CV mentah Anda tetap terproteksi. Rekruter hanya melihat ringkasan kualifikasi teranonim hingga profil Anda dibuka untuk proses wawancara.
         </p>
       </div>
 
@@ -2627,14 +3292,26 @@ export function ApplyForm({ job, withoutCard = false }: { job: Job; withoutCard?
         </p>
       )}
 
-      <Button
-        type="submit"
-        disabled={status === "saving"}
-        className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-10 shadow-xs cursor-pointer gap-2 transition-all"
-      >
-        {status === "saving" ? "Mengirim Lamaran..." : "Kirim Lamaran Sekarang"}
-        <Send className="size-3.5" />
-      </Button>
+      <div className="flex items-center justify-end gap-2 pt-2">
+        {onClose && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="rounded-xl text-xs font-semibold h-10 px-4"
+          >
+            Batal
+          </Button>
+        )}
+        <Button
+          type="submit"
+          disabled={status === "saving" || isAiGenerating}
+          className="flex-1 sm:flex-initial rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-10 shadow-xs cursor-pointer gap-2 transition-all px-6"
+        >
+          {status === "saving" ? "Mengirim Lamaran..." : "Kirim Lamaran Sekarang"}
+          <Send className="size-3.5" />
+        </Button>
+      </div>
     </form>
   );
 

@@ -1,0 +1,2 @@
+ALTER TABLE "applications" ADD COLUMN "unlocked_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "applications_job_unlocked_idx" ON "applications" USING btree ("job_id","unlocked_at");

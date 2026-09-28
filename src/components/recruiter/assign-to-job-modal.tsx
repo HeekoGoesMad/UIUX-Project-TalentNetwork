@@ -229,7 +229,12 @@ export function AssignToJobModal({
               <select
                 aria-label="Pilih lowongan pekerjaan"
                 value={selectedJobId}
-                onChange={(e) => setSelectedJobId(e.target.value)}
+                onChange={(e) => {
+                  const nextJobId = String(e.target.value || "").trim();
+                  if (nextJobId && jobs.some((job) => job.id === nextJobId)) {
+                    setSelectedJobId(nextJobId);
+                  }
+                }}
                 className="field w-full text-sm"
               >
                 {jobs.map((job) => (

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
@@ -121,7 +121,12 @@ export async function GET() {
               .select({ candidateProfileId: schema.applications.candidateProfileId })
               .from(schema.applications)
               .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
-              .where(eq(schema.jobs.organizationId, activeOrgId)),
+              .where(
+                and(
+                  eq(schema.jobs.organizationId, activeOrgId),
+                  isNotNull(schema.applications.unlockedAt)
+                )
+              ),
           ]).then(([runs, apps]) =>
             Array.from(
               new Set([
