@@ -304,7 +304,12 @@ export function demoApplications(): Application[] {
     }
     const decoded = raw.startsWith("[") ? raw : decodeStorage(raw);
     const parsed = JSON.parse(decoded) as Application[];
-    return parsed.length > 0 ? parsed : DEFAULT_DEMO_APPLICATIONS;
+    const sanitized = parsed
+      .map((item) => {
+        const safeId = normalizeSafeId(item?.id) ?? `demo-application-${Date.now().toString(36)}`;
+        return { ...item, id: safeId };
+      });
+    return sanitized.length > 0 ? sanitized : DEFAULT_DEMO_APPLICATIONS;
   } catch {
     return DEFAULT_DEMO_APPLICATIONS;
   }
@@ -312,7 +317,9 @@ export function demoApplications(): Application[] {
 
 export function saveDemoApplication(application: Application) {
   if (typeof window === "undefined") return;
-  const list = [...demoApplications().filter((item) => item.id !== application.id), application];
+  const safeId = normalizeSafeId(application.id) ?? `demo-application-${Date.now().toString(36)}`;
+  const safeApplication = { ...application, id: safeId };
+  const list = [...demoApplications().filter((item) => item.id !== safeApplication.id), safeApplication];
   localStorage.setItem(storageKey, encodeStorage(JSON.stringify(list)));
 }
 
