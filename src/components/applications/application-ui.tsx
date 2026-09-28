@@ -288,7 +288,7 @@ function statusBadge(status: ApplicationStatus) {
 }
 
 function transparencyBadge(application: Application) {
-  if (application.unlockedAt) {
+  if (application.unlockedAt || ["interview", "offer", "hired"].includes(application.status)) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
         <CheckCircle2 className="size-3 text-emerald-600" />
@@ -296,7 +296,7 @@ function transparencyBadge(application: Application) {
       </span>
     );
   }
-  if (application.status === "new" || application.status === "screening") {
+  if (["new", "screening", "review", "shortlisted"].includes(application.status)) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
         <Clock className="size-3 text-slate-500" />
