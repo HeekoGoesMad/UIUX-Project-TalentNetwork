@@ -42,7 +42,7 @@ import {
   getDefaultStatusHistory,
   type StatusHistoryItem,
 } from "@/components/recruiter/candidate-status-git-graph";
-import { maskName } from "@/lib/candidate-display";
+import { getDaysInCurrentStage, maskName } from "@/lib/candidate-display";
 import { cn } from "@/lib/utils";
 
 export type Stage = "screening" | "interview" | "offer" | "hired" | "rejected";
@@ -70,6 +70,8 @@ export type Candidate = {
   unlocked?: boolean;
   unlockedAt?: string | null;
   coverNote?: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
 };
 
 export type Interview = {
@@ -505,6 +507,51 @@ export function CandidateDetailDrawer({
             {/* OVERVIEW TAB */}
             {effectiveTab === "overview" && (
               <div className="space-y-5">
+                {/* SLA Triage Indicator */}
+                {(() => {
+                  const days = getDaysInCurrentStage(candidate);
+                  const isScreening = candidate.stage === "screening";
+                  if (!isScreening || days < 3) return null;
+                  const isOverdue = days >= 5;
+
+                  return (
+                    <div
+                      className={cn(
+                        "rounded-xl border p-3.5 text-xs flex items-start gap-3",
+                        isOverdue
+                          ? "bg-rose-50/90 border-rose-200 text-rose-900 shadow-2xs"
+                          : "bg-amber-50/90 border-amber-200 text-amber-900 shadow-2xs"
+                      )}
+                    >
+                      {isOverdue ? (
+                        <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <Clock className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <div className="space-y-1">
+                        <p className="font-bold flex items-center gap-1.5">
+                          {isOverdue ? "Peringatan SLA Terlewat" : "Mendekati Batas SLA"}
+                          <span
+                            className={cn(
+                              "text-[10px] px-1.5 py-0.2 rounded-full font-semibold",
+                              isOverdue
+                                ? "bg-rose-200/80 text-rose-800"
+                                : "bg-amber-200/80 text-amber-800"
+                            )}
+                          >
+                            {days} hari di antrean
+                          </span>
+                        </p>
+                        <p className="text-[11px] leading-relaxed opacity-90">
+                          {isOverdue
+                            ? "Lamaran kandidat ini telah melampaui estimasi standar peninjauan 3–5 hari kerja. Segera lakukan evaluasi profil atau putuskan kelanjutan ke tahap berikutnya."
+                            : "Lamaran ini telah berada di antrean screening selama 3 hari. Segera tinjau untuk menjaga SLA respons kepada kandidat."}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* 1. INFORMASI PELAMAR */}
                 <Card className="border-slate-200 shadow-2xs">
                   <CardContent className="p-4 space-y-3">
@@ -531,10 +578,22 @@ export function CandidateDetailDrawer({
                         <p className="text-slate-500">Penanggung Jawab</p>
                         <p className="font-medium text-slate-800 mt-0.5">{candidate.owner}</p>
                       </div>
-                      <div className="col-span-2">
+                      <div>
                         <p className="text-slate-500">Ekspektasi Kompensasi</p>
-                        <p className="font-semibold text-emerald-700 mt-0.5">{candidate.compensation || "Rp 15.000.000 / bulan"}</p>
+                        <p className="font-semibold text-emerald-700 mt-0.5">
+                          {candidate.expectedSalary
+                            ? `Rp ${Number(candidate.expectedSalary).toLocaleString("id-ID")} / bln`
+                            : candidate.compensation || "Rp 15.000.000 / bulan"}
+                        </p>
                       </div>
+                      <div>
+                        <p className="text-slate-500">Ketersediaan Kerja</p>
+                        <p className="font-semibold text-purple-700 mt-0.5 flex items-center gap-1">
+                          <CalendarClock className="size-3.5 text-purple-500 shrink-0" />
+                          <span>{candidate.availability || "Fleksibel / Sesuai Kesepakatan"}</span>
+                        </p>
+                      </div>
+
 
                       {/* Lowongan / Talent Pool Assignment */}
                       <div className="col-span-2 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">

@@ -5,9 +5,11 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  Banknote,
   BarChart3,
   Briefcase,
   Calendar,
+  CalendarClock,
   ChevronRight,
   Clock,
   DollarSign,
@@ -55,7 +57,7 @@ import {
   getDefaultStatusHistory,
   type StatusHistoryItem,
 } from "@/components/recruiter/candidate-status-git-graph";
-import { maskName } from "@/lib/candidate-display";
+import { getDaysInCurrentStage, maskName } from "@/lib/candidate-display";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +86,10 @@ export type Candidate = {
   unlocked?: boolean;
   unlockedAt?: string | null;
   coverNote?: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
 };
+
 
 export type Interview = {
   id: string;
@@ -147,6 +152,8 @@ const initialCandidates: Candidate[] = [
     feedback: "Kandidat ini memenuhi kompetensi inti lowongan dan selaras dengan standar peran.",
     offerStatus: "accepted",
     compensation: "Rp 15.000.000 / bulan",
+    expectedSalary: 15000000,
+    availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
     jobId: "job-1",
@@ -165,6 +172,8 @@ const initialCandidates: Candidate[] = [
     feedback: "Portfolio kuat di backend engineering & database architecture.",
     offerStatus: "draft",
     compensation: "Rp 25.000.000 / bulan",
+    expectedSalary: 25000000,
+    availability: "2 Minggu",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Alga Ramandika Praba"],
     jobId: "job-2",
@@ -183,6 +192,8 @@ const initialCandidates: Candidate[] = [
     feedback: "Perlu validasi stakeholder management.",
     offerStatus: "draft",
     compensation: "Rp 22.000.000 / bulan",
+    expectedSalary: 22000000,
+    availability: "Segera (Immediate)",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Ariel Oka"],
     jobId: "talent-pool",
@@ -201,6 +212,8 @@ const initialCandidates: Candidate[] = [
     feedback: "Sangat kuat di systems architecture dan high concurrency.",
     offerStatus: "sent",
     compensation: "Rp 31.000.000 / bulan",
+    expectedSalary: 31000000,
+    availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Hasyim Kipuw"],
     jobId: "job-4",
@@ -219,12 +232,15 @@ const initialCandidates: Candidate[] = [
     feedback: "Pengalaman solid di talent acquisition & HR operations.",
     offerStatus: "draft",
     compensation: "Rp 18.000.000 / bulan",
+    expectedSalary: 18000000,
+    availability: "Fleksibel",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Muhammad Adi Firmansyahah"],
     jobId: "job-1",
     jobTitle: "Senior Product Designer",
   },
 ];
+
 
 const initialInterviews: Interview[] = [
   { id: "interview-1", candidateId: "b082c226-1a6e-42a6-80e0-150ce5f01745", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Architecture Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
@@ -411,28 +427,6 @@ export function validateCandidateStageTransition(
   }
 
   return { allowed: true };
-}
-
-export function getDaysInCurrentStage(candidate: Candidate): number {
-  if (Array.isArray(candidate.statusHistory) && candidate.statusHistory.length > 0) {
-    const sorted = [...candidate.statusHistory].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-    const latestStageEntry = sorted.find((h) => h.stage === candidate.stage);
-    if (latestStageEntry && latestStageEntry.timestamp) {
-      const time = new Date(latestStageEntry.timestamp).getTime();
-      if (!isNaN(time)) {
-        return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
-      }
-    }
-  }
-  if (candidate.appliedAt) {
-    const time = new Date(candidate.appliedAt).getTime();
-    if (!isNaN(time)) {
-      return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
-    }
-  }
-  return 0;
 }
 
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
@@ -688,6 +682,8 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
             submittedAt?: string;
             unlockedAt?: string | null;
             coverNote?: string | null;
+            expectedSalary?: number | null;
+            availability?: string | null;
             source?: "candidate" | "recruiter_invitation";
             job?: { id?: string; title?: string };
             candidate?: { name?: string; headline?: string; location?: string; avatarUrl?: string };
@@ -743,7 +739,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                 score: 4.5,
                 feedback: "",
                 offerStatus: mappedStage === "offer" ? "sent" : mappedStage === "hired" ? "accepted" : "draft",
-                compensation: "Rp 15.000.000 / bulan",
+                compensation: app.expectedSalary ? `Rp ${Number(app.expectedSalary).toLocaleString("id-ID")} / bulan` : "Rp 15.000.000 / bulan",
+                expectedSalary: app.expectedSalary ?? null,
+                availability: app.availability ?? null,
                 reason: "",
                 jobId: finalJobId,
                 jobTitle: finalJobTitle,
@@ -2379,6 +2377,24 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                                 )}
                               </div>
 
+                              {/* Candidate Preferences: Salary & Availability */}
+                              {(candidate.expectedSalary || candidate.availability) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                                  {candidate.expectedSalary && (
+                                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded">
+                                      <Banknote className="size-2.5" />
+                                      Rp {(candidate.expectedSalary / 1000000).toFixed(0)}jt/bln
+                                    </span>
+                                  )}
+                                  {candidate.availability && (
+                                    <span className="inline-flex items-center gap-1 font-medium text-purple-700 bg-purple-50/80 border border-purple-200 px-1.5 py-0.5 rounded">
+                                      <CalendarClock className="size-2.5 text-purple-500" />
+                                      {candidate.availability}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                               {/* Inbound Cover Note Snippet Preview */}
                               {isLocked && candidate.coverNote && (
                                 <div className="mt-2 text-[11px] bg-purple-50/40 border border-purple-100 rounded-lg p-2 text-slate-600 line-clamp-2 italic leading-relaxed">
@@ -2423,6 +2439,24 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                                   </span>
                                   {(() => {
                                     const days = getDaysInCurrentStage(candidate);
+                                    const isScreening = candidate.stage === "screening";
+                                    if (isScreening && days >= 3) {
+                                      const isOverdue = days >= 5;
+                                      return (
+                                        <span
+                                          className={cn(
+                                            "inline-flex items-center gap-1 text-[10px] shrink-0 px-1.5 py-0.5 rounded border font-semibold",
+                                            isOverdue
+                                              ? "text-rose-700 bg-rose-50 border-rose-300 shadow-2xs"
+                                              : "text-amber-800 bg-amber-50 border-amber-300 shadow-2xs"
+                                          )}
+                                          title={isOverdue ? `SLA Overdue: ${days} hari menunggu review triage` : `Mendekati batas SLA: ${days} hari menunggu review`}
+                                        >
+                                          <Clock className={cn("size-2.5", isOverdue ? "text-rose-600" : "text-amber-600")} />
+                                          {isOverdue ? `Overdue: ${days}h` : `SLA: ${days}h`}
+                                        </span>
+                                      );
+                                    }
                                     const isAgingAlert = days >= 7;
                                     return (
                                       <span
@@ -2597,6 +2631,19 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                             <td className="px-4 py-3.5">
                               <p className="font-medium text-slate-800">{candidate.role}</p>
                               <p className="text-[11px] text-slate-400">{candidate.location}</p>
+                              {(candidate.expectedSalary || candidate.availability) && (
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                                  {candidate.expectedSalary && (
+                                    <span className="font-semibold text-emerald-700">
+                                      Rp {(candidate.expectedSalary / 1000000).toFixed(0)}jt/bln
+                                    </span>
+                                  )}
+                                  {candidate.expectedSalary && candidate.availability && <span>·</span>}
+                                  {candidate.availability && (
+                                    <span className="text-purple-700 font-medium">{candidate.availability}</span>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3.5">
                               {candidate.unlocked === false ? (
@@ -2617,18 +2664,40 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                               )}
                             </td>
                             <td className="px-4 py-3.5">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1 text-[11px]",
-                                  isAgingAlert
-                                    ? "text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md font-semibold"
-                                    : "text-slate-600 font-medium"
-                                )}
-                                title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
-                              >
-                                <Clock className={cn("size-3", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
-                                {days === 0 ? "Hari ini" : `${days} hari`}
-                              </span>
+                              {(() => {
+                                const isScreening = candidate.stage === "screening";
+                                if (isScreening && days >= 3) {
+                                  const isOverdue = days >= 5;
+                                  return (
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border",
+                                        isOverdue
+                                          ? "text-rose-700 bg-rose-50 border-rose-300 shadow-2xs"
+                                          : "text-amber-800 bg-amber-50 border-amber-300 shadow-2xs"
+                                      )}
+                                      title={isOverdue ? `SLA Overdue: ${days} hari menunggu review triage` : `Mendekati batas SLA: ${days} hari menunggu review`}
+                                    >
+                                      <Clock className={cn("size-3", isOverdue ? "text-rose-600" : "text-amber-600")} />
+                                      {isOverdue ? `Overdue (${days}h)` : `SLA (${days}h)`}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1 text-[11px]",
+                                      isAgingAlert
+                                        ? "text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md font-semibold"
+                                        : "text-slate-600 font-medium"
+                                    )}
+                                    title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
+                                  >
+                                    <Clock className={cn("size-3", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
+                                    {days === 0 ? "Hari ini" : `${days} hari`}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3.5">
                               <span
