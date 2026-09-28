@@ -86,6 +86,11 @@ import { ApplyForm, useApplications, type Application } from "@/components/appli
 
 const PAGE_LIMIT = 100;
 
+function normalizeSafeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
+
 type JobsPayload = { jobs?: Job[]; hasMore?: boolean; error?: string };
 
 function useJobs() {
@@ -396,7 +401,10 @@ export function JobRowCard({ job, appliedApp }: { job: Job; appliedApp?: Applica
               variant="default"
               className="rounded-lg text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs gap-1 transition-all"
             >
-              <Link href={`/candidate/applications/${appliedApp.id}`}>
+              <Link href={(() => {
+                const safeAppId = normalizeSafeId(appliedApp.id);
+                return safeAppId ? `/candidate/applications/${safeAppId}` : "/candidate/applications";
+              })()}>
                 <FileText className="size-3.5" />
                 <span>Lihat Status</span>
               </Link>
@@ -407,7 +415,10 @@ export function JobRowCard({ job, appliedApp }: { job: Job; appliedApp?: Applica
               variant="outline"
               className="rounded-lg text-xs font-semibold border-border/80 text-muted-foreground hover:text-foreground h-8 px-2"
             >
-              <Link href={`/jobs/${job.id}`}>Detail</Link>
+              <Link href={(() => {
+                const safeJobId = normalizeSafeId(job.id);
+                return safeJobId ? `/jobs/${safeJobId}` : "/jobs";
+              })()}>Detail</Link>
             </Button>
           </div>
         ) : (
@@ -1503,7 +1514,10 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                           variant="outline"
                           className="w-full h-11 rounded-xl border-purple-200 bg-purple-50 text-[#7C3AED] hover:bg-purple-100 font-semibold text-xs gap-1.5 shadow-2xs cursor-pointer"
                         >
-                          <Link href={`/candidate/applications/${existingApp.id}`}>
+                          <Link href={(() => {
+                            const safeApplicationId = normalizeSafeId(existingApp.id);
+                            return safeApplicationId ? `/candidate/applications/${safeApplicationId}` : "/candidate/applications";
+                          })()}>
                             <CheckCircle2 className="size-4 text-[#7C3AED]" />
                             <span>
                               Sudah Dilamar (Tahap: {APPLICATION_STAGE_LABELS[existingApp.status] || existingApp.status}) &bull; Lihat Status

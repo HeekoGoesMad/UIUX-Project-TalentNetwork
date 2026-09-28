@@ -269,14 +269,37 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
   },
 ];
 
+export function normalizeSafeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
+
+function encodeStorage(val: string): string {
+  try {
+    return btoa(encodeURIComponent(val));
+  } catch {
+    return val;
+  }
+}
+
+function decodeStorage(val: string): string {
+  try {
+    return decodeURIComponent(atob(val));
+  } catch {
+    return val;
+  }
+}
+
 export function demoApplications(): Application[] {
+  if (typeof window === "undefined") return DEFAULT_DEMO_APPLICATIONS;
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) {
-      localStorage.setItem(storageKey, JSON.stringify(DEFAULT_DEMO_APPLICATIONS));
+      localStorage.setItem(storageKey, encodeStorage(JSON.stringify(DEFAULT_DEMO_APPLICATIONS)));
       return DEFAULT_DEMO_APPLICATIONS;
     }
-    const parsed = JSON.parse(raw) as Application[];
+    const decoded = raw.startsWith("[") ? raw : decodeStorage(raw);
+    const parsed = JSON.parse(decoded) as Application[];
     return parsed.length > 0 ? parsed : DEFAULT_DEMO_APPLICATIONS;
   } catch {
     return DEFAULT_DEMO_APPLICATIONS;
@@ -284,7 +307,9 @@ export function demoApplications(): Application[] {
 }
 
 export function saveDemoApplication(application: Application) {
-  localStorage.setItem(storageKey, JSON.stringify([...demoApplications().filter((item) => item.id !== application.id), application]));
+  if (typeof window === "undefined") return;
+  const list = [...demoApplications().filter((item) => item.id !== application.id), application];
+  localStorage.setItem(storageKey, encodeStorage(JSON.stringify(list)));
 }
 
 function statusBadge(status: ApplicationStatus) {
@@ -710,9 +735,15 @@ export function CandidateApplicationsPage() {
             ) : (
               <div className="space-y-3.5">
                 <div className="grid gap-3.5">
-                  {paginatedApps.map((application) => (
-                    <Link key={application.id} href={`/candidate/applications/${application.id}`} className="block group">
-                      <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
+                  {paginatedApps.map((application) => {
+                    const safeAppId = normalizeSafeId(application.id);
+                    return (
+                      <Link
+                        key={application.id}
+                        href={safeAppId ? `/candidate/applications/${safeAppId}` : "/candidate/applications"}
+                        className="block group"
+                      >
+                        <Card className="border-border/80 bg-card transition-all group-hover:border-primary/40 group-hover:shadow-xs">
                         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -741,7 +772,8 @@ export function CandidateApplicationsPage() {
                         </CardContent>
                       </Card>
                     </Link>
-                  ))}
+                  );
+                })}
                 </div>
 
                 {/* Pagination Controls */}
@@ -3039,12 +3071,16 @@ Besar harapan saya untuk dapat mendiskusikan lebih lanjut bagaimana kompetensi d
   }
 
   if (duplicate) {
+    const safeDupId = normalizeSafeId(duplicate.id);
     return (
       <div className="rounded-xl border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground">
         <p className="font-semibold text-foreground">Anda sudah melamar posisi ini.</p>
         <p className="mt-1">
           Pantau proses dan feedback rekruter melalui{" "}
-          <Link href={`/candidate/applications/${duplicate.id}`} className="font-semibold text-primary hover:underline">
+          <Link
+            href={safeDupId ? `/candidate/applications/${safeDupId}` : "/candidate/applications"}
+            className="font-semibold text-primary hover:underline"
+          >
             halaman lamaran Anda &rarr;
           </Link>
         </p>
