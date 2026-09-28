@@ -305,16 +305,48 @@ export function CandidateDetailDrawer({
               </button>
             </div>
 
-            {/* Inbound Triage Banner if candidate is locked */}
+            {/* Single Authoritative Inbound Triage Action Card */}
             {candidate.unlocked === false && (
-              <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/80 p-3 text-xs space-y-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-purple-900">
-                  <Lock className="size-3.5 text-[#7C3AED]" />
-                  <span>Lamaran Inbound · Profil Terkunci</span>
+              <div className="mt-3.5 rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/90 via-purple-50/40 to-white p-4 shadow-2xs space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-8 rounded-xl bg-purple-100 text-[#7C3AED] flex items-center justify-center shrink-0 mt-0.5 ring-1 ring-purple-200/80">
+                      <Lock className="size-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-purple-950">
+                          Lamaran Inbound · Profil Terkunci
+                        </h4>
+                        <span className="text-[10px] font-semibold text-purple-700 bg-purple-100/70 border border-purple-200 px-1.5 py-0.2 rounded-md">
+                          1 Token
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-purple-700/90 leading-relaxed mt-1">
+                        Kandidat melamar secara mandiri. Buka profil untuk mengakses kontak langsung (WhatsApp & Email), berkas CV asli, dan evaluasi Role-Fit AI.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-purple-700 leading-relaxed text-[11px]">
-                  Kandidat melamar secara mandiri. Buka profil lengkap untuk mengakses kontak langsung, riwayat kerja, dokumen CV, dan memicu evaluasi Role-Fit AI (Biaya: 1 Token).
-                </p>
+
+                {/* The ONLY Canonical Action Buttons */}
+                <div className="flex items-center gap-2 pt-2 border-t border-purple-100">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-9 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1.5 transition-all"
+                    onClick={() => onUnlockCandidate?.(candidate)}
+                  >
+                    <Unlock className="size-3.5" /> Buka Profil Lengkap (1 Token)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 px-3.5 text-xs font-semibold border-slate-200 bg-white text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/60 gap-1.5 transition-colors"
+                    onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
+                  >
+                    <X className="size-3.5" /> Tolak (0 Token)
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -322,7 +354,12 @@ export function CandidateDetailDrawer({
             <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-slate-200/60">
               <span className="text-xs font-medium text-slate-500">Tahap Saat Ini:</span>
               <div className="flex items-center gap-1.5">
-                {isHired ? (
+                {candidate.unlocked === false ? (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 text-xs font-semibold">
+                    <Lock className="size-3 text-[#7C3AED]" />
+                    <span>Inbound Triage (Terkunci)</span>
+                  </div>
+                ) : isHired ? (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
                     <Lock className="size-3.5 text-emerald-600" />
                     <span>Diterima (Hired) · Final</span>
@@ -341,10 +378,7 @@ export function CandidateDetailDrawer({
                       let isDisabled = false;
                       let labelSuffix = "";
 
-                      if (candidate.unlocked === false && (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")) {
-                        isDisabled = true;
-                        labelSuffix = " (Perlu Buka Profil)";
-                      } else if (
+                      if (
                         isTalentPool &&
                         (opt.id === "interview" || opt.id === "offer" || opt.id === "hired")
                       ) {
@@ -373,26 +407,8 @@ export function CandidateDetailDrawer({
               </div>
             </div>
 
-            {/* Quick Actions (State-Aware) */}
-            {candidate.unlocked === false ? (
-              <div className="mt-3 flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1 h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1.5"
-                  onClick={() => onUnlockCandidate?.(candidate)}
-                >
-                  <Unlock className="size-3.5" /> Buka Profil (1 Token)
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-8 text-xs font-semibold border-slate-300 text-slate-700 hover:text-rose-600 hover:border-rose-300 gap-1.5"
-                  onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
-                >
-                  <X className="size-3.5" /> Tolak (0 Token)
-                </Button>
-              </div>
-            ) : (
+            {/* Quick Actions (Only rendered when candidate is UNLOCKED) */}
+            {candidate.unlocked !== false && (
               <div className="mt-3 flex items-center gap-2">
                 <Button
                   asChild
@@ -591,28 +607,12 @@ export function CandidateDetailDrawer({
                   <h4 className="text-xs font-semibold text-slate-800">Aksi Lanjutan Rekruter</h4>
 
                   {candidate.unlocked === false ? (
-                    <>
-                      <p className="text-xs text-slate-500">
-                        Profil kandidat masih terkunci. Buka profil untuk mengakses kontak langsung, CV, menjadwalkan wawancara, atau menerbitkan surat penawaran.
-                      </p>
-                      <div className="pt-2 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs"
-                          onClick={() => onUnlockCandidate?.(candidate)}
-                        >
-                          <Unlock className="size-3.5 mr-1" /> Buka Profil Sekarang (1 Token)
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-8 font-medium bg-white text-rose-600 border-slate-200 hover:bg-rose-50 hover:border-rose-300"
-                          onClick={() => onStageChange(candidate.id, "rejected", { reason: "Ditolak dari tahap Inbound Triage" })}
-                        >
-                          <X className="size-3.5 mr-1" /> Tolak Lamaran (0 Token)
-                        </Button>
-                      </div>
-                    </>
+                    <div className="flex items-center gap-2.5 text-xs text-slate-500 bg-white border border-slate-200/80 rounded-lg p-2.5">
+                      <Lock className="size-3.5 text-purple-600 shrink-0" />
+                      <span>
+                        Fitur kontak langsung, penjadwalan wawancara, dan penerbitan surat penawaran akan aktif setelah profil dibuka melalui kartu aksi di atas.
+                      </span>
+                    </div>
                   ) : (
                     <>
                       {candidate.stage === "screening" && (

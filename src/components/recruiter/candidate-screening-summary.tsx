@@ -2,7 +2,6 @@
 
 import { CheckCircle2, HelpCircle, Lock, ShieldCheck, Sparkles, Unlock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 
@@ -61,16 +60,23 @@ export function CandidateScreeningSummary({
               </p>
             </div>
 
-            {onUnlock && (
-              <div className="pt-0.5">
-                <Button
-                  size="sm"
+            {onUnlock ? (
+              <div className="pt-1">
+                <button
                   type="button"
                   onClick={onUnlock}
-                  className="h-7 text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium gap-1.5 shadow-2xs"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#7C3AED] hover:text-[#6D28D9] hover:underline transition-colors"
                 >
-                  <Unlock className="size-3" /> Buka Profil untuk Lihat Hasil (1 Token)
-                </Button>
+                  <Unlock className="size-3 text-[#7C3AED]" />
+                  Buka profil untuk evaluasi AI lengkap (1 Token) &rarr;
+                </button>
+              </div>
+            ) : (
+              <div className="pt-1">
+                <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-100/60 border border-purple-200/70 px-2.5 py-1 rounded-full font-medium">
+                  <Lock className="size-3 text-[#7C3AED]" />
+                  Akan otomatis dianalisis saat profil dibuka (1 Token)
+                </span>
               </div>
             )}
           </div>
