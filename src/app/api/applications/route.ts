@@ -12,6 +12,8 @@ const uuid = z.string().uuid();
 const createSchema = z.object({
   jobId: uuid,
   coverNote: z.string().trim().min(20, "Cover note minimal 20 karakter.").max(4000, "Cover note maksimal 4.000 karakter."),
+  expectedSalary: z.number().int().positive().optional(),
+  availability: z.string().trim().max(100).optional(),
 }).strict();
 
 const recruiterAssignSchema = z.object({
@@ -129,7 +131,13 @@ export async function POST(request: Request) {
     if (duplicate) return NextResponse.json({ error: "Anda sudah melamar job ini." }, { status: 409 });
 
     const result = await current.db.transaction(async (tx) => {
-       const [application] = await tx.insert(schema.applications).values({ jobId: job.id, candidateProfileId: candidate.id, coverNote: parsed.data.coverNote }).returning();
+       const [application] = await tx.insert(schema.applications).values({
+         jobId: job.id,
+         candidateProfileId: candidate.id,
+         coverNote: parsed.data.coverNote,
+         expectedSalary: parsed.data.expectedSalary ?? null,
+         availability: parsed.data.availability ?? null,
+       }).returning();
         await tx.insert(schema.applicationStageHistory).values({ applicationId: application.id, fromStatus: null, toStatus: "new", changedBy: current.user.id, reason: "Lamaran dikirim kandidat." });
         await writeAuditLog({ db: tx, actorUserId: current.user.id, organizationId: job.organizationId, action: "application.created", entityType: "application", entityId: application.id, metadata: { jobId: job.id, candidateProfileId: candidate.id, source: application.source } });
        const recipients = await tx.select({ userId: schema.organizationMembers.userId }).from(schema.organizationMembers)

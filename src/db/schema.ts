@@ -559,6 +559,8 @@ export const applications = pgTable("applications", {
   status: applicationStatus("status").notNull().default("new"),
   source: applicationSource("source").notNull().default("candidate"),
   coverNote: text("cover_note"),
+  expectedSalary: integer("expected_salary"),
+  availability: text("availability"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
   unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
