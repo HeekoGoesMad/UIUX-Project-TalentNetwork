@@ -221,12 +221,20 @@ export async function syncAuthenticatedUser(
 
     if (role === "partner") {
       const existingPartnership = await tx
-        .select({ id: schema.partnerships.id, verificationStatus: schema.partnerships.verificationStatus })
+        .select({
+          id: schema.partnerships.id,
+          verificationStatus: schema.partnerships.verificationStatus,
+          skDocumentUrl: schema.partnerships.skDocumentUrl,
+          skNumber: schema.partnerships.skNumber,
+        })
         .from(schema.partnerships)
         .where(eq(schema.partnerships.userId, user.id))
         .limit(1);
 
       let status = existingPartnership[0]?.verificationStatus;
+      let hasSubmittedOnboarding = Boolean(
+        existingPartnership[0]?.skDocumentUrl && existingPartnership[0]?.skNumber
+      );
       if (existingPartnership.length === 0) {
         const partnerName = input.companyName?.trim() || input.name?.trim() || resolvedName || authEmail.split("@")[0];
         const [created] = await tx.insert(schema.partnerships).values({
@@ -235,6 +243,7 @@ export async function syncAuthenticatedUser(
           verificationStatus: "pending",
         }).returning({ id: schema.partnerships.id, verificationStatus: schema.partnerships.verificationStatus });
         status = created?.verificationStatus ?? "pending";
+        hasSubmittedOnboarding = false;
       }
 
       const partnerProvisioningStatus =
@@ -250,6 +259,7 @@ export async function syncAuthenticatedUser(
         userId: user.id,
         role: user.role,
         provisioningStatus: partnerProvisioningStatus,
+        hasSubmittedOnboarding,
         isNew: !existing,
         hasPassword: user.hasPassword,
       };

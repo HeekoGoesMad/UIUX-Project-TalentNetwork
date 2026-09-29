@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { SalaryInput } from "@/components/ui/salary-input";
+import { RequestVerificationDialog } from "@/components/candidate/request-verification-dialog";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   BriefcaseBusiness,
+  Building2,
   Camera,
   Check,
   CheckCircle2,
@@ -19,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Edit3,
   ExternalLink,
   Eye,
@@ -312,7 +315,7 @@ const SECTIONS: SectionMeta[] = [
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function CvWorkspace() {
-  const { cvProfile, user, dbMode, saveCvProfile } = useApp();
+  const { cvProfile, user, dbMode, saveCvProfile, isPartnerCampus } = useApp();
   const [profile, setProfile] = useState<CvProfile>(
     cvProfile ?? blank(dbMode ? user?.email : "", dbMode ? user?.name : "")
   );
@@ -376,6 +379,8 @@ export function CvWorkspace() {
   const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [personalityModalOpen, setPersonalityModalOpen] = useState(false);
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const [selectedEduForVerification, setSelectedEduForVerification] = useState<EducationItem | null>(null);
   const [cropModal, setCropModal] = useState<{
     open: boolean;
     imageSrc: string | null;
@@ -1511,14 +1516,72 @@ export function CvWorkspace() {
                               <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-mono font-semibold text-muted-foreground">
                                 {i + 1}
                               </span>
-                              <div className="min-w-0">
-                                <h4 className="truncate text-sm font-semibold text-foreground">
-                                  {edu.school ? edu.school : `Pendidikan ${i + 1}`}
-                                </h4>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {edu.program ? `${edu.program} · ` : ""}{edu.level || "S1"}
-                                </p>
-                              </div>
+                              {(() => {
+                                const verif = cvProfile?.campusVerification;
+                                const isMatchingEdu = Boolean(
+                                  verif && edu.school && (
+                                    verif.institution.toLowerCase().includes(edu.school.toLowerCase()) ||
+                                    edu.school.toLowerCase().includes(verif.institution.toLowerCase())
+                                  )
+                                );
+                                const isVerified = isMatchingEdu && verif?.status === "verified";
+                                const isPending = isMatchingEdu && verif?.status === "pending";
+
+                                return (
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <h4 className="truncate text-sm font-semibold text-foreground">
+                                        {edu.school ? edu.school : `Pendidikan ${i + 1}`}
+                                      </h4>
+                                      {isVerified && (
+                                        <span className="inline-flex items-center gap-1 rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-[#7C3AED]">
+                                          <GraduationCap className="size-2.5 text-[#7C3AED]" />
+                                          Verified
+                                        </span>
+                                      )}
+                                      {isPending && (
+                                        <span className="inline-flex items-center gap-1 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                          <Clock className="size-2.5 text-muted-foreground" />
+                                          Permintaan terkirim
+                                        </span>
+                                      )}
+                                      {!isVerified && !isPending && edu.school && (
+                                        (() => {
+                                          const isPartner = isPartnerCampus ? isPartnerCampus(edu.school) : false;
+                                          return isPartner ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedEduForVerification(edu);
+                                                setVerificationDialogOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#7C3AED] hover:underline cursor-pointer"
+                                              title="Ajukan verifikasi ke Career Center kampus mitra resmi"
+                                            >
+                                              <ShieldCheck className="size-2.5" /> Minta Verif
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedEduForVerification(edu);
+                                                setVerificationDialogOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer rounded border border-dashed border-border px-1.5 py-0.5 bg-muted/20"
+                                              title="Kampus belum bermitra — klik untuk merekomendasikan"
+                                            >
+                                              <Building2 className="size-2.5 text-muted-foreground" /> Belum Bermitra
+                                            </button>
+                                          );
+                                        })()
+                                      )}
+                                    </div>
+                                    <p className="truncate text-[11px] text-muted-foreground">
+                                      {edu.program ? `${edu.program} · ` : ""}{edu.level || "S1"}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1">
@@ -1874,6 +1937,12 @@ export function CvWorkspace() {
             : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
         }
         onCropComplete={handleCropComplete}
+      />
+
+      <RequestVerificationDialog
+        open={verificationDialogOpen}
+        onOpenChange={setVerificationDialogOpen}
+        initialEducation={selectedEduForVerification}
       />
     </div>
   );

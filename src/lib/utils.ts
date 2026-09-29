@@ -48,3 +48,27 @@ export function formatSalaryValue(val: string | null | undefined): string {
   return cleaned.trim() ? `Rp ${cleaned.replace(/^\s+/, "")}` : "";
 }
 
+/**
+ * Validates whether a given string is a plausible website URL.
+ * Protects against ReDoS (polynomial regular expression backtracking)
+ * by utilizing the WHATWG URL constructor rather than complex nested regexes.
+ */
+export function isValidWebsiteUrl(val: string | null | undefined): boolean {
+  const trimmed = String(val || "").trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+  if (/^(javascript|data|vbscript|file):/i.test(trimmed)) return false;
+  try {
+    const urlStr = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parsed = new URL(urlStr);
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      parsed.hostname.length >= 3 &&
+      parsed.hostname.includes(".") &&
+      !parsed.hostname.startsWith(".") &&
+      !parsed.hostname.endsWith(".")
+    );
+  } catch {
+    return false;
+  }
+}
+

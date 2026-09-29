@@ -148,6 +148,8 @@ export function SiteHeader() {
   const isCandidateSection = pathname?.startsWith("/candidate");
 
   const isLinkActive = (href: string) => {
+    if (href === "/partner") return pathname === "/partner";
+    if (href === "/dashboard") return pathname === "/dashboard";
     if (href === "/candidate") return pathname === href || pathname?.startsWith("/candidate");
     if (href === "/jobs") return pathname === href || pathname?.startsWith("/jobs");
     if (href === "/messages")

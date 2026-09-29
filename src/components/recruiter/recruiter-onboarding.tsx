@@ -541,6 +541,14 @@ export function RecruiterOnboarding() {
       setProvisioningStatus("pending");
       await reloadBootstrap();
 
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("proofylink_company_updates");
+          bc.postMessage({ type: "COMPANY_UPDATED" });
+          bc.close();
+        } catch {}
+      }
+
       toast.success("Dokumen legalitas berhasil dikirim ke antrean review compliance!", {
         id: toastId,
         description: "Tim compliance kami akan memverifikasi keabsahan data dalam 1x24 jam kerja.",

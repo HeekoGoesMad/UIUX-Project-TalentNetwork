@@ -29,6 +29,7 @@ export const PARTNER_CAMPUSES = [
   "Institut Teknologi Sepuluh Nopember",
   "Universitas Airlangga",
   "Universitas Padjadjaran",
+  "Dicoding Indonesia",
 ] as const;
 
 export type PartnerCampus = typeof PARTNER_CAMPUSES[number];
@@ -40,6 +41,8 @@ export type CampusVerification = {
   status: "pending" | "verified" | "rejected";
   verifiedAt?: string;
   verifiedBy?: string;
+  requestedAt?: string;
+  proofDocumentUrl?: string;
 };
 
 export type Candidate = {
@@ -226,6 +229,29 @@ export type RecruiterOnboardingData = {
   ktpFileName?: string;
   submittedAt?: string;
   verificationStatus: "draft" | "pending_review" | "verified" | "needs_revision";
+};
+
+export type PartnerOnboardingData = {
+  // Step 0: PIC Kemitraan
+  picName: string;
+  picTitle: string;
+  picEmail: string;
+  picPhone: string;
+  // Step 1: Profil Lembaga
+  institutionName: string;
+  institutionType: string;
+  province: string;
+  city: string;
+  officeAddress: string;
+  website: string;
+  description: string;
+  // Step 2: Surat SK & Legalitas
+  skNumber: string;
+  skFileName: string;
+  skFileSize?: string;
+  skDocumentUrl?: string;
+  // Step 3: Review & Pengajuan
+  confirmationAgreed: boolean;
 };
 
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
