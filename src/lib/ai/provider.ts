@@ -204,35 +204,7 @@ export async function summary(input: unknown, options?: AiOptions) {
 export async function screening(input: unknown, options?: AiOptions) {
   const context = profileContextSchema.parse(input);
   const score = Math.min(100, 48 + context.skills.length * 8 + (context.targetRole ? 12 : 0));
-  const prompt =
-    `Anda adalah asisten AI evaluasi screening profil kandidat profesional. Analisis profil berikut secara objektif:\n` +
-    JSON.stringify(context) +
-    `\n\nPETUNJUK FORMAT PENTING:\n` +
-    `- Nilai "score" WAJIB berupa BILANGAN BULAT (integer) antara 0 sampai 100 (misalnya 85, BUKAN 0.85 atau 0.9).\n` +
-    `- Nilai "coverage" WAJIB berupa BILANGAN BULAT (integer) antara 0 sampai 100.\n` +
-    `- Sertakan label kualitatif, bukti objektif (evidence), dan batasan evaluasi (limitations).`;
-
-  return aiResult(
-    screeningSchema,
-    prompt,
-    {
-      score,
-      label: label(score),
-      coverage: Math.min(90, 45 + context.skills.length * 8),
-      evidence: [
-        "Kompetensi teknis dan keselarasan peran dianalisis secara objektif.",
-        "Penilaian berfokus pada relevansi keahlian dan rekam jejak kerja.",
-      ],
-      limitations: [
-        "Bukan keputusan final hire/reject.",
-        "Data pribadi sensitif (kontak & privasi) dikecualikan sepenuhnya dari analisis.",
-      ],
-      followUp: "Lakukan interview berbasis bukti kompetensi dan berikan kandidat ruang klarifikasi.",
-      modelVersion: defaultVersion,
-      source: getSource(),
-    },
-    options
-  );
+  return aiResult(screeningSchema, JSON.stringify(context), { score, label: label(score), coverage: Math.min(90, 45 + context.skills.length * 8), evidence: ["Kompetensi teknis dan keselarasan peran dianalisis secara objektif.", "Penilaian berfokus pada relevansi keahlian dan rekam jejak kerja."], limitations: ["Bukan keputusan final hire/reject.", "Data pribadi sensitif (kontak & privasi) dikecualikan sepenuhnya dari analisis."], followUp: "Lakukan interview berbasis bukti kompetensi dan berikan kandidat ruang klarifikasi.", modelVersion: defaultVersion, source: getSource() }, options);
 }
 
 export async function interviewQuestions(input: unknown) {

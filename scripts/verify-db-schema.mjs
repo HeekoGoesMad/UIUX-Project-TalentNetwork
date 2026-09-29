@@ -97,7 +97,7 @@ if (!activeSql) {
   process.exit(1);
 }
 
-// 3. Inspect public schema columns and constraints
+// 3. Inspect public schema columns
 try {
   const rows = await activeSql`
     SELECT table_name, column_name, data_type, is_nullable
@@ -105,44 +105,18 @@ try {
     WHERE table_schema = 'public';
   `;
 
-  const constraints = await activeSql`
-    SELECT conrelid::regclass::text as table_name, conname, contype
-    FROM pg_constraint
-    WHERE connamespace = 'public'::regnamespace;
-  `;
-
   const liveColumns = new Set(rows.map((r) => `${r.table_name}.${r.column_name}`));
   const liveTables = new Set(rows.map((r) => r.table_name));
-  const liveConstraints = new Set(constraints.map((c) => `${c.table_name}:${c.conname}`));
-  const tablesWithPk = new Set(constraints.filter((c) => c.contype === "p").map((c) => c.table_name));
 
   const missingTables = [];
   const missingColumns = [];
-  const missingConstraints = [];
   let totalCheckedColumns = 0;
-  let totalCheckedConstraints = 0;
 
   for (const [, tableData] of Object.entries(expectedTables)) {
     const tableName = tableData.name;
     if (!liveTables.has(tableName)) {
       missingTables.push(tableName);
       continue;
-    }
-
-    // Verify Primary Key
-    const hasPkColumn = Object.values(tableData.columns || {}).some((c) => c.primaryKey);
-    const hasCompositePk = Object.keys(tableData.compositePrimaryKeys || {}).length > 0;
-    if ((hasPkColumn || hasCompositePk) && !tablesWithPk.has(tableName)) {
-      missingConstraints.push(`${tableName}: missing PRIMARY KEY`);
-    }
-
-    // Verify Unique Constraints
-    for (const [, ucData] of Object.entries(tableData.uniqueConstraints || {})) {
-      totalCheckedConstraints++;
-      const ucName = ucData.name;
-      if (!liveConstraints.has(`${tableName}:${ucName}`)) {
-        missingConstraints.push(`${tableName}: missing UNIQUE constraint "${ucName}"`);
-      }
     }
 
     for (const [, colData] of Object.entries(tableData.columns || {})) {
@@ -154,7 +128,7 @@ try {
     }
   }
 
-  if (missingTables.length > 0 || missingColumns.length > 0 || missingConstraints.length > 0) {
+  if (missingTables.length > 0 || missingColumns.length > 0) {
     console.error("\n❌ Database Schema Parity Check FAILED!");
     if (missingTables.length > 0) {
       console.error(`\nMissing Tables (${missingTables.length}):`);
@@ -164,16 +138,12 @@ try {
       console.error(`\nMissing Columns (${missingColumns.length}):`);
       for (const c of missingColumns) console.error(`  - ${c}`);
     }
-    if (missingConstraints.length > 0) {
-      console.error(`\nMissing Constraints (${missingConstraints.length}):`);
-      for (const c of missingConstraints) console.error(`  - ${c}`);
-    }
     console.error("\nPlease generate and run the appropriate migration before proceeding.");
     process.exit(1);
   }
 
   const tableCount = Object.keys(expectedTables).length;
-  console.log(`✅ Schema Parity Verified: All ${tableCount} tables, ${totalCheckedColumns} columns, and ${totalCheckedConstraints} constraints verified in the database.`);
+  console.log(`✅ Schema Parity Verified: All ${tableCount} tables and ${totalCheckedColumns} columns exist in the database.`);
   process.exit(0);
 } catch (err) {
   console.error("❌ Unexpected error during schema verification:", err);

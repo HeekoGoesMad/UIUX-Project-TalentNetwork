@@ -367,21 +367,13 @@ export class ScreeningService {
         return { error: "Status screening run telah berubah.", status: 409 as const };
       }
 
-      const rawScore = typeof insight.score === "number" ? insight.score : 0;
-      const normalizedScore = rawScore <= 1 && rawScore > 0 ? Math.round(rawScore * 100) : Math.round(rawScore);
-      const safeScore = Math.max(0, Math.min(100, Number.isFinite(normalizedScore) ? normalizedScore : 50));
-
-      const rawCoverage = typeof insight.coverage === "number" ? insight.coverage : 0;
-      const normalizedCoverage = rawCoverage <= 1 && rawCoverage > 0 ? Math.round(rawCoverage * 100) : Math.round(rawCoverage);
-      const safeCoverage = Math.max(0, Math.min(100, Number.isFinite(normalizedCoverage) ? normalizedCoverage : 50));
-
       const [score] = await tx
         .insert(schema.screeningScores)
         .values({
           screeningRunId: run.id,
-          score: safeScore,
+          score: insight.score,
           label: insight.label,
-          coverage: safeCoverage,
+          coverage: insight.coverage,
           evidence: insight.evidence,
           limitations: insight.limitations,
           source: insight.source,
@@ -390,9 +382,9 @@ export class ScreeningService {
         .onConflictDoUpdate({
           target: schema.screeningScores.screeningRunId,
           set: {
-            score: safeScore,
+            score: insight.score,
             label: insight.label,
-            coverage: safeCoverage,
+            coverage: insight.coverage,
             evidence: insight.evidence,
             limitations: insight.limitations,
             source: insight.source,

@@ -18,20 +18,7 @@ export const summarySchema = z.object({
   summary: z.string(), strengths: z.array(z.string()), evidence: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
 export const screeningSchema = z.object({
-  score: z.number().transform((val) => {
-    const n = val <= 1 && val > 0 ? Math.round(val * 100) : Math.round(val);
-    return Math.max(0, Math.min(100, Number.isFinite(n) ? n : 50));
-  }),
-  label: z.string(),
-  coverage: z.number().transform((val) => {
-    const n = val <= 1 && val > 0 ? Math.round(val * 100) : Math.round(val);
-    return Math.max(0, Math.min(100, Number.isFinite(n) ? n : 50));
-  }),
-  evidence: z.array(z.string()),
-  limitations: z.array(z.string()),
-  followUp: z.string(),
-  modelVersion: z.string(),
-  source: z.enum(["mock", "azure", "local"]),
+  score: z.number().min(0).max(100), label: z.string(), coverage: z.number().min(0).max(100), evidence: z.array(z.string()), limitations: z.array(z.string()), followUp: z.string(), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]),
 });
 export const questionsSchema = z.object({ questions: z.array(z.string()), limitations: z.array(z.string()), modelVersion: z.string(), source: z.enum(["mock", "azure", "local"]), });
 
