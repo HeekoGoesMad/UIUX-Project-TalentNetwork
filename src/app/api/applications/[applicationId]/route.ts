@@ -57,6 +57,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ap
     if (current.user.role === "candidate") {
       if (parsed.data.status !== "withdrawn" || !["new", "shortlisted", "consent_requested", "consent_approved", "screening", "assessment", "review", "interview", "offer"].includes(currentStatus)) return NextResponse.json({ error: "Lamaran tidak dapat ditarik pada tahap ini." }, { status: 409 });
     } else {
+      if (
+        participant.application.source === "candidate" &&
+        !participant.application.unlockedAt &&
+        ["interview", "offer", "hired"].includes(parsed.data.status)
+      ) {
+        return NextResponse.json(
+          { error: "Kandidat pelamar inbound harus dibuka profilnya terlebih dahulu (1 token) sebelum dapat dipindahkan ke tahap wawancara atau penawaran." },
+          { status: 403 }
+        );
+      }
       if (!recruiterTransitions[currentStatus].includes(parsed.data.status)) return NextResponse.json({ error: `Transisi ${currentStatus} ke ${parsed.data.status} tidak diizinkan.` }, { status: 409 });
     }
     const now = new Date();

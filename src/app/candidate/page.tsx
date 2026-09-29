@@ -21,6 +21,15 @@ import { useApp } from "@/providers/app-provider";
 import { useApplications } from "@/components/applications/application-ui";
 import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 
+function normalizeSafeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
+
+function isSafeHref(href: string): boolean {
+  return typeof href === "string" && href.startsWith("/") && !href.startsWith("//") && !href.includes(":");
+}
+
 function ActionRow({
   icon: Icon,
   title,
@@ -50,7 +59,7 @@ function ActionRow({
         <p className="truncate text-xs text-muted-foreground">{desc}</p>
       </div>
       <Button size="sm" variant={emerald ? "default" : "outline"} asChild className="shrink-0 text-xs font-semibold">
-        <Link href={href}>{cta}</Link>
+        <Link href={isSafeHref(href) ? href : "/candidate"}>{cta}</Link>
       </Button>
     </div>
   );
@@ -197,16 +206,19 @@ export default function CandidateHome() {
             </h2>
             <Card className="overflow-hidden border-border/80 bg-card shadow-xs">
               <div className="divide-y divide-border/60">
-                {pendingOffer && (
-                  <ActionRow
-                    icon={Award}
-                    title="Tawaran pekerjaan siap ditinjau"
-                    desc={`${pendingOffer.job?.title ?? "Posisi baru"} • ${pendingOffer.job?.organizationName ?? "Perusahaan"}`}
-                    href={`/candidate/applications/${pendingOffer.id}`}
-                    cta="Tinjau Tawaran"
-                    emerald
-                  />
-                )}
+                {pendingOffer && (() => {
+                  const safeOfferId = normalizeSafeId(pendingOffer.id);
+                  return (
+                    <ActionRow
+                      icon={Award}
+                      title="Tawaran pekerjaan siap ditinjau"
+                      desc={`${pendingOffer.job?.title ?? "Posisi baru"} • ${pendingOffer.job?.organizationName ?? "Perusahaan"}`}
+                      href={safeOfferId ? `/candidate/applications/${safeOfferId}` : "/candidate/applications"}
+                      cta="Tinjau Tawaran"
+                      emerald
+                    />
+                  );
+                })()}
                 {interviewApplications.length > 0 && (
                   <ActionRow
                     icon={Calendar}
@@ -300,7 +312,10 @@ export default function CandidateHome() {
                         {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Terkirim"}
                       </span>
                       <Button variant="outline" size="sm" asChild className="h-7 px-2.5 text-xs">
-                        <Link href={`/candidate/applications/${app.id}`}>
+                        <Link href={(() => {
+                          const safeAppId = normalizeSafeId(app.id);
+                          return safeAppId ? `/candidate/applications/${safeAppId}` : "/candidate/applications";
+                        })()}>
                           Detail
                         </Link>
                       </Button>

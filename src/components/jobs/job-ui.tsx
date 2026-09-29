@@ -15,6 +15,7 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  FileText,
   GraduationCap,
   Laptop,
   Layers,
@@ -81,9 +82,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApplyForm, useApplications } from "@/components/applications/application-ui";
+import { ApplyForm, useApplications, type Application } from "@/components/applications/application-ui";
 
 const PAGE_LIMIT = 100;
+
+function normalizeSafeId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
 
 type JobsPayload = { jobs?: Job[]; hasMore?: boolean; error?: string };
 
@@ -225,7 +231,21 @@ function getPageItems(totalPages: number, currentPage: number): (number | "gap")
   return items;
 }
 
-export function JobRowCard({ job }: { job: Job }) {
+const APPLICATION_STAGE_LABELS: Record<string, string> = {
+  new: "Baru",
+  shortlisted: "Shortlist",
+  screening: "Peninjauan Berkas",
+  assessment: "Asesmen",
+  review: "Review Profil",
+  interview: "Wawancara",
+  offer: "Penawaran Kerja",
+  hired: "Diterima (Hired)",
+  rejected: "Tidak Lolos",
+  offer_declined: "Tawaran Ditolak",
+  withdrawn: "Ditarik",
+};
+
+export function JobRowCard({ job, appliedApp }: { job: Job; appliedApp?: Application }) {
   const salaryText = formatSalaryDisplay(job);
   const companyName = job.organization?.name || job.organizationName || "Perusahaan Mitra";
   const isApproved = job.organization?.verificationStatus === "approved";
@@ -243,10 +263,15 @@ export function JobRowCard({ job }: { job: Job }) {
       ? "bg-purple-50 text-purple-800 border-purple-200/80"
       : "bg-slate-100 text-slate-800 border-slate-200/80";
 
+  const stageLabel = appliedApp ? (APPLICATION_STAGE_LABELS[appliedApp.status] || appliedApp.status) : "";
+
   return (
     <article
       tabIndex={0}
-      className="group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl border border-border/80 bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className={cn(
+        "group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl border bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        appliedApp ? "border-purple-200/80 bg-purple-50/15" : "border-border/80"
+      )}
     >
       {/* Kolom Kiri: Avatar & Detail Utama */}
       <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
@@ -271,6 +296,12 @@ export function JobRowCard({ job }: { job: Job }) {
                 className="inline-flex items-center text-primary shrink-0"
               >
                 <ShieldCheck className="size-3.5 fill-primary/15 text-primary" />
+              </span>
+            )}
+            {appliedApp && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-[#7C3AED] shadow-2xs">
+                <CheckCircle2 className="size-3 text-[#7C3AED]" />
+                <span>Sudah Dilamar ({stageLabel})</span>
               </span>
             )}
           </div>
@@ -356,23 +387,53 @@ export function JobRowCard({ job }: { job: Job }) {
       </div>
 
       {/* Kolom Kanan: Status Penerimaan & Action Button */}
-      <div className="flex items-center md:flex-col items-end justify-between md:justify-center gap-2 shrink-0 md:min-w-[130px] pt-2 md:pt-0">
+      <div className="flex items-center md:flex-col items-end justify-between md:justify-center gap-2 shrink-0 md:min-w-[140px] pt-2 md:pt-0">
         <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
           <Clock className="size-3 text-muted-foreground/70 shrink-0" />
           <span>Aktif menerima pelamar</span>
         </span>
 
-        <Button
-          asChild
-          size="sm"
-          variant="default"
-          className="rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white shadow-xs group-hover:shadow-sm transition-all"
-        >
-          <Link href={`/jobs/${job.id}`}>
-            Lihat Detail
-            <ArrowRight className="size-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </Button>
+        {appliedApp ? (
+          <div className="flex items-center gap-1.5">
+            <Button
+              asChild
+              size="sm"
+              variant="default"
+              className="rounded-lg text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-xs gap-1 transition-all"
+            >
+              <Link href={(() => {
+                const safeAppId = normalizeSafeId(appliedApp.id);
+                return safeAppId ? `/candidate/applications/${safeAppId}` : "/candidate/applications";
+              })()}>
+                <FileText className="size-3.5" />
+                <span>Lihat Status</span>
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="rounded-lg text-xs font-semibold border-border/80 text-muted-foreground hover:text-foreground h-8 px-2"
+            >
+              <Link href={(() => {
+                const safeJobId = normalizeSafeId(job.id);
+                return safeJobId ? `/jobs/${safeJobId}` : "/jobs";
+              })()}>Detail</Link>
+            </Button>
+          </div>
+        ) : (
+          <Button
+            asChild
+            size="sm"
+            variant="default"
+            className="rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white shadow-xs group-hover:shadow-sm transition-all"
+          >
+            <Link href={`/jobs/${job.id}`}>
+              Lihat Detail
+              <ArrowRight className="size-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -460,6 +521,18 @@ export function PublicJobsPage() {
   );
 
   const { jobs, loading, error } = useJobs();
+  const { applications } = useApplications();
+
+  // Map of candidate's active applications by jobId
+  const appliedJobsMap = useMemo(() => {
+    const map = new Map<string, Application>();
+    for (const app of applications) {
+      if (app.jobId && app.status !== "withdrawn") {
+        map.set(app.jobId, app);
+      }
+    }
+    return map;
+  }, [applications]);
 
   // Faceted subsets: evaluate each dimension against jobs matching ALL other active filters
   const jobsForTypes = useMemo(
@@ -935,7 +1008,7 @@ export function PublicJobsPage() {
         <>
           <div className="mt-4 space-y-3">
             {paginatedJobs.map((job) => (
-              <JobRowCard key={job.id} job={job} />
+              <JobRowCard key={job.id} job={job} appliedApp={appliedJobsMap.get(job.id)} />
             ))}
           </div>
 
@@ -1439,11 +1512,16 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
                         <Button
                           asChild
                           variant="outline"
-                          className="w-full h-11 rounded-xl border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/70 font-semibold text-xs gap-1.5 shadow-2xs"
+                          className="w-full h-11 rounded-xl border-purple-200 bg-purple-50 text-[#7C3AED] hover:bg-purple-100 font-semibold text-xs gap-1.5 shadow-2xs cursor-pointer"
                         >
-                          <Link href="/candidate/applications">
-                            <CheckCircle2 className="size-4 text-emerald-600" />
-                            <span>Sudah Dilamar</span>
+                          <Link href={(() => {
+                            const safeApplicationId = normalizeSafeId(existingApp.id);
+                            return safeApplicationId ? `/candidate/applications/${safeApplicationId}` : "/candidate/applications";
+                          })()}>
+                            <CheckCircle2 className="size-4 text-[#7C3AED]" />
+                            <span>
+                              Sudah Dilamar (Tahap: {APPLICATION_STAGE_LABELS[existingApp.status] || existingApp.status}) &bull; Lihat Status
+                            </span>
                           </Link>
                         </Button>
                       ) : (
@@ -1592,18 +1670,18 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
       {/* Dialog Modal Kirim Lamaran */}
       {job && (
         <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
-          <DialogContent className="max-w-lg p-6 rounded-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl">
             <DialogHeader className="pb-3 border-b border-border/60">
               <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
                 <Send className="size-4 text-primary" />
                 <span>Kirim Lamaran Anda</span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-1">
-                Lamar posisi <strong>{job.title}</strong> di <strong>{companyName}</strong>. CV dan profil tersimpan Anda akan otomatis disertakan ke rekruter.
+                Lamar posisi <strong>{job.title}</strong> di <strong>{companyName}</strong>. Data profil dan CV tersimpan akan otomatis disertakan ke antrean rekruter.
               </DialogDescription>
             </DialogHeader>
             <div className="pt-4">
-              <ApplyForm job={job} withoutCard />
+              <ApplyForm job={job} withoutCard onClose={() => setApplyModalOpen(false)} />
             </div>
           </DialogContent>
         </Dialog>

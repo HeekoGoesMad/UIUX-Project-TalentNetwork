@@ -4,26 +4,45 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Banknote,
   BarChart3,
   Briefcase,
   Calendar,
+  CalendarClock,
+  ChevronRight,
   Clock,
   DollarSign,
   Download,
+  Eye,
+  Filter,
   GripVertical,
   Kanban,
   Keyboard,
+  Loader2,
   Lock,
   MapPin,
   MessageSquare,
   Search,
   Sparkles,
   Table as TableIcon,
+  Unlock,
+  UserX,
+  Workflow,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
 import { HrReportModal } from "@/components/recruiter/hr-report-modal";
 import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
@@ -41,6 +60,7 @@ import {
   getDefaultStatusHistory,
   type StatusHistoryItem,
 } from "@/components/recruiter/candidate-status-git-graph";
+import { getDaysInCurrentStage, maskName } from "@/lib/candidate-display";
 import type { Candidate as GlobalCandidate } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +85,14 @@ export type Candidate = {
   jobTitle?: string;
   avatarUrl?: string;
   statusHistory?: StatusHistoryItem[];
+  source?: "candidate" | "recruiter_invitation";
+  unlocked?: boolean;
+  unlockedAt?: string | null;
+  coverNote?: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
 };
+
 
 export type Interview = {
   id: string;
@@ -93,12 +120,6 @@ const STAGES: Array<{ id: Stage; label: string; bg: string; border: string; text
   { id: "rejected", label: "Tidak Lolos", bg: "bg-slate-50/70", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-400" },
 ];
 
-const defaultJobs = [
-  { id: "job-1", title: "Senior Product Designer" },
-  { id: "job-2", title: "Frontend Architect" },
-  { id: "job-3", title: "Product Manager" },
-  { id: "job-4", title: "Backend Engineer (Go/Node)" },
-];
 
 export const SUPABASE_AVATARS: Record<string, string> = {
   "candidate-adrienne": "https://vtcytlrlfsmzkybqsjsx.supabase.co/storage/v1/object/public/profile-media/avatars/f8d0d466-269f-47d9-b865-c4ba2f0157f9/178ed63f-6ffb-4ef0-9d8d-9b558a0f0681-Screenshot%20(16).png.webp",
@@ -128,10 +149,12 @@ const initialCandidates: Candidate[] = [
     feedback: "Kandidat ini memenuhi kompetensi inti lowongan dan selaras dengan standar peran.",
     offerStatus: "accepted",
     compensation: "Rp 15.000.000 / bulan",
+    expectedSalary: 15000000,
+    availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
-    jobId: "job-1",
-    jobTitle: "Product Management Intern",
+    jobId: "d7ce6147-6f60-4f20-b2b0-cdcd4f5ab835",
+    jobTitle: "AI Engineering",
   },
   {
     id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
@@ -146,15 +169,17 @@ const initialCandidates: Candidate[] = [
     feedback: "Portfolio kuat di backend engineering & database architecture.",
     offerStatus: "draft",
     compensation: "Rp 25.000.000 / bulan",
+    expectedSalary: 25000000,
+    availability: "2 Minggu",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Alga Ramandika Praba"],
-    jobId: "job-2",
-    jobTitle: "Frontend Architect",
+    jobId: "d7ce6147-6f60-4f20-b2b0-cdcd4f5ab835",
+    jobTitle: "AI Engineering",
   },
   {
     id: "1b1c3dcd-4251-44cb-a594-2fc57ee00533",
     name: "Ariel Oka",
-    role: "Software Engineer",
+    role: "Product Designer",
     location: "Bali, Denpasar",
     stage: "screening",
     owner: "Sari Wijaya",
@@ -164,10 +189,12 @@ const initialCandidates: Candidate[] = [
     feedback: "Perlu validasi stakeholder management.",
     offerStatus: "draft",
     compensation: "Rp 22.000.000 / bulan",
+    expectedSalary: 22000000,
+    availability: "Segera (Immediate)",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Ariel Oka"],
-    jobId: "talent-pool",
-    jobTitle: "Talent Pool",
+    jobId: "42393879-3464-4719-9002-623d9993d99c",
+    jobTitle: "Product Designer",
   },
   {
     id: "383de31e-01c2-4d02-b3e4-b563af72ab32",
@@ -182,15 +209,17 @@ const initialCandidates: Candidate[] = [
     feedback: "Sangat kuat di systems architecture dan high concurrency.",
     offerStatus: "sent",
     compensation: "Rp 31.000.000 / bulan",
+    expectedSalary: 31000000,
+    availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Hasyim Kipuw"],
-    jobId: "job-4",
-    jobTitle: "Backend Engineer (Go/Node)",
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
   },
   {
     id: "64781ee2-f82f-40c0-9178-4a76860b6f56",
     name: "Muhammad Adi Firmansyahah",
-    role: "Human Capital Specialist",
+    role: "Product Designer",
     location: "Bali",
     stage: "interview",
     owner: "Dimas Nugroho",
@@ -200,12 +229,15 @@ const initialCandidates: Candidate[] = [
     feedback: "Pengalaman solid di talent acquisition & HR operations.",
     offerStatus: "draft",
     compensation: "Rp 18.000.000 / bulan",
+    expectedSalary: 18000000,
+    availability: "Fleksibel",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Muhammad Adi Firmansyahah"],
-    jobId: "job-1",
-    jobTitle: "Senior Product Designer",
+    jobId: "42393879-3464-4719-9002-623d9993d99c",
+    jobTitle: "Product Designer",
   },
 ];
+
 
 const initialInterviews: Interview[] = [
   { id: "interview-1", candidateId: "b082c226-1a6e-42a6-80e0-150ce5f01745", date: "2026-08-20T09:00", timezone: "Asia/Jakarta (WIB)", type: "Technical Architecture Review", panel: ["Raka Pratama"], status: "Selesai", reminder: true, meetingUrl: "https://meet.google.com/abc-defg-hij" },
@@ -226,7 +258,15 @@ export function getStoredJobAssignments(): Record<string, StoredJobAssignment> {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem(JOB_ASSIGNMENTS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, StoredJobAssignment>;
+    const cleaned: Record<string, StoredJobAssignment> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      if (val && val.jobId && !val.jobId.startsWith("job-")) {
+        cleaned[key] = val;
+      }
+    }
+    return cleaned;
   } catch {
     return {};
   }
@@ -254,7 +294,7 @@ function readInitialState(isDb: boolean): { candidates: Candidate[]; interviews:
   const assignments = getStoredJobAssignments();
   const applyOverrides = (c: Candidate): Candidate => {
     const override = assignments[c.id];
-    if (override) {
+    if (override && override.jobId && !override.jobId.startsWith("job-")) {
       const existingHistory =
         c.statusHistory && c.statusHistory.length > 0
           ? c.statusHistory
@@ -382,45 +422,64 @@ export function validateCandidateStageTransition(
     };
   }
 
+  // 5. Inbound Locked Candidate Guardrail: Must unlock profile (1 token) before advancing to interview, offer, or hired
+  if (candidate.unlocked === false && (targetStage === "interview" || targetStage === "offer" || targetStage === "hired")) {
+    return {
+      allowed: false,
+      reason:
+        "Profil pelamar inbound masih terkunci. Buka profil kandidat (1 Token) terlebih dahulu untuk melanjutkan ke tahap wawancara atau penawaran.",
+    };
+  }
+
   return { allowed: true };
 }
 
-export function getDaysInCurrentStage(candidate: Candidate): number {
-  if (Array.isArray(candidate.statusHistory) && candidate.statusHistory.length > 0) {
-    const sorted = [...candidate.statusHistory].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-    const latestStageEntry = sorted.find((h) => h.stage === candidate.stage);
-    if (latestStageEntry && latestStageEntry.timestamp) {
-      const time = new Date(latestStageEntry.timestamp).getTime();
-      if (!isNaN(time)) {
-        return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
-      }
-    }
-  }
-  if (candidate.appliedAt) {
-    const time = new Date(candidate.appliedAt).getTime();
-    if (!isNaN(time)) {
-      return Math.max(0, Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24)));
-    }
-  }
-  return 0;
-}
-
-export function RecruiterOperationsPage() {
-  const { dbMode, scans, user } = useApp();
+export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
+  const { dbMode, scans, user, reloadBootstrap, tokens } = useApp();
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
-  const [jobFilter, setJobFilter] = useState("all");
-  const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">("all");
-  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(defaultJobs);
+  const [jobFilter, setJobFilter] = useState(() => initialJobId || "all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">(() => (initialJobId ? "jobs" : "all"));
+  const [prevInitialJobId, setPrevInitialJobId] = useState(initialJobId);
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(() => {
+    if (typeof window !== "undefined" && !dbMode) {
+      try {
+        const stored = localStorage.getItem("proofylink-demo-jobs");
+        if (stored) {
+          const parsed = JSON.parse(stored) as Array<{ id: string; title: string }>;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed
+              .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
+              .map((j) => ({ id: j.id, title: j.title }));
+          }
+        }
+      } catch {}
+    }
+    return [];
+  });
+
+  // Inbound Unlock modal state
+  const [unlockModalCandidate, setUnlockModalCandidate] = useState<Candidate | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  // Adjust state if initialJobId prop changes
+  if (initialJobId !== prevInitialJobId) {
+    setPrevInitialJobId(initialJobId);
+    setJobFilter(initialJobId || "all");
+    if (initialJobId) setScopeFilter("jobs");
+  }
 
   // Batch actions states
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [batchTargetJobId, setBatchTargetJobId] = useState<string>("");
+  const [batchTargetStage, setBatchTargetStage] = useState<string>("");
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
+  const [isBatchUpdatingStage, setIsBatchUpdatingStage] = useState(false);
+
+  // 1-Click Smart Triage Filter State
+  const [triageFilter, setTriageFilter] = useState<"all" | "sla" | "interview" | "locked">("all");
 
   // Modals & Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -455,15 +514,41 @@ export function RecruiterOperationsPage() {
 
   // Load available job openings
   useEffect(() => {
-    fetch("/api/jobs")
+    let active = true;
+
+    fetch("/api/jobs?limit=100", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: { jobs?: Array<{ id: string; title: string }> } | null) => {
-        if (payload?.jobs && payload.jobs.length > 0) {
-          setAvailableJobs(payload.jobs.map((j) => ({ id: j.id, title: j.title })));
+        if (active && payload?.jobs) {
+          const liveJobs = payload.jobs
+            .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
+            .map((j) => ({ id: j.id, title: j.title }));
+          setAvailableJobs(liveJobs);
         }
       })
       .catch(() => {});
-  }, []);
+
+    // If initialJobId is provided, also fetch that single job specifically to ensure title is available immediately
+    if (initialJobId && initialJobId !== "talent-pool") {
+      fetch(`/api/jobs/${initialJobId}`, { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((payload: { job?: { id: string; title: string } } | null) => {
+          if (active && payload?.job?.title) {
+            setAvailableJobs((prev) => {
+              if (!prev.some((j) => j.id === payload.job!.id)) {
+                return [...prev, { id: payload.job!.id, title: payload.job!.title }];
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [initialJobId]);
 
   // Enrich candidate avatars from live Supabase /api/candidates query
   useEffect(() => {
@@ -500,19 +585,69 @@ export function RecruiterOperationsPage() {
     }
   }, [data, dbMode, isDbSyncing]);
 
-  // Anti-abuse: check unlocked candidates in DB mode
-  const isCandidateUnlocked = useCallback(
-    (candidateId: string) => {
-      if (!dbMode) return true;
-      return scans.some((scan) => scan.candidateId === candidateId);
-    },
-    [dbMode, scans]
-  );
-
   const activeCandidates = useMemo(() => {
-    if (!dbMode) return data.candidates;
-    return data.candidates.filter((candidate) => isCandidateUnlocked(candidate.id));
-  }, [dbMode, data.candidates, isCandidateUnlocked]);
+    return data.candidates;
+  }, [data.candidates]);
+
+  // Resolve current active job title for scoped pipeline views
+  const currentJobTitle = useMemo(() => {
+    const targetId = jobFilter !== "all" ? jobFilter : initialJobId;
+    if (!targetId || targetId === "all") return null;
+    if (targetId === "talent-pool") return "Talent Pool";
+    const found = availableJobs.find((j) => j.id === targetId);
+    if (found) return found.title;
+    const fromCand = data.candidates.find((c) => c.jobId === targetId)?.jobTitle;
+    if (fromCand) return fromCand;
+    return "Lowongan Kerja";
+  }, [initialJobId, jobFilter, availableJobs, data.candidates]);
+
+  // Unlock Inbound candidate handler (1 token deduction)
+  const handleUnlockCandidate = useCallback(
+    async (cand: Candidate) => {
+      if (!cand.applicationId) {
+        toast.error("Data lamaran kandidat tidak ditemukan.");
+        return;
+      }
+      setIsUnlocking(true);
+      try {
+        const res = await fetch(`/api/applications/${cand.applicationId}/unlock`, {
+          method: "POST",
+        });
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          toast.error(payload.error || "Gagal membuka profil kandidat.");
+          return;
+        }
+
+        setData((prev) => ({
+          ...prev,
+          candidates: prev.candidates.map((c) =>
+            c.id === cand.id || (c.applicationId && c.applicationId === cand.applicationId)
+              ? { ...c, unlocked: true, unlockedAt: new Date().toISOString(), stage: "screening" }
+              : c
+          ),
+        }));
+
+        if (
+          selectedCandidate &&
+          (selectedCandidate.id === cand.id || selectedCandidate.applicationId === cand.applicationId)
+        ) {
+          setSelectedCandidate((prev) =>
+            prev ? { ...prev, unlocked: true, unlockedAt: new Date().toISOString(), stage: "screening" } : null
+          );
+        }
+
+        await reloadBootstrap();
+        setUnlockModalCandidate(null);
+        toast.success("Profil kandidat berhasil dibuka! Evaluasi Role-Fit AI telah dipicu.");
+      } catch {
+        toast.error("Terjadi kendala jaringan saat membuka profil.");
+      } finally {
+        setIsUnlocking(false);
+      }
+    },
+    [reloadBootstrap, selectedCandidate]
+  );
 
   // Sync with live DB records
   useEffect(() => {
@@ -550,69 +685,85 @@ export function RecruiterOperationsPage() {
             candidateProfileId?: string;
             jobId?: string;
             submittedAt?: string;
+            unlockedAt?: string | null;
+            coverNote?: string | null;
+            expectedSalary?: number | null;
+            availability?: string | null;
+            source?: "candidate" | "recruiter_invitation";
             job?: { id?: string; title?: string };
             candidate?: { name?: string; headline?: string; location?: string; avatarUrl?: string };
           };
           const appData = (await appRes.json()) as { applications?: AppRow[] };
           if (appData.applications && appData.applications.length > 0) {
-            mappedCandidates = appData.applications
-              .filter((app) => scannedCandidateIds.has(app.candidateProfileId || app.id))
-              .map((app, index) => {
-                let mappedStage: Stage = "screening";
-                if (["new", "shortlisted", "consent_requested", "consent_approved", "screening", "review"].includes(app.status)) {
-                  mappedStage = "screening";
-                } else if (["assessment", "interview"].includes(app.status)) {
-                  mappedStage = "interview";
-                } else if (app.status === "offer") {
-                  mappedStage = "offer";
-                } else if (app.status === "hired") {
-                  mappedStage = "hired";
-                } else if (app.status === "rejected") {
-                  mappedStage = "rejected";
-                }
+            mappedCandidates = appData.applications.map((app, index) => {
+              const isUnlocked =
+                scannedCandidateIds.has(app.candidateProfileId || app.id) ||
+                Boolean(app.unlockedAt) ||
+                app.source === "recruiter_invitation";
 
-                const candProfile = candidateMap.get(app.candidateProfileId || app.id);
-                const resolvedAvatar =
-                  app.candidate?.avatarUrl ||
-                  candProfile?.avatarUrl ||
-                  (candProfile?.name ? SUPABASE_AVATARS[candProfile.name] : undefined) ||
-                  (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
-                  SUPABASE_AVATARS[app.candidateProfileId || ""];
+              let mappedStage: Stage = "screening";
+              if (["new", "shortlisted", "consent_requested", "consent_approved", "screening", "review"].includes(app.status)) {
+                mappedStage = "screening";
+              } else if (["assessment", "interview"].includes(app.status)) {
+                mappedStage = "interview";
+              } else if (app.status === "offer") {
+                mappedStage = "offer";
+              } else if (app.status === "hired") {
+                mappedStage = "hired";
+              } else if (app.status === "rejected") {
+                mappedStage = "rejected";
+              }
 
-                const candId = app.candidateProfileId || app.id;
-                const override = storedAssignments[candId];
-                const finalJobId = override ? override.jobId : app.jobId;
-                const finalJobTitle = override ? override.jobTitle : app.job?.title;
+              const candProfile = candidateMap.get(app.candidateProfileId || app.id);
+              const resolvedAvatar = isUnlocked
+                ? (app.candidate?.avatarUrl ||
+                   candProfile?.avatarUrl ||
+                   (candProfile?.name ? SUPABASE_AVATARS[candProfile.name] : undefined) ||
+                   (app.candidate?.name ? SUPABASE_AVATARS[app.candidate.name] : undefined) ||
+                   SUPABASE_AVATARS[app.candidateProfileId || ""])
+                : undefined;
 
-                const candObj: Candidate = {
-                  id: candId,
-                  applicationId: app.id,
-                  name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
-                  role:
-                    finalJobTitle && finalJobTitle !== "Talent Pool"
-                      ? finalJobTitle
-                      : app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
-                  location: app.candidate?.location || candProfile?.location || "Indonesia",
-                  stage: mappedStage,
-                  owner: recruiterName,
-                  dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
-                  appliedAt: app.submittedAt ? app.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                  score: 4.5,
-                  feedback: "",
-                  offerStatus: mappedStage === "offer" ? "sent" : mappedStage === "hired" ? "accepted" : "draft",
-                  compensation: "Rp 15.000.000 / bulan",
-                  reason: "",
-                  jobId: finalJobId,
-                  jobTitle: finalJobTitle,
-                  avatarUrl: resolvedAvatar,
-                };
-                candObj.statusHistory = getDefaultStatusHistory(candObj, recruiterName);
-                if (override?.historyItem) {
-                  const alreadyHas = candObj.statusHistory.some((h) => h.id === override.historyItem?.id);
-                  if (!alreadyHas) candObj.statusHistory.push(override.historyItem);
-                }
-                return candObj;
-              });
+              const candId = app.candidateProfileId || app.id;
+              const override = storedAssignments[candId];
+              const validOverride = override && override.jobId && !override.jobId.startsWith("job-") ? override : undefined;
+              const finalJobId = validOverride ? validOverride.jobId : app.jobId;
+              const finalJobTitle = validOverride ? validOverride.jobTitle : app.job?.title;
+
+              const candObj: Candidate = {
+                id: candId,
+                applicationId: app.id,
+                name: app.candidate?.name || candProfile?.name || `Kandidat #${index + 1}`,
+                role:
+                  finalJobTitle && finalJobTitle !== "Talent Pool"
+                    ? finalJobTitle
+                    : app.job?.title || app.candidate?.headline || candProfile?.role || "Software Engineer",
+                location: app.candidate?.location || candProfile?.location || "Indonesia",
+                stage: mappedStage,
+                owner: recruiterName,
+                dueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+                appliedAt: app.submittedAt ? app.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                score: 4.5,
+                feedback: "",
+                offerStatus: mappedStage === "offer" ? "sent" : mappedStage === "hired" ? "accepted" : "draft",
+                compensation: app.expectedSalary ? `Rp ${Number(app.expectedSalary).toLocaleString("id-ID")} / bulan` : "Rp 15.000.000 / bulan",
+                expectedSalary: app.expectedSalary ?? null,
+                availability: app.availability ?? null,
+                reason: "",
+                jobId: finalJobId,
+                jobTitle: finalJobTitle,
+                avatarUrl: resolvedAvatar,
+                source: (app.source as "candidate" | "recruiter_invitation") || "candidate",
+                unlocked: isUnlocked,
+                unlockedAt: app.unlockedAt || null,
+                coverNote: app.coverNote || null,
+              };
+              candObj.statusHistory = getDefaultStatusHistory(candObj, recruiterName);
+              if (override?.historyItem) {
+                const alreadyHas = candObj.statusHistory.some((h) => h.id === override.historyItem?.id);
+                if (!alreadyHas) candObj.statusHistory.push(override.historyItem);
+              }
+              return candObj;
+            });
           }
         }
 
@@ -621,8 +772,9 @@ export function RecruiterOperationsPage() {
         for (const cand of remoteCandList) {
           if (scannedCandidateIds.has(cand.id) && !existingAppCandIds.has(cand.id)) {
             const override = storedAssignments[cand.id];
-            const finalJobId = override ? override.jobId : "talent-pool";
-            const finalJobTitle = override ? override.jobTitle : "Talent Pool";
+            const validOverride = override && override.jobId && !override.jobId.startsWith("job-") ? override : undefined;
+            const finalJobId = validOverride ? validOverride.jobId : "talent-pool";
+            const finalJobTitle = validOverride ? validOverride.jobTitle : "Talent Pool";
 
             const poolCand: Candidate = {
               id: cand.id,
@@ -810,7 +962,48 @@ export function RecruiterOperationsPage() {
     return { total, pool, jobs };
   }, [activeCandidates]);
 
-  // Filtered candidates
+  // Smart Triage Counts (respecting current search, scope, and job filters)
+  const triageCounts = useMemo(() => {
+    const base = activeCandidates.filter((candidate) => {
+      const matchSearch =
+        searchQuery.trim() === "" ||
+        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      const isPool =
+        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+      const matchScope =
+        scopeFilter === "all" ? true : scopeFilter === "pool" ? isPool : !isPool;
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? isPool
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
+      return matchSearch && matchScope && matchJob;
+    });
+
+    const all = base.length;
+    const sla = base.filter((c) => {
+      const days = getDaysInCurrentStage(c);
+      return c.stage === "screening" ? days >= 3 : days >= 7;
+    }).length;
+    const interview = base.filter((c) => {
+      const hasPending = data.interviews.some(
+        (iv) =>
+          (iv.candidateId === c.id || iv.candidateId === c.applicationId) &&
+          (iv.status === "Permintaan Reschedule" || iv.status === "Ditolak Kandidat")
+      );
+      return c.stage === "interview" || hasPending;
+    }).length;
+    const locked = base.filter((c) => c.unlocked === false).length;
+
+    return { all, sla, interview, locked };
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, data.interviews]);
+
+  // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
     return activeCandidates.filter((candidate) => {
       const matchSearch =
@@ -828,15 +1021,36 @@ export function RecruiterOperationsPage() {
           ? isPool
           : !isPool;
 
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
           ? isPool
-          : candidate.jobId === jobFilter || candidate.role === jobFilter;
-      return matchSearch && matchScope && matchJob;
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
+
+      if (!matchSearch || !matchScope || !matchJob) return false;
+
+      // Smart Triage Filter Logic
+      if (triageFilter === "sla") {
+        const days = getDaysInCurrentStage(candidate);
+        if (!(candidate.stage === "screening" ? days >= 3 : days >= 7)) return false;
+      } else if (triageFilter === "interview") {
+        const hasPending = data.interviews.some(
+          (iv) =>
+            (iv.candidateId === candidate.id || iv.candidateId === candidate.applicationId) &&
+            (iv.status === "Permintaan Reschedule" || iv.status === "Ditolak Kandidat")
+        );
+        if (candidate.stage !== "interview" && !hasPending) return false;
+      } else if (triageFilter === "locked") {
+        if (candidate.unlocked !== false) return false;
+      }
+
+      return true;
     });
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter]);
+  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, triageFilter, data.interviews]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -1121,15 +1335,213 @@ export function RecruiterOperationsPage() {
     setIsBatchAssigning(false);
   };
 
-  // KPI Metrics
+  // Batch stage change for selected candidates
+  const handleBatchStageChange = async () => {
+    if (!batchTargetStage || selectedCandidateIds.length === 0) return;
+    setIsBatchUpdatingStage(true);
+    try {
+      const targetStage = batchTargetStage as Stage;
+      const targetIds = new Set(selectedCandidateIds);
+      const stageLabel = STAGES.find((s) => s.id === targetStage)?.label || targetStage;
+
+      const updatedCandidates = data.candidates.map((c) => {
+        if (targetIds.has(c.id)) {
+          const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
+          const histItem: StatusHistoryItem = {
+            id: `hist-batch-stage-${c.id}-${Date.now()}`,
+            stage: targetStage,
+            title: `Perubahan Tahap Massal ke ${stageLabel}`,
+            actionType: "recruiter",
+            timestamp: new Date().toISOString(),
+            actor: recruiterName,
+            actorRole: "Recruiter Lead",
+            notes: `Dipindahkan secara massal bersama ${selectedCandidateIds.length} kandidat lainnya.`,
+          };
+          return {
+            ...c,
+            stage: targetStage,
+            statusHistory: [...existingHist, histItem],
+          };
+        }
+        return c;
+      });
+
+      const nextData = { ...data, candidates: updatedCandidates };
+      setData(nextData);
+
+      if (selectedCandidate && targetIds.has(selectedCandidate.id)) {
+        const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
+        if (updated) setSelectedCandidate(updated);
+      }
+
+      try {
+        const opsRaw = localStorage.getItem(storageKey);
+        const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
+      } catch {}
+
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+      } catch {}
+
+      // Sync demo applications
+      try {
+        const demoAppKey = "proofylink-demo-applications-v1";
+        const demoAppsRaw = localStorage.getItem(demoAppKey);
+        if (demoAppsRaw) {
+          const apps = JSON.parse(demoAppsRaw);
+          if (Array.isArray(apps)) {
+            for (const candId of selectedCandidateIds) {
+              const appIdx = apps.findIndex(
+                (a: { candidateProfileId?: string; id?: string }) =>
+                  a.candidateProfileId === candId || a.id === `demo-app-${candId}`
+              );
+              if (appIdx >= 0) {
+                apps[appIdx].status = targetStage;
+                apps[appIdx].updatedAt = new Date().toISOString();
+              }
+            }
+            localStorage.setItem(demoAppKey, JSON.stringify(apps));
+          }
+        }
+      } catch {}
+
+      // Sync live DB if applicable
+      if (dbMode) {
+        await Promise.allSettled(
+          selectedCandidateIds.map(async (cid) => {
+            const cand = data.candidates.find((c) => c.id === cid);
+            if (cand?.applicationId) {
+              await fetch(`/api/applications/${cand.applicationId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: targetStage }),
+              });
+            }
+          })
+        );
+      }
+
+      toast.success(`${selectedCandidateIds.length} kandidat berhasil dipindahkan ke tahap ${stageLabel}!`);
+      setSelectedCandidateIds([]);
+      setBatchTargetStage("");
+    } catch {
+      toast.error("Gagal memperbarui tahap kandidat secara massal.");
+    } finally {
+      setIsBatchUpdatingStage(false);
+    }
+  };
+
+  // Batch reject & archive to pool (0 Token)
+  const handleBatchRejectToPool = async () => {
+    if (selectedCandidateIds.length === 0) return;
+    setIsBatchUpdatingStage(true);
+    try {
+      const targetIds = new Set(selectedCandidateIds);
+      const updatedCandidates = data.candidates.map((c) => {
+        if (targetIds.has(c.id)) {
+          const existingHist = c.statusHistory || getDefaultStatusHistory(c, recruiterName);
+          const histItem: StatusHistoryItem = {
+            id: `hist-batch-reject-${c.id}-${Date.now()}`,
+            stage: "rejected",
+            title: "Ditolak & Disimpan ke Talent Pool",
+            actionType: "recruiter",
+            timestamp: new Date().toISOString(),
+            actor: recruiterName,
+            actorRole: "Recruiter Lead",
+            notes: "Kandidat tidak lolos untuk lowongan ini dan diarsipkan ke Talent Pool umum tanpa biaya token.",
+          };
+          return {
+            ...c,
+            stage: "rejected" as Stage,
+            jobId: "talent-pool",
+            jobTitle: "Talent Pool",
+            statusHistory: [...existingHist, histItem],
+          };
+        }
+        return c;
+      });
+
+      const nextData = { ...data, candidates: updatedCandidates };
+      setData(nextData);
+
+      if (selectedCandidate && targetIds.has(selectedCandidate.id)) {
+        const updated = updatedCandidates.find((c) => c.id === selectedCandidate.id);
+        if (updated) setSelectedCandidate(updated);
+      }
+
+      try {
+        const opsRaw = localStorage.getItem(storageKey);
+        const opsData = opsRaw ? JSON.parse(opsRaw) : { candidates: [], interviews: [] };
+        opsData.candidates = updatedCandidates;
+        localStorage.setItem(storageKey, JSON.stringify(opsData));
+      } catch {}
+
+      try {
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(nextData));
+      } catch {}
+
+      if (dbMode) {
+        await Promise.allSettled(
+          selectedCandidateIds.map(async (cid) => {
+            const cand = data.candidates.find((c) => c.id === cid);
+            if (cand?.applicationId) {
+              await fetch(`/api/applications/${cand.applicationId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "rejected" }),
+              });
+            }
+          })
+        );
+      }
+
+      toast.success(`${selectedCandidateIds.length} kandidat ditolak dan disimpan ke Talent Pool (0 Token).`);
+      setSelectedCandidateIds([]);
+    } catch {
+      toast.error("Gagal melakukan aksi tolak massal.");
+    } finally {
+      setIsBatchUpdatingStage(false);
+    }
+  };
+
+  // Scope and Job Filtered Candidates for Metrics
+  const scopedCandidates = useMemo(() => {
+    return activeCandidates.filter((candidate) => {
+      const isPool =
+        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+
+      const matchScope =
+        scopeFilter === "all"
+          ? true
+          : scopeFilter === "pool"
+          ? isPool
+          : !isPool;
+
+      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
+      const matchJob =
+        jobFilter === "all"
+          ? true
+          : jobFilter === "talent-pool"
+          ? isPool
+          : candidate.jobId === jobFilter ||
+            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+            candidate.role === jobFilter;
+
+      return matchScope && matchJob;
+    });
+  }, [activeCandidates, scopeFilter, jobFilter, availableJobs]);
+
+  // KPI Metrics reflects candidates currently visible in the active scope/job
   const metrics = useMemo(() => {
-    const total = activeCandidates.length;
-    const screening = activeCandidates.filter((c) => c.stage === "screening").length;
-    const interview = activeCandidates.filter((c) => c.stage === "interview").length;
-    const offer = activeCandidates.filter((c) => c.stage === "offer").length;
-    const hired = activeCandidates.filter((c) => c.stage === "hired").length;
+    const total = scopedCandidates.length;
+    const screening = scopedCandidates.filter((c) => c.stage === "screening").length;
+    const interview = scopedCandidates.filter((c) => c.stage === "interview").length;
+    const offer = scopedCandidates.filter((c) => c.stage === "offer").length;
+    const hired = scopedCandidates.filter((c) => c.stage === "hired").length;
     return { total, screening, interview, offer, hired };
-  }, [activeCandidates]);
+  }, [scopedCandidates]);
 
   // 5-Second Safety Undo Buffer Handler
   const handleUndo = useCallback(() => {
@@ -1649,67 +2061,179 @@ export function RecruiterOperationsPage() {
         {/* Top Header */}
         <div className="border-b border-slate-200 bg-white sticky top-0 z-20 shadow-2xs">
           <div className="container mx-auto px-4 sm:px-6 py-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
-              </div>
+            {initialJobId ? (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  {/* Breadcrumb Navigation */}
+                  <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
+                    <Link
+                      href="/recruiter/jobs"
+                      className="hover:text-slate-900 transition-colors flex items-center gap-1 font-medium"
+                    >
+                      <ArrowLeft className="size-3.5 text-slate-400" />
+                      <span>Daftar Lowongan</span>
+                    </Link>
+                    <ChevronRight className="size-3 text-slate-400" />
+                    <Link
+                      href={`/recruiter/jobs/${initialJobId}`}
+                      className="hover:text-slate-900 transition-colors font-medium text-slate-700 max-w-[220px] truncate"
+                      title={currentJobTitle || "Detail Lowongan"}
+                    >
+                      {currentJobTitle || "Detail Lowongan"}
+                    </Link>
+                    <ChevronRight className="size-3 text-slate-400" />
+                    <span className="font-semibold text-[#7C3AED] bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      Pipeline Pelamar
+                    </span>
+                  </nav>
 
-              {/* View Switcher & Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                {/* View Switcher */}
-                <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                  <button
-                    onClick={() => setViewMode("kanban")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                      viewMode === "kanban"
-                        ? "bg-white text-slate-900 shadow-2xs"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    <Kanban className="size-3.5" /> Papan
-                  </button>
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                      viewMode === "table"
-                        ? "bg-white text-slate-900 shadow-2xs"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    <TableIcon className="size-3.5" /> Tabel
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                      Pipeline: {currentJobTitle || "Lowongan Terpilih"}
+                    </h1>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                      <Workflow className="size-3 text-[#7C3AED]" />
+                      Lowongan Khusus
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Evaluasi pelamar, jadwal wawancara, dan penawaran kerja khusus untuk lowongan ini.
+                  </p>
                 </div>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={exportCsv}
-                  className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
-                >
-                  <Download className="size-3.5" /> Export
-                </Button>
+                {/* View Switcher & Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Link href={`/recruiter/jobs/${initialJobId}`}>
+                      <Eye className="size-3.5 text-slate-500" /> Detail Lowongan
+                    </Link>
+                  </Button>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShortcutsModalOpen(true)}
-                  className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
-                  title="Pintasan Keyboard (Tekan ?)"
-                >
-                  <Keyboard className="size-3.5" /> Pintasan
-                </Button>
+                  {/* View Switcher */}
+                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                    <button
+                      onClick={() => setViewMode("kanban")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "kanban"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Kanban className="size-3.5" /> Papan
+                    </button>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "table"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <TableIcon className="size-3.5" /> Tabel
+                    </button>
+                  </div>
 
-                <Button
-                  size="sm"
-                  onClick={() => setReportModalOpen(true)}
-                  className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
-                >
-                  <BarChart3 className="size-3.5" /> Laporan HR
-                </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportCsv}
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Download className="size-3.5" /> Export
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShortcutsModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                    title="Pintasan Keyboard (Tekan ?)"
+                  >
+                    <Keyboard className="size-3.5" /> Pintasan
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setReportModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                  >
+                    <BarChart3 className="size-3.5" /> Laporan HR
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pipeline Rekrutmen</h1>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Kelola seluruh siklus rekrutmen talenta, penjadwalan interview, dan penawaran kerja terpadu.
+                  </p>
+                </div>
+
+                {/* View Switcher & Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View Switcher */}
+                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                    <button
+                      onClick={() => setViewMode("kanban")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "kanban"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Kanban className="size-3.5" /> Papan
+                    </button>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                        viewMode === "table"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <TableIcon className="size-3.5" /> Tabel
+                    </button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportCsv}
+                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                  >
+                    <Download className="size-3.5" /> Export
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShortcutsModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                    title="Pintasan Keyboard (Tekan ?)"
+                  >
+                    <Keyboard className="size-3.5" /> Pintasan
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setReportModalOpen(true)}
+                    className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                  >
+                    <BarChart3 className="size-3.5" /> Laporan HR
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* KPI Metric Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
@@ -1812,22 +2336,34 @@ export function RecruiterOperationsPage() {
 
             <div className="flex items-center gap-2 justify-end overflow-x-auto">
               {/* Job Opening Filter */}
-              {availableJobs.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <select
-                    value={jobFilter}
-                    onChange={(e) => setJobFilter(e.target.value)}
-                    className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                  >
-                    <option value="all">Semua Lowongan</option>
-                    <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
-                    {availableJobs.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <select
+                  value={jobFilter}
+                  onChange={(e) => setJobFilter(e.target.value)}
+                  className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                >
+                  <option value="all">Semua Lowongan</option>
+                  <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
+                  {availableJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {initialJobId && jobFilter !== initialJobId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setJobFilter(initialJobId);
+                    setScopeFilter("jobs");
+                  }}
+                  className="h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                >
+                  Fokus ke Lowongan Ini
+                </Button>
               )}
 
               {(searchQuery || jobFilter !== "all" || scopeFilter !== "all") && (
@@ -1841,10 +2377,111 @@ export function RecruiterOperationsPage() {
                   }}
                   className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
                 >
-                  Reset
+                  Reset Filter
                 </Button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* 1-Click Smart Triage Filter Chips (Strictly No Emojis, Clean SVG Icons) */}
+        <div className="container mx-auto px-4 sm:px-6 pt-1 pb-3">
+          <div className="flex flex-wrap items-center gap-2 bg-white/70 backdrop-blur-xs p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1.5">
+              <Filter className="size-3.5 text-slate-500" />
+              Triage Cepat:
+            </span>
+
+            {/* Chip: Semua */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("all")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "all"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <span>Semua</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "all" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"
+                )}
+              >
+                {triageCounts.all}
+              </span>
+            </button>
+
+            {/* Chip: Perlu Tindakan SLA */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("sla")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "sla"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                  : "bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100"
+              )}
+            >
+              <Clock className="size-3.5" />
+              <span>Perlu Tindakan SLA</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "sla" ? "bg-amber-700 text-white" : "bg-amber-200/80 text-amber-900"
+                )}
+              >
+                {triageCounts.sla}
+              </span>
+            </button>
+
+            {/* Chip: Wawancara Butuh Respon */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("interview")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "interview"
+                  ? "bg-fuchsia-700 text-white border-fuchsia-700 shadow-2xs"
+                  : "bg-fuchsia-50/80 text-fuchsia-800 border-fuchsia-200 hover:bg-fuchsia-100"
+              )}
+            >
+              <CalendarClock className="size-3.5" />
+              <span>Wawancara Butuh Respon</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "interview" ? "bg-fuchsia-800 text-white" : "bg-fuchsia-200/80 text-fuchsia-900"
+                )}
+              >
+                {triageCounts.interview}
+              </span>
+            </button>
+
+            {/* Chip: Inbound Terkunci */}
+            <button
+              type="button"
+              onClick={() => setTriageFilter("locked")}
+              className={cn(
+                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                triageFilter === "locked"
+                  ? "bg-purple-700 text-white border-purple-700 shadow-2xs"
+                  : "bg-purple-50/80 text-purple-800 border-purple-200 hover:bg-purple-100"
+              )}
+            >
+              <Lock className="size-3.5" />
+              <span>Inbound Terkunci</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  triageFilter === "locked" ? "bg-purple-800 text-white" : "bg-purple-200/80 text-purple-900"
+                )}
+              >
+                {triageCounts.locked}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -1906,20 +2543,27 @@ export function RecruiterOperationsPage() {
                         </div>
                       ) : (
                         stageCandidates.map((candidate, idx) => {
-                          const candidateInterviews = data.interviews.filter(
-                            (i) => i.candidateId === candidate.id || (candidate.applicationId && i.candidateId === candidate.applicationId)
-                          );
+                          const candidateInterviews = data.interviews
+                            .filter(
+                              (i) => i.candidateId === candidate.id || (candidate.applicationId && i.candidateId === candidate.applicationId)
+                            )
+                            .sort((a, b) => {
+                              const timeB = b.date ? new Date(b.date).getTime() : 0;
+                              const timeA = a.date ? new Date(a.date).getTime() : 0;
+                              return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                            });
                           const isDragging = draggingCandidateId === candidate.id;
                           const isHired = candidate.stage === "hired";
+                          const isLocked = candidate.unlocked === false;
 
                           return (
                             <CandidateQuickPeek
                               key={candidate.id}
                               candidate={candidate}
-                              disabled={draggingCandidateId !== null || drawerOpen || shortcutsModalOpen}
+                              disabled={draggingCandidateId !== null || drawerOpen || shortcutsModalOpen || isLocked}
                             >
                               <div
-                                draggable={!isHired}
+                                draggable={!isHired && !isLocked}
                                 onDragStart={(e) => handleDragStart(e, candidate.id)}
                                 onDragEnd={handleDragEnd}
                                 onClick={() => {
@@ -1929,7 +2573,7 @@ export function RecruiterOperationsPage() {
                                 style={{ animationDelay: `${idx * 50}ms` }}
                                 className={cn(
                                   "group relative rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs hover:shadow-xs hover:border-purple-200 hover:-translate-y-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-bottom-2",
-                                  isHired ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+                                  isHired || isLocked ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
                                   isDragging ? "opacity-30 scale-[0.98] border-[#7C3AED]/70 shadow-lg ring-1 ring-purple-300" : "",
                                   focusedCandidateId === candidate.id ? "ring-2 ring-[#7C3AED] ring-offset-2 border-purple-300 shadow-md" : "",
                                   selectedCandidateIds.includes(candidate.id) ? "ring-2 ring-[#7C3AED] bg-purple-50/25 border-purple-300" : ""
@@ -1963,13 +2607,13 @@ export function RecruiterOperationsPage() {
                                       .join("")
                                       .slice(0, 2)
                                       .toUpperCase()}
-                                    avatarUrl={candidate.avatarUrl}
+                                    avatarUrl={isLocked ? undefined : candidate.avatarUrl}
                                     name={candidate.name}
                                     className="size-8 rounded-xl ring-1 ring-purple-100 group-hover:ring-purple-300 transition-all shrink-0"
                                   />
                                   <div>
                                     <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#7C3AED] transition-colors line-clamp-1">
-                                      {candidate.name}
+                                      {isLocked ? maskName(candidate.name) : candidate.name}
                                     </h3>
                                     {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
                                       <p className="text-[11px] font-medium text-[#7C3AED] line-clamp-1 mt-0.5">
@@ -1986,7 +2630,12 @@ export function RecruiterOperationsPage() {
 
                               {/* Candidate Status Pills */}
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                {isHired ? (
+                                {isLocked ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
+                                    <Lock className="size-2.5 text-[#7C3AED]" />
+                                    Inbound Pelamar · Terkunci
+                                  </span>
+                                ) : isHired ? (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                                     <Lock className="size-2.5 text-emerald-600" />
                                     Terkunci · Final
@@ -2076,6 +2725,59 @@ export function RecruiterOperationsPage() {
                                 )}
                               </div>
 
+                              {/* Candidate Preferences: Salary & Availability */}
+                              {(candidate.expectedSalary || candidate.availability) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                                  {candidate.expectedSalary && (
+                                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded">
+                                      <Banknote className="size-2.5" />
+                                      Rp {(candidate.expectedSalary / 1000000).toFixed(0)}jt/bln
+                                    </span>
+                                  )}
+                                  {candidate.availability && (
+                                    <span className="inline-flex items-center gap-1 font-medium text-purple-700 bg-purple-50/80 border border-purple-200 px-1.5 py-0.5 rounded">
+                                      <CalendarClock className="size-2.5 text-purple-500" />
+                                      {candidate.availability}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Inbound Cover Note Snippet Preview */}
+                              {isLocked && candidate.coverNote && (
+                                <div className="mt-2 text-[11px] bg-purple-50/40 border border-purple-100 rounded-lg p-2 text-slate-600 line-clamp-2 italic leading-relaxed">
+                                  &ldquo;{candidate.coverNote}&rdquo;
+                                </div>
+                              )}
+
+                              {/* Inbound Triage Action Buttons */}
+                              {isLocked && (
+                                <div
+                                  className="mt-3 pt-2.5 border-t border-purple-100 flex items-center justify-between gap-1.5"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      initiateStageChange(candidate.id, "rejected", {
+                                        reason: "Ditolak dari tahap Inbound Triage",
+                                      })
+                                    }
+                                    className="h-7 px-2 text-[11px] font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                                  >
+                                    Tolak (0 Token)
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setUnlockModalCandidate(candidate)}
+                                    className="h-7 px-2.5 text-[11px] font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1"
+                                  >
+                                    <Unlock className="size-3" /> Buka Profil (1 Token)
+                                  </Button>
+                                </div>
+                              )}
+
                               {/* Card Footer: Location, SLA & Actions */}
                               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                                 <div className="flex items-center gap-2 max-w-[170px] truncate">
@@ -2085,6 +2787,24 @@ export function RecruiterOperationsPage() {
                                   </span>
                                   {(() => {
                                     const days = getDaysInCurrentStage(candidate);
+                                    const isScreening = candidate.stage === "screening";
+                                    if (isScreening && days >= 3) {
+                                      const isOverdue = days >= 5;
+                                      return (
+                                        <span
+                                          className={cn(
+                                            "inline-flex items-center gap-1 text-[10px] shrink-0 px-1.5 py-0.5 rounded border font-semibold",
+                                            isOverdue
+                                              ? "text-rose-700 bg-rose-50 border-rose-300 shadow-2xs"
+                                              : "text-amber-800 bg-amber-50 border-amber-300 shadow-2xs"
+                                          )}
+                                          title={isOverdue ? `SLA Overdue: ${days} hari menunggu review triage` : `Mendekati batas SLA: ${days} hari menunggu review`}
+                                        >
+                                          <Clock className={cn("size-2.5", isOverdue ? "text-rose-600" : "text-amber-600")} />
+                                          {isOverdue ? `Overdue: ${days}h` : `SLA: ${days}h`}
+                                        </span>
+                                      );
+                                    }
                                     const isAgingAlert = days >= 7;
                                     return (
                                       <span
@@ -2104,13 +2824,22 @@ export function RecruiterOperationsPage() {
                                 </div>
 
                                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                  <Link
-                                    href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}
-                                    className="p-1 rounded-md text-slate-400 hover:text-[#7C3AED] hover:bg-purple-50 transition-colors"
-                                    title="Kirim pesan"
-                                  >
-                                    <MessageSquare className="size-3.5" />
-                                  </Link>
+                                  {!isLocked ? (
+                                    <Link
+                                      href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}
+                                      className="p-1 rounded-md text-slate-400 hover:text-[#7C3AED] hover:bg-purple-50 transition-colors"
+                                      title="Kirim pesan"
+                                    >
+                                      <MessageSquare className="size-3.5" />
+                                    </Link>
+                                  ) : (
+                                    <div
+                                      className="p-1 text-slate-300 cursor-not-allowed"
+                                      title="Buka profil terlebih dahulu untuk mengirim pesan"
+                                    >
+                                      <Lock className="size-3 text-purple-400" />
+                                    </div>
+                                  )}
 
                                   {isHired ? (
                                     <div
@@ -2227,12 +2956,14 @@ export function RecruiterOperationsPage() {
                                     .join("")
                                     .slice(0, 2)
                                     .toUpperCase()}
-                                  avatarUrl={candidate.avatarUrl}
+                                  avatarUrl={candidate.unlocked === false ? undefined : candidate.avatarUrl}
                                   name={candidate.name}
                                   className="size-8 rounded-xl ring-1 ring-purple-100 shrink-0"
                                 />
                                 <div>
-                                  <p className="font-bold text-slate-900 leading-tight">{candidate.name}</p>
+                                  <p className="font-bold text-slate-900 leading-tight">
+                                    {candidate.unlocked !== false ? candidate.name : maskName(candidate.name)}
+                                  </p>
                                   {(!candidate.jobId || candidate.jobId === "talent-pool") ? (
                                     <span className="inline-flex text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
                                       Talent Pool
@@ -2248,32 +2979,73 @@ export function RecruiterOperationsPage() {
                             <td className="px-4 py-3.5">
                               <p className="font-medium text-slate-800">{candidate.role}</p>
                               <p className="text-[11px] text-slate-400">{candidate.location}</p>
+                              {(candidate.expectedSalary || candidate.availability) && (
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                                  {candidate.expectedSalary && (
+                                    <span className="font-semibold text-emerald-700">
+                                      Rp {(candidate.expectedSalary / 1000000).toFixed(0)}jt/bln
+                                    </span>
+                                  )}
+                                  {candidate.expectedSalary && candidate.availability && <span>·</span>}
+                                  {candidate.availability && (
+                                    <span className="text-purple-700 font-medium">{candidate.availability}</span>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3.5">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                                  STAGES.find((s) => s.id === candidate.stage)?.border,
-                                  STAGES.find((s) => s.id === candidate.stage)?.bg,
-                                  STAGES.find((s) => s.id === candidate.stage)?.text
-                                )}
-                              >
-                                {STAGES.find((s) => s.id === candidate.stage)?.label}
-                              </span>
+                              {candidate.unlocked === false ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border border-purple-200 bg-purple-50 text-purple-800">
+                                  <Lock className="size-2.5 text-[#7C3AED]" /> Inbound Terkunci
+                                </span>
+                              ) : (
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                                    STAGES.find((s) => s.id === candidate.stage)?.border,
+                                    STAGES.find((s) => s.id === candidate.stage)?.bg,
+                                    STAGES.find((s) => s.id === candidate.stage)?.text
+                                  )}
+                                >
+                                  {STAGES.find((s) => s.id === candidate.stage)?.label}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3.5">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1 text-[11px]",
-                                  isAgingAlert
-                                    ? "text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md font-semibold"
-                                    : "text-slate-600 font-medium"
-                                )}
-                                title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
-                              >
-                                <Clock className={cn("size-3", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
-                                {days === 0 ? "Hari ini" : `${days} hari`}
-                              </span>
+                              {(() => {
+                                const isScreening = candidate.stage === "screening";
+                                if (isScreening && days >= 3) {
+                                  const isOverdue = days >= 5;
+                                  return (
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold border",
+                                        isOverdue
+                                          ? "text-rose-700 bg-rose-50 border-rose-300 shadow-2xs"
+                                          : "text-amber-800 bg-amber-50 border-amber-300 shadow-2xs"
+                                      )}
+                                      title={isOverdue ? `SLA Overdue: ${days} hari menunggu review triage` : `Mendekati batas SLA: ${days} hari menunggu review`}
+                                    >
+                                      <Clock className={cn("size-3", isOverdue ? "text-rose-600" : "text-amber-600")} />
+                                      {isOverdue ? `Overdue (${days}h)` : `SLA (${days}h)`}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1 text-[11px]",
+                                      isAgingAlert
+                                        ? "text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md font-semibold"
+                                        : "text-slate-600 font-medium"
+                                    )}
+                                    title={isAgingAlert ? `Perhatian SLA: Berada di tahap ${candidate.stage} selama ${days} hari` : `Durasi di tahap saat ini: ${days} hari`}
+                                  >
+                                    <Clock className={cn("size-3", isAgingAlert ? "text-amber-600" : "text-slate-400")} />
+                                    {days === 0 ? "Hari ini" : `${days} hari`}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3.5">
                               <span
@@ -2295,17 +3067,41 @@ export function RecruiterOperationsPage() {
                             </td>
                             <td className="px-4 py-3.5 text-slate-600">{candidate.owner}</td>
                             <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
-                                onClick={() => {
-                                  setSelectedCandidate(candidate);
-                                  setDrawerOpen(true);
-                                }}
-                              >
-                                Detail
-                              </Button>
+                              {candidate.unlocked === false ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      initiateStageChange(candidate.id, "rejected", {
+                                        reason: "Ditolak dari tahap Inbound Triage",
+                                      })
+                                    }
+                                    className="h-7 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2"
+                                  >
+                                    Tolak
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setUnlockModalCandidate(candidate)}
+                                    className="h-7 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1 px-2.5"
+                                  >
+                                    <Unlock className="size-3" /> Buka (1 Token)
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                                  onClick={() => {
+                                    setSelectedCandidate(candidate);
+                                    setDrawerOpen(true);
+                                  }}
+                                >
+                                  Detail
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -2318,9 +3114,9 @@ export function RecruiterOperationsPage() {
           )}
         </div>
 
-        {/* Floating Batch Assignment Action Bar */}
+        {/* Floating Batch Assignment & Pipeline Action Bar */}
         {selectedCandidateIds.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-slate-200/90 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-slate-200/90 shadow-2xl rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-bottom-4 duration-200 max-w-[95vw]">
             <div className="flex items-center gap-2">
               <span className="size-6 rounded-full bg-[#7C3AED] text-white flex items-center justify-center text-xs font-bold">
                 {selectedCandidateIds.length}
@@ -2328,13 +3124,45 @@ export function RecruiterOperationsPage() {
               <span className="text-xs font-semibold text-slate-900">Kandidat Terpilih</span>
             </div>
 
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
-            <div className="flex items-center gap-2">
+            {/* Aksi 1: Pindahkan Tahap Massal */}
+            <div className="flex items-center gap-1.5">
+              <select
+                value={batchTargetStage}
+                onChange={(e) => setBatchTargetStage(e.target.value)}
+                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+              >
+                <option value="">Pindahkan Tahap Massal...</option>
+                <option value="screening">Review Profil</option>
+                <option value="interview">Wawancara</option>
+                <option value="offer">Penawaran (Offer)</option>
+                <option value="hired">Diterima (Hired)</option>
+              </select>
+
+              <Button
+                size="sm"
+                disabled={!batchTargetStage || isBatchUpdatingStage}
+                onClick={handleBatchStageChange}
+                className="h-8 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-2xs gap-1 px-3"
+              >
+                {isBatchUpdatingStage ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ArrowRight className="size-3.5" />
+                )}
+                <span>Ubah Tahap</span>
+              </Button>
+            </div>
+
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Aksi 2: Penugasan Lowongan */}
+            <div className="flex items-center gap-1.5">
               <select
                 value={batchTargetJobId}
                 onChange={(e) => setBatchTargetJobId(e.target.value)}
-                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden max-w-[180px] truncate"
               >
                 <option value="">Pilih Lowongan Tujuan...</option>
                 <option value="talent-pool">Talent Pool (Pindahkan ke Pool)</option>
@@ -2349,18 +3177,33 @@ export function RecruiterOperationsPage() {
                 size="sm"
                 disabled={!batchTargetJobId || isBatchAssigning}
                 onClick={handleBatchAssign}
-                className="h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                className="h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5 px-3"
               >
                 <Briefcase className="size-3.5" />
-                {isBatchAssigning ? "Menugaskan..." : "Tugaskan ke Lowongan"}
+                <span>{isBatchAssigning ? "Menugaskan..." : "Tugaskan"}</span>
               </Button>
             </div>
+
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Aksi 3: Tolak & Simpan ke Pool Massal */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isBatchUpdatingStage}
+              onClick={handleBatchRejectToPool}
+              className="h-8 text-xs font-semibold border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-300 rounded-xl gap-1.5 px-3"
+              title="Tolak kandidat untuk lowongan saat ini dan simpan ke Talent Pool (0 Token)"
+            >
+              <UserX className="size-3.5" />
+              <span>Tolak &amp; Simpan ke Pool</span>
+            </Button>
 
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setSelectedCandidateIds([])}
-              className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
+              className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800 px-2"
             >
               Batal
             </Button>
@@ -2385,7 +3228,96 @@ export function RecruiterOperationsPage() {
           availableJobs={availableJobs}
           onAssignJob={handleAssignJob}
           onOpenScheduleModal={(c) => setScheduleModalCandidate(c)}
+          onUnlockCandidate={(c) => setUnlockModalCandidate(c)}
         />
+
+        {/* Unlock Inbound Candidate Modal (1 Token Monetization) */}
+        <Dialog
+          open={Boolean(unlockModalCandidate)}
+          onOpenChange={(open) => {
+            if (!open && !isUnlocking) setUnlockModalCandidate(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <div className="size-10 rounded-xl bg-purple-100 text-[#7C3AED] flex items-center justify-center mb-2">
+                <Sparkles className="size-5" />
+              </div>
+              <DialogTitle className="text-base font-bold text-slate-950">
+                Buka Profil Pelamar (1 Token)
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Membuka profil pelamar inbound ini akan memotong 1 Token Rekruter. Anda akan mendapatkan akses penuh ke CV, portofolio, dan kontak kandidat, serta memicu evaluasi Role-Fit AI otomatis.
+              </DialogDescription>
+            </DialogHeader>
+
+            {unlockModalCandidate && (
+              <div className="space-y-3 py-2 text-xs">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Kandidat</span>
+                    <span className="font-semibold text-slate-900">{maskName(unlockModalCandidate.name)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Posisi Dilamar</span>
+                    <span className="font-semibold text-purple-700">{unlockModalCandidate.jobTitle || unlockModalCandidate.role}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Biaya Akses</span>
+                    <span className="font-bold text-amber-600">1 Token Rekruter</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Saldo Anda</span>
+                    <span className="font-semibold text-slate-700">{tokens ?? 0} Token Tersedia</span>
+                  </div>
+                </div>
+
+                {unlockModalCandidate.coverNote && (
+                  <div className="bg-purple-50/50 rounded-xl p-3 border border-purple-100">
+                    <p className="text-[11px] font-semibold text-purple-900 mb-1">Cuplikan Surat Lamaran:</p>
+                    <p className="text-[11px] text-slate-600 italic line-clamp-3 leading-relaxed">
+                      &ldquo;{unlockModalCandidate.coverNote}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={isUnlocking}
+                onClick={() => setUnlockModalCandidate(null)}
+                className="text-xs text-slate-600 hover:text-slate-900"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                disabled={isUnlocking || !unlockModalCandidate}
+                onClick={() => {
+                  if (unlockModalCandidate) {
+                    void handleUnlockCandidate(unlockModalCandidate);
+                  }
+                }}
+                className="text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold gap-1.5 shadow-2xs"
+              >
+                {isUnlocking ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Membuka Profil...
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="size-3.5" />
+                    Buka Profil Sekarang (1 Token)
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Schedule Interview Transition Modal (Screening -> Interview) */}
         <ScheduleInterviewTransitionModal
