@@ -106,6 +106,13 @@
       "when": 1790644331422,
       "tag": "0015_breezy_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790644400000,
+      "tag": "0016_restore_constraints_and_indexes",
+      "breakpoints": true
     }
   ]
 }
