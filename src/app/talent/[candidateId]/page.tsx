@@ -19,7 +19,6 @@ import {
 import { findCandidate } from "@/data/candidates";
 import { maskName } from "@/lib/candidate-display";
 import { UUID_RE, cn } from "@/lib/utils";
-import { saveDemoApplication } from "@/components/applications/application-ui";
 import { useApp } from "@/providers/app-provider";
 import type { AiSummary, Candidate, CandidatePersonality, ScreeningInsight, ScreeningResult } from "@/types";
 import {
@@ -546,16 +545,6 @@ export default function TalentProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
-  useEffect(() => {
-    const isUnlocked = scans.some((item) => item.candidateId === candidate?.id);
-    if (isUnlocked && dbMode && candidate?.id && UUID_RE.test(candidate.id)) {
-      fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidateProfileId: candidate.id }),
-      }).catch((err) => console.error("Auto sync application check failed", err));
-    }
-  }, [scans, dbMode, candidate?.id]);
 
   if (!hydrated || !user || user.role !== "recruiter")
     return (
@@ -622,49 +611,8 @@ export default function TalentProfile() {
       }
       setConfirmOpen(false);
 
-      {
-        const orgName = user?.companyName || "Perusahaan Mitra";
-        let resolvedJobId = "talent-pool";
-        let resolvedJobTitle = "Talent Pool";
-        try {
-          const demoAppKey = "proofylink-demo-applications-v1";
-          const rawApps = localStorage.getItem(demoAppKey);
-          if (rawApps) {
-            const apps = JSON.parse(rawApps);
-            if (Array.isArray(apps)) {
-              const found = apps.find(
-                (a: { id?: string; candidateProfileId?: string; jobId?: string; job?: { title?: string } }) =>
-                  a.id === `demo-app-${candidate.id}` || a.candidateProfileId === candidate.id
-              );
-              if (found && found.jobId && found.jobId !== "talent-pool") {
-                resolvedJobId = found.jobId;
-                resolvedJobTitle = found.job?.title || "Lowongan Terpilih";
-              }
-            }
-          }
-        } catch {}
-
-        saveDemoApplication({
-          id: `demo-app-${candidate.id}`,
-          jobId: resolvedJobId,
-          status: "screening",
-          coverNote: "Profil dibuka dan sedang dalam tahap screening awal melalui Talent Network.",
-          submittedAt: new Date().toISOString(),
-          withdrawnAt: null,
-          updatedAt: new Date().toISOString(),
-          job: {
-            id: resolvedJobId,
-            title: resolvedJobTitle,
-            organizationName: orgName,
-          },
-          candidate: {
-            name: candidate.name,
-            headline: candidate.role,
-            location: candidate.location,
-          },
-        });
-
-        // Ensure operations pipeline records candidate in Talent Pool or assigned job (screening stage)
+      // Record candidate into Talent Pool in demo recruiter operations
+      if (!dbMode) {
         try {
           const opsKey = "proofylink-demo-recruiter-operations";
           const opsRaw = localStorage.getItem(opsKey);
@@ -673,14 +621,12 @@ export default function TalentProfile() {
             if (opsParsed && Array.isArray(opsParsed.candidates)) {
               const existingIdx = opsParsed.candidates.findIndex((c: { id: string }) => c.id === candidate.id);
               if (existingIdx >= 0) {
-                // Keep in screening stage if currently in review/interview without actual scheduled interview
                 if (opsParsed.candidates[existingIdx].stage === "interview") {
                   opsParsed.candidates[existingIdx].stage = "screening";
                 }
-                // Hanya atur ke talent-pool jika kandidat belum memiliki lowongan aktif
                 if (!opsParsed.candidates[existingIdx].jobId) {
-                  opsParsed.candidates[existingIdx].jobId = resolvedJobId;
-                  opsParsed.candidates[existingIdx].jobTitle = resolvedJobTitle;
+                  opsParsed.candidates[existingIdx].jobId = "talent-pool";
+                  opsParsed.candidates[existingIdx].jobTitle = "Talent Pool";
                 }
               } else {
                 opsParsed.candidates.push({
@@ -707,15 +653,6 @@ export default function TalentProfile() {
         } catch {
           // ignore
         }
-      }
-
-      if (dbMode && UUID_RE.test(candidate.id)) {
-        // In dbMode, notify candidate in DB by creating/updating application review status
-        void fetch("/api/applications", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidateProfileId: candidate.id }),
-        }).catch(() => null);
       }
 
       const started = await startScreening(candidate.id);

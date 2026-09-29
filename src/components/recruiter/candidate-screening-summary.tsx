@@ -13,6 +13,7 @@ interface CandidateScreeningSummaryProps {
   feedback?: string;
   isUnlocked?: boolean;
   onUnlock?: () => void;
+  isTalentPool?: boolean;
 }
 
 export function CandidateScreeningSummary({
@@ -23,6 +24,7 @@ export function CandidateScreeningSummary({
   feedback,
   isUnlocked = true,
   onUnlock,
+  isTalentPool = false,
 }: CandidateScreeningSummaryProps) {
   const { screeningResults } = useApp();
   const savedResult = screeningResults[candidateId];
@@ -118,12 +120,16 @@ export function CandidateScreeningSummary({
     ? savedResult.insight.score >= 80
     : score >= 4.0;
 
-  const fitLabel = isHighFit ? "Sangat Sesuai" : "Terverifikasi AI";
+  const fitLabel = isTalentPool
+    ? (isHighFit ? "Sangat Baik" : "Baik")
+    : (isHighFit ? "Sangat Sesuai" : "Terverifikasi AI");
 
   const summaryText =
     savedResult?.summary?.summary ||
     (feedback && feedback.trim().length > 0
       ? feedback
+      : isTalentPool
+      ? `Portofolio dan riwayat pengalaman ${candidateName} menunjukkan keahlian yang solid di bidang ${role}.`
       : `Portofolio dan riwayat pengalaman ${candidateName} menunjukkan keselarasan yang kuat dengan kompetensi inti posisi ${role}.`);
 
   const strengths = savedResult?.summary?.strengths?.length
@@ -187,7 +193,7 @@ export function CandidateScreeningSummary({
         {/* Recommendation / Focus Areas */}
         <div className="rounded-lg border border-purple-100 bg-purple-50/50 p-2.5 space-y-1">
           <p className="text-[11px] font-semibold text-purple-900 flex items-center gap-1">
-            <HelpCircle className="size-3 text-[#7C3AED]" /> Fokus Evaluasi Wawancara:
+            <HelpCircle className="size-3 text-[#7C3AED]" /> {isTalentPool ? "Fokus Eksplorasi Keahlian:" : "Fokus Evaluasi Wawancara:"}
           </p>
           <ul className="space-y-0.5 text-[11px] text-purple-900/90 pl-4 list-disc">
             {focusAreas.map((area, i) => (

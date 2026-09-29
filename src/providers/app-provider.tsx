@@ -1034,14 +1034,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    if (supabaseConfigured && UUID_RE.test(id)) {
-      void fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidateProfileId: id }),
-      }).catch(() => {});
-    }
-
     setState((current) => ({
       ...current,
       tokens: current.tokens - 1,
