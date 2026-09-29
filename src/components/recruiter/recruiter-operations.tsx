@@ -2227,8 +2227,8 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
               </div>
             )}
 
-            {/* KPI Metric Strip (Only for /recruiter/operations, hidden on dedicated job pipeline) */}
-            {!isJobSpecificPipeline && (
+            {/* KPI Metric Strip (Only for /recruiter/operations active jobs, hidden on dedicated job pipeline and talent pool) */}
+            {!isJobSpecificPipeline && scopeFilter !== "pool" && (
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
                 <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
                   <span className="text-[11px] font-medium text-slate-500">Total Pelamar</span>
