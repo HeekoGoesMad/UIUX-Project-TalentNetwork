@@ -248,31 +248,9 @@ export async function findOrCreateApplicationForCandidate(
     return existing;
   }
 
-  let targetJobId = input.jobId;
+  const targetJobId = input.jobId;
   if (!targetJobId) {
-    const [firstJob] = await db
-      .select({ id: schema.jobs.id })
-      .from(schema.jobs)
-      .where(eq(schema.jobs.organizationId, input.organizationId))
-      .limit(1);
-
-    if (firstJob) {
-      targetJobId = firstJob.id;
-    } else {
-      const [newJob] = await db
-        .insert(schema.jobs)
-        .values({
-          organizationId: input.organizationId,
-          createdBy: input.recruiterUserId,
-          title: "Talent Network Candidate",
-          description: "Posisi yang dibuka untuk kandidat dari ProofyLink Talent Network.",
-          employmentType: "full_time",
-          workArrangement: "remote",
-          status: "published",
-        })
-        .returning();
-      targetJobId = newJob.id;
-    }
+    throw new Error("Job ID diperlukan untuk menugaskan kandidat ke lowongan kerja.");
   }
 
   const [created] = await db

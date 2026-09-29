@@ -18,7 +18,7 @@ const createSchema = z.object({
 
 const recruiterAssignSchema = z.object({
   candidateProfileId: uuid,
-  jobId: uuid.optional(),
+  jobId: uuid,
 });
 
 const paginationSchema = z.object({
