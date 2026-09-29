@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -151,11 +149,16 @@ export function CandidateDetailDrawer({
   onOpenScheduleModal,
   onUnlockCandidate,
 }: CandidateDetailDrawerProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "interview" | "offer" | "notes">("overview");
-  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackCandidateId, setFeedbackCandidateId] = useState<string | null>(null);
+  const [userFeedbackOverride, setUserFeedbackOverride] = useState<string | null>(null);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [sendingInterviewId, setSendingInterviewId] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
+
+  const feedbackText =
+    userFeedbackOverride !== null && feedbackCandidateId === candidate?.id
+      ? userFeedbackOverride
+      : (candidate?.feedback || "");
 
   // Administrative Revoke Modal (HR Escape Hatch for Hired candidates)
   const [revokeModalOpen, setRevokeModalOpen] = useState(false);
@@ -173,6 +176,7 @@ export function CandidateDetailDrawer({
   const [isAddingInterview, setIsAddingInterview] = useState(false);
   const [showPastInterviews, setShowPastInterviews] = useState(false);
   const [copiedBrief, setCopiedBrief] = useState(false);
+
   const candidateInterviews = useMemo(() => {
     if (!candidate) return [];
     return interviews
@@ -196,9 +200,7 @@ export function CandidateDetailDrawer({
 
   const isHired = candidate.stage === "hired";
   const isOfferOrAbove = candidate.stage === "offer" || candidate.stage === "hired";
-
-  // When candidate is Hired, only overview and notes tabs are accessible
-  const effectiveTab = isHired && (activeTab === "interview" || activeTab === "offer") ? "overview" : activeTab;
+  const isPoolCandidate = !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
 
   const handleSaveFeedback = () => {
     setIsSavingFeedback(true);
@@ -400,7 +402,7 @@ export function CandidateDetailDrawer({
               </div>
             )}
 
-            {/* Interactive Visual Stage Stepper or Rejection / Locked Banner */}
+            {/* Interactive Visual Stage Stepper or Rejection / Locked / Talent Pool Banner */}
             {candidate.unlocked === false ? (
               <div className="mt-3.5 flex items-center justify-between p-3 rounded-xl border border-purple-200 bg-purple-50/70">
                 <span className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
@@ -408,6 +410,16 @@ export function CandidateDetailDrawer({
                   Status: Inbound Triage (Terkunci)
                 </span>
                 <span className="text-[11px] text-purple-700 font-medium">Buka profil untuk memproses tahap</span>
+              </div>
+            ) : isPoolCandidate ? (
+              <div className="mt-3.5 p-3 rounded-xl border border-purple-200 bg-purple-50/60 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="size-4 text-[#7C3AED]" />
+                  <div>
+                    <p className="text-xs font-bold text-purple-950">Talent Pool (Belum Ada Lowongan)</p>
+                    <p className="text-[11px] text-purple-700">Tugaskan kandidat ke lowongan aktif untuk memulai alur seleksi.</p>
+                  </div>
+                </div>
               </div>
             ) : candidate.stage === "rejected" ? (
               <div className="mt-3.5 p-3 rounded-xl border border-rose-200 bg-rose-50/70 flex items-center justify-between gap-3">
@@ -483,8 +495,6 @@ export function CandidateDetailDrawer({
                           }
                           if (step.id !== candidate.stage) {
                             onStageChange(candidate.id, step.id as Stage);
-                            if (step.id === "interview") setActiveTab("interview");
-                            if (step.id === "offer") setActiveTab("offer");
                             toast.success(`Kandidat dipindahkan ke tahap ${step.label}.`);
                           }
                         }}
@@ -537,7 +547,7 @@ export function CandidateDetailDrawer({
                   variant="outline"
                   className={cn(
                     "h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50 hover:text-[#6D28D9] gap-1.5",
-                    isOfferOrAbove || candidate.stage === "rejected" ? "flex-1" : "flex-1"
+                    isPoolCandidate || isOfferOrAbove || candidate.stage === "rejected" ? "flex-1" : "flex-1"
                   )}
                 >
                   <Link href={`/messages/${candidate.id}?contact=${encodeURIComponent(candidate.name)}`}>
@@ -562,8 +572,8 @@ export function CandidateDetailDrawer({
                   <span>{copiedBrief ? "Tersalin" : "Salin Brief"}</span>
                 </Button>
 
-                {/* Buat Penawaran only visible if candidate is not in offer, hired, or rejected */}
-                {!isOfferOrAbove && candidate.stage !== "rejected" && (
+                {/* Buat Penawaran only visible if candidate is in active job and not in offer, hired, or rejected */}
+                {!isPoolCandidate && !isOfferOrAbove && candidate.stage !== "rejected" && (
                   <Button
                     size="sm"
                     className="flex-1 h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1.5"
@@ -576,130 +586,13 @@ export function CandidateDetailDrawer({
             )}
           </div>
 
-          {/* Tab Navigation (When Hired: Only Overview and Notes) */}
-          <div className="flex border-b border-slate-200 px-6 bg-white gap-6">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={cn(
-                "py-3 text-xs font-semibold border-b-2 transition-colors",
-                effectiveTab === "overview"
-                  ? "border-[#7C3AED] text-[#7C3AED]"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              )}
-            >
-              Ringkasan
-            </button>
-
-            {!isHired && (
-              <>
-                <button
-                  onClick={() => setActiveTab("interview")}
-                  className={cn(
-                    "py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5",
-                    effectiveTab === "interview"
-                      ? "border-[#7C3AED] text-[#7C3AED]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  Wawancara
-                  {latestInterview && (
-                    <span
-                      className={cn(
-                        "size-2 rounded-full",
-                        latestInterview.status === "Permintaan Reschedule" || latestInterview.status === "reschedule_requested"
-                          ? "bg-amber-500"
-                          : latestInterview.status === "Ditolak Kandidat" || latestInterview.status === "declined"
-                          ? "bg-amber-600"
-                          : latestInterview.status === "Terjadwal (Terkonfirmasi)" || latestInterview.status === "confirmed"
-                          ? "bg-emerald-500"
-                          : latestInterview.status === "Selesai" || latestInterview.status === "Dibatalkan"
-                          ? "bg-slate-400"
-                          : "bg-[#7C3AED]"
-                      )}
-                    />
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab("offer")}
-                  className={cn(
-                    "py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5",
-                    effectiveTab === "offer"
-                      ? "border-[#7C3AED] text-[#7C3AED]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  Penawaran
-                  {candidate.offerStatus !== "draft" && (
-                    <span className="size-2 rounded-full bg-emerald-500" />
-                  )}
-                </button>
-              </>
-            )}
-
-            <button
-              onClick={() => setActiveTab("notes")}
-              className={cn(
-                "py-3 text-xs font-semibold border-b-2 transition-colors",
-                effectiveTab === "notes"
-                  ? "border-[#7C3AED] text-[#7C3AED]"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              )}
-            >
-              Catatan &amp; Riwayat
-            </button>
-          </div>
-
-          {/* Body Content */}
+          {/* Body Content: Clean Single-Flow Section Driven by Status */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* OVERVIEW TAB */}
-            {effectiveTab === "overview" && (
+            {/* 1. STATUS-DRIVEN PRIMARY CONTENT */}
+            {isPoolCandidate ? (
+              /* TALENT POOL MODE: Ringkasan Saja */
               <div className="space-y-5">
-                {/* SLA Triage Indicator */}
-                {(() => {
-                  const days = getDaysInCurrentStage(candidate);
-                  const isScreening = candidate.stage === "screening";
-                  if (!isScreening || days < 3) return null;
-                  const isOverdue = days >= 5;
-
-                  return (
-                    <div
-                      className={cn(
-                        "rounded-xl border p-3.5 text-xs flex items-start gap-3",
-                        isOverdue
-                          ? "bg-rose-50/90 border-rose-200 text-rose-900 shadow-2xs"
-                          : "bg-amber-50/90 border-amber-200 text-amber-900 shadow-2xs"
-                      )}
-                    >
-                      {isOverdue ? (
-                        <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
-                      ) : (
-                        <Clock className="size-4 text-amber-600 shrink-0 mt-0.5" />
-                      )}
-                      <div className="space-y-1">
-                        <p className="font-bold flex items-center gap-1.5">
-                          {isOverdue ? "Peringatan SLA Terlewat" : "Mendekati Batas SLA"}
-                          <span
-                            className={cn(
-                              "text-[10px] px-1.5 py-0.2 rounded-full font-semibold",
-                              isOverdue
-                                ? "bg-rose-200/80 text-rose-800"
-                                : "bg-amber-200/80 text-amber-800"
-                            )}
-                          >
-                            {days} hari di antrean
-                          </span>
-                        </p>
-                        <p className="text-[11px] leading-relaxed opacity-90">
-                          {isOverdue
-                            ? "Lamaran kandidat ini telah melampaui estimasi standar peninjauan 3–5 hari kerja. Segera lakukan evaluasi profil atau putuskan kelanjutan ke tahap berikutnya."
-                            : "Lamaran ini telah berada di antrean screening selama 3 hari. Segera tinjau untuk menjaga SLA respons kepada kandidat."}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 1. INFORMASI PELAMAR */}
+                {/* Informasi Pelamar */}
                 <Card className="border-slate-200 shadow-2xs">
                   <CardContent className="p-4 space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Informasi Pelamar</h3>
@@ -712,14 +605,14 @@ export function CandidateDetailDrawer({
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500">Tahap Saat Ini</p>
-                        <p className="font-semibold text-[#7C3AED] capitalize mt-0.5">
-                          {candidate.stage}
-                        </p>
+                        <p className="text-slate-500">Status Penempatan</p>
+                        <span className="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-[#7C3AED] mt-0.5">
+                          Talent Pool
+                        </span>
                       </div>
                       <div>
-                        <p className="text-slate-500">Tanggal Melamar</p>
-                        <p className="font-medium text-slate-800 mt-0.5">{candidate.appliedAt}</p>
+                        <p className="text-slate-500">Waktu Masuk Pool</p>
+                        <p className="font-medium text-slate-800 mt-0.5">{candidate.appliedAt || "Baru saja"}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">Penanggung Jawab</p>
@@ -741,17 +634,11 @@ export function CandidateDetailDrawer({
                         </p>
                       </div>
 
-
                       {/* Lowongan / Talent Pool Assignment */}
                       <div className="col-span-2 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
                         <div>
-                          <p className="text-slate-500 text-[11px]">Lowongan Pekerjaan</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <Briefcase className="size-3.5 text-slate-400" />
-                            <span className="font-semibold text-slate-800 text-xs">
-                              {candidate.jobTitle || (candidate.jobId && candidate.jobId !== "talent-pool" ? "Lowongan Terpilih" : "Talent Pool")}
-                            </span>
-                          </div>
+                          <p className="text-slate-500 text-[11px]">Tugaskan ke Lowongan</p>
+                          <p className="text-[10px] text-slate-400">Pilih lowongan untuk memindahkan ke pipeline aktif</p>
                         </div>
 
                         {availableJobs && availableJobs.length > 0 && onAssignJob && (
@@ -797,7 +684,7 @@ export function CandidateDetailDrawer({
                   </Card>
                 )}
 
-                {/* 2. RINGKASAN HASIL AI SCREENING (Merged from /recruiter/screenings) */}
+                {/* Ringkasan Hasil AI Screening */}
                 <CandidateScreeningSummary
                   candidateId={candidate.id}
                   candidateName={candidate.name}
@@ -806,154 +693,218 @@ export function CandidateDetailDrawer({
                   feedback={candidate.feedback}
                   isUnlocked={candidate.unlocked !== false}
                   onUnlock={() => onUnlockCandidate?.(candidate)}
+                  isTalentPool={true}
                 />
 
-                {/* 3. AKSI LANJUTAN REKRUTER (Context-Aware) */}
+                {/* Panduan Talent Pool */}
+                <div className="rounded-xl border border-purple-200/80 bg-purple-50/40 p-4 space-y-1.5">
+                  <h4 className="text-xs font-bold text-purple-950">Panduan Talent Pool</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Kandidat berada dalam basis talenta umum. Ketika ada posisi baru yang cocok, tugaskan kandidat ke lowongan tersebut untuk memulai alur screening, wawancara, dan penawaran.
+                  </p>
+                </div>
+              </div>
+            ) : candidate.stage === "screening" ? (
+              /* SCREENING: Ringkasan Saja */
+              <div className="space-y-5">
+                {/* SLA Triage Indicator */}
+                {(() => {
+                  const days = getDaysInCurrentStage(candidate);
+                  if (days < 3) return null;
+                  const isOverdue = days >= 5;
+
+                  return (
+                    <div
+                      className={cn(
+                        "rounded-xl border p-3.5 text-xs flex items-start gap-3",
+                        isOverdue
+                          ? "bg-rose-50/90 border-rose-200 text-rose-900 shadow-2xs"
+                          : "bg-amber-50/90 border-amber-200 text-amber-900 shadow-2xs"
+                      )}
+                    >
+                      {isOverdue ? (
+                        <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <Clock className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <div className="space-y-1">
+                        <p className="font-bold flex items-center gap-1.5">
+                          {isOverdue ? "Peringatan SLA Terlewat" : "Mendekati Batas SLA"}
+                          <span
+                            className={cn(
+                              "text-[10px] px-1.5 py-0.2 rounded-full font-semibold",
+                              isOverdue
+                                ? "bg-rose-200/80 text-rose-800"
+                                : "bg-amber-200/80 text-amber-800"
+                            )}
+                          >
+                            {days} hari di antrean
+                          </span>
+                        </p>
+                        <p className="text-[11px] leading-relaxed opacity-90">
+                          {isOverdue
+                            ? "Lamaran kandidat ini telah melampaui estimasi standar peninjauan 3–5 hari kerja. Segera lakukan evaluasi profil atau putuskan kelanjutan ke tahap berikutnya."
+                            : "Lamaran ini telah berada di antrean screening selama 3 hari. Segera tinjau untuk menjaga SLA respons kepada kandidat."}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Informasi Pelamar */}
+                <Card className="border-slate-200 shadow-2xs">
+                  <CardContent className="p-4 space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Informasi Pelamar</h3>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-slate-500">Lokasi</p>
+                        <p className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <MapPin className="size-3.5 text-slate-400" />
+                          {candidate.location}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Tahap Saat Ini</p>
+                        <p className="font-semibold text-[#7C3AED] capitalize mt-0.5">
+                          Screening
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Tanggal Melamar</p>
+                        <p className="font-medium text-slate-800 mt-0.5">{candidate.appliedAt}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Penanggung Jawab</p>
+                        <p className="font-medium text-slate-800 mt-0.5">{candidate.owner}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Ekspektasi Kompensasi</p>
+                        <p className="font-semibold text-emerald-700 mt-0.5">
+                          {candidate.expectedSalary
+                            ? `Rp ${Number(candidate.expectedSalary).toLocaleString("id-ID")} / bln`
+                            : candidate.compensation || "Rp 15.000.000 / bulan"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Ketersediaan Kerja</p>
+                        <p className="font-semibold text-purple-700 mt-0.5 flex items-center gap-1">
+                          <CalendarClock className="size-3.5 text-purple-500 shrink-0" />
+                          <span>{candidate.availability || "Fleksibel / Sesuai Kesepakatan"}</span>
+                        </p>
+                      </div>
+
+                      {/* Lowongan Pekerjaan */}
+                      <div className="col-span-2 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-slate-500 text-[11px]">Lowongan Pekerjaan</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Briefcase className="size-3.5 text-slate-400" />
+                            <span className="font-semibold text-slate-800 text-xs">
+                              {candidate.jobTitle || "Lowongan Terpilih"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {availableJobs && availableJobs.length > 0 && onAssignJob && (
+                          <select
+                            value={candidate.jobId || "talent-pool"}
+                            onChange={(e) => {
+                              const targetVal = e.target.value;
+                              if (targetVal === "talent-pool") {
+                                onAssignJob(candidate.id, "talent-pool", "Talent Pool");
+                              } else {
+                                const found = availableJobs.find((j) => j.id === targetVal);
+                                if (found) {
+                                  onAssignJob(candidate.id, found.id, found.title);
+                                }
+                              }
+                            }}
+                            className="text-xs rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden cursor-pointer"
+                          >
+                            <option value="talent-pool">Pindahkan ke Talent Pool</option>
+                            {availableJobs.map((job) => (
+                              <option key={job.id} value={job.id}>
+                                {job.title}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Cover Note */}
+                {candidate.coverNote && (
+                  <Card className="border-purple-200/80 bg-purple-50/20">
+                    <CardContent className="p-4 space-y-1.5">
+                      <h4 className="text-xs font-bold text-purple-950">
+                        Surat Lamaran / Cover Note
+                      </h4>
+                      <p className="text-xs text-slate-700 leading-relaxed italic whitespace-pre-line">
+                        &ldquo;{candidate.coverNote}&rdquo;
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Ringkasan Hasil AI Screening */}
+                <CandidateScreeningSummary
+                  candidateId={candidate.id}
+                  candidateName={candidate.name}
+                  role={candidate.role}
+                  score={candidate.score}
+                  feedback={candidate.feedback}
+                  isUnlocked={candidate.unlocked !== false}
+                  onUnlock={() => onUnlockCandidate?.(candidate)}
+                  isTalentPool={false}
+                />
+
+                {/* Aksi Lanjutan Rekruter */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
                   <h4 className="text-xs font-semibold text-slate-800">Aksi Lanjutan Rekruter</h4>
-
                   {candidate.unlocked === false ? (
                     <div className="flex items-center gap-2.5 text-xs text-slate-500 bg-white border border-slate-200/80 rounded-lg p-2.5">
                       <Lock className="size-3.5 text-purple-600 shrink-0" />
                       <span>
-                        Fitur kontak langsung, penjadwalan wawancara, dan penerbitan surat penawaran akan aktif setelah profil dibuka melalui kartu aksi di atas.
+                        Fitur kontak langsung, penjadwalan wawancara, dan penerbitan surat penawaran akan aktif setelah profil dibuka.
                       </span>
                     </div>
                   ) : (
                     <>
-                      {candidate.stage === "screening" && (
-                        <>
-                          <p className="text-xs text-slate-500">
-                            {!candidate.jobId || candidate.jobId === "talent-pool"
-                              ? "Kandidat berada di Talent Pool. Tugaskan ke salah satu lowongan aktif terlebih dahulu untuk memulai tahapan seleksi."
-                              : "Kandidat memenuhi kualifikasi awal. Lanjutkan ke sesi wawancara atau terbitkan surat penawaran."}
-                          </p>
-                          <div className="pt-2 flex flex-wrap gap-2">
-                            {candidate.jobId && candidate.jobId !== "talent-pool" && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-8 font-medium bg-white text-slate-700"
-                                  onClick={() => setActiveTab("interview")}
-                                >
-                                  <Calendar className="size-3.5 mr-1 text-purple-600" /> Atur Sesi Wawancara
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-8 font-medium bg-white text-[#7C3AED] border-purple-200 hover:bg-purple-50"
-                                  onClick={() => onOpenOfferModal(candidate)}
-                                >
-                                  <DollarSign className="size-3.5 mr-1" /> Terbitkan Penawaran
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                  {candidate.stage === "interview" && (
-                    <>
-                      {interviews.filter((i) => i.candidateId === candidate.id).some((iv) => iv.status === "Ditolak Kandidat" || iv.status === "declined") ? (
-                        <>
-                          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-900 space-y-1">
-                            <p className="font-semibold text-slate-800">
-                              Sesi Wawancara Ditolak Kandidat
-                            </p>
-                            <p className="text-[11px] text-slate-600">
-                              Kandidat berhalangan hadir pada jadwal yang diajukan. Lamaran tetap aktif. Anda dapat menjadwalkan ulang atau mengembalikan kandidat ke tahap screening.
-                            </p>
-                          </div>
-                          <div className="pt-2 flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                              onClick={() => {
-                                if (onOpenScheduleModal) onOpenScheduleModal(candidate);
-                              }}
-                            >
-                              <CalendarClock className="size-3.5 mr-1" /> Jadwalkan Ulang
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8 font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-                              onClick={() => {
-                                onStageChange(candidate.id, "screening", {
-                                  reason: "Dikembalikan ke tahap screening setelah penolakan sesi wawancara.",
-                                });
-                                toast.info("Kandidat dikembalikan ke tahap Screening.");
-                              }}
-                            >
-                              <ArrowLeft className="size-3.5 mr-1" /> Kembalikan ke Screening
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs text-slate-500">
-                            Kandidat sedang dalam proses wawancara. Terbitkan surat penawaran resmi jika dinyatakan lolos.
-                          </p>
-                          <div className="pt-2 flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                              onClick={() => onOpenOfferModal(candidate)}
-                            >
-                              <DollarSign className="size-3.5 mr-1" /> Terbitkan Surat Penawaran
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8 font-medium bg-white text-slate-700"
-                              onClick={() => setActiveTab("interview")}
-                            >
-                              <Clock className="size-3.5 mr-1 text-purple-600" /> Lihat Jadwal Wawancara
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-
-                  {candidate.stage === "offer" && (
-                    <>
                       <p className="text-xs text-slate-500">
-                        Surat penawaran telah diterbitkan. Konfirmasi penerimaan kandidat setelah penawaran disepakati.
+                        Kandidat memenuhi kualifikasi awal. Lanjutkan ke sesi wawancara atau terbitkan surat penawaran.
                       </p>
                       <div className="pt-2 flex flex-wrap gap-2">
                         <Button
                           size="sm"
-                          className="text-xs h-8 font-medium bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => onStageChange(candidate.id, "hired")}
+                          variant="outline"
+                          className="text-xs h-8 font-medium bg-white text-slate-700"
+                          onClick={() => {
+                            if (onOpenScheduleModal) {
+                              onOpenScheduleModal(candidate);
+                            } else {
+                              onStageChange(candidate.id, "interview");
+                            }
+                          }}
                         >
-                          <CheckCircle2 className="size-3.5 mr-1" /> Konfirmasi Penerimaan (Tandai Hired)
+                          <Calendar className="size-3.5 mr-1 text-purple-600" /> Atur Sesi Wawancara
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8 font-medium bg-white text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                          onClick={() => onOpenOfferModal(candidate)}
+                        >
+                          <DollarSign className="size-3.5 mr-1" /> Terbitkan Penawaran
                         </Button>
                       </div>
                     </>
                   )}
-
-                  {candidate.stage === "hired" && (
-                    <div className="pt-1 flex items-center gap-2 text-xs text-emerald-800 font-medium">
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-                      <span>Proses rekrutmen selesai. Kandidat resmi diterima dan siap untuk onboarding.</span>
-                    </div>
-                  )}
-
-                  {candidate.stage === "rejected" && (
-                    <p className="text-xs text-slate-500">
-                      Kandidat ditandai tidak lolos untuk posisi ini.
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
+                </div>
               </div>
-            )}
-
-            {/* INTERVIEWS TAB */}
-            {effectiveTab === "interview" && (
+            ) : candidate.stage === "interview" ? (
+              /* INTERVIEW: Detail & Form Wawancara */
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Jadwal Sesi Wawancara</h3>
@@ -969,12 +920,12 @@ export function CandidateDetailDrawer({
                     <Calendar className="size-8 text-slate-300 mx-auto" />
                     <p className="text-xs font-semibold text-slate-700 mt-2">Belum ada sesi wawancara</p>
                     <p className="text-xs text-slate-400 mt-1">
-                      {isOfferOrAbove ? "Tahap wawancara telah selesai." : "Buat jadwal baru di formulir bawah ini."}
+                      Buat jadwal wawancara baru melalui formulir di bawah.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Only Render The Latest Single Interview Session */}
+                    {/* Render The Latest Single Interview Session */}
                     {(() => {
                       const iv = latestInterview;
                       const isPastDate = Boolean(iv.date && !isNaN(new Date(iv.date).getTime()) && new Date(iv.date).getTime() < now);
@@ -1095,12 +1046,10 @@ export function CandidateDetailDrawer({
                                     variant="outline"
                                     className="h-7 text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                                     onClick={() => {
-                                      if (candidate) {
-                                        onStageChange(candidate.id, "screening", {
-                                          reason: "Dikembalikan ke tahap screening setelah penolakan sesi wawancara.",
-                                        });
-                                        toast.info("Kandidat dipindahkan kembali ke tahap Screening.");
-                                      }
+                                      onStageChange(candidate.id, "screening", {
+                                        reason: "Dikembalikan ke tahap screening setelah penolakan sesi wawancara.",
+                                      });
+                                      toast.info("Kandidat dipindahkan kembali ke tahap Screening.");
                                     }}
                                   >
                                     <ArrowLeft className="size-3.5 mr-1" /> Kembalikan ke Screening
@@ -1220,73 +1169,82 @@ export function CandidateDetailDrawer({
                   </div>
                 )}
 
-                {/* Form Tambah Wawancara Cepat: Hidden if candidate is in Offer or Hired */}
-                {!isOfferOrAbove ? (
-                  <Card className="border-slate-200 bg-slate-50/70 shadow-2xs">
-                    <CardContent className="p-4">
-                      <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                        <Calendar className="size-4 text-[#7C3AED]" /> Buat Jadwal Baru
-                      </h4>
-                      <form onSubmit={handleCreateInterview} className="space-y-3">
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                            Tipe Wawancara
-                          </label>
-                          <input
-                            type="text"
-                            value={newInterviewType}
-                            onChange={(e) => setNewInterviewType(e.target.value)}
-                            className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                            placeholder="mis. Wawancara Teknis / User"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                            Waktu &amp; Tanggal (WIB)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            value={newInterviewDate}
-                            onChange={(e) => setNewInterviewDate(e.target.value)}
-                            className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                            Tautan Video Meeting
-                          </label>
-                          <input
-                            type="url"
-                            value={newMeetingUrl}
-                            onChange={(e) => setNewMeetingUrl(e.target.value)}
-                            className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                            placeholder="https://meet.google.com/..."
-                            required
-                          />
-                        </div>
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={isAddingInterview}
-                          className="w-full h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                        >
-                          {isAddingInterview ? "Menyimpan..." : "Simpan Sesi Wawancara"}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500">
-                    Kandidat telah melampaui tahap wawancara. Penjadwalan baru tidak diperlukan.
-                  </div>
-                )}
-              </div>
-            )}
+                {/* Form Buat Jadwal Baru */}
+                <Card className="border-slate-200 bg-slate-50/70 shadow-2xs">
+                  <CardContent className="p-4">
+                    <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                      <Calendar className="size-4 text-[#7C3AED]" /> Buat Jadwal Baru
+                    </h4>
+                    <form onSubmit={handleCreateInterview} className="space-y-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          Tipe Wawancara
+                        </label>
+                        <input
+                          type="text"
+                          value={newInterviewType}
+                          onChange={(e) => setNewInterviewType(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                          placeholder="mis. Wawancara Teknis / User"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          Waktu &amp; Tanggal (WIB)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={newInterviewDate}
+                          onChange={(e) => setNewInterviewDate(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          Tautan Video Meeting
+                        </label>
+                        <input
+                          type="url"
+                          value={newMeetingUrl}
+                          onChange={(e) => setNewMeetingUrl(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                          placeholder="https://meet.google.com/..."
+                          required
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={isAddingInterview}
+                        className="w-full h-8 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                      >
+                        {isAddingInterview ? "Menyimpan..." : "Simpan Sesi Wawancara"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
 
-            {/* OFFERS TAB */}
-            {effectiveTab === "offer" && (
+                {/* Aksi Lanjutan Wawancara */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-slate-800">Aksi Lanjutan Wawancara</h4>
+                  <p className="text-xs text-slate-500">
+                    Kandidat sedang dalam proses wawancara. Terbitkan surat penawaran resmi jika dinyatakan lolos.
+                  </p>
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      className="text-xs h-8 font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                      onClick={() => onOpenOfferModal(candidate)}
+                    >
+                      <DollarSign className="size-3.5 mr-1" /> Terbitkan Surat Penawaran
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : candidate.stage === "offer" ? (
+              /* OFFER: Detail & Status Penawaran */
               <div className="space-y-5">
                 <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-2xs">
                   <div className="flex items-center justify-between">
@@ -1376,80 +1334,118 @@ export function CandidateDetailDrawer({
                   </div>
                 </div>
               </div>
+            ) : candidate.stage === "hired" ? (
+              /* HIRED: Rincian Penerimaan & Onboarding */
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2.5 text-emerald-800 font-bold text-sm">
+                    <CheckCircle2 className="size-5 text-emerald-600" />
+                    <span>Kandidat Resmi Diterima (Hired)</span>
+                  </div>
+                  <p className="text-xs text-emerald-700/90 leading-relaxed">
+                    Proses seleksi telah selesai secara sukses. Penawaran kerja telah disepakati dan kandidat siap dipersiapkan untuk hari pertama kerja (onboarding).
+                  </p>
+                  <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-xs text-emerald-900">
+                    <span className="text-emerald-700">Kompensasi Disepakati:</span>
+                    <span className="font-bold">{candidate.compensation || "Rp 15.000.000 / bulan"}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* REJECTED */
+              <div className="space-y-5">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4 space-y-2">
+                  <p className="text-xs font-bold text-rose-900">Kandidat Tidak Lolos (Arsip)</p>
+                  <p className="text-xs text-rose-700">
+                    Kandidat ini diarsipkan dari alur aktif lowongan. Anda dapat mengaktifkannya kembali ke tahap screening jika ada pertimbangan baru.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onStageChange(candidate.id, "screening")}
+                    className="h-8 text-xs font-semibold bg-white border-rose-300 text-rose-700 hover:bg-rose-100 gap-1.5 shadow-2xs mt-1"
+                  >
+                    <Undo2 className="size-3.5" /> Aktifkan Lagi ke Screening
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {/* NOTES & HISTORY TAB */}
-            {effectiveTab === "notes" && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                    Catatan Internal Rekruter
-                  </label>
-                  <textarea
-                    rows={4}
-                    defaultValue={candidate.feedback}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="Tuliskan catatan evaluasi, kelebihan, atau pertimbangan tim..."
-                    className="w-full text-xs rounded-xl border border-slate-300 p-3 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                  />
-                  <div className="mt-2 flex justify-end">
+            {/* 2. CATATAN & RIWAYAT (SELALU DI BAGIAN PALING BAWAH) */}
+            <div className="border-t border-slate-200/80 pt-6 mt-6 space-y-5">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Catatan Internal Rekruter
+                </label>
+                <textarea
+                  rows={3}
+                  value={feedbackText}
+                  onChange={(e) => {
+                    if (candidate) {
+                      setFeedbackCandidateId(candidate.id);
+                      setUserFeedbackOverride(e.target.value);
+                    }
+                  }}
+                  placeholder="Tuliskan catatan evaluasi, kelebihan, atau pertimbangan tim..."
+                  className="w-full text-xs rounded-xl border border-slate-300 p-3 bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    size="sm"
+                    className="text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white"
+                    onClick={handleSaveFeedback}
+                    disabled={isSavingFeedback}
+                  >
+                    {isSavingFeedback ? "Menyimpan..." : "Simpan Catatan"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <GitCommit className="size-3.5 text-[#7C3AED]" />
+                    Riwayat Status &amp; Milestone
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-medium">Git Timeline View</span>
+                </div>
+
+                <CandidateStatusGitGraph
+                  history={candidate.statusHistory || getDefaultStatusHistory(candidate, recruiterName)}
+                  appliedAt={candidate.appliedAt}
+                  dueDate={candidate.dueDate}
+                  currentStage={candidate.stage}
+                />
+              </div>
+
+              {/* Administrative Escape Hatch (Only when Hired) */}
+              {isHired && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="rounded-xl border border-red-200 bg-red-50/50 p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-red-900">
+                        <ShieldAlert className="size-4 text-red-600" />
+                        <span>Tindakan Administratif (Khusus HRD)</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] bg-red-100/60 text-red-700 border-red-200">
+                        Otoritas Khusus
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-red-800/80 leading-relaxed">
+                      Gunakan tindakan ini jika kandidat membatalkan penawaran sebelum hari pertama kerja (renege) atau terjadi pembatalan penugasan resmi.
+                    </p>
                     <Button
+                      variant="outline"
                       size="sm"
-                      className="text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white"
-                      onClick={handleSaveFeedback}
-                      disabled={isSavingFeedback}
+                      className="text-xs font-semibold text-red-700 border-red-300 hover:bg-red-100/60 h-8 gap-1.5"
+                      onClick={() => setRevokeModalOpen(true)}
                     >
-                      {isSavingFeedback ? "Menyimpan..." : "Simpan Catatan"}
+                      <Undo2 className="size-3.5" /> Batalkan Penerimaan (Renege)
                     </Button>
                   </div>
                 </div>
-
-                <div className="border-t border-slate-200 pt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <GitCommit className="size-3.5 text-[#7C3AED]" />
-                      Riwayat Status & Milestone
-                    </h4>
-                    <span className="text-[10px] text-slate-400 font-medium">Git Timeline View</span>
-                  </div>
-
-                  <CandidateStatusGitGraph
-                    history={candidate.statusHistory || getDefaultStatusHistory(candidate, recruiterName)}
-                    appliedAt={candidate.appliedAt}
-                    dueDate={candidate.dueDate}
-                    currentStage={candidate.stage}
-                  />
-                </div>
-
-                {/* Administrative Escape Hatch (Only when Hired) */}
-                {isHired && (
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    <div className="rounded-xl border border-red-200 bg-red-50/50 p-3.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-red-900">
-                          <ShieldAlert className="size-4 text-red-600" />
-                          <span>Tindakan Administratif (Khusus HRD)</span>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] bg-red-100/60 text-red-700 border-red-200">
-                          Otoritas Khusus
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-red-800/80 leading-relaxed">
-                        Gunakan tindakan ini jika kandidat membatalkan penawaran sebelum hari pertama kerja (renege) atau terjadi pembatalan penugasan resmi.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs font-semibold text-red-700 border-red-300 hover:bg-red-100/60 h-8 gap-1.5"
-                        onClick={() => setRevokeModalOpen(true)}
-                      >
-                        <Undo2 className="size-3.5" /> Batalkan Penerimaan (Renege)
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

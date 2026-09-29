@@ -91,6 +91,8 @@ export type Candidate = {
   coverNote?: string | null;
   expectedSalary?: number | null;
   availability?: string | null;
+  skills?: string[];
+  matchScore?: number;
 };
 
 
@@ -435,7 +437,7 @@ export function validateCandidateStageTransition(
 }
 
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
-  const { dbMode, scans, user, reloadBootstrap, tokens } = useApp();
+  const { dbMode, scans, user, reloadBootstrap, tokens, screeningResults } = useApp();
   const isJobSpecificPipeline = Boolean(initialJobId && initialJobId !== "talent-pool");
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
@@ -2468,11 +2470,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
               <div className="p-4 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Sparkles className="size-4 text-[#7C3AED]" />
                     <span>Daftar Talenta di Talent Pool</span>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                      {filteredCandidates.length} talenta
-                    </span>
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Kandidat yang telah dibuka profilnya melalui fitur Sourcing / Cari Talent. Siap ditugaskan ke lowongan aktif kapan saja.
@@ -2603,13 +2601,67 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                               )}
                             </td>
                             <td className="px-4 py-3.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-800 text-xs">Skor: {candidate.score || 4.5}</span>
-                                <span className="text-[10px] text-slate-400">/ 5.0</span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 line-clamp-1 max-w-[260px] mt-0.5">
-                                {candidate.feedback || "Profil siap ditinjau dan ditugaskan ke lowongan."}
-                              </p>
+                              {(() => {
+                                const cachedScreening = screeningResults ? screeningResults[candidate.id] : undefined;
+                                const isHighQuality = cachedScreening?.insight?.score
+                                  ? cachedScreening.insight.score >= 80
+                                  : (candidate.score ? candidate.score >= 4.0 : true);
+                                
+                                const qualityLabel = isHighQuality ? "Sangat Baik" : "Baik";
+                                const qualityColor = isHighQuality
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-purple-50 text-[#7C3AED] border-purple-200";
+
+                                const candidateSkills = candidate.skills && candidate.skills.length > 0
+                                  ? candidate.skills.slice(0, 3)
+                                  : ["Analisis Data", "Problem Solving", "Kolaborasi Tim"];
+
+                                const evalSummary =
+                                  cachedScreening?.summary?.summary ||
+                                  (candidate.feedback && !candidate.feedback.includes("Skor:") && candidate.feedback.trim().length > 0
+                                    ? candidate.feedback
+                                    : `Portofolio dan riwayat ${candidate.role} terverifikasi dengan kompetensi yang solid.`);
+
+                                return (
+                                  <div className="space-y-1.5 max-w-[280px]">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                          qualityColor
+                                        )}
+                                      >
+                                        {qualityLabel}
+                                      </span>
+                                      {cachedScreening && (
+                                        <span className="text-[10px] text-slate-400 font-medium">
+                                          Screening Tersimpan
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Skills Badges */}
+                                    <div className="flex flex-wrap gap-1">
+                                      {candidateSkills.map((sk) => (
+                                        <span
+                                          key={sk}
+                                          className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium border border-slate-200/80"
+                                        >
+                                          {sk}
+                                        </span>
+                                      ))}
+                                    </div>
+
+                                    {/* Qualitative Summary */}
+                                    <p
+                                      className="text-[11px] text-slate-500 line-clamp-1 leading-snug"
+                                      title={evalSummary}
+                                    >
+                                      {evalSummary}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3.5 text-slate-600">
                               <span className="inline-flex items-center gap-1 text-slate-600 text-[11px]">
