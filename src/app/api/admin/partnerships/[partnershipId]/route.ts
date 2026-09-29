@@ -15,9 +15,6 @@ const updatePartnershipSchema = z
       .enum(["pending", "approved", "need_revision", "rejected"])
       .optional(),
     verificationNotes: z.string().trim().max(1000).optional().nullable(),
-    location: z.string().trim().optional().nullable(),
-    skNumber: z.string().trim().optional().nullable(),
-    skDocumentUrl: z.string().trim().optional().nullable(),
   })
   .strict();
 
@@ -61,9 +58,6 @@ export async function PATCH(
       updatePayload.reviewedAt = new Date();
     }
     if (data.verificationNotes !== undefined) updatePayload.verificationNotes = data.verificationNotes;
-    if (data.location !== undefined) updatePayload.location = data.location;
-    if (data.skNumber !== undefined) updatePayload.skNumber = data.skNumber;
-    if (data.skDocumentUrl !== undefined) updatePayload.skDocumentUrl = data.skDocumentUrl;
 
     const [updated] = await db
       .update(schema.partnerships)
