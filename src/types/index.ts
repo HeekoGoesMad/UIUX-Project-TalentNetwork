@@ -231,6 +231,29 @@ export type RecruiterOnboardingData = {
   verificationStatus: "draft" | "pending_review" | "verified" | "needs_revision";
 };
 
+export type PartnerOnboardingData = {
+  // Step 0: PIC Kemitraan
+  picName: string;
+  picTitle: string;
+  picEmail: string;
+  picPhone: string;
+  // Step 1: Profil Lembaga
+  institutionName: string;
+  institutionType: string;
+  province: string;
+  city: string;
+  officeAddress: string;
+  website: string;
+  description: string;
+  // Step 2: Surat SK & Legalitas
+  skNumber: string;
+  skFileName: string;
+  skFileSize?: string;
+  skDocumentUrl?: string;
+  // Step 3: Review & Pengajuan
+  confirmationAgreed: boolean;
+};
+
 export const CONSENT_STATE_BY_DB_STATUS: Record<string, ConsentState | undefined> = { pending: "pending-candidate-consent", approved: "consented", declined: "declined", revoked: "withdrawn", expired: "consent-expired" };
 
 export type CareerActivityCategory = "project" | "certification" | "leadership" | "skill_research";

@@ -9,6 +9,7 @@ import {
   Building2,
   CheckCircle2,
   Clock,
+  Eye,
   FileCheck,
   FileText,
   GraduationCap,
@@ -44,6 +45,40 @@ export default function PartnerPendingPage() {
   const [redirecting, setRedirecting] = useState(false);
   const [localStatus, setLocalStatus] = useState<ProvisioningStatus>(() => user?.provisioningStatus || "pending");
   const [partnershipData, setPartnershipData] = useState<PartnershipDetail | null>(null);
+  const [openingDoc, setOpeningDoc] = useState(false);
+
+  const handleOpenDoc = async () => {
+    if (!partnershipData?.skDocumentUrl) {
+      toast.info("Belum ada berkas fisik SK yang terlampir.");
+      return;
+    }
+
+    if (
+      partnershipData.skDocumentUrl.startsWith("http://") ||
+      partnershipData.skDocumentUrl.startsWith("https://") ||
+      partnershipData.skDocumentUrl.startsWith("/documents/")
+    ) {
+      window.open(partnershipData.skDocumentUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setOpeningDoc(true);
+    try {
+      const res = await fetch("/api/partner/legal-docs");
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else if (data.isMock) {
+        toast.info(data.message || "Dokumen diunggah dalam mode mock development.");
+      } else {
+        toast.error(data.message || "Gagal membuka dokumen.");
+      }
+    } catch {
+      toast.error("Gagal membuka dokumen.");
+    } finally {
+      setOpeningDoc(false);
+    }
+  };
 
   const status = localStatus || user?.provisioningStatus || "pending";
   const isApproved = status === "active";
@@ -452,9 +487,24 @@ export default function PartnerPendingPage() {
                   </span>
                 </div>
               </div>
-              <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium">
-                <Clock className="size-3 mr-1" /> Dalam Antrean Review
-              </Badge>
+              <div className="flex items-center gap-2">
+                {partnershipData?.skDocumentUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenDoc}
+                    disabled={openingDoc}
+                    className="h-7 text-xs gap-1 border-purple-200 bg-white hover:bg-purple-50 text-purple-900"
+                  >
+                    {openingDoc ? <Loader2 className="size-3 animate-spin" /> : <Eye className="size-3" />}
+                    Lihat
+                  </Button>
+                )}
+                <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium">
+                  <Clock className="size-3 mr-1" /> Dalam Antrean Review
+                </Badge>
+              </div>
             </div>
 
             {/* Manfaat kemitraan callout */}

@@ -16,10 +16,16 @@ import {
   GraduationCap,
   Loader2,
   AlertCircle,
+  Eye,
+  Trash2,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/app-provider";
+import { IndonesianPhoneInput } from "@/components/ui/phone-input";
+import { extractIndonesianLocalPhone } from "@/lib/utils";
+import type { PartnerOnboardingData } from "@/types";
 
 const partnerSteps = [
   { title: "Akun PIC Kemitraan", note: "Identitas perwakilan", icon: User },
@@ -96,42 +102,23 @@ function Intro({ title, text, children }: { title: string; text: string; childre
   );
 }
 
-export type PartnerOnboardingData = {
-  picName: string;
-  picTitle: string;
-  picEmail: string;
-  picPhone: string;
-  institutionName: string;
-  institutionType: string;
-  description: string;
-  province: string;
-  city: string;
-  officeAddress: string;
-  website: string;
-  skNumber: string;
-  skFileName: string;
-  skFileSize?: string;
-  skDocumentUrl?: string;
-  confirmationAgreed: boolean;
-};
-
 const defaultForm: PartnerOnboardingData = {
   picName: "",
-  picTitle: "Koordinator Career Center / Hubungan Industri",
+  picTitle: "",
   picEmail: "",
   picPhone: "",
   institutionName: "",
   institutionType: "Universitas Negeri (PTN)",
-  description: "Lembaga pendidikan tinggi penyedia talent berkualitas dan pusat pengembangan karier mahasiswa.",
+  description: "",
   province: "DKI Jakarta",
   city: "",
   officeAddress: "",
   website: "",
-  skNumber: "SK-DIKTI-2024/001",
-  skFileName: "SK_Kemitraan_Kampus.pdf",
-  skFileSize: "1.2 MB",
-  skDocumentUrl: "/documents/sample-sk-mitra.pdf",
-  confirmationAgreed: true,
+  skNumber: "",
+  skFileName: "",
+  skFileSize: "",
+  skDocumentUrl: "",
+  confirmationAgreed: false,
 };
 
 export function PartnerOnboarding() {
@@ -143,6 +130,8 @@ export function PartnerOnboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [revisionNotes, setRevisionNotes] = useState<string | null>(null);
+  const [uploadingSk, setUploadingSk] = useState(false);
+  const [openingDoc, setOpeningDoc] = useState(false);
   const skInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing data from API or draft
@@ -167,14 +156,19 @@ export function PartnerOnboarding() {
             setForm((prev) => ({
               ...prev,
               institutionName: p.name || prev.institutionName,
+              institutionType: p.institutionType || prev.institutionType,
+              officeAddress: p.officeAddress || prev.officeAddress,
+              website: p.website || prev.website,
+              description: p.description || prev.description,
               skNumber: p.skNumber || prev.skNumber,
               skDocumentUrl: p.skDocumentUrl || prev.skDocumentUrl,
-              skFileName: p.skDocumentUrl ? p.skDocumentUrl.split("/").pop() || "Surat_SK_Mitra.pdf" : prev.skFileName,
-              city: city || prev.city,
-              province: province || prev.province,
+              skFileName: p.skDocumentUrl ? p.skDocumentUrl.split("/").pop() || "Berkas_SK_Mitra.pdf" : prev.skFileName,
+              city: p.city || city || prev.city,
+              province: p.province || province || prev.province,
               picName: data.profile?.displayName || user?.name || prev.picName,
+              picTitle: p.picPosition || prev.picTitle,
               picEmail: user?.email || prev.picEmail,
-              picPhone: data.profile?.phone || prev.picPhone,
+              picPhone: p.picPhone || data.profile?.phone || prev.picPhone,
             }));
 
             if (p.verificationNotes) {
@@ -193,9 +187,9 @@ export function PartnerOnboarding() {
         if (active) {
           setForm((prev) => ({
             ...prev,
-            institutionName: prev.institutionName || user?.companyName || user?.name || "Universitas Indonesia",
+            institutionName: prev.institutionName || user?.companyName || "",
             picEmail: prev.picEmail || user?.email || "",
-            picName: prev.picName || user?.name || "Dr. Perwakilan Kampus",
+            picName: prev.picName || (user?.role === "partner" && user?.companyName ? "" : user?.name || ""),
           }));
           if (user?.provisioningReason) {
             setRevisionNotes(user.provisioningReason);
@@ -226,29 +220,89 @@ export function PartnerOnboarding() {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const handleFileUpload = (file: File | null) => {
+  const handleFileUpload = async (file: File | null) => {
     if (!file) return;
-    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-    if (!allowed.includes(file.type)) {
-      toast.error("Format file harus PDF, JPG, atau PNG.");
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    const fileExt = file.name.toLowerCase().split(".").pop();
+    const isAllowedExt = ["pdf", "jpg", "jpeg", "png", "webp"].includes(fileExt || "");
+
+    if (!allowedTypes.includes(file.type) && !isAllowedExt) {
+      toast.error("Format berkas harus PDF, JPG, atau PNG.");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Ukuran file maksimal 10MB.");
+      toast.error("Ukuran berkas maksimal 10MB.");
       return;
     }
 
-    const sizeStr = file.size > 1024 * 1024
-      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-      : `${Math.round(file.size / 1024)} KB`;
+    setUploadingSk(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
+      const res = await fetch("/api/partner/legal-docs", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengunggah berkas SK.");
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        skFileName: data.fileName || file.name,
+        skFileSize: data.fileSize,
+        skDocumentUrl: data.storagePath,
+      }));
+      setErrors((prev) => ({ ...prev, skDocumentUrl: undefined }));
+      toast.success(`Berkas ${file.name} (${data.fileSize}) berhasil diunggah.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal mengunggah berkas.";
+      toast.error(msg);
+    } finally {
+      setUploadingSk(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
     setForm((prev) => ({
       ...prev,
-      skFileName: file.name,
-      skFileSize: sizeStr,
-      skDocumentUrl: `/uploads/documents/${file.name}`,
+      skFileName: "",
+      skFileSize: "",
+      skDocumentUrl: "",
     }));
-    toast.success(`Berkas ${file.name} (${sizeStr}) siap dilampirkan.`);
+    toast.info("Lampiran dokumen SK dihapus.");
+  };
+
+  const handleViewSkDocument = async () => {
+    if (!form.skDocumentUrl) return;
+    if (
+      form.skDocumentUrl.startsWith("http://") ||
+      form.skDocumentUrl.startsWith("https://") ||
+      form.skDocumentUrl.startsWith("/documents/")
+    ) {
+      window.open(form.skDocumentUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setOpeningDoc(true);
+    try {
+      const res = await fetch("/api/partner/legal-docs");
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else if (data.isMock) {
+        toast.info(data.message || "Dokumen diunggah dalam mode mock development.");
+      } else {
+        toast.error(data.error || data.message || "Tidak dapat membuka dokumen.");
+      }
+    } catch {
+      toast.error("Gagal membuka dokumen.");
+    } finally {
+      setOpeningDoc(false);
+    }
   };
 
   const validateStep = (currentStep: number): boolean => {
@@ -256,20 +310,52 @@ export function PartnerOnboarding() {
 
     if (currentStep === 0) {
       if (!form.picName.trim() || form.picName.trim().length < 2) {
-        nextErrors.picName = "Nama lengkap PIC wajib diisi.";
+        nextErrors.picName = "Nama lengkap PIC wajib diisi (minimal 2 karakter).";
       }
-      if (!form.picTitle.trim()) {
-        nextErrors.picTitle = "Jabatan / Posisi wajib diisi.";
+      if (!form.picTitle.trim() || form.picTitle.trim().length < 2) {
+        nextErrors.picTitle = "Jabatan / Posisi di lembaga wajib diisi.";
+      }
+      if (!form.picEmail.trim()) {
+        nextErrors.picEmail = "Email resmi PIC wajib diisi.";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.picEmail.trim())) {
+        nextErrors.picEmail = "Format email PIC tidak valid.";
+      }
+      const digits = extractIndonesianLocalPhone(form.picPhone);
+      if (!digits) {
+        nextErrors.picPhone = "Nomor WhatsApp / telepon PIC wajib diisi.";
+      } else if (digits.length < 8) {
+        nextErrors.picPhone = "Nomor kontak minimal 8 digit angka.";
+      } else if (digits.length > 15) {
+        nextErrors.picPhone = "Nomor kontak maksimal 15 digit angka.";
       }
     } else if (currentStep === 1) {
       if (!form.institutionName.trim() || form.institutionName.trim().length < 2) {
-        nextErrors.institutionName = "Nama lembaga/kampus wajib diisi.";
+        nextErrors.institutionName = "Nama lembaga / instansi wajib diisi (minimal 2 karakter).";
       }
-      if (!form.city.trim()) {
-        nextErrors.city = "Kota domisili kampus wajib diisi.";
+      if (!form.institutionType.trim()) {
+        nextErrors.institutionType = "Kategori lembaga wajib dipilih.";
+      }
+      if (!form.province.trim()) {
+        nextErrors.province = "Provinsi domisili lembaga wajib dipilih.";
+      }
+      if (!form.city.trim() || form.city.trim().length < 2) {
+        nextErrors.city = "Kota domisili lembaga wajib diisi.";
+      }
+      if (!form.officeAddress.trim() || form.officeAddress.trim().length < 5) {
+        nextErrors.officeAddress = "Alamat kantor / sekretariat career center wajib diisi (minimal 5 karakter).";
+      }
+      if (!form.website.trim()) {
+        nextErrors.website = "Website resmi lembaga wajib diisi.";
+      } else if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(form.website.trim())) {
+        nextErrors.website = "Format URL website tidak valid (contoh: https://kampus.ac.id).";
       }
     } else if (currentStep === 2) {
-      // Step 2 (SK & Dokumen) bypassable
+      if (!form.skNumber.trim() || form.skNumber.trim().length < 3) {
+        nextErrors.skNumber = "Nomor Surat Keputusan (SK) resmi wajib diisi (minimal 3 karakter).";
+      }
+      if (!form.skDocumentUrl || !form.skDocumentUrl.trim()) {
+        nextErrors.skDocumentUrl = "Dokumen salinan Surat Keputusan (SK) wajib dilampirkan.";
+      }
     } else if (currentStep === 3) {
       if (!form.confirmationAgreed) {
         nextErrors.confirmationAgreed = "Anda harus menyetujui pernyataan keabsahan dokumen.";
@@ -308,23 +394,30 @@ export function PartnerOnboarding() {
       return;
     }
 
+    if (!form.skDocumentUrl || !form.skNumber.trim()) {
+      toast.error("Dokumen SK dan nomor SK wajib diisi sebelum mengajukan.");
+      setStep(2);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
-        institutionName: form.institutionName.trim() || "Universitas Indonesia",
+        picName: form.picName.trim(),
+        picPosition: form.picTitle.trim(),
+        picEmail: form.picEmail.trim(),
+        picPhone: form.picPhone.trim(),
+        institutionName: form.institutionName.trim(),
         institutionType: form.institutionType,
-        city: form.city.trim() || "Jakarta Pusat",
         province: form.province,
-        location: `${form.city.trim() || "Jakarta Pusat"}, ${form.province}`,
-        officeAddress: form.officeAddress.trim() || undefined,
-        website: form.website.trim() || undefined,
-        skNumber: form.skNumber.trim() || "SK-DIKTI-2024/001",
-        skFileName: form.skFileName || "SK_Kemitraan_Kampus.pdf",
-        skDocumentUrl: form.skDocumentUrl || `/documents/${form.skFileName || "sample-sk-mitra.pdf"}`,
-        picName: form.picName.trim() || "Dr. Perwakilan Kampus",
-        picEmail: form.picEmail.trim() || user?.email || "mitra@kampus.ac.id",
-        picPhone: form.picPhone.trim() || "081234567890",
-        picPosition: form.picTitle.trim() || "Koordinator Career Center",
+        city: form.city.trim(),
+        location: `${form.city.trim()}, ${form.province}`,
+        officeAddress: form.officeAddress.trim(),
+        website: form.website.trim(),
+        description: form.description.trim() || undefined,
+        skNumber: form.skNumber.trim(),
+        skFileName: form.skFileName || undefined,
+        skDocumentUrl: form.skDocumentUrl.trim(),
       };
 
       const res = await fetch("/api/partner/onboarding", {
@@ -497,44 +590,48 @@ export function PartnerOnboarding() {
                     text="Data perwakilan resmi career center kampus yang akan mengelola verifikasi mahasiswa & kemitraan industri."
                   >
                     <div className="space-y-4">
-                      <Field label="Nama Lengkap PIC *" error={errors.picName}>
+                      <Field label="Nama Lengkap PIC *" hint="Nama penanggung jawab resmi lembaga" error={errors.picName}>
                         <input
                           required
                           className={inputClass}
                           value={form.picName}
                           onChange={(e) => update("picName", e.target.value)}
-                          placeholder="Nama lengkap PIC / Koordinator"
+                          placeholder="Contoh: Dr. Budi Santoso, M.Kom"
                         />
                       </Field>
 
-                      <Field label="Jabatan / Posisi di Lembaga *" error={errors.picTitle}>
+                      <Field label="Jabatan / Posisi di Lembaga *" hint="Contoh: Koordinator Career Center / Kepala Biro Hubungan Industri" error={errors.picTitle}>
                         <input
                           required
                           className={inputClass}
                           value={form.picTitle}
                           onChange={(e) => update("picTitle", e.target.value)}
-                          placeholder="Contoh: Koordinator Career Center / Hubungan Industri"
+                          placeholder="Koordinator Career Center / Hubungan Industri"
                         />
                       </Field>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Email Resmi PIC *" hint="Email untuk notifikasi akun" error={errors.picEmail}>
+                        <Field label="Email Resmi PIC *" hint="Email resmi institusi untuk notifikasi akun" error={errors.picEmail}>
                           <input
                             type="email"
+                            required
                             className={inputClass}
                             value={form.picEmail}
                             onChange={(e) => update("picEmail", e.target.value)}
-                            placeholder="email@kampus.ac.id"
+                            placeholder="nama.pic@kampus.ac.id"
                           />
                         </Field>
 
-                        <Field label="WhatsApp / No Telepon PIC *" hint="Dapat dihubungi untuk konfirmasi" error={errors.picPhone}>
-                          <input
-                            type="tel"
-                            className={inputClass}
+                        <Field
+                          label="WhatsApp / No Telepon PIC *"
+                          hint="Diawali kode wilayah Indonesia (+62)"
+                          error={errors.picPhone}
+                        >
+                          <IndonesianPhoneInput
                             value={form.picPhone}
-                            onChange={(e) => update("picPhone", e.target.value)}
-                            placeholder="0812xxxxxxxx"
+                            onChange={(val) => update("picPhone", val)}
+                            error={Boolean(errors.picPhone)}
+                            placeholder="812-3456-7890"
                           />
                         </Field>
                       </div>
@@ -559,18 +656,18 @@ export function PartnerOnboarding() {
                     text="Informasi entitas pendidikan resmi sesuai Surat Keputusan dan operasional kampus."
                   >
                     <div className="space-y-4">
-                      <Field label="Nama Lembaga / Instansi *" error={errors.institutionName}>
+                      <Field label="Nama Lembaga / Instansi *" hint="Nama resmi perguruan tinggi atau institusi pelatihan" error={errors.institutionName}>
                         <input
                           required
                           className={inputClass}
                           value={form.institutionName}
                           onChange={(e) => update("institutionName", e.target.value)}
-                          placeholder="Contoh: Universitas Gadjah Mada / Institut Teknologi Bandung"
+                          placeholder="Contoh: Universitas Indonesia / Institut Teknologi Bandung"
                         />
                       </Field>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Jenis Lembaga / Kategori *">
+                        <Field label="Jenis Lembaga / Kategori *" error={errors.institutionType}>
                           <select
                             className={inputClass}
                             value={form.institutionType}
@@ -584,7 +681,7 @@ export function PartnerOnboarding() {
                           </select>
                         </Field>
 
-                        <Field label="Provinsi Domisili *">
+                        <Field label="Provinsi Domisili *" error={errors.province}>
                           <select
                             className={inputClass}
                             value={form.province}
@@ -600,61 +697,75 @@ export function PartnerOnboarding() {
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Kota / Kabupaten *" error={errors.city}>
+                        <Field label="Kota / Kabupaten *" hint="Lokasi kota kampus / sekretariat" error={errors.city}>
                           <input
                             required
                             className={inputClass}
                             value={form.city}
                             onChange={(e) => update("city", e.target.value)}
-                            placeholder="Kota lokasi kampus"
+                            placeholder="Contoh: Jakarta Pusat / Bandung"
                           />
                         </Field>
 
-                        <Field label="Website Resmi Lembaga">
+                        <Field label="Website Resmi Lembaga *" hint="Contoh: https://kampus.ac.id" error={errors.website}>
                           <input
                             type="url"
+                            required
                             className={inputClass}
                             value={form.website}
                             onChange={(e) => update("website", e.target.value)}
-                            placeholder="https://..."
+                            placeholder="https://kampus.ac.id"
                           />
                         </Field>
                       </div>
 
-                      <Field label="Alamat Kantor / Sekretariat Career Center">
+                      <Field label="Alamat Kantor / Sekretariat Career Center *" hint="Alamat lengkap gedung rektorat atau sekretariat kemitraan" error={errors.officeAddress}>
                         <textarea
+                          required
                           className={textareaClass}
                           value={form.officeAddress}
                           onChange={(e) => update("officeAddress", e.target.value)}
-                          placeholder="Alamat lengkap gedung rektorat atau sekretariat kemitraan..."
+                          placeholder="Contoh: Gedung Rektorat Lt. 2, Jl. Salemba Raya No. 4, Jakarta Pusat"
+                        />
+                      </Field>
+
+                      <Field label="Deskripsi Singkat Lembaga (Opsional)" hint="Profil peran career center atau fokus keilmuan kampus">
+                        <textarea
+                          className={textareaClass}
+                          value={form.description}
+                          onChange={(e) => update("description", e.target.value)}
+                          placeholder="Contoh: Lembaga pendidikan tinggi penyedia talent teknologi dan bisnis berkualitas..."
                         />
                       </Field>
                     </div>
                   </Intro>
                 )}
 
-                {/* ── STEP 2: SURAT SK & LEGALITAS (BYPASSABLE) ── */}
+                {/* ── STEP 2: SURAT SK & LEGALITAS (WAJIB / REAL UPLOAD) ── */}
                 {step === 2 && (
                   <Intro
-                    title="Surat Keputusan (SK) &amp; Berkas Legalitas"
-                    text="Lampirkan nomor SK dan dokumen pendirian atau surat tugas resmi kemitraan (Opsional / Dapat Di-bypass)."
+                    title="Surat Keputusan (SK) &amp; Berkas Legalitas *"
+                    text="Lampirkan nomor SK resmi dan unggah salinan dokumen pendirian atau surat tugas resmi kemitraan kampus."
                   >
                     <div className="space-y-5">
                       <Field
-                        label="Nomor Surat Keputusan (SK) Resmi (Opsional / Bypass)"
-                        hint="Dapat dikosongkan (default: SK-DIKTI-2024/001)"
+                        label="Nomor Surat Keputusan (SK) Resmi *"
+                        hint="Nomor SK pendirian dari kementerian (Kemendikbud/Kemenag) atau SK rektorat kemitraan"
+                        error={errors.skNumber}
                       >
                         <input
+                          required
                           className={inputClass}
                           value={form.skNumber}
                           onChange={(e) => update("skNumber", e.target.value)}
-                          placeholder="Nomor SK resmi dari Kemendikbud / Kemenag / Rektorat"
+                          placeholder="Contoh: SK-DIKTI-2024/001 atau No. 123/UN2.R/SK/2024"
                         />
                       </Field>
 
                       <Field
-                        label="Unggah Salinan Berkas Surat SK (PDF / JPG) (Opsional / Bypass)"
-                        hint="Maksimal 10MB. Jika tidak diunggah, dokumen kemitraan default akan disiapkan."
+                        label="Unggah Salinan Berkas Surat SK (PDF / JPG / PNG) *"
+                        hint="Maksimal 10MB. Berkas resmi diperlukan oleh tim compliance untuk verifikasi akun."
+                        error={errors.skDocumentUrl}
                       >
                         <input
                           ref={skInputRef}
@@ -664,50 +775,103 @@ export function PartnerOnboarding() {
                           onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
                         />
 
-                        <div
-                          onClick={() => skInputRef.current?.click()}
-                          className={`mt-1 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 transition-all cursor-pointer ${
-                            form.skFileName
-                              ? "border-purple-300 bg-purple-50/40"
-                              : "border-slate-300 bg-slate-50/60 hover:bg-slate-50 hover:border-[#7C3AED]"
-                          }`}
-                        >
-                          <div className="flex size-12 items-center justify-center rounded-2xl bg-purple-100 text-[#7C3AED] shadow-2xs mb-3">
-                            <UploadCloud className="size-6" />
+                        {uploadingSk ? (
+                          <div className="mt-1 flex flex-col items-center justify-center rounded-2xl border-2 border-purple-300 bg-purple-50/50 p-8 text-center space-y-3">
+                            <Loader2 className="size-8 animate-spin text-[#7C3AED]" />
+                            <p className="text-sm font-semibold text-purple-950">
+                              Mengunggah berkas SK ke storage compliance...
+                            </p>
+                            <p className="text-xs text-muted-foreground">Mohon tunggu sebentar.</p>
                           </div>
-                          {form.skFileName ? (
-                            <div className="text-center space-y-1">
-                              <p className="text-sm font-bold text-purple-950 flex items-center justify-center gap-1.5">
-                                <FileCheck className="size-4 text-emerald-600" /> {form.skFileName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {form.skFileSize || "Berkas terlampir"} · Klik untuk mengganti dokumen
-                              </p>
+                        ) : form.skDocumentUrl ? (
+                          <div className="mt-1 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-5 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                                  <FileCheck className="size-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-slate-900 truncate">
+                                    {form.skFileName || "Berkas_SK_Resmi.pdf"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {form.skFileSize || "Berkas tersimpan"} · Siap diverifikasi
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleViewSkDocument}
+                                  disabled={openingDoc}
+                                  className="h-8 gap-1 text-xs border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800"
+                                >
+                                  {openingDoc ? (
+                                    <Loader2 className="size-3 animate-spin" />
+                                  ) : (
+                                    <Eye className="size-3.5" />
+                                  )}
+                                  Lihat
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleRemoveFile}
+                                  className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </div>
                             </div>
-                          ) : (
+
+                            <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-xs text-emerald-800">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <Check className="size-3.5 text-emerald-600" /> Dokumen berhasil terlampir
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => skInputRef.current?.click()}
+                                className="font-semibold underline hover:text-emerald-950 cursor-pointer"
+                              >
+                                Ganti berkas
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => skInputRef.current?.click()}
+                            className="mt-1 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-7 transition-all cursor-pointer hover:bg-slate-50 hover:border-[#7C3AED]"
+                          >
+                            <div className="flex size-12 items-center justify-center rounded-2xl bg-purple-100 text-[#7C3AED] shadow-2xs mb-3">
+                              <UploadCloud className="size-6" />
+                            </div>
                             <div className="text-center space-y-1">
                               <p className="text-sm font-semibold text-slate-800">
-                                Klik untuk memilih berkas Surat SK (Opsional)
+                                Klik untuk memilih berkas Surat SK Resmi *
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Mendukung format PDF, PNG, atau JPG hingga 10MB
+                                Format didukung: PDF, PNG, JPG, atau WEBP hingga 10MB
                               </p>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </Field>
 
                       <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
                         <Info className="size-4 text-blue-600 shrink-0 mt-0.5" />
                         <p>
-                          Berkas Surat SK menjamin validitas lembaga sehingga mahasiswa universitas Anda dapat memperoleh lencana <strong>Campus Verified Talent</strong> di ProofyLink.
+                          Salinan Surat Keputusan (SK) atau MoU menjamin keabsahan lembaga sehingga mahasiswa universitas Anda dapat memperoleh lencana resmi <strong>Campus Verified Talent</strong> di ProofyLink.
                         </p>
                       </div>
                     </div>
                   </Intro>
                 )}
 
-                {/* ── STEP 3: REVIEW & PENGAJUAN (EXACT MOCKUP STYLE) ── */}
+                {/* ── STEP 3: REVIEW & PENGAJUAN ── */}
                 {step === 3 && (
                   <div className="space-y-6">
                     <div>
@@ -717,7 +881,7 @@ export function PartnerOnboarding() {
                       </p>
                     </div>
 
-                    {/* Dark Navy Review Card (Matching Screenshot) */}
+                    {/* Dark Navy Review Card */}
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <div className="bg-[#0b2342] p-6 text-white space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -730,17 +894,19 @@ export function PartnerOnboarding() {
                         </div>
 
                         <h3 className="text-2xl font-bold tracking-tight text-white">
-                          {form.institutionName || "Universitas Indonesia"}
+                          {form.institutionName || "Nama Lembaga Belum Diisi"}
                         </h3>
 
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          {form.description}
-                        </p>
+                        {form.description ? (
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {form.description}
+                          </p>
+                        ) : null}
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 pt-1">
                           <span className="flex items-center gap-1.5">
                             <MapPin className="size-3.5 text-emerald-400" />
-                            {form.city || "Jakarta Pusat"}, {form.province}
+                            {form.city || "-"}, {form.province}
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1.5">
@@ -749,7 +915,7 @@ export function PartnerOnboarding() {
                           </span>
                           <span>•</span>
                           <span>
-                            PIC: <strong>{form.picName || "Budi Santoso"}</strong> ({form.picTitle})
+                            PIC: <strong>{form.picName || "-"}</strong> ({form.picTitle || "-"})
                           </span>
                         </div>
                       </div>
@@ -759,43 +925,46 @@ export function PartnerOnboarding() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-slate-100">
                           <div>
                             <span className="text-muted-foreground block text-[11px]">Email PIC</span>
-                            <strong className="text-slate-900 font-semibold text-xs">{form.picEmail || user?.email || "mitra@kampus.ac.id"}</strong>
+                            <strong className="text-slate-900 font-semibold text-xs">{form.picEmail || "-"}</strong>
                           </div>
                           <div>
                             <span className="text-muted-foreground block text-[11px]">WhatsApp PIC</span>
-                            <strong className="text-slate-900 font-semibold text-xs">{form.picPhone || "0812-9876-5432"}</strong>
+                            <strong className="text-slate-900 font-semibold text-xs">{form.picPhone || "-"}</strong>
                           </div>
                           <div>
                             <span className="text-muted-foreground block text-[11px]">Website Lembaga</span>
-                            <strong className="text-slate-900 font-semibold text-xs">{form.website || "https://kampus.ac.id"}</strong>
+                            <strong className="text-slate-900 font-semibold text-xs flex items-center gap-1">
+                              <Globe className="size-3 text-slate-400" />
+                              {form.website || "-"}
+                            </strong>
                           </div>
                           <div>
-                            <span className="text-muted-foreground block text-[11px]">Alamat Kantor</span>
+                            <span className="text-muted-foreground block text-[11px]">Alamat Kantor / Sekretariat</span>
                             <strong className="text-slate-900 font-semibold text-xs leading-relaxed">
-                              {form.officeAddress || "Gedung Rektorat Lt. 2, Kampus Pusat"}
+                              {form.officeAddress || "-"}
                             </strong>
                           </div>
                         </div>
 
                         {/* Berkas Terlampir Checklist */}
                         <div>
-                          <p className="font-bold text-slate-900 text-xs mb-2.5">Berkas Terlampir:</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center gap-2 text-slate-800">
-                              <Check className="size-4 text-emerald-600 shrink-0" />
-                              <span>Surat SK: <strong>{form.skFileName || "SK_Kemitraan_Kampus.pdf"}</strong></span>
+                          <p className="font-bold text-slate-900 text-xs mb-2.5">Berkas Compliance Terlampir:</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div className="flex items-center gap-2 text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                              <FileCheck className="size-4 text-emerald-600 shrink-0" />
+                              <div className="min-w-0">
+                                <span className="block text-[11px] text-muted-foreground">Dokumen Fisik SK</span>
+                                <strong className="text-xs truncate block text-slate-900">
+                                  {form.skFileName || "Berkas SK Terunggah"}
+                                </strong>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 text-slate-800">
+                            <div className="flex items-center gap-2 text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                               <Check className="size-4 text-emerald-600 shrink-0" />
-                              <span>Nomor SK: <strong>{form.skNumber || "SK-DIKTI-2024/001"}</strong></span>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-800">
-                              <Check className="size-4 text-emerald-600 shrink-0" />
-                              <span>Akta / Dokumen Resmi: <strong>SK_Kemenkumham.pdf</strong></span>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-800">
-                              <Check className="size-4 text-emerald-600 shrink-0" />
-                              <span>KTP / Identitas PIC: <strong>KTP_PIC_Perwakilan.jpg</strong></span>
+                              <div className="min-w-0">
+                                <span className="block text-[11px] text-muted-foreground">Nomor Registrasi SK</span>
+                                <strong className="text-xs truncate block text-slate-900">{form.skNumber || "-"}</strong>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -803,23 +972,28 @@ export function PartnerOnboarding() {
                     </div>
 
                     {/* Confirmation Checkbox Card */}
-                    <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-4 cursor-pointer text-xs leading-relaxed text-slate-700 transition-colors hover:bg-blue-50/70">
-                      <input
-                        type="checkbox"
-                        checked={form.confirmationAgreed}
-                        onChange={(e) => update("confirmationAgreed", e.target.checked)}
-                        className="mt-0.5 size-4 rounded border-slate-300 text-[#0b2342] focus:ring-[#0b2342]"
-                      />
-                      <span>
-                        Saya menyatakan bahwa seluruh data dan dokumen yang dilampirkan adalah benar, sah, dan saya memiliki wewenang resmi mewakili entitas lembaga bersangkutan untuk mendaftar di ProofyLink Talent Network.
-                      </span>
-                    </label>
+                    <div className="space-y-1">
+                      <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-4 cursor-pointer text-xs leading-relaxed text-slate-700 transition-colors hover:bg-blue-50/70">
+                        <input
+                          type="checkbox"
+                          checked={form.confirmationAgreed}
+                          onChange={(e) => update("confirmationAgreed", e.target.checked)}
+                          className="mt-0.5 size-4 rounded border-slate-300 text-[#0b2342] focus:ring-[#0b2342]"
+                        />
+                        <span>
+                          Saya menyatakan bahwa seluruh data lembaga dan dokumen Surat Keputusan (SK) yang dilampirkan adalah benar, sah, dan saya memiliki wewenang resmi mewakili entitas lembaga bersangkutan untuk mendaftar di ProofyLink Talent Network.
+                        </span>
+                      </label>
+                      {errors.confirmationAgreed ? (
+                        <p className="text-xs font-medium text-destructive pl-1">{errors.confirmationAgreed}</p>
+                      ) : null}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* ─── BOTTOM NAVIGATION BAR (MATCHING MOCKUP) ─── */}
+            {/* ─── BOTTOM NAVIGATION BAR ─── */}
             <div className="flex items-center justify-between border-t bg-card px-4 py-3.5 sm:px-8 sm:py-4">
               <Button
                 type="button"
@@ -855,8 +1029,8 @@ export function PartnerOnboarding() {
                   <Button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={submitting}
-                    className="gap-1.5 text-xs h-9 px-5 rounded-lg font-semibold bg-[#059669] hover:bg-[#047857] text-white shadow-xs"
+                    disabled={submitting || !form.confirmationAgreed || !form.skDocumentUrl}
+                    className="gap-1.5 text-xs h-9 px-5 rounded-lg font-semibold bg-[#059669] hover:bg-[#047857] text-white shadow-xs disabled:opacity-50"
                   >
                     {submitting ? (
                       <>

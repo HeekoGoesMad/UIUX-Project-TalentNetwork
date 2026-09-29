@@ -198,6 +198,8 @@ export async function GET() {
           ? Boolean(organization?.nibDocumentUrl && organization?.npwpDocumentUrl)
           : isCandidate
           ? Boolean(candidateProfile && candidateProfile.isPublished)
+          : current.user.role === "partner"
+          ? Boolean(partnership?.skDocumentUrl && partnership?.skNumber)
           : true,
         hasPassword: current.user.hasPassword || Boolean(current.authUser.app_metadata?.providers?.includes("email")),
       },
