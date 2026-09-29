@@ -13,6 +13,7 @@ import {
   FileCheck,
   FileText,
   Loader2,
+  Lock,
   Radio,
   RefreshCw,
   Search,
@@ -417,24 +418,8 @@ function AdminCompaniesContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formCompanyName || selectedCompany.name,
-          picName: formPicName || null,
-          picTitle: formPicTitle || null,
-          picPhone: formPicPhone || null,
           verificationStatus: formStatus,
           verificationNotes: formNotes || null,
-          nib: formNib || null,
-          npwp: formNpwp || null,
-          industry: formIndustry || null,
-          companyScale: formScale || null,
-          province: formProvince || null,
-          city: formCity || null,
-          description: formDescription || null,
-          officeAddress: formOfficeAddress || null,
-          companyEmail: formCompanyEmail || null,
-          companyPhone: formCompanyPhone || null,
-          website: formWebsite || null,
-          linkedinUrl: formLinkedin || null,
           subscriptionTier: formTier,
           subscriptionStatus: formSubStatus,
         }),
@@ -442,13 +427,13 @@ function AdminCompaniesContent() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Gagal memperbarui data.");
+        throw new Error(errorData.error || "Gagal memperbarui status verifikasi.");
       }
 
       const resData = await res.json();
       const updated = resData.company;
 
-      toast.success(`Data perusahaan ${formCompanyName || selectedCompany.name} berhasil diperbarui & disinkronkan!`);
+      toast.success(`Keputusan verifikasi untuk ${selectedCompany.name} berhasil disimpan!`);
       setModalOpen(false);
 
       if (updated) {
@@ -877,57 +862,143 @@ function AdminCompaniesContent() {
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {activeTab === "legal" && (
                 <div className="space-y-4 text-xs">
+                  {/* Notice Banner: Read-only Mode */}
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-900 flex items-start gap-3 shadow-2xs">
+                    <Lock className="size-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                        Mode Review Verifikasi (Hanya Baca)
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/60 text-amber-900 px-2 py-0.5 text-[10px] font-bold">
+                          Terkunci dari Edit Admin
+                        </span>
+                      </p>
+                      <p className="text-[11.5px] text-amber-800 leading-relaxed">
+                        Data identitas PIC, profil perusahaan, dan dokumen legalitas di bawah ini bersifat hanya-baca (read-only). Hanya pemilik akun rekruter yang berwenang mengubah profil dan dokumen legalitas mereka.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Bagian 1: Identitas PIC / Penanggung Jawab */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
-                        <User className="size-4" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
+                          <User className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">Identitas PIC / Penanggung Jawab Rekrutmen</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Informasi perwakilan resmi dari tim HR atau Talent Acquisition yang mengelola akun.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">Identitas PIC / Penanggung Jawab Rekrutmen</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Informasi perwakilan resmi dari tim HR atau Talent Acquisition yang mengelola akun.
-                        </p>
-                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                        <Lock className="size-2.5" /> Read-only
+                      </span>
                     </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Nama Lengkap PIC</label>
-                        <Input
-                          value={formPicName}
-                          onChange={(e) => setFormPicName(e.target.value)}
-                          placeholder="Contoh: Budi Santoso"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicName || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicName && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicName, "Nama PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Nama PIC"
+                            >
+                              {copiedField === "Nama PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Jabatan / Role PIC</label>
-                        <Input
-                          value={formPicTitle}
-                          onChange={(e) => setFormPicTitle(e.target.value)}
-                          placeholder="Contoh: Talent Acquisition Lead / HR Manager"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicTitle || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicTitle && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicTitle, "Jabatan PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Jabatan PIC"
+                            >
+                              {copiedField === "Jabatan PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Email Akun PIC</label>
-                        <Input
-                          value={formPicEmail}
-                          disabled
-                          className="h-8.5 text-xs bg-slate-50 text-muted-foreground cursor-not-allowed"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicEmail || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicEmail && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicEmail, "Email Akun PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Email Akun PIC"
+                            >
+                              {copiedField === "Email Akun PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                         <span className="text-[10px] text-muted-foreground block mt-0.5">
-                          Email login terikat dengan autentikasi akun dan bersifat read-only.
+                          Email login terikat dengan autentikasi akun.
                         </span>
                       </div>
+
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Nomor Telepon / WhatsApp PIC</label>
-                        <Input
-                          value={formPicPhone}
-                          onChange={(e) => setFormPicPhone(e.target.value)}
-                          placeholder="Contoh: 0812-3456-7890"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicPhone || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicPhone && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicPhone, "Telepon PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Telepon PIC"
+                            >
+                              {copiedField === "Telepon PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -946,37 +1017,58 @@ function AdminCompaniesContent() {
                           </p>
                         </div>
                       </div>
-                      {selectedCompany?.logoUrl && (
-                        <div className="flex items-center gap-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={selectedCompany.logoUrl}
-                            alt="Logo Perusahaan"
-                            className="size-8 rounded-lg object-cover border border-slate-200"
-                          />
-                          <span className="text-[10px] text-slate-500 font-medium">Logo Aktif</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {selectedCompany?.logoUrl && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={selectedCompany.logoUrl}
+                              alt="Logo Perusahaan"
+                              className="size-7 rounded-lg object-cover border border-slate-200"
+                            />
+                            <span className="text-[10px] text-slate-500 font-medium">Logo Aktif</span>
+                          </div>
+                        )}
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                          <Lock className="size-2.5" /> Read-only
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">
-                          Nama Resmi Perusahaan (PT/CV) *
+                          Nama Resmi Perusahaan (PT/CV)
                         </label>
-                        <Input
-                          value={formCompanyName}
-                          onChange={(e) => setFormCompanyName(e.target.value)}
-                          placeholder="Nama badan hukum perusahaan"
-                          className="h-8.5 text-xs bg-white font-medium"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formCompanyName || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-bold pr-8"
+                          />
+                          {formCompanyName && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyName, "Nama Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Nama Perusahaan"
+                            >
+                              {copiedField === "Nama Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Sektor Industri *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Sektor Industri</label>
                         <select
                           value={formIndustry}
-                          onChange={(e) => setFormIndustry(e.target.value)}
-                          className="w-full h-8.5 text-xs rounded-md border border-slate-300 bg-white px-2.5 font-medium"
+                          disabled
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed px-2.5 font-medium"
                         >
                           {INDUSTRY_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -987,11 +1079,11 @@ function AdminCompaniesContent() {
                       </div>
 
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Skala / Ukuran Perusahaan *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Skala / Ukuran Perusahaan</label>
                         <select
                           value={formScale}
-                          onChange={(e) => setFormScale(e.target.value)}
-                          className="w-full h-8.5 text-xs rounded-md border border-slate-300 bg-white px-2.5 font-medium"
+                          disabled
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed px-2.5 font-medium"
                         >
                           {SCALE_OPTIONS.map((opt) => (
                             <option key={opt.id} value={opt.id}>
@@ -1003,82 +1095,168 @@ function AdminCompaniesContent() {
 
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Email Resmi Perusahaan</label>
-                        <Input
-                          value={formCompanyEmail}
-                          onChange={(e) => setFormCompanyEmail(e.target.value)}
-                          placeholder="Contoh: hr@perusahaan.com"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formCompanyEmail || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formCompanyEmail && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyEmail, "Email Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Email Perusahaan"
+                            >
+                              {copiedField === "Email Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Telepon Kantor Resmi</label>
-                        <Input
-                          value={formCompanyPhone}
-                          onChange={(e) => setFormCompanyPhone(e.target.value)}
-                          placeholder="Contoh: (021) 12345678"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formCompanyPhone || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formCompanyPhone && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyPhone, "Telepon Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Telepon Perusahaan"
+                            >
+                              {copiedField === "Telepon Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Website Resmi</label>
-                        <Input
-                          value={formWebsite}
-                          onChange={(e) => setFormWebsite(e.target.value)}
-                          placeholder="https://perusahaan.com"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative flex items-center gap-1.5">
+                          <Input
+                            value={formWebsite || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formWebsite && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formWebsite, "Website Perusahaan")}
+                                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin Website"
+                              >
+                                {copiedField === "Website Perusahaan" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                              <a
+                                href={formWebsite.startsWith("http") ? formWebsite : `https://${formWebsite}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#7C3AED] hover:text-[#6D28D9] ml-1"
+                                title="Kunjungi Website"
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Profil LinkedIn Perusahaan</label>
-                        <Input
-                          value={formLinkedin}
-                          onChange={(e) => setFormLinkedin(e.target.value)}
-                          placeholder="https://linkedin.com/company/..."
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative flex items-center gap-1.5">
+                          <Input
+                            value={formLinkedin || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formLinkedin && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formLinkedin, "LinkedIn Perusahaan")}
+                                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin LinkedIn"
+                              >
+                                {copiedField === "LinkedIn Perusahaan" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                              <a
+                                href={formLinkedin.startsWith("http") ? formLinkedin : `https://${formLinkedin}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#7C3AED] hover:text-[#6D28D9] ml-1"
+                                title="Buka LinkedIn"
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Provinsi Kantor</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Provinsi &amp; Kota Kantor</label>
                         <Input
-                          value={formProvince}
-                          onChange={(e) => setFormProvince(e.target.value)}
-                          placeholder="Contoh: DKI Jakarta, Jawa Barat"
-                          className="h-8.5 text-xs bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Kota Kantor</label>
-                        <Input
-                          value={formCity}
-                          onChange={(e) => setFormCity(e.target.value)}
-                          placeholder="Contoh: Jakarta Selatan, Surabaya"
-                          className="h-8.5 text-xs bg-white"
+                          value={[formCity, formProvince].filter(Boolean).join(", ") || "-"}
+                          disabled
+                          className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200"
                         />
                       </div>
 
                       <div className="sm:col-span-2">
                         <label className="font-semibold text-slate-700 block mb-1">Alamat Kantor Lengkap</label>
-                        <Input
-                          value={formOfficeAddress}
-                          onChange={(e) => setFormOfficeAddress(e.target.value)}
-                          placeholder="Gedung, lantai, nomor, dan nama jalan"
-                          className="h-8.5 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formOfficeAddress || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formOfficeAddress && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formOfficeAddress, "Alamat Kantor")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Alamat Kantor"
+                            >
+                              {copiedField === "Alamat Kantor" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="sm:col-span-2">
                         <label className="font-semibold text-slate-700 block mb-1">Deskripsi Perusahaan</label>
                         <textarea
-                          value={formDescription}
-                          onChange={(e) => setFormDescription(e.target.value)}
+                          value={formDescription || "Belum ada deskripsi profil perusahaan."}
+                          disabled
+                          readOnly
                           rows={3}
-                          placeholder="Ceritakan tentang model bisnis, produk, atau nilai perusahaan..."
-                          className="w-full text-xs rounded-md border border-slate-300 bg-white p-2.5 outline-none focus:border-ring focus:ring-1 focus:ring-ring resize-none"
+                          className="w-full text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed p-2.5 resize-none leading-relaxed"
                         />
                       </div>
                     </div>
@@ -1086,16 +1264,21 @@ function AdminCompaniesContent() {
 
                   {/* Bagian 3: Dokumen Legalitas & Perpajakan Resmi (NIB & NPWP) */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                        <FileCheck className="size-4" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                          <FileCheck className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan Resmi</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Periksa nomor identitas berusaha (NIB) dan NPWP Badan Usaha beserta berkas PDF lampiran.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan Resmi</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Periksa nomor identitas berusaha (NIB) dan NPWP Badan Usaha beserta berkas PDF lampiran.
-                        </p>
-                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                        <Lock className="size-2.5" /> Read-only
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 items-stretch">
@@ -1123,10 +1306,9 @@ function AdminCompaniesContent() {
                           </label>
                           <div className="relative">
                             <Input
-                              value={formNib}
-                              onChange={(e) => setFormNib(e.target.value)}
-                              placeholder="Contoh: 1234567890123"
-                              className="h-8.5 text-xs bg-white font-mono pr-8"
+                              value={formNib || "-"}
+                              disabled
+                              className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-mono pr-8"
                             />
                             {formNib && (
                               <button
@@ -1193,10 +1375,9 @@ function AdminCompaniesContent() {
                           </label>
                           <div className="relative">
                             <Input
-                              value={formNpwp}
-                              onChange={(e) => setFormNpwp(e.target.value)}
-                              placeholder="Contoh: 01.234.567.8-901.000"
-                              className="h-8.5 text-xs bg-white font-mono pr-8"
+                              value={formNpwp || "-"}
+                              disabled
+                              className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-mono pr-8"
                             />
                             {formNpwp && (
                               <button
@@ -1445,7 +1626,7 @@ function AdminCompaniesContent() {
                   className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl font-semibold px-4 cursor-pointer shadow-xs"
                 >
                   {updating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-                  Simpan Perubahan &amp; Sinkronisasi
+                  Simpan Keputusan Verifikasi
                 </Button>
               </div>
             </DialogFooter>
