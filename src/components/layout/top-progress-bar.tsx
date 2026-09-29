@@ -11,14 +11,9 @@ function ProgressBarInner() {
 
   const trickleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isNavigatingRef = useRef(false);
 
   const clearTimers = () => {
-    if (pendingStartRef.current) {
-      clearTimeout(pendingStartRef.current);
-      pendingStartRef.current = null;
-    }
     if (trickleTimerRef.current) {
       clearInterval(trickleTimerRef.current);
       trickleTimerRef.current = null;
@@ -64,12 +59,39 @@ function ProgressBarInner() {
     }, 200);
   };
 
+  const isFirstMountRef = useRef(true);
+  const previousPathnameRef = useRef(pathname);
+  const previousSearchRef = useRef(searchParams?.toString());
+
   // Trigger completion whenever pathname or searchParams change (navigation committed)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      completeProgress();
-    });
-    return () => cancelAnimationFrame(frame);
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+
+    const currentSearch = searchParams?.toString();
+    const hasPathChanged = pathname !== previousPathnameRef.current;
+    const hasSearchChanged = currentSearch !== previousSearchRef.current;
+
+    previousPathnameRef.current = pathname;
+    previousSearchRef.current = currentSearch;
+
+    if (!hasPathChanged && !hasSearchChanged) return;
+
+    if (isNavigatingRef.current) {
+      const frame = requestAnimationFrame(() => {
+        completeProgress();
+      });
+      return () => cancelAnimationFrame(frame);
+    } else {
+      // Route committed without click interceptor (e.g. router.push, back/forward)
+      startProgress();
+      const sweepTimer = setTimeout(() => {
+        completeProgress();
+      }, 250);
+      return () => clearTimeout(sweepTimer);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
 
@@ -126,11 +148,9 @@ function ProgressBarInner() {
           return;
         }
 
+        // Immediately start progress bar without deferring, avoiding cancellation on fast/prefetched routes
         clearTimers();
-        // Defer start by a tiny frame so that any unsaved guard or modal cancel event has time to abort
-        pendingStartRef.current = setTimeout(() => {
-          startProgress();
-        }, 16);
+        startProgress();
       } catch {
         // Ignore malformed URLs
       }

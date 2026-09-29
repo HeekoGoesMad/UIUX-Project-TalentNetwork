@@ -3,24 +3,41 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { extractIndonesianLocalPhone, formatToE164Indonesian, isValidWebsiteUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 const partnerOnboardingSchema = z.object({
-  institutionName: z.string().trim().min(2, "Nama lembaga minimal 2 karakter."),
-  institutionType: z.string().trim().optional(),
-  city: z.string().trim().optional(),
-  province: z.string().trim().optional(),
-  location: z.string().trim().optional(),
-  officeAddress: z.string().trim().optional(),
-  website: z.string().trim().optional(),
-  skNumber: z.string().trim().optional(),
-  skDocumentUrl: z.string().trim().optional(),
-  skFileName: z.string().trim().optional(),
+  // PIC
   picName: z.string().trim().min(2, "Nama PIC minimal 2 karakter."),
-  picEmail: z.string().email("Format email PIC tidak valid.").optional().or(z.literal("")),
-  picPhone: z.string().trim().min(6, "Nomor kontak minimal 6 digit.").optional().or(z.literal("")),
-  picPosition: z.string().trim().optional(),
+  picPosition: z.string().trim().min(2, "Jabatan / posisi PIC di lembaga wajib diisi."),
+  picEmail: z.string().trim().email("Format email PIC tidak valid."),
+  picPhone: z
+    .string()
+    .trim()
+    .refine((val) => {
+      const digits = extractIndonesianLocalPhone(val);
+      return digits.length >= 8 && digits.length <= 15;
+    }, "Nomor WhatsApp / telepon PIC minimal 8 dan maksimal 15 digit angka."),
+
+  // Lembaga
+  institutionName: z.string().trim().min(2, "Nama lembaga minimal 2 karakter."),
+  institutionType: z.string().trim().min(1, "Kategori lembaga wajib dipilih."),
+  province: z.string().trim().min(1, "Provinsi domisili wajib dipilih."),
+  city: z.string().trim().min(2, "Kota / kabupaten domisili wajib diisi."),
+  officeAddress: z.string().trim().min(5, "Alamat kantor / sekretariat wajib diisi."),
+  website: z
+    .string()
+    .trim()
+    .min(3, "Website resmi lembaga wajib diisi.")
+    .refine((val) => isValidWebsiteUrl(val), "Format URL website lembaga tidak valid (contoh: https://kampus.ac.id atau kampus.ac.id)."),
+  description: z.string().trim().optional(),
+
+  // Legalitas & SK
+  skNumber: z.string().trim().min(3, "Nomor SK resmi wajib diisi."),
+  skDocumentUrl: z.string().trim().min(1, "Dokumen Surat Keputusan (SK) resmi wajib dilampirkan."),
+  skFileName: z.string().trim().optional(),
+  location: z.string().trim().optional(),
 });
 
 export async function GET() {
@@ -76,13 +93,22 @@ export async function POST(request: Request) {
   const db = current.db;
   const user = current.user;
 
+  // Format phone to standard Indonesian E.164 (+62...)
+  const formattedPhone = formatToE164Indonesian(data.picPhone);
+
+  // Normalize website url
+  const normalizedWebsite =
+    data.website.startsWith("http://") || data.website.startsWith("https://")
+      ? data.website
+      : `https://${data.website}`;
+
   // Format composite location string
   const resolvedLocation =
     data.location?.trim() ||
     [data.city?.trim(), data.province?.trim()].filter(Boolean).join(", ") ||
     "Indonesia";
 
-  const resolvedSkDoc = data.skDocumentUrl || (data.skFileName ? `/uploads/documents/${data.skFileName}` : "/documents/sample-sk-mitra.pdf");
+  const resolvedSkDoc = data.skDocumentUrl.trim();
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -92,14 +118,14 @@ export async function POST(request: Request) {
         .values({
           userId: user.id,
           displayName: data.picName,
-          phone: data.picPhone || null,
+          phone: formattedPhone,
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: schema.profiles.userId,
           set: {
             displayName: data.picName,
-            phone: data.picPhone || null,
+            phone: formattedPhone,
             updatedAt: new Date(),
           },
         });
@@ -127,6 +153,14 @@ export async function POST(request: Request) {
           .values({
             userId: user.id,
             name: data.institutionName,
+            institutionType: data.institutionType || null,
+            officeAddress: data.officeAddress || null,
+            website: normalizedWebsite,
+            description: data.description || null,
+            province: data.province || null,
+            city: data.city || null,
+            picPosition: data.picPosition || null,
+            picPhone: formattedPhone,
             skNumber: data.skNumber || null,
             skDocumentUrl: resolvedSkDoc,
             location: resolvedLocation,
@@ -141,6 +175,14 @@ export async function POST(request: Request) {
           .update(schema.partnerships)
           .set({
             name: data.institutionName,
+            institutionType: data.institutionType || null,
+            officeAddress: data.officeAddress || null,
+            website: normalizedWebsite,
+            description: data.description || null,
+            province: data.province || null,
+            city: data.city || null,
+            picPosition: data.picPosition || null,
+            picPhone: formattedPhone,
             skNumber: data.skNumber || null,
             skDocumentUrl: resolvedSkDoc,
             location: resolvedLocation,
@@ -161,6 +203,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Gagal menyimpan onboarding kemitraan:", error);
-    return NextResponse.json({ error: "Gagal memproses pengajuan kemitraan." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Gagal memproses pengajuan kemitraan.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  Bell,
   Building2,
   CheckCircle2,
   ExternalLink,
@@ -28,6 +30,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { AccessibilitySettings } from "@/components/settings/accessibility-settings";
 import { SecuritySettings } from "@/components/settings/security-settings";
+import {
+  NotificationSettings,
+  type NotificationPrefs,
+} from "@/components/settings/notification-settings";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { cn, extractIndonesianLocalPhone } from "@/lib/utils";
 
@@ -78,8 +84,54 @@ const EMPTY_FORM = {
   verificationStatus: "",
 };
 
-export function RecruiterSettingsView() {
-  const [activeTab, setActiveTab] = useState<"profile" | "accessibility" | "security">("profile");
+export type RecruiterSettingsTab =
+  | "profile"
+  | "notifications"
+  | "accessibility"
+  | "security";
+
+const TAB_PARAMS: Record<RecruiterSettingsTab, string> = {
+  profile: "profile",
+  notifications: "notif",
+  accessibility: "a11y",
+  security: "security",
+};
+
+function parseSettingsTab(value: string | null): RecruiterSettingsTab {
+  if (value === "notif" || value === "notifications") return "notifications";
+  if (value === "a11y" || value === "accessibility") return "accessibility";
+  if (value === "security") return "security";
+  return "profile";
+}
+
+type RecruiterSettingsViewProps = {
+  initialPreferences?: NotificationPrefs | null;
+};
+
+export function RecruiterSettingsView({
+  initialPreferences,
+}: RecruiterSettingsViewProps = {}) {
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<RecruiterSettingsTab>(() =>
+    parseSettingsTab(searchParams?.get("tab") ?? null)
+  );
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTab(
+        parseSettingsTab(new URLSearchParams(window.location.search).get("tab"))
+      );
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const changeTab = (tab: RecruiterSettingsTab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `?tab=${TAB_PARAMS[tab]}`);
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -267,6 +319,45 @@ export function RecruiterSettingsView() {
               } catch {}
             }
 
+            // Autofill Nomor Telepon / WhatsApp PIC jika belum terisi dari server: fallback ke draft onboarding di localStorage
+            if (!next.picPhone) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.picPhone === "string" && draft.form.picPhone.trim()) {
+                    next.picPhone = draft.form.picPhone.trim();
+                  }
+                }
+              } catch {}
+            }
+
+            // Fallback nama PIC dari draft onboarding jika belum ada
+            if (!next.picName) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.picName === "string" && draft.form.picName.trim()) {
+                    next.picName = draft.form.picName.trim();
+                  }
+                }
+              } catch {}
+            }
+
+            // Fallback nomor telepon kantor jika ada di draft
+            if (!next.companyPhone) {
+              try {
+                const draftRaw = window.localStorage.getItem("proofylink-recruiter-onboarding-draft");
+                if (draftRaw) {
+                  const draft = JSON.parse(draftRaw);
+                  if (typeof draft?.form?.companyPhone === "string" && draft.form.companyPhone.trim()) {
+                    next.companyPhone = draft.form.companyPhone.trim();
+                  }
+                }
+              } catch {}
+            }
+
             return next;
           });
         }
@@ -369,9 +460,14 @@ export function RecruiterSettingsView() {
       }
     }
 
-    // Nomor Telepon Kantor Resmi (Opsional, jika diisi min 6 karakter)
-    if (form.companyPhone.trim() && form.companyPhone.trim().length < 6) {
-      errs.companyPhone = "Nomor telepon kantor minimal 6 karakter.";
+    // Nomor Telepon Kantor Resmi (Wajib, minimal 6 digit angka)
+    const companyPhoneDigits = extractIndonesianLocalPhone(form.companyPhone);
+    if (!companyPhoneDigits) {
+      errs.companyPhone = "Nomor telepon kantor resmi wajib diisi.";
+    } else if (companyPhoneDigits.length < 6) {
+      errs.companyPhone = "Nomor telepon kantor minimal 6 digit angka.";
+    } else if (companyPhoneDigits.length > 15) {
+      errs.companyPhone = "Nomor telepon kantor maksimal 15 digit angka.";
     }
 
     if (!form.officeAddress.trim()) {
@@ -466,6 +562,15 @@ export function RecruiterSettingsView() {
         }
       } catch {}
 
+      // Kirim sinyal broadcast real-time ke konsol admin dan tab lain
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("proofylink_company_updates");
+          bc.postMessage({ type: "PROFILE_SAVED" });
+          bc.close();
+        } catch {}
+      }
+
       if (data?.isDemo) {
         toast.success("Tersimpan sebagai demo (tanpa database).");
       } else {
@@ -509,7 +614,7 @@ export function RecruiterSettingsView() {
           Pengaturan Akun &amp; Perusahaan
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Kelola informasi perwakilan PIC, profil entitas bisnis, aksesibilitas antarmuka, dan keamanan akun.
+          Kelola informasi perwakilan PIC, profil entitas bisnis, preferensi notifikasi, aksesibilitas antarmuka, dan keamanan akun.
         </p>
       </div>
 
@@ -532,9 +637,10 @@ export function RecruiterSettingsView() {
       {/* Tabs Navigasi */}
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border/80 pb-3">
         {[
-          { id: "profile", label: "Profil & Perusahaan", icon: Building2 },
-          { id: "accessibility", label: "Aksesibilitas", icon: Sliders },
-          { id: "security", label: "Keamanan & Sandi", icon: Lock },
+          { id: "profile" as const, label: "Profil & Perusahaan", icon: Building2 },
+          { id: "notifications" as const, label: "Notifikasi & Privasi", icon: Bell },
+          { id: "accessibility" as const, label: "Aksesibilitas", icon: Sliders },
+          { id: "security" as const, label: "Keamanan & Sandi", icon: Lock },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -542,7 +648,7 @@ export function RecruiterSettingsView() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as "profile" | "accessibility" | "security")}
+              onClick={() => changeTab(tab.id)}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 active
                   ? "bg-primary text-white shadow-xs"
@@ -959,13 +1065,24 @@ export function RecruiterSettingsView() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="companyPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
-                    <Phone className="size-3.5 text-primary" />
-                    <span>Telepon / Kontak Kantor Resmi</span>
-                    <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/70 rounded-md px-1.5 py-0.5 leading-none">
-                      Opsional
-                    </span>
-                  </label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="companyPhone" className="text-xs font-semibold text-foreground flex items-center gap-1.5 select-none">
+                      <Phone className="size-3.5 text-primary" />
+                      <span>Telepon / Kontak Kantor Resmi</span>
+                      <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 rounded-md px-1.5 py-0.5 leading-none tracking-wide uppercase">
+                        Wajib
+                      </span>
+                    </label>
+                    {form.picPhone && form.picPhone !== form.companyPhone && (
+                      <button
+                        type="button"
+                        onClick={() => handleChangeField("companyPhone", form.picPhone)}
+                        className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                      >
+                        Gunakan nomor PIC
+                      </button>
+                    )}
+                  </div>
                   <IndonesianPhoneInput
                     id="companyPhone"
                     name="companyPhone"
@@ -1240,10 +1357,15 @@ export function RecruiterSettingsView() {
         </form>
       )}
 
-      {/* Konten Tab 2: Aksesibilitas */}
+      {/* Konten Tab 2: Notifikasi & Privasi */}
+      {activeTab === "notifications" && (
+        <NotificationSettings initialPreferences={initialPreferences} role="recruiter" />
+      )}
+
+      {/* Konten Tab 3: Aksesibilitas */}
       {activeTab === "accessibility" && <AccessibilitySettings />}
 
-      {/* Konten Tab 3: Keamanan & Sandi */}
+      {/* Konten Tab 4: Keamanan & Sandi */}
       {activeTab === "security" && <SecuritySettings />}
 
       {/* Dialog Crop & Kompresi Logo Perusahaan (Rasio 1:1, Max 512x512 WebP) */}

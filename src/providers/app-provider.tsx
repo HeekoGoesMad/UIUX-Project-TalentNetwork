@@ -1,12 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, PARTNER_CAMPUSES, CandidatePersonality, TalentCategory, CareerAdvisorSavedResult } from "@/types";
+import { AppState, CareerStatus, ConsentState, CvProfile, DemoUser, ProvisioningStatus, ScreeningResult, UserRole, asCareerStatus, CONSENT_STATE_BY_DB_STATUS, CampusVerification, CandidatePersonality, TalentCategory, CareerAdvisorSavedResult } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { UUID_RE } from "@/lib/utils";
 import { DEMO_CANDIDATE_USER, DEMO_CANDIDATE_CV } from "@/lib/demo-seed";
-import { candidates } from "@/data/candidates";
 
 const storageKey = "talent-network-state-v1";
 const sessionKey = "proofylink-demo-session-v1";
@@ -19,9 +18,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   ]);
 }
 
-const defaultPartnerVerifications: Record<string, CampusVerification> = Object.fromEntries(
-  candidates.filter((c) => c.campusVerification).map((c) => [c.id, c.campusVerification!])
-);
+const defaultPartnerVerifications: Record<string, CampusVerification> = {};
 
 const initial: AppState = {
   tokens: 25,
@@ -79,8 +76,12 @@ type Context = AppState & {
   configError?: boolean;
   activePartnerInstitution: string;
   setActivePartnerInstitution: (institution: string) => void;
+  approvedPartnerCampuses: string[];
+  isPartnerCampus: (institutionName?: string | null) => boolean;
+  recommendCampus: (institution: string, notes?: string) => Promise<boolean>;
   verifyCandidateByPartner: (candidateId: string, status: "verified" | "rejected") => Promise<boolean>;
   verifyAllCandidatesForInstitution: (institution: string) => Promise<number>;
+  requestCampusVerification: (params: { institution: string; program?: string; year?: string; proofDocumentUrl?: string }) => Promise<boolean>;
   markNotificationRead: (id: string) => Promise<boolean>;
   markAllNotificationsRead: () => Promise<boolean>;
   login: (role: UserRole, email: string, password: string) => Promise<AuthResult>;
@@ -88,7 +89,7 @@ type Context = AppState & {
   loginAsFreshCandidate: () => void;
   loginAsDemoPartner: () => void;
   register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => Promise<AuthResult>;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
   scan: (id: string) => boolean;
   toggleShortlist: (id: string) => void;
   saveNote: (id: string, note: string) => void;
@@ -262,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [consentRequests, setConsentRequests] = useState<Record<string, unknown>[]>([]);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(() => {
-    if (typeof window === "undefined") return "Universitas Indonesia";
+    if (typeof window === "undefined") return "ITB STIKOM Bali";
     const session = localStorage.getItem(sessionKey);
     if (session) {
       try {
@@ -270,8 +271,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (parsed.companyName) return parsed.companyName;
       } catch {}
     }
-    return "Universitas Indonesia";
+    return "ITB STIKOM Bali";
   });
+  const [approvedPartnerCampuses, setApprovedPartnerCampuses] = useState<string[]>(["ITB STIKOM Bali"]);
+
+  useEffect(() => {
+    let ignore = false;
+    fetch("/api/partner/campuses")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!ignore && data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
+          setApprovedPartnerCampuses(data.campuses);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
   const pendingRole = useRef<UserRole | null>(null);
@@ -367,10 +384,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         shortlists?: BootstrapShortlist[];
         consentRequests?: Record<string, unknown>[];
         scannedCandidateIds?: string[];
+        approvedPartnerCampuses?: string[];
         error?: string;
       };
 
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
+
+      if (Array.isArray(payload.approvedPartnerCampuses) && payload.approvedPartnerCampuses.length > 0) {
+        setApprovedPartnerCampuses(payload.approvedPartnerCampuses);
+      }
 
       if (payload.identity?.role) {
         dbIdentity.current = { role: payload.identity.role, provisioningStatus: payload.identity.provisioningStatus };
@@ -393,6 +415,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           companyName: resolvedCompanyName ?? current?.companyName,
           hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
         }));
+        if (role === "partner" && resolvedCompanyName) {
+          setActivePartnerInstitution(resolvedCompanyName);
+        }
       }
 
       setProfile(payload.profile ?? null);
@@ -566,6 +591,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else {
       toast.info("Verifikasi ditolak");
     }
+
+    try {
+      await fetch("/api/partner/talent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId, status, institution }),
+      });
+    } catch (err) {
+      console.error("Gagal menyimpan verifikasi ke server", err);
+    }
+
     return true;
   };
 
@@ -580,11 +616,117 @@ export function AppProvider({ children }: { children: ReactNode }) {
           count++;
         }
       });
-      return { ...current, partnerVerifications: next };
+      const nextCv =
+        current.cvProfile &&
+        current.cvProfile.campusVerification &&
+        current.cvProfile.campusVerification.institution.toLowerCase().includes(institution.toLowerCase()) &&
+        current.cvProfile.campusVerification.status === "pending"
+          ? {
+              ...current.cvProfile,
+              campusVerification: {
+                ...current.cvProfile.campusVerification,
+                status: "verified" as const,
+                verifiedAt: now,
+                verifiedBy: `${institution} Career Center`,
+              },
+            }
+          : current.cvProfile;
+      return { ...current, partnerVerifications: next, cvProfile: nextCv };
     });
+
+    try {
+      await fetch("/api/partner/talent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch: true, institution, status: "verified" }),
+      });
+    } catch (err) {
+      console.error("Gagal menyimpan verifikasi massal ke server", err);
+    }
+
     toast.success(`${count} talent berhasil diverifikasi massal!`);
     return count;
   };
+
+  const requestCampusVerification = async (params: {
+    institution: string;
+    program?: string;
+    year?: string;
+    proofDocumentUrl?: string;
+  }) => {
+    const now = new Date().toISOString();
+    const candidateId = state.cvProfile?.id || "my-candidate";
+    const updated: CampusVerification = {
+      institution: params.institution,
+      program: params.program || "Umum",
+      year: params.year || "2024",
+      status: "pending",
+      requestedAt: now,
+      proofDocumentUrl: params.proofDocumentUrl,
+    };
+
+    setState((current) => {
+      const nextCv = current.cvProfile
+        ? { ...current.cvProfile, campusVerification: updated }
+        : current.cvProfile;
+      return {
+        ...current,
+        cvProfile: nextCv,
+        partnerVerifications: {
+          ...(current.partnerVerifications ?? {}),
+          [candidateId]: updated,
+        },
+      };
+    });
+
+    if (supabaseConfigured && state.cvProfile) {
+      try {
+        await syncProfile({ ...state.cvProfile, campusVerification: updated });
+      } catch (err) {
+        console.error("Gagal sinkronisasi pengajuan verifikasi ke database", err);
+      }
+    }
+
+    toast.success("Permintaan verifikasi terkirim!", {
+      description: `Pengajuan verifikasi untuk ${params.institution} berhasil dikirim ke mitra.`,
+    });
+
+    return true;
+  };
+
+  const isPartnerCampus = useCallback(
+    (institutionName?: string | null): boolean => {
+      if (!institutionName || !institutionName.trim()) return false;
+      const target = institutionName.trim().toLowerCase();
+      return approvedPartnerCampuses.some((c) => {
+        const campus = c.toLowerCase();
+        return campus === target || campus.includes(target) || target.includes(campus);
+      });
+    },
+    [approvedPartnerCampuses]
+  );
+
+  const recommendCampus = useCallback(async (institution: string, notes?: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/partner/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ institution, notes }),
+      });
+      if (res.ok) {
+        toast.success("Rekomendasi terkirim!", {
+          description: `Terima kasih! Rekomendasi untuk ${institution} berhasil dicatat. Tim ProofyLink akan memprioritaskan komunikasi kemitraan.`,
+        });
+        return true;
+      }
+    } catch (err) {
+      console.error("Gagal mengirim rekomendasi kampus:", err);
+    }
+    toast.success("Rekomendasi terkirim!", {
+      description: `Terima kasih! Kami telah mencatat ${institution} dalam prioritas kemitraan.`,
+    });
+    return true;
+  }, []);
 
   const markNotificationRead = async (id: string) => {
     if (supabaseConfigured) {
@@ -811,7 +953,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { role, provisioningStatus: fallbackStatus, hasSubmittedOnboarding: false };
   };
 
-  const logout = async () => {
+  const logout = async (redirectPath?: string) => {
     if (supabaseConfigured) {
       const supabase = createClient();
       try { await supabase.auth.signOut(); } catch {}
@@ -831,6 +973,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         root.removeAttribute("data-relaxed-spacing");
       }
     } catch {}
+    if (redirectPath && typeof window !== "undefined") {
+      window.location.href = redirectPath;
+    }
   };
 
   const scan = (id: string) => {
@@ -1006,21 +1151,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const saveCvProfile = async (profile: CvProfile) => {
-    let campusVerification = profile.campusVerification;
-    const edu = profile.education?.[0];
-    if (edu?.school) {
-      const match = PARTNER_CAMPUSES.find((c) => edu.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(edu.school.toLowerCase()));
-      if (match) {
-        campusVerification = {
-          institution: match,
-          program: edu.program || "Umum",
-          year: edu.dates || "2024",
-          status: campusVerification?.institution === match && campusVerification?.status === "verified" ? "verified" : "pending",
-          verifiedAt: campusVerification?.institution === match && campusVerification?.status === "verified" ? campusVerification.verifiedAt : undefined,
-          verifiedBy: campusVerification?.institution === match && campusVerification?.status === "verified" ? campusVerification.verifiedBy : undefined,
-        };
-      }
-    }
+    const campusVerification = profile.campusVerification !== undefined
+      ? profile.campusVerification
+      : state.cvProfile?.campusVerification;
     const currentAvatarUrl =
       profile.avatarUrl !== undefined ? profile.avatarUrl : (state.cvProfile?.avatarUrl || "");
     const currentBannerUrl =
@@ -1277,6 +1410,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     previewCandidate,
     reloadBootstrap,
     setProvisioningStatus,
+    requestCampusVerification,
+    isPartnerCampus,
+    recommendCampus,
   });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -1284,6 +1420,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActivePartnerInstitution,
       verifyCandidateByPartner,
       verifyAllCandidatesForInstitution,
+      requestCampusVerification,
       markNotificationRead,
       markAllNotificationsRead,
       login,
@@ -1307,6 +1444,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       previewCandidate,
       reloadBootstrap,
       setProvisioningStatus,
+      isPartnerCampus,
+      recommendCampus,
     };
   });
 
@@ -1314,6 +1453,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActivePartnerInstitution: (institution: string) => actionsRef.current.setActivePartnerInstitution(institution),
     verifyCandidateByPartner: (candidateId: string, status: "verified" | "rejected") => actionsRef.current.verifyCandidateByPartner(candidateId, status),
     verifyAllCandidatesForInstitution: (institution: string) => actionsRef.current.verifyAllCandidatesForInstitution(institution),
+    requestCampusVerification: (params: { institution: string; program?: string; year?: string; proofDocumentUrl?: string }) => actionsRef.current.requestCampusVerification(params),
+    isPartnerCampus: (institutionName?: string | null) => actionsRef.current.isPartnerCampus(institutionName),
+    recommendCampus: (institution: string, notes?: string) => actionsRef.current.recommendCampus(institution, notes),
     markNotificationRead: (id: string) => actionsRef.current.markNotificationRead(id),
     markAllNotificationsRead: () => actionsRef.current.markAllNotificationsRead(),
     login: (role: UserRole, email: string, password: string) => actionsRef.current.login(role, email, password),
@@ -1321,7 +1463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loginAsFreshCandidate: () => actionsRef.current.loginAsFreshCandidate(),
     loginAsDemoPartner: () => actionsRef.current.loginAsDemoPartner(),
     register: (name: string, role: UserRole, email: string, password: string, companyName?: string) => actionsRef.current.register(name, role, email, password, companyName),
-    logout: () => actionsRef.current.logout(),
+    logout: (redirectPath?: string) => actionsRef.current.logout(redirectPath),
     scan: (id: string) => actionsRef.current.scan(id),
     toggleShortlist: (id: string) => actionsRef.current.toggleShortlist(id),
     saveNote: (id: string, note: string) => actionsRef.current.saveNote(id, note),
@@ -1383,6 +1525,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     databaseError,
     configError,
     activePartnerInstitution,
+    approvedPartnerCampuses,
     ...actions,
   }), [
     state,
@@ -1400,6 +1543,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     databaseError,
     configError,
     activePartnerInstitution,
+    approvedPartnerCampuses,
     actions,
   ]);
 

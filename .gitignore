@@ -90,4 +90,6 @@ next-env.d.ts
 .opencode
 .vscode
 
+scripts/
+
 mock-talentNetwork.code-workspace

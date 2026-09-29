@@ -4,16 +4,21 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Building2,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   ExternalLink,
   Eye,
   FileCheck,
   FileText,
   Loader2,
+  Lock,
+  Radio,
   RefreshCw,
   Search,
   ShieldAlert,
+  Sparkles,
   Trash2,
   User,
   XCircle,
@@ -34,6 +39,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export interface CompanyItem {
@@ -50,6 +56,9 @@ export interface CompanyItem {
   city: string | null;
   officeAddress: string | null;
   companyEmail: string | null;
+  companyPhone: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
   website: string | null;
   linkedinUrl: string | null;
   description: string | null;
@@ -70,6 +79,7 @@ export interface CompanyItem {
     name: string | null;
     email: string | null;
     phone: string | null;
+    title: string | null;
   };
   usage: {
     tokenBalance: number;
@@ -133,6 +143,25 @@ const SCALE_OPTIONS = [
 
 const TIER_OPTIONS = ["trial", "starter", "professional", "enterprise"];
 
+const QUICK_NOTES_TEMPLATES = [
+  {
+    label: "Legalitas Valid & Sah",
+    text: "Dokumen NIB dan NPWP telah diperiksa dan dinyatakan sah serta sesuai dengan profil entitas usaha. Akun rekruter disetujui.",
+  },
+  {
+    label: "NIB Buram / Tidak Jelas",
+    text: "Berkas NIB tidak terbaca dengan jelas atau terpotong. Mohon unggah ulang dokumen resmi OSS dalam format PDF yang jelas dan beresolusi tinggi.",
+  },
+  {
+    label: "NPWP Tidak Cocok",
+    text: "Nomor atau nama wajib pajak pada dokumen NPWP tidak cocok dengan data legalitas perusahaan. Mohon periksa dan unggah kembali berkas yang sesuai.",
+  },
+  {
+    label: "Data Kontak Kurang Lengkap",
+    text: "Mohon lengkapi alamat kantor operasional, nomor telepon kantor, dan informasi kontak penanggung jawab (PIC) yang valid.",
+  },
+];
+
 import { Suspense } from "react";
 
 function AdminCompaniesContent() {
@@ -142,6 +171,9 @@ function AdminCompaniesContent() {
 
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const { phase: gatePhase, code: gateCode, fail: failGate } = useAdminGate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
@@ -152,6 +184,7 @@ function AdminCompaniesContent() {
   const [activeTab, setActiveTab] = useState<"legal" | "verification" | "subscription">("legal");
   const [updating, setUpdating] = useState(false);
   const [openingDoc, setOpeningDoc] = useState<"nib" | "npwp" | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Edit form state in modal - matches recruiter profile form 1:1
   const [formStatus, setFormStatus] = useState<CompanyItem["verificationStatus"]>("pending");
@@ -162,7 +195,8 @@ function AdminCompaniesContent() {
   const [formScale, setFormScale] = useState("");
   const [formProvince, setFormProvince] = useState("");
   const [formCity, setFormCity] = useState("");
-  const [formEmail, setFormEmail] = useState("");
+  const [formCompanyEmail, setFormCompanyEmail] = useState("");
+  const [formCompanyPhone, setFormCompanyPhone] = useState("");
   const [formWebsite, setFormWebsite] = useState("");
   const [formLinkedin, setFormLinkedin] = useState("");
   const [formTier, setFormTier] = useState<CompanyItem["subscriptionTier"]>("trial");
@@ -181,9 +215,11 @@ function AdminCompaniesContent() {
     setSelectedCompany(c);
     setFormCompanyName(c.name || "");
     setFormPicName(c.owner?.name || "");
-    setFormPicTitle("");
+    setFormPicTitle(c.owner?.title || "");
     setFormPicEmail(c.owner?.email || c.companyEmail || "");
     setFormPicPhone(c.owner?.phone || "");
+    setFormCompanyEmail(c.companyEmail || "");
+    setFormCompanyPhone(c.companyPhone || "");
     setFormStatus(c.verificationStatus);
     setFormNotes(c.verificationNotes || "");
     setFormNib(c.nib || "");
@@ -194,75 +230,184 @@ function AdminCompaniesContent() {
     setFormCity(c.city || "");
     setFormDescription(c.description || "");
     setFormOfficeAddress(c.officeAddress || "");
-    setFormEmail(c.companyEmail || c.owner?.email || "");
     setFormWebsite(c.website || "");
     setFormLinkedin(c.linkedinUrl || "");
     setFormTier(c.subscriptionTier || "trial");
     setFormSubStatus(c.subscriptionStatus || "active");
   }, []);
 
-  const openReviewModal = useCallback((c: CompanyItem) => {
-    populateForm(c);
-    setActiveTab("legal");
-    setModalOpen(true);
+  const openReviewModal = useCallback(
+    (c: CompanyItem) => {
+      populateForm(c);
+      setActiveTab("legal");
+      setModalOpen(true);
 
-    // Live sync: fetch fresh copy from server to ensure 100% latest live data
-    void fetch(new URL(`/api/admin/companies?t=${Date.now()}`, window.location.origin), {
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.companies) {
-          const fresh = (data.companies as CompanyItem[]).find((item) => item.id === c.id);
-          if (fresh) {
-            populateForm(fresh);
-          }
-        }
-      })
-      .catch(() => null);
-  }, [populateForm]);
-
-  const fetchCompanies = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(new URL(`/api/admin/companies?t=${Date.now()}`, window.location.origin), {
+      // Live sync fresh copy from server to ensure 100% latest live data
+      void fetch(new URL(`/api/admin/companies?t=${Date.now()}`, window.location.origin), {
         cache: "no-store",
-        headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCompanies(data.companies || []);
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.companies) {
+            const fresh = (data.companies as CompanyItem[]).find((item) => item.id === c.id);
+            if (fresh) {
+              populateForm(fresh);
+            }
+          }
+        })
+        .catch(() => null);
+    },
+    [populateForm]
+  );
 
-        if (initialReviewId && data.companies) {
-          const target = data.companies.find((c: CompanyItem) => c.id === initialReviewId);
-          if (target) {
-            openReviewModal(target);
+  const fetchCompanies = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setRefreshing(true);
+      try {
+        const res = await fetch(new URL(`/api/admin/companies?t=${Date.now()}`, window.location.origin), {
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const incoming = (data.companies || []) as CompanyItem[];
+          setCompanies(incoming);
+          setLastRefreshedAt(new Date());
+
+          // Refresh selectedCompany if modal is open
+          setSelectedCompany((curr) => {
+            if (!curr) return null;
+            const updated = incoming.find((item) => item.id === curr.id);
+            return updated || curr;
+          });
+
+          if (initialReviewId && incoming.length > 0) {
+            const target = incoming.find((c: CompanyItem) => c.id === initialReviewId);
+            if (target) {
+              openReviewModal(target);
+            }
+          }
+        } else if (res.status === 401) {
+          failGate(401);
+        } else if (res.status === 403) {
+          failGate(403);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          if (!silent) {
+            console.error("Companies API error:", res.status, errData);
+            toast.error(`Gagal memuat data perusahaan (${res.status}): ${errData.error ?? "Unknown error"}`);
           }
         }
-      } else if (res.status === 401) {
-        failGate(401);
-      } else if (res.status === 403) {
-        failGate(403);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error("Companies API error:", res.status, errData);
-        toast.error(`Gagal memuat data perusahaan (${res.status}): ${errData.error ?? "Unknown error"}`);
+      } catch (err) {
+        if (!silent) {
+          console.error("fetchCompanies exception:", err);
+          toast.error("Gagal memuat daftar perusahaan.");
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (err) {
-      console.error("fetchCompanies exception:", err);
-      toast.error("Gagal memuat daftar perusahaan.");
-    } finally {
-      setLoading(false);
-    }
-  }, [initialReviewId, openReviewModal, failGate]);
+    },
+    [initialReviewId, openReviewModal, failGate]
+  );
 
-
+  // 1. Initial fetch on mount
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void fetchCompanies();
+      void fetchCompanies(false);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [fetchCompanies]);
+
+  // 2. Real-time updates via Supabase Realtime channel
+  useEffect(() => {
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("admin-companies-realtime-sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "organizations" },
+          () => {
+            void fetchCompanies(true);
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "profiles" },
+          () => {
+            void fetchCompanies(true);
+          }
+        )
+        .subscribe((status) => {
+          setIsRealtimeActive(status === "SUBSCRIBED");
+        });
+    } catch (e) {
+      console.warn("Supabase realtime subscription unavailable:", e);
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          const supabase = createClient();
+          void supabase.removeChannel(channel);
+        } catch {}
+      }
+    };
+  }, [fetchCompanies]);
+
+  // 3. Tab-to-tab BroadcastChannel sync for instant updates in same browser
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const bc = new BroadcastChannel("proofylink_company_updates");
+    bc.onmessage = (event) => {
+      if (
+        event.data?.type === "COMPANY_UPDATED" ||
+        event.data?.type === "RECRUITER_UPDATED" ||
+        event.data?.type === "PROFILE_SAVED"
+      ) {
+        void fetchCompanies(true);
+      }
+    };
+    return () => {
+      bc.close();
+    };
+  }, [fetchCompanies]);
+
+  // 4. Background polling and window visibility revalidation
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchCompanies(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchCompanies(true);
+      }
+    }, 12000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearInterval(interval);
+    };
+  }, [fetchCompanies]);
+
+  const handleCopyText = (text: string, fieldName: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    toast.success(`${fieldName} disalin ke clipboard!`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleApplyQuickNote = (noteText: string) => {
+    setFormNotes((prev) => (prev ? `${prev.trim()}\n${noteText}` : noteText));
+  };
 
   const handleSaveCompany = async () => {
     if (!selectedCompany) return;
@@ -273,22 +418,8 @@ function AdminCompaniesContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formCompanyName || selectedCompany.name,
-          picName: formPicName || null,
-          picPhone: formPicPhone || null,
           verificationStatus: formStatus,
           verificationNotes: formNotes || null,
-          nib: formNib || null,
-          npwp: formNpwp || null,
-          industry: formIndustry || null,
-          companyScale: formScale || null,
-          province: formProvince || null,
-          city: formCity || null,
-          description: formDescription || null,
-          officeAddress: formOfficeAddress || null,
-          companyEmail: formEmail || null,
-          website: formWebsite || null,
-          linkedinUrl: formLinkedin || null,
           subscriptionTier: formTier,
           subscriptionStatus: formSubStatus,
         }),
@@ -296,13 +427,13 @@ function AdminCompaniesContent() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Gagal memperbarui data.");
+        throw new Error(errorData.error || "Gagal memperbarui status verifikasi.");
       }
 
       const resData = await res.json();
       const updated = resData.company;
 
-      toast.success(`Data perusahaan ${formCompanyName || selectedCompany.name} berhasil diperbarui & disinkronkan!`);
+      toast.success(`Keputusan verifikasi untuk ${selectedCompany.name} berhasil disimpan!`);
       setModalOpen(false);
 
       if (updated) {
@@ -310,7 +441,17 @@ function AdminCompaniesContent() {
           prev.map((item) => (item.id === selectedCompany.id ? { ...item, ...updated } : item))
         );
       }
-      void fetchCompanies();
+
+      // Broadcast update across tabs
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("proofylink_company_updates");
+          bc.postMessage({ type: "COMPANY_UPDATED", companyId: selectedCompany.id });
+          bc.close();
+        } catch {}
+      }
+
+      void fetchCompanies(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal menyimpan perubahan.";
       toast.error(msg);
@@ -337,7 +478,16 @@ function AdminCompaniesContent() {
       if (modalOpen && selectedCompany?.id === company.id) {
         setModalOpen(false);
       }
-      fetchCompanies();
+
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("proofylink_company_updates");
+          bc.postMessage({ type: "COMPANY_UPDATED", companyId: company.id });
+          bc.close();
+        } catch {}
+      }
+
+      void fetchCompanies(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal menghapus perusahaan.";
       toast.error(msg);
@@ -368,7 +518,6 @@ function AdminCompaniesContent() {
     }
   };
 
-
   // Filtered companies
   const filtered = useMemo(() => {
     return companies.filter((c) => {
@@ -380,7 +529,11 @@ function AdminCompaniesContent() {
         (c.nib && c.nib.toLowerCase().includes(s)) ||
         (c.npwp && c.npwp.toLowerCase().includes(s)) ||
         (c.companyEmail && c.companyEmail.toLowerCase().includes(s)) ||
-        (c.city && c.city.toLowerCase().includes(s));
+        (c.companyPhone && c.companyPhone.toLowerCase().includes(s)) ||
+        (c.city && c.city.toLowerCase().includes(s)) ||
+        (c.province && c.province.toLowerCase().includes(s)) ||
+        (c.owner?.name && c.owner.name.toLowerCase().includes(s)) ||
+        (c.owner?.email && c.owner.email.toLowerCase().includes(s));
       return matchesStatus && matchesSearch;
     });
   }, [companies, statusFilter, search]);
@@ -404,15 +557,28 @@ function AdminCompaniesContent() {
   return (
     <AdminShell title="Manajemen & Verifikasi Perusahaan">
       <div className="space-y-6">
-        {/* Top Header Card with Quick Summary */}
+        {/* Top Header Card with Quick Summary & Real-time Indicator */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                Direktori Perusahaan
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                  Direktori &amp; Review Rekruter
+                </h2>
+                {isRealtimeActive ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Real-time
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-0.5 text-[10.5px] font-medium text-slate-600 border border-slate-200">
+                    <Radio className="size-3 text-slate-400" />
+                    Auto-sync (12s)
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Verifikasi legalitas, izin berusaha, dan status akun rekruter terdaftar.
+                Verifikasi legalitas NIB/NPWP, informasi profil entitas rekruter, dan sinkronisasi akun secara real time.
               </p>
             </div>
 
@@ -425,6 +591,17 @@ function AdminCompaniesContent() {
                 <Clock className="size-3.5" />
                 {companies.filter((c) => c.verificationStatus === "pending").length} Menunggu Review
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchCompanies(false)}
+                disabled={refreshing}
+                className="h-8 rounded-xl border-slate-200 text-xs px-2.5 bg-white hover:bg-slate-50 gap-1 text-slate-600"
+                title={`Terakhir diperbarui: ${lastRefreshedAt.toLocaleTimeString("id-ID")}`}
+              >
+                <RefreshCw className={cn("size-3.5", refreshing ? "animate-spin text-[#7C3AED]" : "")} />
+                <span className="hidden sm:inline font-medium">Segarkan</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -435,7 +612,7 @@ function AdminCompaniesContent() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <Input
               type="text"
-              placeholder="Cari nama perusahaan, NIB, NPWP, atau email..."
+              placeholder="Cari perusahaan, NIB, NPWP, nama PIC, email, atau telepon..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10 bg-white border-slate-200 text-xs rounded-xl h-10 shadow-2xs"
@@ -449,12 +626,11 @@ function AdminCompaniesContent() {
               { id: "approved", label: "Approved" },
               { id: "need_revision", label: "Need Revision" },
               { id: "rejected", label: "Rejected" },
-              { id: "suspended", label: "Suspended" },
             ].map((st) => (
               <Button
                 key={st.id}
-                variant={statusFilter === st.id ? "default" : "outline"}
                 size="sm"
+                variant={statusFilter === st.id ? "default" : "outline"}
                 onClick={() => setStatusFilter(st.id)}
                 className={cn(
                   "text-xs rounded-xl h-8.5 font-bold transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5",
@@ -466,15 +642,6 @@ function AdminCompaniesContent() {
                 {st.label}
               </Button>
             ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchCompanies}
-              className="h-8.5 rounded-xl border-slate-200 px-2.5 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all hover:-translate-y-0.5"
-              title="Segarkan data"
-            >
-              <RefreshCw className={cn("size-3.5", loading ? "animate-spin" : "")} />
-            </Button>
           </div>
         </div>
 
@@ -486,11 +653,11 @@ function AdminCompaniesContent() {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/90 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">
                     <th className="py-3.5 px-4">Nama Perusahaan &amp; Sektor</th>
-                    <th className="py-3.5 px-4">Legalitas (NIB / NPWP)</th>
-                    <th className="py-3.5 px-4">Skala &amp; Lokasi</th>
+                    <th className="py-3.5 px-4">PIC / Penanggung Jawab</th>
+                    <th className="py-3.5 px-4">Legalitas (NIB &amp; NPWP)</th>
+                    <th className="py-3.5 px-4">Lokasi &amp; Skala</th>
                     <th className="py-3.5 px-4">Status Verifikasi</th>
-                    <th className="py-3.5 px-4">Paket Langganan</th>
-                    <th className="py-3.5 px-4">Saldo Token</th>
+                    <th className="py-3.5 px-4">Paket &amp; Token</th>
                     <th className="py-3.5 px-4 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -499,14 +666,14 @@ function AdminCompaniesContent() {
                     <tr>
                       <td colSpan={7} className="py-14 text-center text-muted-foreground">
                         <Loader2 className="size-7 animate-spin mx-auto mb-2 text-[#7C3AED]" />
-                        <span className="font-medium text-xs">Memuat data master perusahaan...</span>
+                        <span className="font-medium text-xs">Memuat data rekruter &amp; perusahaan...</span>
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-14 text-center text-muted-foreground">
                         <Building2 className="size-9 mx-auto mb-2 text-slate-300" />
-                        <span className="font-medium text-xs">Tidak ada data perusahaan yang sesuai kriteria pencarian.</span>
+                        <span className="font-medium text-xs">Tidak ada data rekruter yang sesuai kriteria pencarian.</span>
                       </td>
                     </tr>
                   ) : (
@@ -517,38 +684,65 @@ function AdminCompaniesContent() {
                       return (
                         <tr key={c.id} className="hover:bg-purple-50/20 transition-colors">
                           <td className="py-3.5 px-4">
-                            <p className="font-bold text-slate-900 text-sm">{c.name}</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              {c.industry || "Sektor belum dipilih"}
+                            <div className="flex items-center gap-3">
+                              {c.logoUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={c.logoUrl}
+                                  alt={c.name}
+                                  className="size-9 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                                />
+                              ) : (
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED] font-bold text-xs border border-purple-200/80">
+                                  {c.name.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-sm truncate max-w-[200px]" title={c.name}>
+                                  {c.name}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[200px]">
+                                  {c.industry || "Sektor belum dipilih"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-[11px]">
+                            <p className="font-semibold text-slate-800">{c.owner?.name || "Nama PIC Belum Diisi"}</p>
+                            {c.owner?.title && (
+                              <p className="text-purple-700 font-medium text-[10.5px]">{c.owner.title}</p>
+                            )}
+                            <p className="text-slate-500 text-[10.5px] truncate max-w-[170px] mt-0.5">
+                              {c.owner?.phone || c.owner?.email || "-"}
                             </p>
                           </td>
                           <td className="py-3.5 px-4 text-[11px]">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-semibold text-slate-600">NIB:</span>
-                                {c.nibDocumentUrl ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF Ada
+                                <span className="font-semibold text-slate-600 text-[10.5px]">NIB:</span>
+                                <span className="font-mono text-slate-800 text-[11px]">{c.nib || "-"}</span>
+                                {c.nibDocumentUrl && (
+                                  <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF
                                   </span>
-                                ) : (
-                                  <span className="text-slate-400 text-[10px] italic">-</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <span className="font-semibold text-slate-600">NPWP:</span>
-                                {c.npwpDocumentUrl ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF Ada
+                                <span className="font-semibold text-slate-600 text-[10.5px]">NPWP:</span>
+                                <span className="font-mono text-slate-800 text-[11px]">{c.npwp || "-"}</span>
+                                {c.npwpDocumentUrl && (
+                                  <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="size-2.5 text-emerald-600" /> PDF
                                   </span>
-                                ) : (
-                                  <span className="text-slate-400 text-[10px] italic">-</span>
                                 )}
                               </div>
                             </div>
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
                             <div className="font-medium text-slate-800">{c.companyScale || "-"}</div>
-                            <div className="text-[11px] text-slate-500">{c.city || c.province || "-"}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {[c.city, c.province].filter(Boolean).join(", ") || "-"}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4">
                             <span
@@ -562,12 +756,12 @@ function AdminCompaniesContent() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
-                            <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 capitalize text-[10px] font-bold">
+                            <Badge className="bg-purple-50 text-[#7C3AED] border-purple-200 capitalize text-[10px] font-bold mb-1">
                               {c.subscriptionTier}
                             </Badge>
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
-                            {c.tokenBalance} Token
+                            <p className="font-bold text-slate-900 font-mono text-[11px]">
+                              {c.tokenBalance} Token
+                            </p>
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -601,17 +795,18 @@ function AdminCompaniesContent() {
           </CardContent>
         </Card>
 
-        {/* Modal Detail & Review Perusahaan */}
+        {/* Modal Detail & Review Data Rekruter */}
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden rounded-2xl">
             <DialogHeader className="border-b border-slate-100 pb-3.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <DialogTitle className="text-lg font-bold text-slate-900">
-                    Review Perusahaan: {selectedCompany?.name}
+                  <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>Review Data Rekruter:</span>
+                    <span className="text-[#7C3AED]">{selectedCompany?.name}</span>
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    ID: <span className="font-mono text-slate-700 font-semibold">{selectedCompany?.id}</span> · Terdaftar sejak{" "}
+                    ID Organisasi: <span className="font-mono text-slate-700 font-semibold">{selectedCompany?.id}</span> · Terdaftar sejak{" "}
                     {selectedCompany?.createdAt
                       ? new Date(selectedCompany.createdAt).toLocaleDateString("id-ID")
                       : "-"}
@@ -632,7 +827,7 @@ function AdminCompaniesContent() {
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                   )}
                 >
-                  Informasi &amp; Legalitas
+                  Profil Rekruter &amp; Legalitas
                 </Button>
                 <Button
                   size="sm"
@@ -645,7 +840,7 @@ function AdminCompaniesContent() {
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                   )}
                 >
-                  Status Verifikasi
+                  Keputusan Verifikasi
                 </Button>
                 <Button
                   size="sm"
@@ -667,92 +862,213 @@ function AdminCompaniesContent() {
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {activeTab === "legal" && (
                 <div className="space-y-4 text-xs">
+                  {/* Notice Banner: Read-only Mode */}
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-900 flex items-start gap-3 shadow-2xs">
+                    <Lock className="size-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                        Mode Review Verifikasi (Hanya Baca)
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/60 text-amber-900 px-2 py-0.5 text-[10px] font-bold">
+                          Terkunci dari Edit Admin
+                        </span>
+                      </p>
+                      <p className="text-[11.5px] text-amber-800 leading-relaxed">
+                        Data identitas PIC, profil perusahaan, dan dokumen legalitas di bawah ini bersifat hanya-baca (read-only). Hanya pemilik akun rekruter yang berwenang mengubah profil dan dokumen legalitas mereka.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Bagian 1: Identitas PIC / Penanggung Jawab */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
-                        <User className="size-4" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-[#7C3AED]">
+                          <User className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">Identitas PIC / Penanggung Jawab Rekrutmen</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Informasi perwakilan resmi dari tim HR atau Talent Acquisition yang mengelola akun.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">Identitas PIC / Penanggung Jawab</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Informasi perwakilan resmi dari tim Talent Acquisition atau HR.
-                        </p>
-                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                        <Lock className="size-2.5" /> Read-only
+                      </span>
                     </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Nama Lengkap PIC</label>
-                        <Input
-                          value={formPicName}
-                          onChange={(e) => setFormPicName(e.target.value)}
-                          placeholder="Contoh: Budi Santoso"
-                          className="h-8 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicName || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicName && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicName, "Nama PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Nama PIC"
+                            >
+                              {copiedField === "Nama PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Jabatan / Role PIC</label>
-                        <Input
-                          value={formPicTitle}
-                          onChange={(e) => setFormPicTitle(e.target.value)}
-                          placeholder="Contoh: Talent Acquisition Lead"
-                          className="h-8 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicTitle || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicTitle && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicTitle, "Jabatan PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Jabatan PIC"
+                            >
+                              {copiedField === "Jabatan PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">Email Akun PIC</label>
-                        <Input
-                          value={formPicEmail}
-                          disabled
-                          className="h-8 text-xs bg-slate-50 text-muted-foreground cursor-not-allowed"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formPicEmail || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicEmail && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicEmail, "Email Akun PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Email Akun PIC"
+                            >
+                              {copiedField === "Email Akun PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                         <span className="text-[10px] text-muted-foreground block mt-0.5">
-                          Email login terikat dengan akun dan tidak dapat diubah langsung.
+                          Email login terikat dengan autentikasi akun.
                         </span>
                       </div>
+
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Nomor Telepon / WhatsApp</label>
-                        <Input
-                          value={formPicPhone}
-                          onChange={(e) => setFormPicPhone(e.target.value)}
-                          placeholder="0812-xxxx-xxxx"
-                          className="h-8 text-xs bg-white"
-                        />
+                        <label className="font-semibold text-slate-700 block mb-1">Nomor Telepon / WhatsApp PIC</label>
+                        <div className="relative">
+                          <Input
+                            value={formPicPhone || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-medium pr-8"
+                          />
+                          {formPicPhone && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formPicPhone, "Telepon PIC")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Telepon PIC"
+                            >
+                              {copiedField === "Telepon PIC" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Bagian 2: Profil Entitas Bisnis & Operasional */}
+                  {/* Bagian 2: Profil Entitas Perusahaan */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
-                        <Building2 className="size-4" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                          <Building2 className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">Profil Entitas Perusahaan</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Data profil organisasi yang ditampilkan kepada kandidat pada platform Talent Network.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">Profil Perusahaan</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Informasi perusahaan yang ditampilkan kepada kandidat saat permintaan kontak.
-                        </p>
+                      <div className="flex items-center gap-2">
+                        {selectedCompany?.logoUrl && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={selectedCompany.logoUrl}
+                              alt="Logo Perusahaan"
+                              className="size-7 rounded-lg object-cover border border-slate-200"
+                            />
+                            <span className="text-[10px] text-slate-500 font-medium">Logo Aktif</span>
+                          </div>
+                        )}
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                          <Lock className="size-2.5" /> Read-only
+                        </span>
                       </div>
                     </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="font-semibold text-slate-700 block mb-1">
-                          Nama Resmi Perusahaan (PT/CV) *
+                          Nama Resmi Perusahaan (PT/CV)
                         </label>
-                        <Input
-                          value={formCompanyName}
-                          onChange={(e) => setFormCompanyName(e.target.value)}
-                          placeholder="Nama badan hukum perusahaan"
-                          className="h-8 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={formCompanyName || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-bold pr-8"
+                          />
+                          {formCompanyName && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyName, "Nama Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Nama Perusahaan"
+                            >
+                              {copiedField === "Nama Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Sektor Industri *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Sektor Industri</label>
                         <select
                           value={formIndustry}
-                          onChange={(e) => setFormIndustry(e.target.value)}
-                          className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2"
+                          disabled
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed px-2.5 font-medium"
                         >
                           {INDUSTRY_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -761,12 +1077,13 @@ function AdminCompaniesContent() {
                           ))}
                         </select>
                       </div>
+
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Skala / Ukuran Perusahaan *</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Skala / Ukuran Perusahaan</label>
                         <select
                           value={formScale}
-                          onChange={(e) => setFormScale(e.target.value)}
-                          className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2"
+                          disabled
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed px-2.5 font-medium"
                         >
                           {SCALE_OPTIONS.map((opt) => (
                             <option key={opt.id} value={opt.id}>
@@ -775,97 +1092,249 @@ function AdminCompaniesContent() {
                           ))}
                         </select>
                       </div>
+
                       <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Kota Kantor</label>
+                        <label className="font-semibold text-slate-700 block mb-1">Email Resmi Perusahaan</label>
+                        <div className="relative">
+                          <Input
+                            value={formCompanyEmail || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formCompanyEmail && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyEmail, "Email Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Email Perusahaan"
+                            >
+                              {copiedField === "Email Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Telepon Kantor Resmi</label>
+                        <div className="relative">
+                          <Input
+                            value={formCompanyPhone || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formCompanyPhone && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formCompanyPhone, "Telepon Perusahaan")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Telepon Perusahaan"
+                            >
+                              {copiedField === "Telepon Perusahaan" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Website Resmi</label>
+                        <div className="relative flex items-center gap-1.5">
+                          <Input
+                            value={formWebsite || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formWebsite && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formWebsite, "Website Perusahaan")}
+                                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin Website"
+                              >
+                                {copiedField === "Website Perusahaan" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                              <a
+                                href={formWebsite.startsWith("http") ? formWebsite : `https://${formWebsite}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#7C3AED] hover:text-[#6D28D9] ml-1"
+                                title="Kunjungi Website"
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Profil LinkedIn Perusahaan</label>
+                        <div className="relative flex items-center gap-1.5">
+                          <Input
+                            value={formLinkedin || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formLinkedin && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formLinkedin, "LinkedIn Perusahaan")}
+                                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin LinkedIn"
+                              >
+                                {copiedField === "LinkedIn Perusahaan" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                              <a
+                                href={formLinkedin.startsWith("http") ? formLinkedin : `https://${formLinkedin}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#7C3AED] hover:text-[#6D28D9] ml-1"
+                                title="Buka LinkedIn"
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Provinsi &amp; Kota Kantor</label>
                         <Input
-                          value={formCity}
-                          onChange={(e) => setFormCity(e.target.value)}
-                          placeholder="Contoh: Surabaya, Jawa Timur"
-                          className="h-8 text-xs bg-white"
+                          value={[formCity, formProvince].filter(Boolean).join(", ") || "-"}
+                          disabled
+                          className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200"
                         />
                       </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="font-semibold text-slate-700 block mb-1">Alamat Kantor Lengkap</label>
+                        <div className="relative">
+                          <Input
+                            value={formOfficeAddress || "-"}
+                            disabled
+                            className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 pr-8"
+                          />
+                          {formOfficeAddress && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(formOfficeAddress, "Alamat Kantor")}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Salin Alamat Kantor"
+                            >
+                              {copiedField === "Alamat Kantor" ? (
+                                <Check className="size-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="sm:col-span-2">
                         <label className="font-semibold text-slate-700 block mb-1">Deskripsi Perusahaan</label>
                         <textarea
-                          value={formDescription}
-                          onChange={(e) => setFormDescription(e.target.value)}
+                          value={formDescription || "Belum ada deskripsi profil perusahaan."}
+                          disabled
+                          readOnly
                           rows={3}
-                          placeholder="Ceritakan tentang model bisnis, produk, atau nilai perusahaan..."
-                          className="w-full text-xs rounded-md border border-slate-300 bg-white p-2.5 outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Website Resmi</label>
-                        <Input
-                          value={formWebsite}
-                          onChange={(e) => setFormWebsite(e.target.value)}
-                          placeholder="https://perusahaan.com"
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-slate-700 block mb-1">Profil LinkedIn Perusahaan</label>
-                        <Input
-                          value={formLinkedin}
-                          onChange={(e) => setFormLinkedin(e.target.value)}
-                          placeholder="https://linkedin.com/company/..."
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="font-semibold text-slate-700 block mb-1">Alamat Kantor Lengkap</label>
-                        <Input
-                          value={formOfficeAddress}
-                          onChange={(e) => setFormOfficeAddress(e.target.value)}
-                          placeholder="Gedung, lantai, nomor, dan nama jalan"
-                          className="h-8 text-xs bg-white"
+                          className="w-full text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-800 cursor-not-allowed p-2.5 resize-none leading-relaxed"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Bagian 3: Dokumen Legalitas & Perpajakan (PDF) */}
+                  {/* Bagian 3: Dokumen Legalitas & Perpajakan Resmi (NIB & NPWP) */}
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                        <FileCheck className="size-4" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                          <FileCheck className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan Resmi</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Periksa nomor identitas berusaha (NIB) dan NPWP Badan Usaha beserta berkas PDF lampiran.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">Dokumen Legalitas &amp; Perpajakan Resmi (PDF)</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Verifikasi keabsahan berkas resmi NIB dan NPWP yang diunggah oleh perusahaan.
-                        </p>
-                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold border border-slate-200">
+                        <Lock className="size-2.5" /> Read-only
+                      </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 items-stretch">
                       {/* NIB Card */}
-                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <FileText className="size-3.5 text-primary" />
-                            Dokumen NIB OSS (PDF)
+                      <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between gap-2 min-h-7">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 min-w-0">
+                            <FileText className="size-4 text-[#7C3AED] shrink-0" />
+                            <span className="truncate">Dokumen NIB OSS</span>
                           </span>
                           {selectedCompany?.nibDocumentUrl ? (
-                            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Terlampir
+                            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 whitespace-nowrap inline-flex items-center">
+                              <CheckCircle2 className="size-3 mr-1 text-emerald-600 shrink-0" /> PDF Terlampir
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200">
+                            <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200 shrink-0 whitespace-nowrap">
                               Belum Diunggah
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Nomor Induk Berusaha resmi yang diterbitkan OSS untuk legalitas operasional bisnis.
-                        </p>
-                        <div className="pt-1">
+
+                        <div className="my-2.5 flex-1 flex flex-col justify-center">
+                          <label className="text-[11px] font-semibold text-slate-700 block mb-1.5 h-4 leading-4 truncate">
+                            Nomor Induk Berusaha (NIB 13 Digit)
+                          </label>
+                          <div className="relative">
+                            <Input
+                              value={formNib || "-"}
+                              disabled
+                              className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-mono pr-8"
+                            />
+                            {formNib && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formNib, "Nomor NIB")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin NIB"
+                              >
+                                {copiedField === "Nomor NIB" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-auto pt-1">
                           {selectedCompany?.nibDocumentUrl ? (
                             <Button
                               type="button"
                               size="sm"
                               disabled={openingDoc === "nib"}
                               onClick={() => handleOpenDocument("nib")}
-                              className="w-full h-8 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium cursor-pointer shadow-xs"
+                              className="w-full h-8.5 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold cursor-pointer shadow-xs rounded-xl flex items-center justify-center"
                             >
                               {openingDoc === "nib" ? (
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -875,41 +1344,66 @@ function AdminCompaniesContent() {
                               Buka &amp; Periksa Berkas NIB (PDF)
                             </Button>
                           ) : (
-                            <div className="rounded-md border border-dashed border-slate-300 bg-white/60 p-2 text-center text-[11px] text-slate-400 italic">
-                              Perusahaan belum melampirkan berkas NIB
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-white/70 h-8.5 flex items-center justify-center text-center text-[11px] text-slate-400 italic px-2">
+                              Perusahaan belum melampirkan berkas NIB (PDF)
                             </div>
                           )}
                         </div>
                       </div>
 
                       {/* NPWP Card */}
-                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <FileText className="size-3.5 text-primary" />
-                            Dokumen NPWP Badan (PDF)
+                      <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between gap-2 min-h-7">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 min-w-0">
+                            <FileText className="size-4 text-[#7C3AED] shrink-0" />
+                            <span className="truncate">Dokumen NPWP Badan</span>
                           </span>
                           {selectedCompany?.npwpDocumentUrl ? (
-                            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                              <CheckCircle2 className="size-3 mr-1 text-emerald-600" /> PDF Terlampir
+                            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 whitespace-nowrap inline-flex items-center">
+                              <CheckCircle2 className="size-3 mr-1 text-emerald-600 shrink-0" /> PDF Terlampir
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200">
+                            <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-100 border-slate-200 shrink-0 whitespace-nowrap">
                               Belum Diunggah
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Salinan dokumen NPWP Badan Usaha atau SKT resmi Ditjen Pajak untuk kepatuhan fiskal.
-                        </p>
-                        <div className="pt-1">
+
+                        <div className="my-2.5 flex-1 flex flex-col justify-center">
+                          <label className="text-[11px] font-semibold text-slate-700 block mb-1.5 h-4 leading-4 truncate">
+                            Nomor NPWP Badan Usaha (15-16 Digit)
+                          </label>
+                          <div className="relative">
+                            <Input
+                              value={formNpwp || "-"}
+                              disabled
+                              className="h-8.5 text-xs bg-slate-50 text-slate-800 cursor-not-allowed border-slate-200 font-mono pr-8"
+                            />
+                            {formNpwp && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(formNpwp, "Nomor NPWP")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title="Salin NPWP"
+                              >
+                                {copiedField === "Nomor NPWP" ? (
+                                  <Check className="size-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="size-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-auto pt-1">
                           {selectedCompany?.npwpDocumentUrl ? (
                             <Button
                               type="button"
                               size="sm"
                               disabled={openingDoc === "npwp"}
                               onClick={() => handleOpenDocument("npwp")}
-                              className="w-full h-8 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium cursor-pointer shadow-xs"
+                              className="w-full h-8.5 text-xs gap-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold cursor-pointer shadow-xs rounded-xl flex items-center justify-center"
                             >
                               {openingDoc === "npwp" ? (
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -919,8 +1413,8 @@ function AdminCompaniesContent() {
                               Buka &amp; Periksa Berkas NPWP (PDF)
                             </Button>
                           ) : (
-                            <div className="rounded-md border border-dashed border-slate-300 bg-white/60 p-2 text-center text-[11px] text-slate-400 italic">
-                              Perusahaan belum melampirkan berkas NPWP
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-white/70 h-8.5 flex items-center justify-center text-center text-[11px] text-slate-400 italic px-2">
+                              Perusahaan belum melampirkan berkas NPWP (PDF)
                             </div>
                           )}
                         </div>
@@ -932,10 +1426,16 @@ function AdminCompaniesContent() {
 
               {activeTab === "verification" && (
                 <div className="space-y-4 text-xs">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-                    <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                      Keputusan Verifikasi
-                    </p>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
+                    <div>
+                      <p className="font-bold text-slate-900 uppercase tracking-wider text-[11px] mb-1">
+                        Keputusan Verifikasi Akun Rekruter
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Persetujuan verifikasi akan secara otomatis mengaktifkan hak akses rekruter untuk mengunggah lowongan kerja dan membuka profil kandidat.
+                      </p>
+                    </div>
+
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">
                         Ubah Status Verifikasi:
@@ -943,7 +1443,7 @@ function AdminCompaniesContent() {
                       <select
                         value={formStatus}
                         onChange={(e) => setFormStatus(e.target.value as CompanyItem["verificationStatus"])}
-                        className="w-full h-9 text-xs rounded-md border border-slate-300 bg-white px-2 font-bold text-slate-900"
+                        className="w-full h-9 text-xs rounded-md border border-slate-300 bg-white px-2.5 font-bold text-slate-900 shadow-2xs"
                       >
                         <option value="pending">Pending Verification (Menunggu Peninjauan)</option>
                         <option value="approved">Approved (Setujui Perusahaan &amp; Aktifkan Rekruter)</option>
@@ -953,15 +1453,35 @@ function AdminCompaniesContent() {
                       </select>
                     </div>
 
+                    {/* Quick Notes Template Chips */}
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
+                        <Sparkles className="size-3.5 text-[#7C3AED]" />
+                        Template Catatan Cepat (Quick Notes):
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {QUICK_NOTES_TEMPLATES.map((tmpl) => (
+                          <button
+                            key={tmpl.label}
+                            type="button"
+                            onClick={() => handleApplyQuickNote(tmpl.text)}
+                            className="rounded-lg border border-purple-200 bg-purple-50/70 hover:bg-purple-100/80 px-2.5 py-1 text-[11px] font-medium text-[#7C3AED] transition-colors cursor-pointer text-left shadow-2xs"
+                          >
+                            + {tmpl.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">
-                        Catatan Verifikasi:
+                        Catatan Hasil Verifikasi &amp; Alasan:
                       </label>
                       <textarea
                         value={formNotes}
                         onChange={(e) => setFormNotes(e.target.value)}
-                        placeholder="Tuliskan catatan hasil verifikasi atau detail berkas yang perlu diperbaiki oleh perusahaan..."
-                        className="w-full h-24 p-2 text-xs rounded-md border border-slate-300 bg-white resize-none"
+                        placeholder="Tuliskan catatan hasil pemeriksaan berkas atau detail yang perlu direvisi oleh rekruter..."
+                        className="w-full h-28 p-2.5 text-xs rounded-md border border-slate-300 bg-white resize-none outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                       />
                     </div>
 
@@ -992,7 +1512,7 @@ function AdminCompaniesContent() {
                         <select
                           value={formTier}
                           onChange={(e) => setFormTier(e.target.value as CompanyItem["subscriptionTier"])}
-                          className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2 capitalize"
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-300 bg-white px-2 capitalize font-medium"
                         >
                           {TIER_OPTIONS.map((t) => (
                             <option key={t} value={t}>
@@ -1006,7 +1526,7 @@ function AdminCompaniesContent() {
                         <select
                           value={formSubStatus}
                           onChange={(e) => setFormSubStatus(e.target.value as CompanyItem["subscriptionStatus"])}
-                          className="w-full h-8 text-xs rounded-md border border-slate-300 bg-white px-2 capitalize"
+                          className="w-full h-8.5 text-xs rounded-md border border-slate-300 bg-white px-2 capitalize font-medium"
                         >
                           <option value="active">Active</option>
                           <option value="expired">Expired</option>
@@ -1103,10 +1623,10 @@ function AdminCompaniesContent() {
                   size="sm"
                   onClick={handleSaveCompany}
                   disabled={updating}
-                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl font-semibold px-4"
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl font-semibold px-4 cursor-pointer shadow-xs"
                 >
                   {updating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-                  Simpan Perubahan &amp; Sinkronisasi
+                  Simpan Keputusan Verifikasi
                 </Button>
               </div>
             </DialogFooter>

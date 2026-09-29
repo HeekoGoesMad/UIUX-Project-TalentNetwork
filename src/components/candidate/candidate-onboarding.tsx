@@ -1411,12 +1411,7 @@ function EducationStep({
           </div>
         </div>
 
-        {items.map((item, index) => {
-          const partnerMatch = PARTNER_CAMPUSES.find(
-            (c) => item.school.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(item.school.toLowerCase())
-          );
-
-          return (
+        {items.map((item, index) => (
             <Card key={index} className="p-5 border-border">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1529,23 +1524,9 @@ function EducationStep({
                   </label>
                 </div>
 
-                {partnerMatch && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50/70 p-2.5 text-xs text-amber-900 font-medium border border-amber-200/80">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <GraduationCap className="size-4 shrink-0 text-amber-700" />
-                      <span className="truncate">
-                        Terhubung ke Career Center <strong>{partnerMatch}</strong>.
-                      </span>
-                    </div>
-                    <span className="inline-flex items-center gap-1 shrink-0 text-[10px] font-semibold text-amber-700 bg-white/80 border border-amber-200 px-2 py-0.5 rounded-full">
-                      <Clock className="size-2.5" /> Verifikasi Segera Hadir
-                    </span>
-                  </div>
-                )}
               </div>
             </Card>
-          );
-        })}
+        ))}
         <Button type="button" variant="outline" onClick={add} className="border-border">
           <Plus className="size-4" />
           Tambah pendidikan

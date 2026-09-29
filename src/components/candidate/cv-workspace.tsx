@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
 import { SalaryInput } from "@/components/ui/salary-input";
+import { RequestVerificationDialog } from "@/components/candidate/request-verification-dialog";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/providers/app-provider";
 import { type CvProfile, type EducationItem, type ExperienceItem } from "@/types";
 import { POPULAR_LOCATION_SUGGESTIONS, isValidLocationFormat, normalizeLocation } from "@/lib/locations";
 import {
   BriefcaseBusiness,
+  Building2,
   Camera,
   Check,
   CheckCircle2,
@@ -19,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Edit3,
   ExternalLink,
   Eye,
@@ -35,13 +38,49 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useUnsavedNavigationGuard } from "@/hooks/use-unsaved-navigation-guard";
 import { CvDownload } from "./cv-download";
 import { CvUnsavedBar } from "./cv-unsaved-bar";
 import { PersonalityModal } from "./personality-modal";
 import { ProfessionalSummaryModal } from "./professional-summary-modal";
+
+export function parseSectionFromUrl(sectionParam?: string | null, hash?: string | null): SectionId | null {
+  const target = (sectionParam || hash || "").toLowerCase().replace(/^#/, "").trim();
+  if (!target) return null;
+  if (
+    target === "skills" ||
+    target === "kompetensi" ||
+    target === "competencies" ||
+    target === "sec-skills" ||
+    target === "portfolio" ||
+    target === "portofolio" ||
+    target === "sec-portfolio"
+  ) {
+    return "skills";
+  }
+  if (
+    target === "basic" ||
+    target === "basic-info" ||
+    target === "sec-basic" ||
+    target === "target-role" ||
+    target === "identitas"
+  ) {
+    return "basic";
+  }
+  if (target === "summary" || target === "about" || target === "sec-summary" || target === "ringkasan") {
+    return "summary";
+  }
+  if (target === "experience" || target === "sec-experience" || target === "pengalaman") {
+    return "experience";
+  }
+  if (target === "education" || target === "sec-education" || target === "pendidikan") {
+    return "education";
+  }
+  return null;
+}
 
 function blank(email = "", fullName = ""): CvProfile {
   return {
@@ -276,7 +315,7 @@ const SECTIONS: SectionMeta[] = [
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function CvWorkspace() {
-  const { cvProfile, user, dbMode, saveCvProfile } = useApp();
+  const { cvProfile, user, dbMode, saveCvProfile, isPartnerCampus } = useApp();
   const [profile, setProfile] = useState<CvProfile>(
     cvProfile ?? blank(dbMode ? user?.email : "", dbMode ? user?.name : "")
   );
@@ -294,7 +333,45 @@ export function CvWorkspace() {
     }
   }
 
-  const [activeSection, setActiveSection] = useState<SectionId>("basic");
+  const searchParams = useSearchParams();
+  const [activeSection, setActiveSection] = useState<SectionId>(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const matched = parseSectionFromUrl(sp.get("section"), window.location.hash);
+      if (matched) return matched;
+    }
+    return "basic";
+  });
+
+  useEffect(() => {
+    const handleUrlNavigation = () => {
+      const sectionFromParam = searchParams?.get("section");
+      const hash = typeof window !== "undefined" ? window.location.hash : "";
+      const matched = parseSectionFromUrl(sectionFromParam, hash);
+      if (matched) {
+        setActiveSection(matched);
+        const isPortfolioTarget =
+          sectionFromParam === "portfolio" ||
+          sectionFromParam === "portofolio" ||
+          hash === "#portfolio" ||
+          hash === "#sec-portfolio" ||
+          hash === "#portofolio";
+        setTimeout(() => {
+          const el = isPortfolioTarget
+            ? document.getElementById("sec-portfolio") || document.getElementById(`sec-${matched}`)
+            : document.getElementById(`sec-${matched}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 120);
+      }
+    };
+
+    handleUrlNavigation();
+
+    window.addEventListener("hashchange", handleUrlNavigation);
+    return () => window.removeEventListener("hashchange", handleUrlNavigation);
+  }, [searchParams]);
   const [viewAll, setViewAll] = useState(false);
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
@@ -302,6 +379,8 @@ export function CvWorkspace() {
   const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [personalityModalOpen, setPersonalityModalOpen] = useState(false);
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const [selectedEduForVerification, setSelectedEduForVerification] = useState<EducationItem | null>(null);
   const [cropModal, setCropModal] = useState<{
     open: boolean;
     imageSrc: string | null;
@@ -918,7 +997,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 1: Identitas & Kontak ── */}
             {(viewAll || activeSection === "basic") && (
-              <div id="sec-basic" className="space-y-5">
+              <div id="sec-basic" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center gap-2 border-b border-border/60 pb-2">
                     <User className="size-4 text-primary" />
@@ -1089,7 +1168,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 2: Ringkasan & Persona ── */}
             {(viewAll || activeSection === "summary") && (
-              <div id="sec-summary" className="space-y-5">
+              <div id="sec-summary" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center gap-2 border-b border-border/60 pb-2 pt-2">
                     <Sparkles className="size-4 text-primary" />
@@ -1170,7 +1249,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 3: Pengalaman Kerja ── */}
             {(viewAll || activeSection === "experience") && (
-              <div id="sec-experience" className="space-y-4">
+              <div id="sec-experience" className="space-y-4 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1395,7 +1474,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 4: Pendidikan & Studi ── */}
             {(viewAll || activeSection === "education") && (
-              <div id="sec-education" className="space-y-4">
+              <div id="sec-education" className="space-y-4 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1437,14 +1516,72 @@ export function CvWorkspace() {
                               <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-mono font-semibold text-muted-foreground">
                                 {i + 1}
                               </span>
-                              <div className="min-w-0">
-                                <h4 className="truncate text-sm font-semibold text-foreground">
-                                  {edu.school ? edu.school : `Pendidikan ${i + 1}`}
-                                </h4>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {edu.program ? `${edu.program} · ` : ""}{edu.level || "S1"}
-                                </p>
-                              </div>
+                              {(() => {
+                                const verif = cvProfile?.campusVerification;
+                                const isMatchingEdu = Boolean(
+                                  verif && edu.school && (
+                                    verif.institution.toLowerCase().includes(edu.school.toLowerCase()) ||
+                                    edu.school.toLowerCase().includes(verif.institution.toLowerCase())
+                                  )
+                                );
+                                const isVerified = isMatchingEdu && verif?.status === "verified";
+                                const isPending = isMatchingEdu && verif?.status === "pending";
+
+                                return (
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <h4 className="truncate text-sm font-semibold text-foreground">
+                                        {edu.school ? edu.school : `Pendidikan ${i + 1}`}
+                                      </h4>
+                                      {isVerified && (
+                                        <span className="inline-flex items-center gap-1 rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-[#7C3AED]">
+                                          <GraduationCap className="size-2.5 text-[#7C3AED]" />
+                                          Verified
+                                        </span>
+                                      )}
+                                      {isPending && (
+                                        <span className="inline-flex items-center gap-1 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                          <Clock className="size-2.5 text-muted-foreground" />
+                                          Permintaan terkirim
+                                        </span>
+                                      )}
+                                      {!isVerified && !isPending && edu.school && (
+                                        (() => {
+                                          const isPartner = isPartnerCampus ? isPartnerCampus(edu.school) : false;
+                                          return isPartner ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedEduForVerification(edu);
+                                                setVerificationDialogOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#7C3AED] hover:underline cursor-pointer"
+                                              title="Ajukan verifikasi ke Career Center kampus mitra resmi"
+                                            >
+                                              <ShieldCheck className="size-2.5" /> Minta Verif
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedEduForVerification(edu);
+                                                setVerificationDialogOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer rounded border border-dashed border-border px-1.5 py-0.5 bg-muted/20"
+                                              title="Kampus belum bermitra — klik untuk merekomendasikan"
+                                            >
+                                              <Building2 className="size-2.5 text-muted-foreground" /> Belum Bermitra
+                                            </button>
+                                          );
+                                        })()
+                                      )}
+                                    </div>
+                                    <p className="truncate text-[11px] text-muted-foreground">
+                                      {edu.program ? `${edu.program} · ` : ""}{edu.level || "S1"}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1">
@@ -1572,7 +1709,7 @@ export function CvWorkspace() {
 
             {/* ── SECTION 5: Kompetensi & Portofolio ── */}
             {(viewAll || activeSection === "skills") && (
-              <div id="sec-skills" className="space-y-5">
+              <div id="sec-skills" className="space-y-5 scroll-mt-24">
                 {viewAll && (
                   <div className="flex items-center justify-between border-b border-border/60 pb-2 pt-2">
                     <div className="flex items-center gap-2">
@@ -1635,7 +1772,7 @@ export function CvWorkspace() {
                 </Field>
 
                 {/* Portfolio Links */}
-                <div className="space-y-3 border-t border-border/60 pt-4">
+                <div id="sec-portfolio" className="space-y-3 border-t border-border/60 pt-4 scroll-mt-24">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-semibold text-foreground">Tautan Portofolio &amp; Karya</span>
@@ -1800,6 +1937,12 @@ export function CvWorkspace() {
             : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
         }
         onCropComplete={handleCropComplete}
+      />
+
+      <RequestVerificationDialog
+        open={verificationDialogOpen}
+        onOpenChange={setVerificationDialogOpen}
+        initialEducation={selectedEduForVerification}
       />
     </div>
   );

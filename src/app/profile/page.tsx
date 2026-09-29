@@ -8,6 +8,7 @@ import { ProfessionalSummaryModal } from "@/components/candidate/professional-su
 import { ProfessionalSummaryCard } from "@/components/talent/professional-summary-card";
 import { CandidateStatusBadge } from "@/components/talent/candidate-status-badge";
 import { VerifiedBadge } from "@/components/talent/verified-badge";
+import { RequestVerificationDialog } from "@/components/candidate/request-verification-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -17,19 +18,22 @@ import {
     Banknote,
     Brain,
     BriefcaseBusiness,
+    Building2,
     Camera,
     Check,
     ChevronDown,
+    Clock,
     ExternalLink,
     FileText,
     GraduationCap,
     MapPin,
     Pencil,
+    ShieldCheck,
     Trash2,
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
@@ -101,9 +105,32 @@ const DEMO = {
 import { calculateCandidateReadiness } from "@/lib/candidate/onboarding-step";
 
 export default function ProfilePage() {
-  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile } = useApp();
+  const { user, cvProfile, careerStatus, saveCareerStatus, dbMode, saveCvProfile, isPartnerCampus } = useApp();
   const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [verificationDialogOpen, setVerificationDialogOpen] = useState(false);
+  const [selectedEduForVerification, setSelectedEduForVerification] = useState<EducationItem | null>(null);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+        setStatusOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [statusOpen]);
 
   // Merge cvProfile over demo data so each field gracefully falls back
   const source = cvProfile ?? (dbMode ? null : DEMO);
@@ -304,8 +331,8 @@ export default function ProfilePage() {
           <div className="space-y-5">
 
             {/* Hero card */}
-            <section className="relative rounded-xl border border-border/70 bg-card shadow-xs overflow-hidden">
-              <div className="relative h-36 sm:h-44 w-full overflow-hidden bg-muted">
+            <section className="relative z-20 rounded-xl border border-border/70 bg-card shadow-xs">
+              <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-t-xl bg-muted">
                 {/* Banner Photo Overlay */}
                 {p.bannerUrl ? (
                   <img
@@ -402,6 +429,15 @@ export default function ProfilePage() {
                       {p.fullName || user?.name || "Profil Saya"}
                     </h2>
                     <VerifiedBadge />
+                    {cvProfile?.campusVerification?.status === "verified" && (
+                      <span
+                        title={`Terverifikasi oleh ${cvProfile.campusVerification.verifiedBy || cvProfile.campusVerification.institution}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-[#7C3AED]"
+                      >
+                        <GraduationCap className="size-3 text-[#7C3AED]" />
+                        Campus Verified · {cvProfile.campusVerification.institution}
+                      </span>
+                    )}
                     {p.personality && (
                       <span
                         title={`Tipe Kepribadian: ${p.personality.type} (${p.personality.label})`}
@@ -439,7 +475,7 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Career Status Selector */}
-                  <div className="relative mt-3.5">
+                  <div className="relative mt-3.5" ref={statusRef}>
                     <button
                       id="career-status-btn"
                       onClick={() => setStatusOpen((prev) => !prev)}
@@ -460,7 +496,7 @@ export default function ProfilePage() {
                       <div
                         role="listbox"
                         aria-label="Pilih status karier"
-                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border bg-card p-1 shadow-md"
+                        className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border bg-card p-1 shadow-lg"
                       >
                         {(Object.keys(CAREER_STATUS_CONFIG) as CareerStatus[]).map((key) => {
                           const cfg = CAREER_STATUS_CONFIG[key];
@@ -557,28 +593,92 @@ export default function ProfilePage() {
             {p.education.length > 0 && (
               <ProfileSection title="Pendidikan">
                 <div className="space-y-4">
-                  {p.education.map((edu, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="space-y-0.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-foreground">{edu.school}</p>
-                          {edu.level && (
-                            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                              {edu.level}
-                            </span>
+                  {p.education.map((edu, i) => {
+                    const verif = cvProfile?.campusVerification;
+                    const isMatchingEdu = Boolean(
+                      verif && edu.school && (
+                        verif.institution.toLowerCase().includes(edu.school.toLowerCase()) ||
+                        edu.school.toLowerCase().includes(verif.institution.toLowerCase())
+                      )
+                    );
+                    const isVerified = isMatchingEdu && verif?.status === "verified";
+                    const isPending = isMatchingEdu && verif?.status === "pending";
+
+                    return (
+                      <div key={i} className="flex items-start gap-3">
+                        <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{edu.school}</p>
+                              {edu.level && (
+                                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                  {edu.level}
+                                </span>
+                              )}
+                              {isVerified && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-[#7C3AED]">
+                                  <GraduationCap className="size-3 text-[#7C3AED]" />
+                                  Campus Verified
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Verification action/indicator for candidate */}
+                            <div>
+                              {isPending ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-muted/40 border border-border/60 rounded-md px-2 py-0.5">
+                                  <Clock className="size-3 text-muted-foreground" />
+                                  Permintaan verifikasi terkirim
+                                </span>
+                              ) : !isVerified ? (
+                                (() => {
+                                  const isPartner = isPartnerCampus ? isPartnerCampus(edu.school) : false;
+                                  return isPartner ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[11px] px-2.5 border-dashed text-primary hover:bg-primary/5 hover:border-primary/40 gap-1 cursor-pointer"
+                                      onClick={() => {
+                                        setSelectedEduForVerification(edu);
+                                        setVerificationDialogOpen(true);
+                                      }}
+                                    >
+                                      <ShieldCheck className="size-3 text-primary" />
+                                      Minta Verifikasi
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[11px] px-2.5 border-dashed text-muted-foreground hover:text-foreground hover:bg-muted/40 gap-1 cursor-pointer"
+                                      onClick={() => {
+                                        setSelectedEduForVerification(edu);
+                                        setVerificationDialogOpen(true);
+                                      }}
+                                      title="Kampus belum terdaftar sebagai mitra resmi"
+                                    >
+                                      <Building2 className="size-3 text-muted-foreground" />
+                                      Rekomendasikan Kampus
+                                    </Button>
+                                  );
+                                })()
+                              ) : null}
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {edu.program}
+                            {edu.gpa && <span className="font-semibold"> · IPK: {edu.gpa}</span>}
+                          </p>
+                          {edu.dates && (
+                            <p className="text-xs text-muted-foreground">{edu.dates}</p>
                           )}
                         </div>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {edu.program}
-                          {edu.gpa && <span className="font-semibold"> · IPK: {edu.gpa}</span>}
-                        </p>
-                        {edu.dates && (
-                          <p className="text-xs text-muted-foreground">{edu.dates}</p>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ProfileSection>
             )}
@@ -682,6 +782,11 @@ export default function ProfilePage() {
                       <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
                     </a>
                   ))}
+                  <div className="pt-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs" asChild>
+                      <Link href="/candidate/cv?section=skills">Tambah portofolio</Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <EmptyState
@@ -690,7 +795,7 @@ export default function ProfilePage() {
                   description="Tambahkan case study terbaikmu."
                   action={
                     <Button variant="outline" size="sm" asChild>
-                      <Link href="/candidate">Tambah portofolio</Link>
+                      <Link href="/candidate/cv?section=skills">Tambah portofolio</Link>
                     </Button>
                   }
                   className="rounded-lg border-dashed bg-transparent p-5 shadow-none"
@@ -722,6 +827,12 @@ export default function ProfilePage() {
             : "Geser dan perbesar untuk mengatur foto sampul (banner) Anda."
         }
         onCropComplete={handleCropComplete}
+      />
+
+      <RequestVerificationDialog
+        open={verificationDialogOpen}
+        onOpenChange={setVerificationDialogOpen}
+        initialEducation={selectedEduForVerification}
       />
     </ProtectedRoute>
   );

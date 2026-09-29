@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { schema } from "@/db";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiError } from "@/lib/api/request-error";
@@ -17,7 +18,12 @@ const updateCompanySchema = z
     description: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     officeAddress: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     picName: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    picTitle: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     picPhone: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    companyEmail: z.preprocess(emptyToNull, z.string().email().optional().nullable()),
+    companyPhone: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    logoUrl: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
+    bannerUrl: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     verificationStatus: z
       .enum(["pending", "approved", "need_revision", "rejected", "suspended"])
       .optional(),
@@ -51,7 +57,6 @@ const updateCompanySchema = z
       .nullable(),
     province: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     city: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
-    companyEmail: z.preprocess(emptyToNull, z.string().email().optional().nullable()),
     website: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     linkedinUrl: z.preprocess(emptyToNull, z.string().trim().optional().nullable()),
     subscriptionTier: z.enum(["trial", "starter", "professional", "enterprise"]).optional(),
@@ -110,6 +115,9 @@ export async function PATCH(
     if (parsed.data.province !== undefined) updateData.province = parsed.data.province;
     if (parsed.data.city !== undefined) updateData.city = parsed.data.city;
     if (parsed.data.companyEmail !== undefined) updateData.companyEmail = parsed.data.companyEmail;
+    if (parsed.data.companyPhone !== undefined) updateData.companyPhone = parsed.data.companyPhone;
+    if (parsed.data.logoUrl !== undefined) updateData.logoUrl = parsed.data.logoUrl;
+    if (parsed.data.bannerUrl !== undefined) updateData.bannerUrl = parsed.data.bannerUrl;
     if (parsed.data.website !== undefined) updateData.website = parsed.data.website;
     if (parsed.data.linkedinUrl !== undefined) updateData.linkedinUrl = parsed.data.linkedinUrl;
     if (parsed.data.subscriptionTier !== undefined) updateData.subscriptionTier = parsed.data.subscriptionTier;
@@ -130,6 +138,33 @@ export async function PATCH(
         .update(schema.profiles)
         .set(profileSet)
         .where(eq(schema.profiles.userId, updatedOrg.createdBy));
+    }
+
+    // Update PIC title di Supabase user metadata jika ada
+    if (updatedOrg.createdBy && parsed.data.picTitle !== undefined) {
+      const [ownerUserForAuth] = await db
+        .select({ authUserId: schema.users.authUserId })
+        .from(schema.users)
+        .where(eq(schema.users.id, updatedOrg.createdBy))
+        .limit(1);
+
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+      if (url && serviceRoleKey && ownerUserForAuth?.authUserId) {
+        try {
+          const supabaseAdmin = createSupabaseClient(url, serviceRoleKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          await supabaseAdmin.auth.admin.updateUserById(ownerUserForAuth.authUserId, {
+            user_metadata: {
+              picTitle: parsed.data.picTitle,
+              picPosition: parsed.data.picTitle,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to update picTitle in Supabase auth metadata:", err);
+        }
+      }
     }
 
     // SINKRONISASI: Jika perusahaan disetujui, otomatis aktifkan recruiter provisioning status untuk owner / PIC
@@ -193,6 +228,7 @@ export async function PATCH(
           name: ownerProfile?.displayName ?? null,
           email: ownerUser?.email ?? null,
           phone: ownerProfile?.phone ?? null,
+          title: parsed.data.picTitle ?? null,
         },
       },
     });

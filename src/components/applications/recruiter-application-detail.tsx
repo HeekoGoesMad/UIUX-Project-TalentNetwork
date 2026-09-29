@@ -11,9 +11,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/providers/app-provider";
 import { createDemoInvitation, getDemoTemplate, listDemoInvitations, listDemoTemplates, type DemoTemplate } from "@/lib/assessment-demo";
+import { getDaysSinceDate } from "@/lib/candidate-display";
 
 type Status = "new" | "shortlisted" | "screening" | "assessment" | "review" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
-type Application = { id: string; jobId: string; status: Status; coverNote: string | null; submittedAt: string; updatedAt: string; job?: { id: string; title: string; organizationName: string }; candidate?: { name: string | null; headline: string | null; location: string | null } | null };
+type Application = {
+  id: string;
+  jobId: string;
+  status: Status;
+  coverNote: string | null;
+  expectedSalary?: number | null;
+  availability?: string | null;
+  submittedAt: string;
+  updatedAt: string;
+  job?: { id: string; title: string; organizationName: string };
+  candidate?: { name: string | null; headline: string | null; location: string | null } | null;
+};
 type History = { id: string; fromStatus: Status | null; toStatus: Status; reason: string | null; createdAt: string };
 type Invitation = { id: string; applicationId: string; templateId: string; templateName: string; status: string; sentAt: string; expiresAt: string | null; attempt?: { id: string; status: string } | null };
 type TemplateOption = Pick<DemoTemplate, "id" | "name" | "description" | "timeLimitMinutes" | "attemptLimit"> & { invitationCount?: number };
@@ -84,8 +96,27 @@ export function RecruiterApplicationDetail({ applicationId }: { applicationId: s
       <header className="mt-7 flex flex-col justify-between gap-5 border-b pb-7 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-bold tracking-tight">{application.job?.title ?? "Application"}</h1><p className="mt-2 text-muted-foreground">{application.job?.organizationName ?? "Organisasi"}</p></div>{badge(statusLabels[application.status], "bg-muted text-foreground border border-border")}</header>
       {!dbMode && <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Demo mode: application dan invitation demo tidak masuk database.</p>}
       {error && <p className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}
+      {(() => {
+        const days = getDaysSinceDate(application.submittedAt);
+        if (!["new", "screening", "review", "shortlisted"].includes(application.status) || days < 3) return null;
+        const isOverdue = days >= 5;
+        return (
+          <div className={`mt-5 rounded-xl border p-4 text-xs flex items-start gap-3 ${isOverdue ? "bg-rose-50/90 border-rose-200 text-rose-900" : "bg-amber-50/90 border-amber-200 text-amber-900"}`}>
+            <Clock3 className={`size-4 mt-0.5 shrink-0 ${isOverdue ? "text-rose-600" : "text-amber-600"}`} />
+            <div>
+              <p className="font-bold flex items-center gap-1.5">
+                {isOverdue ? "Peringatan SLA Terlewat" : "Mendekati Batas SLA Peninjauan"}
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${isOverdue ? "bg-rose-200/80 text-rose-800" : "bg-amber-200/80 text-amber-800"}`}>
+                  {days} hari menunggu
+                </span>
+              </p>
+              <p className="mt-0.5 leading-relaxed opacity-90">{isOverdue ? "Lamaran telah melampaui estimasi standar peninjauan 3–5 hari kerja. Segera tindak lanjuti profil pelamar untuk menjaga kepuasan kandidat." : "Lamaran telah berada di antrean selama 3 hari. Segera tinjau untuk menjaga SLA respons kepada kandidat."}</p>
+            </div>
+          </div>
+        );
+      })()}
       <div className="mt-7 grid gap-5 lg:grid-cols-[1fr_360px]"><div className="space-y-5">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="size-5 text-primary" /> Candidate identity</CardTitle></CardHeader><CardContent><p className="text-xl font-semibold">{application.candidate?.name ?? "Nama kandidat tidak tersedia"}</p><p className="mt-1 text-sm text-muted-foreground">{application.candidate?.headline ?? "Headline belum tersedia"}</p><p className="mt-2 text-sm text-muted-foreground">{application.candidate?.location ?? "Lokasi belum tersedia"}</p><dl className="mt-5 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Submitted</dt><dd className="mt-1 font-mono text-xs">{date(application.submittedAt)}</dd></div><div><dt className="text-muted-foreground">Updated</dt><dd className="mt-1 font-mono text-xs">{date(application.updatedAt)}</dd></div></dl></CardContent></Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="size-5 text-primary" /> Candidate identity</CardTitle></CardHeader><CardContent><p className="text-xl font-semibold">{application.candidate?.name ?? "Nama kandidat tidak tersedia"}</p><p className="mt-1 text-sm text-muted-foreground">{application.candidate?.headline ?? "Headline belum tersedia"}</p><p className="mt-2 text-sm text-muted-foreground">{application.candidate?.location ?? "Lokasi belum tersedia"}</p><dl className="mt-5 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Submitted</dt><dd className="mt-1 font-mono text-xs">{date(application.submittedAt)}</dd></div><div><dt className="text-muted-foreground">Updated</dt><dd className="mt-1 font-mono text-xs">{date(application.updatedAt)}</dd></div>{application.expectedSalary && (<div><dt className="text-muted-foreground">Ekspektasi Gaji</dt><dd className="mt-1 font-semibold text-emerald-700">Rp {Number(application.expectedSalary).toLocaleString("id-ID")} / bulan</dd></div>)}{application.availability && (<div><dt className="text-muted-foreground">Ketersediaan Kerja</dt><dd className="mt-1 font-semibold text-purple-700">{application.availability}</dd></div>)}</dl></CardContent></Card>
         <Card><CardHeader><CardTitle>Stage history</CardTitle></CardHeader><CardContent>{history.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada histori tahap.</p> : <div className="space-y-5">{history.map((item, index) => <div key={item.id} className="flex gap-3"><div className="flex flex-col items-center"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-primary"><Check className="size-4" /></span>{index < history.length - 1 && <span className="mt-1 h-full w-px bg-border" />}</div><div className="pb-2"><p className="font-semibold">{statusLabels[item.toStatus]}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{date(item.createdAt)}</p>{item.reason && <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.reason}</p>}</div></div>)}</div>}</CardContent></Card>
         <Card><CardHeader><CardTitle>Cover note</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{application.coverNote || "Kandidat tidak menambahkan cover note."}</p></CardContent></Card>
       </div><div className="space-y-5">

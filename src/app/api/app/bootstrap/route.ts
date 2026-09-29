@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
@@ -32,8 +32,8 @@ export async function GET() {
     const isCandidate = current.user.role === "candidate";
     const isPartner = current.user.role === "partner";
 
-    // Batch 1: Concurrently load base profile, candidate profile, notifications, organization membership, and partnership
-    const [profileRows, candidateProfileRows, notifications, memberRows, partnershipRows] = await Promise.all([
+    // Batch 1: Concurrently load base profile, candidate profile, notifications, organization membership, partnership, and approved partner campuses
+    const [profileRows, candidateProfileRows, notifications, memberRows, partnershipRows, approvedPartnershipRows] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
       isCandidate
         ? current.db.select().from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1)
@@ -45,6 +45,7 @@ export async function GET() {
       isPartner
         ? current.db.select().from(schema.partnerships).where(eq(schema.partnerships.userId, current.user.id)).limit(1)
         : Promise.resolve([]),
+      current.db.select({ name: schema.partnerships.name }).from(schema.partnerships).where(eq(schema.partnerships.verificationStatus, "approved")),
     ]);
 
     const profile = profileRows[0] ?? null;
@@ -121,7 +122,12 @@ export async function GET() {
               .select({ candidateProfileId: schema.applications.candidateProfileId })
               .from(schema.applications)
               .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
-              .where(eq(schema.jobs.organizationId, activeOrgId)),
+              .where(
+                and(
+                  eq(schema.jobs.organizationId, activeOrgId),
+                  isNotNull(schema.applications.unlockedAt)
+                )
+              ),
           ]).then(([runs, apps]) =>
             Array.from(
               new Set([
@@ -192,6 +198,8 @@ export async function GET() {
           ? Boolean(organization?.nibDocumentUrl && organization?.npwpDocumentUrl)
           : isCandidate
           ? Boolean(candidateProfile && candidateProfile.isPublished)
+          : current.user.role === "partner"
+          ? Boolean(partnership?.skDocumentUrl && partnership?.skNumber)
           : true,
         hasPassword: current.user.hasPassword || Boolean(current.authUser.app_metadata?.providers?.includes("email")),
       },
@@ -210,6 +218,7 @@ export async function GET() {
         completed: Number(screeningSummaryRaw?.completed ?? 0),
       },
       scannedCandidateIds: scannedCandidateIds || [],
+      approvedPartnerCampuses: approvedPartnershipRows.map((p) => p.name),
     });
   } catch (err) {
     console.error("Error in /api/app/bootstrap:", err);
