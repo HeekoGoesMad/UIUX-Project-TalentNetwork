@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/app-provider";
 import { IndonesianPhoneInput } from "@/components/ui/phone-input";
-import { extractIndonesianLocalPhone } from "@/lib/utils";
+import { extractIndonesianLocalPhone, isValidWebsiteUrl } from "@/lib/utils";
 import type { PartnerOnboardingData } from "@/types";
 
 const partnerSteps = [
@@ -346,7 +346,7 @@ export function PartnerOnboarding() {
       }
       if (!form.website.trim()) {
         nextErrors.website = "Website resmi lembaga wajib diisi.";
-      } else if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(form.website.trim())) {
+      } else if (!isValidWebsiteUrl(form.website)) {
         nextErrors.website = "Format URL website tidak valid (contoh: https://kampus.ac.id).";
       }
     } else if (currentStep === 2) {

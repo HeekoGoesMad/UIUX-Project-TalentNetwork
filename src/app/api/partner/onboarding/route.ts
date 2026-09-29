@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
-import { extractIndonesianLocalPhone, formatToE164Indonesian } from "@/lib/utils";
+import { extractIndonesianLocalPhone, formatToE164Indonesian, isValidWebsiteUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +30,7 @@ const partnerOnboardingSchema = z.object({
     .string()
     .trim()
     .min(3, "Website resmi lembaga wajib diisi.")
-    .refine((val) => {
-      // Allow http://, https://, or standard domain pattern
-      return /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(val);
-    }, "Format URL website lembaga tidak valid (contoh: https://kampus.ac.id atau kampus.ac.id)."),
+    .refine((val) => isValidWebsiteUrl(val), "Format URL website lembaga tidak valid (contoh: https://kampus.ac.id atau kampus.ac.id)."),
   description: z.string().trim().optional(),
 
   // Legalitas & SK

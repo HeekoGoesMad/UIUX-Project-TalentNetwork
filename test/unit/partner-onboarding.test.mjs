@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractIndonesianLocalPhone, formatToE164Indonesian } from "../../src/lib/utils.ts";
+import { extractIndonesianLocalPhone, formatToE164Indonesian, isValidWebsiteUrl } from "../../src/lib/utils.ts";
 
 describe("Partner Phone Number Handling", () => {
   it("extracts local digits from various Indonesian phone formats", () => {
@@ -28,7 +28,6 @@ describe("Partner Phone Number Handling", () => {
 
 describe("Partner Onboarding Required Data Validation", () => {
   const isEmailValid = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const isUrlValid = (url) => /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(url.trim());
 
   it("validates PIC required fields correctly", () => {
     const validPic = {
@@ -61,9 +60,9 @@ describe("Partner Onboarding Required Data Validation", () => {
     assert.ok(validInstitution.province.trim().length > 0);
     assert.ok(validInstitution.city.trim().length >= 2);
     assert.ok(validInstitution.officeAddress.trim().length >= 5);
-    assert.ok(isUrlValid(validInstitution.website));
+    assert.ok(isValidWebsiteUrl(validInstitution.website));
 
-    assert.equal(isUrlValid("invalid url with spaces"), false);
+    assert.equal(isValidWebsiteUrl("invalid url with spaces"), false);
   });
 
   it("enforces SK Document upload and SK number (no bypass)", () => {
