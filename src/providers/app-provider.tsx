@@ -66,6 +66,8 @@ type Context = AppState & {
   devBypass: boolean;
   bootstrapped: boolean;
   user: DemoUser | null;
+  hasPassword?: boolean;
+  setHasPassword?: (val: boolean) => void;
   profile: BootstrapProfile | null;
   tokenAccount: BootstrapTokenAccount;
   screeningRunStatuses: Record<string, string>;
@@ -253,6 +255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
+  const [hasPassword, setHasPassword] = useState<boolean | undefined>(undefined);
   const hydrated = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [bootstrapped, setBootstrapped] = useState(() => !supabaseConfigured);
   const [profile, setProfile] = useState<BootstrapProfile | null>(null);
@@ -409,12 +412,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           email: payload.identity?.email ?? current?.email ?? "",
           name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
           role,
-          hasPassword: payload.identity?.hasPassword ?? current?.hasPassword,
           provisioningStatus: status,
           provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
           companyName: resolvedCompanyName ?? current?.companyName,
           hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
         }));
+        if (typeof payload.identity?.hasPassword === "boolean") {
+          setHasPassword(payload.identity.hasPassword);
+        }
         if (role === "partner" && resolvedCompanyName) {
           setActivePartnerInstitution(resolvedCompanyName);
         }
@@ -541,7 +546,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     if (user) {
-      localStorage.setItem(sessionKey, JSON.stringify(user));
+      const sessionData: DemoUser = {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        provisioningStatus: user.provisioningStatus,
+        provisioningReason: user.provisioningReason,
+        companyName: user.companyName,
+        hasSubmittedOnboarding: user.hasSubmittedOnboarding,
+      };
+      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
     } else {
       localStorage.removeItem(sessionKey);
     }
@@ -778,10 +792,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (supabaseConfigured) {
       const supabase = createClient();
       try {
-        const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
-        if (error) {
+        const authResponse = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 10000);
+        if (authResponse.error) {
           isLoggingIn.current = false;
-          return { error: error.message };
+          return { error: authResponse.error.message };
         }
 
         // Sync with expected role to check role match against database
@@ -804,29 +818,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus; hasSubmittedOnboarding?: boolean };
+        const synced = await syncResponse.json() as { role: UserRole; provisioningStatus: ProvisioningStatus; hasSubmittedOnboarding?: boolean; userId?: string };
         const actualRole = synced.role ?? role;
         const provisioningStatus: ProvisioningStatus = synced.provisioningStatus ?? (actualRole === "candidate" ? "active" : "pending");
         dbIdentity.current = { role: actualRole, provisioningStatus };
 
-        const metadata = data.user.user_metadata ?? {};
-        const institutionName =
-          (typeof metadata.companyName === "string" && metadata.companyName.trim()) ||
-          (typeof metadata.name === "string" && metadata.name.trim()) ||
-          "Universitas Indonesia";
-        if (actualRole === "partner") {
+        const institutionName = actualRole === "partner" ? "Universitas Indonesia" : undefined;
+        if (actualRole === "partner" && institutionName) {
           setActivePartnerInstitution(institutionName);
         }
         setUser({
           role: actualRole,
           provisioningStatus,
           email,
-          name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : email.split("@")[0],
-          companyName: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName : (actualRole === "partner" ? institutionName : undefined),
+          name: email.split("@")[0],
+          companyName: actualRole === "partner" ? institutionName : undefined,
           hasSubmittedOnboarding: synced.hasSubmittedOnboarding,
         });
+        setHasPassword(true);
         isLoggingIn.current = false;
-        bootstrapUserKey.current = data.user.id;
+        bootstrapUserKey.current = synced.userId ?? email;
         void loadBootstrap();
         return { role: actualRole, provisioningStatus, hasSubmittedOnboarding: synced.hasSubmittedOnboarding };
       } catch (e) {
@@ -961,6 +972,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dbIdentity.current = {};
     bootstrapUserKey.current = null;
     setUser(null);
+    setHasPassword(undefined);
     localStorage.removeItem(sessionKey);
     try {
       localStorage.removeItem("proofylink-a11y-prefs");
@@ -1508,6 +1520,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     devBypass,
     bootstrapped,
     user,
+    hasPassword,
+    setHasPassword,
     profile,
     tokenAccount,
     screeningRunStatuses,
@@ -1526,6 +1540,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     devBypass,
     bootstrapped,
     user,
+    hasPassword,
     profile,
     tokenAccount,
     screeningRunStatuses,

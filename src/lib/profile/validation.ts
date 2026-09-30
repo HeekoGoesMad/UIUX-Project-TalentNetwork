@@ -157,12 +157,20 @@ export function extractStorageKey(
 
   // Ignore mock, demo, or external URLs
   if (trimmed.startsWith("development-mock/")) return null;
-  if (
-    trimmed.includes("images.unsplash.com") ||
-    trimmed.includes("api.dicebear.com") ||
-    trimmed.startsWith("data:")
-  ) {
-    return null;
+  if (trimmed.startsWith("data:")) return null;
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "images.unsplash.com" ||
+      host.endsWith(".images.unsplash.com") ||
+      host === "api.dicebear.com" ||
+      host.endsWith(".api.dicebear.com")
+    ) {
+      return null;
+    }
+  } catch {
+    // Relative path or non-standard URI
   }
 
   // Check if it's a Supabase public object URL: .../storage/v1/object/public/<bucket>/<key>

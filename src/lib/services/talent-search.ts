@@ -65,7 +65,16 @@ export function serializeCandidate(
     : undefined;
 
   const portfolio = getSectionItems<string>(sections, "portfolio");
-  const linkedinFromPortfolio = portfolio.find((url) => typeof url === "string" && url.toLowerCase().includes("linkedin.com"));
+  const linkedinFromPortfolio = portfolio.find((url) => {
+    if (typeof url !== "string") return false;
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      return host === "linkedin.com" || host.endsWith(".linkedin.com");
+    } catch {
+      return false;
+    }
+  });
   const linkedin =
     (typeof preferences.linkedinUrl === "string" && preferences.linkedinUrl.trim())
       ? preferences.linkedinUrl.trim()

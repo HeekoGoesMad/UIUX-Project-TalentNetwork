@@ -87,8 +87,8 @@ export function calculateCandidateReadiness(data?: CandidateStepData | null): Ca
   const missingSections = sections.filter((s) => !s.done);
   const firstIncompleteAnchor = missingSections.length > 0 ? missingSections[0].anchor : "/candidate/cv";
 
-  let tier: CandidateReadiness["tier"] = "Belum Siap";
-  let tierColor = "text-muted-foreground";
+  let tier: CandidateReadiness["tier"];
+  let tierColor: string;
 
   if (percent === 100) {
     tier = "Profil Prima";

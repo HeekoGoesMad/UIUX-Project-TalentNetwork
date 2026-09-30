@@ -121,7 +121,6 @@ export type DemoUser = {
   name: string;
   email: string;
   role: UserRole;
-  hasPassword?: boolean;
   provisioningStatus?: ProvisioningStatus;
   provisioningReason?: string | null;
   companyName?: string;
