@@ -129,7 +129,7 @@ export function serializeCandidate(
               "1580489944761-15a19d654956",
               "1519085360753-af0119f7cbe7",
             ][(row.id.charCodeAt(0) + row.id.length) % 8]
-          }?q=80&w=400&auto=format&fit=crop`),
+          }?q=75&w=128&auto=format&fit=crop`),
     bannerUrl:
       (typeof preferences.bannerUrl === "string" && preferences.bannerUrl.trim()
         ? preferences.bannerUrl.trim()
@@ -144,7 +144,7 @@ export function serializeCandidate(
               "1557804506-669a67965ba0",
               "1507679799987-c73779587ccf",
             ][(row.id.charCodeAt(row.id.length - 1) + row.id.length) % 8]
-          }?q=80&w=1600&auto=format&fit=crop`),
+          }?q=75&w=800&auto=format&fit=crop`),
     history: experience.map((item) => ({
       company: item.company,
       role: item.role,

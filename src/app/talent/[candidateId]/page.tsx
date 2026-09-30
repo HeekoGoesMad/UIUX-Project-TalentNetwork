@@ -701,7 +701,7 @@ export default function TalentProfile() {
 
   const bannerSrc =
     candidate.bannerUrl ||
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop";
+    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=75&w=800&auto=format&fit=crop";
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -715,7 +715,10 @@ export default function TalentProfile() {
           <img
             src={bannerSrc}
             alt={`Banner ${displayName}`}
+            width={896}
+            height={224}
             loading="eager"
+            fetchPriority="high"
             decoding="async"
             className={cn(
               "h-full w-full object-cover transition-all duration-700",

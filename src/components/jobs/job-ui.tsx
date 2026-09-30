@@ -203,7 +203,7 @@ function CompanyAvatar({
         className={`relative shrink-0 overflow-hidden border border-border/80 bg-white p-1.5 shadow-2xs flex items-center justify-center ${sizeClasses[size]}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoUrl} alt={name} className="size-full object-contain" />
+        <img src={logoUrl} alt={name} loading="lazy" decoding="async" className="size-full object-contain" />
       </div>
     );
   }
