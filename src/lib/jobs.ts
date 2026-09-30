@@ -78,7 +78,9 @@ export type Job = {
   salaryMax?: number | null;
   salaryCurrency?: string;
   salaryPeriod?: "monthly" | "hourly" | "yearly" | string;
+  payPeriod?: "monthly" | "hourly" | "yearly" | string;
   isSalaryNegotiable?: boolean;
+  isPayNegotiable?: boolean;
   hideSalary?: boolean;
   // Kriteria & Spesifikasi
   experienceLevel?: ExperienceLevel | string | null;
@@ -165,10 +167,11 @@ export function formatSalaryDisplay(job: Partial<Job>): string {
   }
   const min = job.salaryMin;
   const max = job.salaryMax;
+  const rawPeriod = job.salaryPeriod || job.payPeriod;
   const period =
-    job.salaryPeriod === "yearly"
+    rawPeriod === "yearly"
       ? "/ thn"
-      : job.salaryPeriod === "hourly"
+      : rawPeriod === "hourly"
       ? "/ jam"
       : "/ bln";
 
@@ -187,7 +190,7 @@ export function formatSalaryDisplay(job: Partial<Job>): string {
     baseStr = `Hingga ${formatRp(max)} ${period}`;
   }
 
-  if (job.isSalaryNegotiable) {
+  if (job.isSalaryNegotiable || job.isPayNegotiable) {
     baseStr += " (Nego)";
   }
   return baseStr;

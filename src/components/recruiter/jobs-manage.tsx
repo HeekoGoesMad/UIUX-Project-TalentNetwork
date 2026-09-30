@@ -67,8 +67,8 @@ const demoRecruiterJob: Job = {
   salaryMin: 12000000,
   salaryMax: 17000000,
   salaryCurrency: "IDR",
-  salaryPeriod: "monthly",
-  isSalaryNegotiable: true,
+  payPeriod: "monthly",
+  isPayNegotiable: true,
   hideSalary: false,
   experienceLevel: "3_5_years",
   minEducation: "bachelor",
@@ -85,6 +85,56 @@ const demoRecruiterJob: Job = {
   ],
 };
 
+function toSafeDemoJob(job: Job): Record<string, unknown> {
+  const safe: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(job)) {
+    if (key === "salaryPeriod") {
+      safe.payPeriod = value;
+    } else if (key === "isSalaryNegotiable") {
+      safe.isPayNegotiable = value;
+    } else {
+      safe[key] = value;
+    }
+  }
+  return safe;
+}
+
+function fromSafeDemoJob(data: Record<string, unknown>): Job {
+  const job = { ...data } as unknown as Job;
+  const payPeriod = data.payPeriod ?? data["salaryPeriod"];
+  if (payPeriod) {
+    job.salaryPeriod = String(payPeriod);
+    job.payPeriod = String(payPeriod);
+  }
+  const isPayNegotiable = data.isPayNegotiable ?? data["isSalaryNegotiable"];
+  if (isPayNegotiable !== undefined) {
+    job.isSalaryNegotiable = Boolean(isPayNegotiable);
+    job.isPayNegotiable = Boolean(isPayNegotiable);
+  }
+  return job;
+}
+
+function loadDemoJobs(): Job[] {
+  if (typeof window === "undefined") return [demoRecruiterJob, ...DEMO_JOBS];
+  try {
+    const raw = localStorage.getItem("proofylink-demo-jobs");
+    if (!raw) return [demoRecruiterJob, ...DEMO_JOBS];
+    const parsed = JSON.parse(raw) as Record<string, unknown>[];
+    if (!Array.isArray(parsed)) return [demoRecruiterJob, ...DEMO_JOBS];
+    return parsed.map(fromSafeDemoJob);
+  } catch {
+    return [demoRecruiterJob, ...DEMO_JOBS];
+  }
+}
+
+function saveDemoJobs(jobs: Job[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const safeList = jobs.map(toSafeDemoJob);
+    localStorage.setItem("proofylink-demo-jobs", JSON.stringify(safeList));
+  } catch {}
+}
+
 function useJobs(recruiter = false) {
   const { dbMode } = useApp();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -96,8 +146,7 @@ function useJobs(recruiter = false) {
     setLoading(true);
     setError(null);
     if (!dbMode) {
-      const stored = localStorage.getItem("proofylink-demo-jobs");
-      const parsed = stored ? (JSON.parse(stored) as Job[]) : [demoRecruiterJob, ...DEMO_JOBS];
+      const parsed = loadDemoJobs();
       const visible = recruiter ? parsed : parsed.filter((job) => job.status === "published");
       setJobs(visible);
       setLoading(false);
@@ -315,8 +364,8 @@ type FormValues = {
   showSalary: boolean;
   salaryMin: string;
   salaryMax: string;
-  salaryPeriod: string;
-  isSalaryNegotiable: boolean;
+  payPeriod: string;
+  isPayNegotiable: boolean;
   // Kriteria
   experienceLevel: string;
   minEducation: string;
@@ -340,8 +389,8 @@ const initialForm: FormValues = {
   showSalary: true,
   salaryMin: "",
   salaryMax: "",
-  salaryPeriod: "monthly",
-  isSalaryNegotiable: false,
+  payPeriod: "monthly",
+  isPayNegotiable: false,
   experienceLevel: "1_3_years",
   minEducation: "bachelor",
   requiredSkills: "",
@@ -396,8 +445,8 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
         showSalary: !found.hideSalary,
         salaryMin: found.salaryMin != null ? String(found.salaryMin) : "",
         salaryMax: found.salaryMax != null ? String(found.salaryMax) : "",
-        salaryPeriod: found.salaryPeriod || "monthly",
-        isSalaryNegotiable: Boolean(found.isSalaryNegotiable),
+        payPeriod: (found as { payPeriod?: string }).payPeriod || (found as { salaryPeriod?: string }).salaryPeriod || "monthly",
+        isPayNegotiable: Boolean((found as { isPayNegotiable?: boolean }).isPayNegotiable ?? (found as { isSalaryNegotiable?: boolean }).isSalaryNegotiable),
         experienceLevel: found.experienceLevel || "1_3_years",
         minEducation: found.minEducation || "bachelor",
         requiredSkills: (found.requirements || [])
@@ -416,8 +465,7 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
     };
 
     if (!dbMode) {
-      const stored = localStorage.getItem("proofylink-demo-jobs");
-      const list = stored ? (JSON.parse(stored) as Job[]) : [demoRecruiterJob, ...DEMO_JOBS];
+      const list = loadDemoJobs();
       const found = list.find((item) => item.id === jobId);
       if (found) {
         populate(found);
@@ -491,8 +539,10 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
       salaryMin: minSal,
       salaryMax: maxSal,
       salaryCurrency: "IDR",
-      salaryPeriod: form.salaryPeriod,
-      isSalaryNegotiable: form.isSalaryNegotiable,
+      salaryPeriod: form.payPeriod,
+      payPeriod: form.payPeriod,
+      isSalaryNegotiable: form.isPayNegotiable,
+      isPayNegotiable: form.isPayNegotiable,
       // Kriteria
       experienceLevel: form.experienceLevel || null,
       minEducation: form.minEducation || null,
@@ -516,9 +566,7 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
           if (!response.ok || !result.job) throw new Error(result.error ?? "Gagal memperbarui lowongan.");
           router.push(`/recruiter/jobs/${jobId}`);
         } else {
-          const jobs = JSON.parse(
-            localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
-          ) as Job[];
+          const jobs = loadDemoJobs();
           const target = jobs.find((j) => j.id === jobId);
           if (!target) throw new Error("Lowongan tidak ditemukan.");
 
@@ -540,10 +588,7 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
             ],
           };
 
-          localStorage.setItem(
-            "proofylink-demo-jobs",
-            JSON.stringify(jobs.map((item) => (item.id === jobId ? updated : item)))
-          );
+          saveDemoJobs(jobs.map((item) => (item.id === jobId ? updated : item)));
           router.push(`/recruiter/jobs/${jobId}`);
         }
       } else {
@@ -587,10 +632,8 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
               })),
             ],
           };
-          const jobs = JSON.parse(
-            localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
-          ) as Job[];
-          localStorage.setItem("proofylink-demo-jobs", JSON.stringify([job, ...jobs]));
+          const jobs = loadDemoJobs();
+          saveDemoJobs([job, ...jobs]);
           router.push(`/recruiter/jobs/${job.id}`);
         }
       }
@@ -834,8 +877,8 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-foreground">Periode Gaji</label>
                       <select
-                        value={form.salaryPeriod}
-                        onChange={(e) => update("salaryPeriod", e.target.value)}
+                        value={form.payPeriod}
+                        onChange={(e) => update("payPeriod", e.target.value)}
                         className={fieldInputClass}
                       >
                         <option value="monthly">Per Bulan (Bulanan)</option>
@@ -848,8 +891,8 @@ export function JobFormPage({ jobId }: { jobId?: string } = {}) {
                   <label className="flex items-center gap-2 cursor-pointer pt-1">
                     <input
                       type="checkbox"
-                      checked={form.isSalaryNegotiable}
-                      onChange={(e) => update("isSalaryNegotiable", e.target.checked)}
+                      checked={form.isPayNegotiable}
+                      onChange={(e) => update("isPayNegotiable", e.target.checked)}
                       className="size-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <span className="text-xs font-medium text-foreground">
@@ -1174,12 +1217,9 @@ export function JobManagePage({ jobId }: { jobId: string }) {
           throw new Error(data.error ?? "Gagal menghapus lowongan.");
         }
       } else {
-        const stored = localStorage.getItem("proofylink-demo-jobs");
-        if (stored) {
-          const list = JSON.parse(stored) as Job[];
-          const filtered = list.filter((item) => item.id !== job.id);
-          localStorage.setItem("proofylink-demo-jobs", JSON.stringify(filtered));
-        }
+        const list = loadDemoJobs();
+        const filtered = list.filter((item) => item.id !== job.id);
+        saveDemoJobs(filtered);
       }
       setDeleteDialogOpen(false);
       router.push("/recruiter/jobs");
@@ -1192,9 +1232,7 @@ export function JobManagePage({ jobId }: { jobId: string }) {
 
   useEffect(() => {
     if (!dbMode) {
-      const jobs = JSON.parse(
-        localStorage.getItem("proofylink-demo-jobs") ?? JSON.stringify([demoRecruiterJob, ...DEMO_JOBS])
-      ) as Job[];
+      const jobs = loadDemoJobs();
       setJob(jobs.find((item) => item.id === jobId) ?? null);
       setLoading(false);
       return;
@@ -1230,8 +1268,8 @@ export function JobManagePage({ jobId }: { jobId: string }) {
         publishedAt: status === "published" ? new Date().toISOString() : job.publishedAt,
         closedAt: status === "closed" ? new Date().toISOString() : job.closedAt,
       };
-      const jobs = JSON.parse(localStorage.getItem("proofylink-demo-jobs") ?? "[]") as Job[];
-      localStorage.setItem("proofylink-demo-jobs", JSON.stringify(jobs.map((item) => (item.id === job.id ? next : item))));
+      const jobs = loadDemoJobs();
+      saveDemoJobs(jobs.map((item) => (item.id === job.id ? next : item)));
       setJob(next);
     }
   };
