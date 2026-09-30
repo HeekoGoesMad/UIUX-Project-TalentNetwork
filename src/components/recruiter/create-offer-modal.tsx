@@ -89,11 +89,11 @@ export function CreateOfferModal({
             terms: {
               salary: String(salary),
               currency: currency || "IDR",
-              startDate: startDate || undefined,
+              startDate,
               benefits: benefits || undefined,
               notes: notes || undefined,
             },
-            expiresAt: expirationDate ? new Date(expirationDate).toISOString() : undefined,
+            expiresAt: new Date(expirationDate).toISOString(),
           };
 
           const res = await fetch("/api/offers", {

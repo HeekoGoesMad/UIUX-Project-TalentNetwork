@@ -73,7 +73,7 @@ export async function PATCH(
       .from(schema.organizationMembers)
       .where(eq(schema.organizationMembers.userId, user.id))
       .limit(1);
-    let organizationId = membership[0]?.organizationId;
+    const organizationId = membership[0]?.organizationId;
 
     if (parsed.data.action === "approve") {
       if (!organizationId) {
@@ -92,7 +92,6 @@ export async function PATCH(
             set: { verificationStatus: "approved", updatedAt: new Date(), reviewedAt: new Date() },
           })
           .returning({ id: schema.organizations.id });
-        organizationId = org.id;
         await tx.insert(schema.organizationMembers).values({ organizationId: org.id, userId: user.id, role: "owner" }).onConflictDoNothing();
         await tx.insert(schema.tokenAccounts).values({ organizationId: org.id }).onConflictDoNothing();
       } else {
