@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
@@ -170,6 +170,22 @@ export async function GET(request: Request) {
     const db = "error" in current ? getDb() : current.db;
     const recruiter = !("error" in current) && current.user.role === "recruiter";
 
+    // Auto-close any published jobs past their expiration
+    try {
+      await db
+        .update(schema.jobs)
+        .set({ status: "closed", closedAt: schema.jobs.expiresAt })
+        .where(
+          and(
+            eq(schema.jobs.status, "published"),
+            isNotNull(schema.jobs.expiresAt),
+            lte(schema.jobs.expiresAt, new Date())
+          )
+        );
+    } catch (e) {
+      console.warn("Failed to auto-close expired jobs:", e);
+    }
+
     let where = recruiter ? undefined : eq(schema.jobs.status, "published");
     if (recruiter) {
       const scope = await getRecruiterScope(db, current.user);
@@ -209,6 +225,7 @@ export async function POST(request: Request) {
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const values = parsed.data;
+    const default30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const [job] = await current.db
       .insert(schema.jobs)
       .values({
@@ -232,7 +249,7 @@ export async function POST(request: Request) {
         qualifications: values.qualifications ?? null,
         benefits: values.benefits,
         vacanciesCount: values.vacanciesCount,
-        expiresAt: values.expiresAt ? new Date(values.expiresAt) : null,
+        expiresAt: values.expiresAt ? new Date(values.expiresAt) : default30Days,
       })
       .returning();
 

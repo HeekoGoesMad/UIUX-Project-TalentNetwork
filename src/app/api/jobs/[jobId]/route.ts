@@ -10,7 +10,7 @@ const updateSchema = z.object({
   employmentType: z.enum(["full_time", "part_time", "contract", "internship", "temporary"]).optional(),
   workArrangement: z.enum(["onsite", "hybrid", "remote"]).optional(),
   location: z.string().trim().max(160).nullable().optional(),
-  status: z.enum(["draft", "published", "closed"]).optional(),
+  status: z.enum(["draft", "published", "closed", "archived"]).optional(),
   requiredSkills: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
   preferredSkills: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
   // Glints additions
@@ -31,10 +31,10 @@ const updateSchema = z.object({
 });
 
 const allowedTransitions: Record<string, string[]> = {
-  draft: ["published", "closed"],
-  published: ["closed"],
-  closed: [],
-  archived: [],
+  draft: ["published", "closed", "archived"],
+  published: ["closed", "archived"],
+  closed: ["published", "archived"],
+  archived: ["draft", "published"],
 };
 
 function unavailable(error?: unknown) {
@@ -114,7 +114,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
     }
 
     const job = await load(db, jobId, organizationId);
-    return job ? NextResponse.json({ job }) : NextResponse.json({ error: "Job tidak ditemukan." }, { status: 404 });
+    if (!job) return NextResponse.json({ error: "Job tidak ditemukan." }, { status: 404 });
+
+    // Auto-close if published and past expiresAt
+    if (job.status === "published" && job.expiresAt && new Date(job.expiresAt) <= new Date()) {
+      await db
+        .update(schema.jobs)
+        .set({ status: "closed", closedAt: job.expiresAt })
+        .where(eq(schema.jobs.id, job.id));
+      job.status = "closed";
+      job.closedAt = job.expiresAt;
+    }
+
+    return NextResponse.json({ job });
   } catch (error) {
     return unavailable(error);
   }
@@ -147,14 +159,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ jo
 
     const { requiredSkills, preferredSkills, status, expiresAt, ...fields } = parsed.data;
     const now = new Date();
+    const default30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const computedExpiresAt =
+      expiresAt !== undefined
+        ? expiresAt
+          ? new Date(expiresAt)
+          : null
+        : status === "published"
+        ? default30Days
+        : undefined;
+
     const update: Record<string, unknown> = {
       ...fields,
-      ...(expiresAt !== undefined ? { expiresAt: expiresAt ? new Date(expiresAt) : null } : {}),
+      ...(computedExpiresAt !== undefined ? { expiresAt: computedExpiresAt } : {}),
       ...(status
         ? {
             status,
             publishedAt: status === "published" ? now : undefined,
-            closedAt: status === "closed" ? now : undefined,
+            closedAt: status === "closed" ? now : status === "published" ? null : undefined,
           }
         : {}),
       updatedAt: now,
