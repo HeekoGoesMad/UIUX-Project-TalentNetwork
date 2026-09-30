@@ -486,6 +486,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         window.addEventListener("message", handleMessage);
         window.addEventListener("storage", handleStorage);
 
+        let lastSessionCheck = 0;
+        let isCheckingSession = false;
+
         const pollTimer = setInterval(async () => {
           if (handled) return;
 
@@ -506,56 +509,66 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             }
           } catch {}
 
+          const isPopupClosed = Boolean(popup && popup.closed);
+          const now = Date.now();
+          const shouldCheckSession = isPopupClosed || now - lastSessionCheck >= 2000;
+
           // 2. Active session check: parent window detects session and closes child popup immediately
-          try {
-            const supabase = createClient();
-            const { data: userData } = await supabase.auth.getUser();
-            if (userData?.user) {
-              handled = true;
-              if (popup && !popup.closed) {
-                try {
-                  popup.close();
-                } catch {}
-              }
-              cleanup();
-
-              // If localStorage has the auth event payload written by the popup, use it
-              try {
-                const stored = localStorage.getItem("proofylink_oauth_event");
-                if (stored) {
-                  const parsed = JSON.parse(stored);
-                  if (parsed && typeof parsed === "object" && parsed.type === "GOOGLE_AUTH_SUCCESS") {
-                    handleAuthPayload(parsed);
-                    return;
-                  }
+          if (shouldCheckSession && !isCheckingSession) {
+            isCheckingSession = true;
+            lastSessionCheck = now;
+            try {
+              const supabase = createClient();
+              const { data: userData } = await supabase.auth.getUser();
+              if (userData?.user) {
+                handled = true;
+                if (popup && !popup.closed) {
+                  try {
+                    popup.close();
+                  } catch {}
                 }
-              } catch {}
+                cleanup();
 
-              // Otherwise load bootstrap identity to determine role and onboarding status
-              const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
-              const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
-              const identity = bootstrapData?.identity;
-              const userRole = (identity?.role as UserRole) || role;
-              const hasPassword = Boolean(identity?.hasPassword);
-              const dest = destination(
-                userRole,
-                getNext(),
-                false,
-                identity?.provisioningStatus,
-                identity?.hasSubmittedOnboarding
-              );
-              // Setup password only if user explicitly registered and has no password
-              const shouldSetupPassword = mode === "register" && !hasPassword;
-              const target = shouldSetupPassword
-                ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
-                : dest;
-              router.replace(safeRedirectPath(target, "/dashboard"));
-              return;
+                // If localStorage has the auth event payload written by the popup, use it
+                try {
+                  const stored = localStorage.getItem("proofylink_oauth_event");
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed && typeof parsed === "object" && parsed.type === "GOOGLE_AUTH_SUCCESS") {
+                      handleAuthPayload(parsed);
+                      return;
+                    }
+                  }
+                } catch {}
+
+                // Otherwise load bootstrap identity to determine role and onboarding status
+                const res = await fetch("/api/app/bootstrap", { cache: "no-store" }).catch(() => null);
+                const bootstrapData = res && res.ok ? await res.json().catch(() => null) : null;
+                const identity = bootstrapData?.identity;
+                const userRole = (identity?.role as UserRole) || role;
+                const hasPassword = Boolean(identity?.hasPassword);
+                const dest = destination(
+                  userRole,
+                  getNext(),
+                  false,
+                  identity?.provisioningStatus,
+                  identity?.hasSubmittedOnboarding
+                );
+                // Setup password only if user explicitly registered and has no password
+                const shouldSetupPassword = mode === "register" && !hasPassword;
+                const target = shouldSetupPassword
+                  ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
+                  : dest;
+                router.replace(safeRedirectPath(target, "/dashboard"));
+                return;
+              }
+            } catch {} finally {
+              isCheckingSession = false;
             }
-          } catch {}
+          }
 
           // 3. User closed popup without authenticating
-          if (popup && popup.closed) {
+          if (isPopupClosed) {
             cleanup();
             if (!handled) {
               setGoogleLoading(false);
