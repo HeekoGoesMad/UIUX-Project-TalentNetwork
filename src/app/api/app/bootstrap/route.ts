@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ShortlistService } from "@/lib/services/shortlist";
 import { ConsentService } from "@/lib/services/consent";
 import { distillNotificationContent } from "@/lib/notifications/candidate-formatter";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 export async function GET() {
   try {
@@ -219,7 +220,7 @@ export async function GET() {
       },
       scannedCandidateIds: scannedCandidateIds || [],
       approvedPartnerCampuses: approvedPartnershipRows.map((p) => p.name),
-    });
+    }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("Error in /api/app/bootstrap:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

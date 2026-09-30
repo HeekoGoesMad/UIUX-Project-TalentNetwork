@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { MessagingService } from "@/lib/services/messaging";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const createConversationSchema = z.object({
   candidateProfileId: z.string().uuid(),
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     const limitParam = Number(new URL(request.url).searchParams.get("limit") ?? 50);
     const result = await MessagingService.listConversations(current.db, current.user.id, limitParam);
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("[GET /api/conversations Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

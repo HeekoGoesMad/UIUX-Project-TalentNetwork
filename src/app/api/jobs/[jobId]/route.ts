@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getRecruiterScope } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const updateSchema = z.object({
   title: z.string().trim().min(2).max(160).optional(),
@@ -126,7 +127,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
       job.closedAt = job.expiresAt;
     }
 
-    return NextResponse.json({ job });
+    const headers = recruiter
+      ? CACHE_HEADERS.PRIVATE_NO_STORE
+      : CACHE_HEADERS.PUBLIC_DETAIL;
+    return NextResponse.json({ job }, { headers });
   } catch (error) {
     return unavailable(error);
   }
