@@ -303,6 +303,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setSupabaseUser = (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!authUser) {
+      if (typeof window !== "undefined") {
+        const storedSession = localStorage.getItem(sessionKey);
+        if (storedSession) {
+          try {
+            const parsed = JSON.parse(storedSession) as DemoUser;
+            if (parsed && parsed.role) {
+              setUser(parsed);
+              return;
+            }
+          } catch {}
+        }
+      }
       setUser(null);
       return;
     }

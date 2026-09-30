@@ -412,10 +412,12 @@ export default function Dashboard() {
                             <span
                               className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                                 job.status === "published"
-                                  ? "bg-emerald-50 text-emerald-700"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                                   : job.status === "closed"
-                                  ? "bg-slate-100 text-slate-600"
-                                  : "bg-amber-50 text-amber-700"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                                  : job.status === "archived"
+                                  ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                  : "bg-blue-50 text-blue-700 border border-blue-200/60"
                               }`}
                             >
                               {statusLabels[job.status]}

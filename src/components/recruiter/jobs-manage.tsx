@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  Archive,
   ArrowLeft,
   Banknote,
   BriefcaseBusiness,
@@ -147,7 +148,19 @@ function useJobs(recruiter = false) {
     setError(null);
     if (!dbMode) {
       const parsed = loadDemoJobs();
-      const visible = recruiter ? parsed : parsed.filter((job) => job.status === "published");
+      const now = new Date();
+      let updatedStorage = false;
+      const checkedJobs = parsed.map((job) => {
+        if (job.status === "published" && job.expiresAt && new Date(job.expiresAt) <= now) {
+          updatedStorage = true;
+          return { ...job, status: "closed" as const, closedAt: job.expiresAt };
+        }
+        return job;
+      });
+      if (updatedStorage) {
+        saveDemoJobs(checkedJobs);
+      }
+      const visible = recruiter ? checkedJobs : checkedJobs.filter((job) => job.status === "published");
       setJobs(visible);
       setLoading(false);
       return () => {
@@ -195,8 +208,10 @@ function JobCard({ job, manage = false }: { job: Job; manage?: boolean }) {
               job.status === "published"
                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                 : job.status === "closed"
-                ? "bg-slate-100 text-slate-600"
-                : "bg-amber-50 text-amber-700 border border-amber-200/60"
+                ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                : job.status === "archived"
+                ? "bg-slate-100 text-slate-700 border border-slate-200"
+                : "bg-blue-50 text-blue-700 border border-blue-200/60"
             }`}
           >
             {statusLabels[job.status]}
@@ -316,7 +331,7 @@ export function RecruiterJobsPage() {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-2">
-          {(["all", "draft", "published", "closed"] as const).map((value) => (
+          {(["all", "draft", "published", "closed", "archived"] as const).map((value) => (
             <Button
               key={value}
               size="sm"
@@ -1202,6 +1217,9 @@ export function JobManagePage({ jobId }: { jobId: string }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [republishDialogOpen, setRepublishDialogOpen] = useState(false);
+  const [republishing, setRepublishing] = useState(false);
+  const [republishError, setRepublishError] = useState<string | null>(null);
 
   const handleDeleteJob = async () => {
     if (!job) return;
@@ -1233,7 +1251,13 @@ export function JobManagePage({ jobId }: { jobId: string }) {
   useEffect(() => {
     if (!dbMode) {
       const jobs = loadDemoJobs();
-      setJob(jobs.find((item) => item.id === jobId) ?? null);
+      const found = jobs.find((item) => item.id === jobId) ?? null;
+      if (found && found.status === "published" && found.expiresAt && new Date(found.expiresAt) <= new Date()) {
+        found.status = "closed";
+        found.closedAt = found.expiresAt;
+        saveDemoJobs(jobs);
+      }
+      setJob(found);
       setLoading(false);
       return;
     }
@@ -1247,7 +1271,7 @@ export function JobManagePage({ jobId }: { jobId: string }) {
       .finally(() => setLoading(false));
   }, [dbMode, jobId]);
 
-  const changeStatus = async (status: "published" | "closed") => {
+  const changeStatus = async (status: "published" | "closed" | "archived") => {
     if (!job) return;
     if (dbMode) {
       const response = await fetch(`/api/jobs/${job.id}`, {
@@ -1262,15 +1286,88 @@ export function JobManagePage({ jobId }: { jobId: string }) {
       }
       setJob(data.job);
     } else {
+      const now = new Date().toISOString();
       const next: Job = {
         ...job,
         status,
-        publishedAt: status === "published" ? new Date().toISOString() : job.publishedAt,
-        closedAt: status === "closed" ? new Date().toISOString() : job.closedAt,
+        publishedAt: status === "published" ? now : job.publishedAt,
+        closedAt: status === "closed" ? now : status === "archived" ? (job.closedAt || now) : null,
+        expiresAt: status === "published" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : job.expiresAt,
       };
       const jobs = loadDemoJobs();
       saveDemoJobs(jobs.map((item) => (item.id === job.id ? next : item)));
       setJob(next);
+    }
+  };
+
+  const handleRepublishJob = async () => {
+    if (!job) return;
+    setRepublishing(true);
+    setRepublishError(null);
+    try {
+      if (dbMode) {
+        const response = await fetch(`/api/jobs/${job.id}/republish`, {
+          method: "POST",
+        });
+        const data = (await response.json()) as { job?: Job; error?: string };
+        if (!response.ok || !data.job) {
+          throw new Error(data.error ?? "Gagal mempublikasikan ulang lowongan.");
+        }
+        setRepublishDialogOpen(false);
+        router.push(`/recruiter/jobs/${data.job.id}`);
+      } else {
+        const now = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const oldArchivedJob: Job = {
+          ...job,
+          status: "archived",
+          closedAt: job.closedAt || now,
+        };
+        const newJobId = `demo-job-${Date.now()}`;
+        const newJob: Job = {
+          ...job,
+          id: newJobId,
+          status: "published",
+          publishedAt: now,
+          expiresAt,
+          closedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const jobs = JSON.parse(localStorage.getItem("proofylink-demo-jobs") ?? "[]") as Job[];
+        const updatedList = jobs.map((item) => (item.id === job.id ? oldArchivedJob : item));
+        updatedList.unshift(newJob);
+        localStorage.setItem("proofylink-demo-jobs", JSON.stringify(updatedList));
+
+        // Migrate mock candidates from old job to Talent Pool
+        try {
+          const raw = localStorage.getItem("proofylink-job-assignments-v1");
+          const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+          let modified = false;
+          for (const [candidateId, val] of Object.entries(parsed)) {
+            if ((val as { jobId?: string })?.jobId === job.id) {
+              parsed[candidateId] = {
+                jobId: "talent-pool",
+                jobTitle: "Talent Pool",
+                updatedAt: now,
+              };
+              modified = true;
+            }
+          }
+          if (modified) {
+            localStorage.setItem("proofylink-job-assignments-v1", JSON.stringify(parsed));
+          }
+        } catch {
+          // Ignore
+        }
+
+        setRepublishDialogOpen(false);
+        router.push(`/recruiter/jobs/${newJob.id}`);
+      }
+    } catch (err: unknown) {
+      setRepublishError(err instanceof Error ? err.message : "Gagal mempublikasikan ulang lowongan.");
+    } finally {
+      setRepublishing(false);
     }
   };
 
@@ -1304,11 +1401,45 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                <span
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    job.status === "published"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                      : job.status === "closed"
+                      ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                      : job.status === "archived"
+                      ? "bg-slate-100 text-slate-700 border border-slate-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200/60"
+                  }`}
+                >
                   {statusLabels[job.status]}
                 </span>
               </div>
             </div>
+
+            {job.status === "closed" && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 flex items-start gap-3">
+                <AlertCircle className="size-5 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900">Lowongan Ini Sedang Ditutup</p>
+                  <p className="mt-0.5 text-xs text-amber-800 leading-relaxed">
+                    Masa aktif lowongan telah berakhir atau ditutup manual. Pelamar baru tidak dapat melamar, namun Anda tetap dapat memproses pelamar yang sudah ada di pipeline.
+                    Anda dapat <strong>mempublikasikan ulang sebagai batch baru</strong> (pelamar otomatis dipindahkan ke Talent Pool dan lowongan baru dimulai dengan pipeline bersih) atau <strong>mengarsipkannya</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+            {job.status === "archived" && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-900 flex items-start gap-3">
+                <Archive className="size-5 shrink-0 text-slate-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-slate-900">Lowongan Ini Telah Diarsipkan</p>
+                  <p className="mt-0.5 text-xs text-slate-600 leading-relaxed">
+                    Proses perekrutan pada lowongan ini telah selesai. Seluruh riwayat pelamar dan penilaian tetap tersimpan untuk keperluan audit. Anda dapat mempublikasikan ulang kapan saja untuk membuka batch perekrutan baru.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Quick Glints Overview */}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1427,9 +1558,25 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                       </Button>
                     )}
                     {job.status === "closed" && (
-                      <p className="text-xs text-muted-foreground">
-                        Lowongan ini sudah ditutup dan tidak menerima pelamar baru.
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-2xs"
+                          onClick={() => setRepublishDialogOpen(true)}
+                        >
+                          <Sparkles className="size-4" /> Publikasikan Ulang (Batch Baru)
+                        </Button>
+                        <Button variant="outline" onClick={() => changeStatus("archived")}>
+                          <Archive className="size-4 mr-1.5" /> Arsipkan Lowongan
+                        </Button>
+                      </div>
+                    )}
+                    {job.status === "archived" && (
+                      <Button
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-2xs"
+                        onClick={() => setRepublishDialogOpen(true)}
+                      >
+                        <Sparkles className="size-4" /> Publikasikan Ulang (Batch Baru)
+                      </Button>
                     )}
                     <Button
                       variant="outline"
@@ -1490,6 +1637,53 @@ export function JobManagePage({ jobId }: { jobId: string }) {
                     disabled={deleting}
                   >
                     {deleting ? "Menghapus..." : "Ya, Hapus Lowongan"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={republishDialogOpen} onOpenChange={setRepublishDialogOpen}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <div className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 mb-2">
+                    <Sparkles className="size-5" />
+                  </div>
+                  <DialogTitle>Publikasikan Ulang Lowongan (Batch Baru)?</DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground pt-2">
+                    Mempublikasikan ulang akan membuat lowongan aktif baru untuk posisi{" "}
+                    <strong className="text-foreground">&quot;{job.title}&quot;</strong> dengan masa aktif 30 hari ke depan.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1.5 text-foreground">
+                  <p className="font-semibold text-primary flex items-center gap-1.5">
+                    <Check className="size-3.5" /> Yang akan terjadi otomatis:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-1">
+                    <li>Lowongan saat ini akan diubah statusnya menjadi <strong>Archived (Diarsipkan)</strong>.</li>
+                    <li>Seluruh kandidat di pipeline yang belum selesai akan <strong>dipindahkan ke Talent Pool</strong> umum (0 token).</li>
+                    <li>Lowongan baru akan terbit dengan nama yang sama, durasi 30 hari baru, dan <strong>pipeline bersih (0 pelamar)</strong>.</li>
+                  </ul>
+                </div>
+                {republishError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive flex items-center gap-2">
+                    <AlertCircle className="size-4 shrink-0" />
+                    <span>{republishError}</span>
+                  </div>
+                )}
+                <DialogFooter className="gap-2 sm:gap-0 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setRepublishDialogOpen(false)}
+                    disabled={republishing}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    onClick={handleRepublishJob}
+                    disabled={republishing}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {republishing ? "Menerbitkan Batch Baru..." : "Ya, Publikasikan Batch Baru"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
