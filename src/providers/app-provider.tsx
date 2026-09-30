@@ -237,6 +237,18 @@ function parseState(value: string | null): AppState {
 
 const emptySubscribe = () => () => {};
 
+function getInitialSession(): { user: DemoUser | null; companyName?: string } {
+  if (typeof window === "undefined") return { user: null };
+  try {
+    const raw = localStorage.getItem(sessionKey);
+    if (!raw) return { user: null };
+    const parsed = JSON.parse(raw) as DemoUser;
+    return { user: parsed, companyName: parsed?.companyName };
+  } catch {
+    return { user: null };
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !supabaseConfigured;
@@ -245,16 +257,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return initial;
     return parseState(localStorage.getItem(storageKey));
   });
-  const [user, setUser] = useState<DemoUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    const session = localStorage.getItem(sessionKey);
-    if (!session) return null;
-    try {
-      return JSON.parse(session) as DemoUser;
-    } catch {
-      return null;
-    }
-  });
+  const [initialSession] = useState(() => getInitialSession());
+  const [user, setUser] = useState<DemoUser | null>(initialSession.user);
   const [hasPassword, setHasPassword] = useState<boolean | undefined>(undefined);
   const hydrated = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [bootstrapped, setBootstrapped] = useState(() => !supabaseConfigured);
@@ -265,32 +269,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shortlists, setShortlists] = useState<BootstrapShortlist[]>([]);
   const [consentRequests, setConsentRequests] = useState<Record<string, unknown>[]>([]);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
-  const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(() => {
-    if (typeof window === "undefined") return "ITB STIKOM Bali";
-    const session = localStorage.getItem(sessionKey);
-    if (session) {
-      try {
-        const parsed = JSON.parse(session) as DemoUser;
-        if (parsed.companyName) return parsed.companyName;
-      } catch {}
-    }
-    return "ITB STIKOM Bali";
-  });
+  const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(
+    () => initialSession.companyName || "ITB STIKOM Bali"
+  );
   const [approvedPartnerCampuses, setApprovedPartnerCampuses] = useState<string[]>(["ITB STIKOM Bali"]);
 
-  useEffect(() => {
-    let ignore = false;
-    fetch("/api/partner/campuses")
+  const campusesPromiseRef = useRef<Promise<string[]> | null>(null);
+  const loadPartnerCampuses = useCallback(async (): Promise<string[]> => {
+    if (campusesPromiseRef.current) return campusesPromiseRef.current;
+    campusesPromiseRef.current = fetch("/api/partner/campuses")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!ignore && data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
+        if (data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
           setApprovedPartnerCampuses(data.campuses);
+          return data.campuses as string[];
         }
+        return ["ITB STIKOM Bali"];
       })
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
+      .catch(() => ["ITB STIKOM Bali"]);
+    return campusesPromiseRef.current;
   }, []);
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
@@ -382,7 +379,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isBootstrapping = useRef(false);
   const loadBootstrap = async () => {
+    if (isBootstrapping.current) return;
+    isBootstrapping.current = true;
     setBootstrapped(false);
     setDatabaseError(null);
     try {
@@ -509,6 +509,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
       toast.error("Gagal menyiapkan workspace", { description: error instanceof Error ? error.message : "Data database tidak dapat dimuat." });
       setBootstrapped(true);
+    } finally {
+      isBootstrapping.current = false;
     }
   };
 
@@ -552,9 +554,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      } catch {}
+    }, 200);
+
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      } catch {}
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, [state, hydrated]);
 
+  const lastSavedSession = useRef<string | null>(null);
   useEffect(() => {
     if (!hydrated) return;
     if (user) {
@@ -567,9 +586,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         companyName: user.companyName,
         hasSubmittedOnboarding: user.hasSubmittedOnboarding,
       };
-      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+      const serialized = JSON.stringify(sessionData);
+      if (lastSavedSession.current !== serialized) {
+        lastSavedSession.current = serialized;
+        try {
+          localStorage.setItem(sessionKey, serialized);
+        } catch {}
+      }
     } else {
-      localStorage.removeItem(sessionKey);
+      if (lastSavedSession.current !== null) {
+        lastSavedSession.current = null;
+        try {
+          localStorage.removeItem(sessionKey);
+        } catch {}
+      }
     }
   }, [user, hydrated]);
 
@@ -724,12 +754,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (institutionName?: string | null): boolean => {
       if (!institutionName || !institutionName.trim()) return false;
       const target = institutionName.trim().toLowerCase();
-      return approvedPartnerCampuses.some((c) => {
+      const matched = approvedPartnerCampuses.some((c) => {
         const campus = c.toLowerCase();
         return campus === target || campus.includes(target) || target.includes(campus);
       });
+      if (!matched && approvedPartnerCampuses.length <= 1) {
+        void loadPartnerCampuses();
+      }
+      return matched;
     },
-    [approvedPartnerCampuses]
+    [approvedPartnerCampuses, loadPartnerCampuses]
   );
 
   const recommendCampus = useCallback(async (institution: string, notes?: string): Promise<boolean> => {
