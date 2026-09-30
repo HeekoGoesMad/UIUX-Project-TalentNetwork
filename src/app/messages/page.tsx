@@ -39,7 +39,13 @@ type Message = {
 };
 type Attachment = { name: string; mimeType: string; size: number };
 type MessagePage = { messages: Message[]; hasMore: boolean; nextCursor: string | null };
-type CachedConversationList = { data?: Conversation[]; fetchedAt: number; lastAttemptAt: number; inFlight?: Promise<Conversation[]> };
+type CachedConversationList = {
+  data?: Conversation[];
+  fetchedAt: number;
+  lastAttemptAt: number;
+  inFlight?: Promise<Conversation[]>;
+  inFlightToken?: symbol;
+};
 type CachedMessagePage = MessagePage & { fetchedAt: number };
 type CachedMessages = {
   messages: Message[];
@@ -49,6 +55,7 @@ type CachedMessages = {
   lastAttemptAt: number;
   pages: Map<string, CachedMessagePage>;
   inFlight: Map<string, Promise<MessagePage>>;
+  inFlightTokens: Map<string, symbol>;
 };
 
 const CACHE_STALE_MS = 45_000;
@@ -83,7 +90,9 @@ async function fetchConversations(userKey: string, force = false): Promise<Conve
     if (!response.ok) throw new Error(payload.error ?? "Gagal memuat percakapan.");
     return payload.conversations ?? [];
   })();
+  const requestToken = Symbol();
   cache.inFlight = request;
+  cache.inFlightToken = requestToken;
   conversationCache.set(userKey, cache);
 
   try {
@@ -92,7 +101,10 @@ async function fetchConversations(userKey: string, force = false): Promise<Conve
     cache.fetchedAt = Date.now();
     return data;
   } finally {
-    if (cache.inFlight === request) cache.inFlight = undefined;
+    if (cache.inFlightToken === requestToken) {
+      cache.inFlight = undefined;
+      cache.inFlightToken = undefined;
+    }
   }
 }
 
@@ -106,6 +118,7 @@ function storeMessagePage(userKey: string, conversationId: string, before: strin
     lastAttemptAt: 0,
     pages: new Map<string, CachedMessagePage>(),
     inFlight: new Map<string, Promise<MessagePage>>(),
+    inFlightTokens: new Map<string, symbol>(),
   };
   cache.pages.set(before ?? "initial", { ...page, fetchedAt: Date.now() });
   cache.messages = mergeMessages(cache.messages, page.messages);
@@ -132,6 +145,7 @@ async function fetchMessagePage(userKey: string, conversationId: string, before?
     lastAttemptAt: 0,
     pages: new Map<string, CachedMessagePage>(),
     inFlight: new Map<string, Promise<MessagePage>>(),
+    inFlightTokens: new Map<string, symbol>(),
   };
   cache.lastAttemptAt = Date.now();
   const request = (async () => {
@@ -142,7 +156,9 @@ async function fetchMessagePage(userKey: string, conversationId: string, before?
     if (!response.ok) throw new Error(payload.error ?? "Gagal memuat pesan.");
     return { messages: payload.messages ?? [], hasMore: Boolean(payload.hasMore), nextCursor: payload.nextCursor ?? null };
   })();
+  const requestToken = Symbol();
   cache.inFlight.set(pageKey, request);
+  cache.inFlightTokens.set(pageKey, requestToken);
   messageCache.set(key, cache);
 
   try {
@@ -151,7 +167,10 @@ async function fetchMessagePage(userKey: string, conversationId: string, before?
       return page;
     });
   } finally {
-    if (cache.inFlight.get(pageKey) === request) cache.inFlight.delete(pageKey);
+    if (cache.inFlightTokens.get(pageKey) === requestToken) {
+      cache.inFlight.delete(pageKey);
+      cache.inFlightTokens.delete(pageKey);
+    }
   }
 }
 

@@ -573,7 +573,7 @@ export default function TalentProfile() {
 
   const unlocked = scans.some((item) => item.candidateId === candidate.id);
   const screeningStatus = screeningRunStatuses[candidate.id];
-  const completed = hydrated && (dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed");
+  const completed = dbMode ? remoteScreeningCompleted || screeningStatus === "completed" : screeningStatus === "completed";
 
   // startScreening only reports success/failure, so attribute dbMode failures via
   // the single-balance endpoint: token shortage is claimed only when the balance
