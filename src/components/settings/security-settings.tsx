@@ -18,7 +18,7 @@ import { useApp } from "@/providers/app-provider";
 import { checkPasswordRequirements, isPasswordValid } from "@/components/auth/auth-form";
 
 export function SecuritySettings() {
-  const { user, devBypass } = useApp();
+  const { user, devBypass, hasPassword: appHasPassword, setHasPassword } = useApp();
 
   const [passwordSetOverride, setPasswordSetOverride] = useState<boolean | null>(null);
   const [supabaseHasPassword, setSupabaseHasPassword] = useState<boolean | null>(null);
@@ -41,7 +41,7 @@ export function SecuritySettings() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof user?.hasPassword !== "boolean") {
+    if (typeof appHasPassword !== "boolean") {
       createClient()
         .auth.getUser()
         .then(({ data }) => {
@@ -56,13 +56,13 @@ export function SecuritySettings() {
         })
         .catch(() => {});
     }
-  }, [user?.hasPassword]);
+  }, [appHasPassword]);
 
   const hasPassword =
     passwordSetOverride !== null
       ? passwordSetOverride
-      : typeof user?.hasPassword === "boolean"
-      ? user.hasPassword
+      : typeof appHasPassword === "boolean"
+      ? appHasPassword
       : supabaseHasPassword ?? true;
 
   // Initial setup criteria
@@ -134,6 +134,7 @@ export function SecuritySettings() {
         await new Promise((res) => setTimeout(res, 600));
         toast.success("Demo Mode — kata sandi disimulasikan berhasil diatur.");
         setPasswordSetOverride(true);
+        setHasPassword?.(true);
         setIsSettingInitialPassword(false);
         setSetupPassword("");
         setSetupConfirm("");
@@ -154,6 +155,7 @@ export function SecuritySettings() {
 
       toast.success("Kata sandi berhasil diatur dengan aman.");
       setPasswordSetOverride(true);
+      setHasPassword?.(true);
       setIsSettingInitialPassword(false);
       setSetupPassword("");
       setSetupConfirm("");
