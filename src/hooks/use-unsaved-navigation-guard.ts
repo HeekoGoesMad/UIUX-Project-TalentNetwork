@@ -82,12 +82,14 @@ export function useUnsavedNavigationGuard({
       const href = anchor.getAttribute("href");
       if (!href) return;
 
-      // Ignore hash links and protocols on the same page
+      // Ignore hash links and non-navigation or script protocols
       if (
         href.startsWith("#") ||
         href.startsWith("mailto:") ||
         href.startsWith("tel:") ||
-        href.startsWith("javascript:")
+        href.startsWith("javascript:") ||
+        href.startsWith("data:") ||
+        href.startsWith("vbscript:")
       ) {
         return;
       }

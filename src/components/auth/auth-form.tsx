@@ -181,9 +181,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   useEffect(() => {
     if (hydrated && user && !loading && !googleLoading && !otpModalOpen && mode === "login") {
       const dest = destination(user.role, getNext(), false, user.provisioningStatus);
-      window.location.href = safeRedirectPath(dest, "/dashboard");
+      router.replace(safeRedirectPath(dest, "/dashboard"));
     }
-  }, [hydrated, user, loading, googleLoading, mode, otpModalOpen]);
+  }, [hydrated, user, loading, googleLoading, mode, otpModalOpen, router]);
 
   // Reset loading indicators if the user navigates back from external Google OAuth page (bfcache)
   useEffect(() => {
@@ -316,7 +316,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       result.provisioningStatus,
       result.hasSubmittedOnboarding
     );
-    window.location.href = safeRedirectPath(dest, "/dashboard");
+    router.replace(safeRedirectPath(dest, "/dashboard"));
   };
 
   const handleGoogleClick = () => {
@@ -436,7 +436,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
               : (typeof authData.destination === "string" ? authData.destination : dest);
 
-            window.location.href = safeRedirectPath(target, "/dashboard");
+            router.replace(safeRedirectPath(target, "/dashboard"));
           } else if (authData.type === "GOOGLE_AUTH_ERROR") {
             handled = true;
             if (popup && !popup.closed) {
@@ -549,7 +549,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               const target = shouldSetupPassword
                 ? `/auth/setup-password?role=${userRole}&next=${encodeURIComponent(dest)}`
                 : dest;
-              window.location.href = safeRedirectPath(target, "/dashboard");
+              router.replace(safeRedirectPath(target, "/dashboard"));
               return;
             }
           } catch {}
