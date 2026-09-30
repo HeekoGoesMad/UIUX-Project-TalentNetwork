@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export type DocumentStorageResult = {
   provider: "development-mock" | "supabase-storage";
@@ -30,9 +31,11 @@ export async function storeCvDocument(input: { key: string; bytes: Uint8Array; c
 
   let supabase;
   if (serviceKey) {
-    supabase = createSupabaseClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    supabase =
+      getAdminClient() ??
+      createSupabaseClient(url, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
   } else {
     supabase = await createClient();
   }
@@ -68,7 +71,7 @@ export async function createCvDownloadUrl(storagePath: string): Promise<string |
   const bucket = storagePath.slice(0, slash);
   const key = storagePath.slice(slash + 1);
   if (!bucket || !key) return null;
-  const supabase = createSupabaseClient(url, serviceRoleKey);
+  const supabase = getAdminClient() ?? createSupabaseClient(url, serviceRoleKey);
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(key, CV_DOWNLOAD_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) {
     console.warn(`[cv-storage] signed URL creation failed: ${error?.message ?? "unknown error"}`);

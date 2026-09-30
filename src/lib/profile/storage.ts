@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { extractStorageKey, sanitizeMediaName } from "./validation";
 
 export {
@@ -34,6 +35,8 @@ async function getStorageClient() {
   }
 
   if (serviceKey) {
+    const admin = getAdminClient();
+    if (admin) return admin;
     return createSupabaseClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });

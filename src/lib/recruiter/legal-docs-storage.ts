@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export type LegalDocStorageResult = {
   provider: "development-mock" | "supabase-storage";
@@ -49,9 +50,11 @@ export async function storeLegalDocument(input: {
 
   let supabase;
   if (serviceKey) {
-    supabase = createSupabaseClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    supabase =
+      getAdminClient() ??
+      createSupabaseClient(url, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
   } else {
     supabase = await createClient();
   }
@@ -116,7 +119,7 @@ export async function createLegalDocDownloadUrl(storagePath: string): Promise<st
   const bucket = storagePath.slice(0, slash);
   const key = storagePath.slice(slash + 1);
   if (!bucket || !key) return null;
-  const supabase = createSupabaseClient(url, serviceRoleKey);
+  const supabase = getAdminClient() ?? createSupabaseClient(url, serviceRoleKey);
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(key, LEGAL_DOC_DOWNLOAD_URL_TTL_SECONDS);

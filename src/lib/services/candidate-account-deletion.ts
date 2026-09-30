@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 import { schema, type Database } from "@/db";
 import { cleanUserStorageMedia, deleteProfileMedia } from "@/lib/profile/storage";
@@ -14,6 +15,9 @@ export type DeleteCandidateAccountResult = {
 };
 
 async function getAdminStorageClient() {
+  const admin = getAdminClient();
+  if (admin) return admin;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
