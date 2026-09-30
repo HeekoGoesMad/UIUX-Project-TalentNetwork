@@ -594,7 +594,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   // Save to demo storage when not in dbMode, or cache DB records in dbMode
   useEffect(() => {
     if (!dbMode) {
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      } catch {}
     } else if (typeof window !== "undefined" && !isDbSyncing) {
       try {
         localStorage.setItem(DB_CACHE_KEY, JSON.stringify(data));

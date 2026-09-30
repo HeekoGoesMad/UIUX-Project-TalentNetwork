@@ -550,26 +550,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { listener.subscription.unsubscribe(); };
   }, [supabaseConfigured]);
 
+  const stateRef = useRef(state);
+
   useEffect(() => {
+    stateRef.current = state;
     if (!hydrated) return;
-    localStorage.setItem(storageKey, JSON.stringify(state));
+
+    const flush = () => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(stateRef.current));
+      } catch (err) {
+        console.warn("[AppProvider] Failed to persist state to localStorage:", err);
+      }
+    };
+
+    const timer = setTimeout(flush, 200);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearTimeout(timer);
+      flush();
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [state, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (user) {
-      const sessionData: DemoUser = {
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        provisioningStatus: user.provisioningStatus,
-        provisioningReason: user.provisioningReason,
-        companyName: user.companyName,
-        hasSubmittedOnboarding: user.hasSubmittedOnboarding,
-      };
-      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-    } else {
-      localStorage.removeItem(sessionKey);
+    try {
+      if (user) {
+        const sessionData: DemoUser = {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          provisioningStatus: user.provisioningStatus,
+          provisioningReason: user.provisioningReason,
+          companyName: user.companyName,
+          hasSubmittedOnboarding: user.hasSubmittedOnboarding,
+        };
+        localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+      } else {
+        localStorage.removeItem(sessionKey);
+      }
+    } catch (err) {
+      console.warn("[AppProvider] Failed to persist session to localStorage:", err);
     }
   }, [user, hydrated]);
 
@@ -985,8 +1019,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrapUserKey.current = null;
     setUser(null);
     setHasPassword(undefined);
-    localStorage.removeItem(sessionKey);
     try {
+      localStorage.removeItem(sessionKey);
       localStorage.removeItem("proofylink-a11y-prefs");
       if (typeof document !== "undefined") {
         const root = document.documentElement;
