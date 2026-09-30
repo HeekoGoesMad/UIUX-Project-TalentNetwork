@@ -91,6 +91,8 @@ export type Candidate = {
   coverNote?: string | null;
   expectedSalary?: number | null;
   availability?: string | null;
+  skills?: string[];
+  matchScore?: number;
 };
 
 
@@ -141,20 +143,20 @@ const initialCandidates: Candidate[] = [
     name: "Adrienne Kayana Wistara Lie",
     role: "Product Management Intern",
     location: "Denpasar Barat, Bali",
-    stage: "hired",
+    stage: "screening",
     owner: "Adrienne",
     dueDate: "2026-09-25",
     appliedAt: "2026-09-09",
     score: 4.8,
-    feedback: "Kandidat ini memenuhi kompetensi inti lowongan dan selaras dengan standar peran.",
-    offerStatus: "accepted",
+    feedback: "Kandidat berpotensi tinggi dari Talent Pool, siap ditugaskan ke lowongan yang sesuai.",
+    offerStatus: "draft",
     compensation: "Rp 15.000.000 / bulan",
     expectedSalary: 15000000,
     availability: "1 Bulan",
     reason: "",
     avatarUrl: SUPABASE_AVATARS["Adrienne Kayana Wistara Lie"],
-    jobId: "d7ce6147-6f60-4f20-b2b0-cdcd4f5ab835",
-    jobTitle: "AI Engineering",
+    jobId: "talent-pool",
+    jobTitle: "Talent Pool",
   },
   {
     id: "b082c226-1a6e-42a6-80e0-150ce5f01745",
@@ -435,13 +437,14 @@ export function validateCandidateStageTransition(
 }
 
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
-  const { dbMode, scans, user, reloadBootstrap, tokens } = useApp();
+  const { dbMode, scans, user, reloadBootstrap, tokens, screeningResults } = useApp();
+  const isJobSpecificPipeline = Boolean(initialJobId && initialJobId !== "talent-pool");
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
-  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "table">(() => (isJobSpecificPipeline ? "table" : "kanban"));
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState(() => initialJobId || "all");
-  const [scopeFilter, setScopeFilter] = useState<"all" | "pool" | "jobs">(() => (initialJobId ? "jobs" : "all"));
+  const [scopeFilter, setScopeFilter] = useState<"jobs" | "pool">(() => (initialJobId ? "jobs" : "jobs"));
   const [prevInitialJobId, setPrevInitialJobId] = useState(initialJobId);
   const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(() => {
     if (typeof window !== "undefined" && !dbMode) {
@@ -464,11 +467,19 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   const [unlockModalCandidate, setUnlockModalCandidate] = useState<Candidate | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
 
+  // Dedicated Talent Pool Actions modal states
+  const [assignModalCandidate, setAssignModalCandidate] = useState<Candidate | null>(null);
+  const [selectedAssignJobId, setSelectedAssignJobId] = useState<string>("");
+  const [deleteModalCandidate, setDeleteModalCandidate] = useState<Candidate | null>(null);
+
   // Adjust state if initialJobId prop changes
   if (initialJobId !== prevInitialJobId) {
     setPrevInitialJobId(initialJobId);
     setJobFilter(initialJobId || "all");
-    if (initialJobId) setScopeFilter("jobs");
+    if (initialJobId) {
+      setScopeFilter("jobs");
+      setViewMode("table");
+    }
   }
 
   // Batch actions states
@@ -969,20 +980,31 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         searchQuery.trim() === "" ||
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchSearch) return false;
+
+      if (isJobSpecificPipeline) {
+        const targetJobTitle = availableJobs.find((j) => j.id === initialJobId)?.title;
+        return (
+          candidate.jobId === initialJobId ||
+          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false)
+        );
+      }
+
       const isPool =
         !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
-      const matchScope =
-        scopeFilter === "all" ? true : scopeFilter === "pool" ? isPool : !isPool;
-      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
-      const matchJob =
-        jobFilter === "all"
-          ? true
-          : jobFilter === "talent-pool"
-          ? isPool
-          : candidate.jobId === jobFilter ||
-            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
-            candidate.role === jobFilter;
-      return matchSearch && matchScope && matchJob;
+      const matchScope = scopeFilter === "pool" ? isPool : !isPool;
+      if (!matchScope) return false;
+
+      if (scopeFilter === "jobs" && jobFilter !== "all") {
+        const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
+        return (
+          candidate.jobId === jobFilter ||
+          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
+          candidate.role === jobFilter
+        );
+      }
+
+      return true;
     });
 
     const all = base.length;
@@ -1001,7 +1023,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     const locked = base.filter((c) => c.unlocked === false).length;
 
     return { all, sla, interview, locked };
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, data.interviews]);
+  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, availableJobs, data.interviews]);
 
   // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
@@ -1010,28 +1032,29 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         searchQuery.trim() === "" ||
         candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchSearch) return false;
 
-      const isPool =
-        !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+      if (isJobSpecificPipeline) {
+        const targetJobTitle = availableJobs.find((j) => j.id === initialJobId)?.title;
+        const matchJob =
+          candidate.jobId === initialJobId ||
+          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false);
+        if (!matchJob) return false;
+      } else {
+        const isPool =
+          !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
+        const matchScope = scopeFilter === "pool" ? isPool : !isPool;
+        if (!matchScope) return false;
 
-      const matchScope =
-        scopeFilter === "all"
-          ? true
-          : scopeFilter === "pool"
-          ? isPool
-          : !isPool;
-
-      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
-      const matchJob =
-        jobFilter === "all"
-          ? true
-          : jobFilter === "talent-pool"
-          ? isPool
-          : candidate.jobId === jobFilter ||
+        if (scopeFilter === "jobs" && jobFilter !== "all") {
+          const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
+          const matchJob =
+            candidate.jobId === jobFilter ||
             (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
             candidate.role === jobFilter;
-
-      if (!matchSearch || !matchScope || !matchJob) return false;
+          if (!matchJob) return false;
+        }
+      }
 
       // Smart Triage Filter Logic
       if (triageFilter === "sla") {
@@ -1050,7 +1073,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
       return true;
     });
-  }, [activeCandidates, searchQuery, scopeFilter, jobFilter, availableJobs, triageFilter, data.interviews]);
+  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, availableJobs, triageFilter, data.interviews]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -1512,12 +1535,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
       const isPool =
         !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
 
-      const matchScope =
-        scopeFilter === "all"
-          ? true
-          : scopeFilter === "pool"
-          ? isPool
-          : !isPool;
+      const matchScope = scopeFilter === "pool" ? isPool : !isPool;
 
       const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
@@ -2114,32 +2132,6 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                     </Link>
                   </Button>
 
-                  {/* View Switcher */}
-                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                    <button
-                      onClick={() => setViewMode("kanban")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                        viewMode === "kanban"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      )}
-                    >
-                      <Kanban className="size-3.5" /> Papan
-                    </button>
-                    <button
-                      onClick={() => setViewMode("table")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                        viewMode === "table"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      )}
-                    >
-                      <TableIcon className="size-3.5" /> Tabel
-                    </button>
-                  </div>
-
                   <Button
                     size="sm"
                     variant="outline"
@@ -2179,31 +2171,33 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
                 {/* View Switcher & Action Buttons */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* View Switcher */}
-                  <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                    <button
-                      onClick={() => setViewMode("kanban")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                        viewMode === "kanban"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      )}
-                    >
-                      <Kanban className="size-3.5" /> Papan
-                    </button>
-                    <button
-                      onClick={() => setViewMode("table")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                        viewMode === "table"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      )}
-                    >
-                      <TableIcon className="size-3.5" /> Tabel
-                    </button>
-                  </div>
+                  {/* View Switcher (Only shown for Lowongan Aktif) */}
+                  {scopeFilter === "jobs" && (
+                    <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                      <button
+                        onClick={() => setViewMode("kanban")}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                          viewMode === "kanban"
+                            ? "bg-white text-slate-900 shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        <Kanban className="size-3.5" /> Papan
+                      </button>
+                      <button
+                        onClick={() => setViewMode("table")}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                          viewMode === "table"
+                            ? "bg-white text-slate-900 shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        <TableIcon className="size-3.5" /> Tabel
+                      </button>
+                    </div>
+                  )}
 
                   <Button
                     size="sm"
@@ -2235,29 +2229,31 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
               </div>
             )}
 
-            {/* KPI Metric Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
-                <span className="text-[11px] font-medium text-slate-500">Total Pelamar</span>
-                <span className="text-sm font-bold text-slate-900">{metrics.total}</span>
+            {/* KPI Metric Strip (Only for /recruiter/operations active jobs, hidden on dedicated job pipeline and talent pool) */}
+            {!isJobSpecificPipeline && scopeFilter !== "pool" && (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-3 border-t border-slate-100">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
+                  <span className="text-[11px] font-medium text-slate-500">Total Pelamar</span>
+                  <span className="text-sm font-bold text-slate-900">{metrics.total}</span>
+                </div>
+                <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
+                  <span className="text-[11px] font-medium text-blue-700">Screening</span>
+                  <span className="text-sm font-bold text-blue-900">{metrics.screening}</span>
+                </div>
+                <div className="bg-fuchsia-50/70 border border-fuchsia-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
+                  <span className="text-[11px] font-medium text-fuchsia-700">Wawancara</span>
+                  <span className="text-sm font-bold text-fuchsia-900">{metrics.interview}</span>
+                </div>
+                <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
+                  <span className="text-[11px] font-medium text-amber-700">Penawaran (Offer)</span>
+                  <span className="text-sm font-bold text-amber-900">{metrics.offer}</span>
+                </div>
+                <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between col-span-2 sm:col-span-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
+                  <span className="text-[11px] font-medium text-emerald-700">Diterima (Hired)</span>
+                  <span className="text-sm font-bold text-emerald-900">{metrics.hired}</span>
+                </div>
               </div>
-              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
-                <span className="text-[11px] font-medium text-blue-700">Screening</span>
-                <span className="text-sm font-bold text-blue-900">{metrics.screening}</span>
-              </div>
-              <div className="bg-fuchsia-50/70 border border-fuchsia-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
-                <span className="text-[11px] font-medium text-fuchsia-700">Wawancara</span>
-                <span className="text-sm font-bold text-fuchsia-900">{metrics.interview}</span>
-              </div>
-              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-2 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
-                <span className="text-[11px] font-medium text-amber-700">Penawaran (Offer)</span>
-                <span className="text-sm font-bold text-amber-900">{metrics.offer}</span>
-              </div>
-              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between col-span-2 sm:col-span-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-default">
-                <span className="text-[11px] font-medium text-emerald-700">Diterima (Hired)</span>
-                <span className="text-sm font-bold text-emerald-900">{metrics.hired}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -2265,13 +2261,19 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-              <div className="relative w-full sm:w-72">
+              <div className="relative w-full sm:w-80">
                 <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari kandidat atau posisi..."
+                  placeholder={
+                    isJobSpecificPipeline
+                      ? "Cari pelamar di lowongan ini..."
+                      : scopeFilter === "pool"
+                      ? "Cari talenta di Talent Pool..."
+                      : "Cari pelamar atau lowongan..."
+                  }
                   className="w-full text-xs rounded-xl border border-slate-200 pl-9 pr-3 py-2 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden transition-colors"
                 />
                 {searchQuery && (
@@ -2284,210 +2286,444 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                 )}
               </div>
 
-              {/* Segmented Scope Filter Toggle */}
-              <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200/80 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setScopeFilter("all")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
-                    scopeFilter === "all"
-                      ? "bg-white text-slate-900 shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  Semua
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 font-medium text-slate-600">
-                    {scopeCounts.total}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScopeFilter("pool")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
-                    scopeFilter === "pool"
-                      ? "bg-white text-[#7C3AED] shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  Talent Pool
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-100/70 font-medium text-purple-700">
-                    {scopeCounts.pool}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScopeFilter("jobs")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
-                    scopeFilter === "jobs"
-                      ? "bg-white text-slate-900 shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  Lowongan Aktif
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 font-medium text-slate-600">
-                    {scopeCounts.jobs}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 justify-end overflow-x-auto">
-              {/* Job Opening Filter */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                <select
-                  value={jobFilter}
-                  onChange={(e) => setJobFilter(e.target.value)}
-                  className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
-                >
-                  <option value="all">Semua Lowongan</option>
-                  <option value="talent-pool">Talent Pool (Belum ada lowongan)</option>
-                  {availableJobs.map((j) => (
-                    <option key={j.id} value={j.id}>
-                      {j.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {initialJobId && jobFilter !== initialJobId && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setJobFilter(initialJobId);
-                    setScopeFilter("jobs");
-                  }}
-                  className="h-8 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50"
-                >
-                  Fokus ke Lowongan Ini
-                </Button>
-              )}
-
-              {(searchQuery || jobFilter !== "all" || scopeFilter !== "all") && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setJobFilter("all");
-                    setScopeFilter("all");
-                  }}
-                  className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
-                >
-                  Reset Filter
-                </Button>
+              {/* Segmented Scope Filter Toggle (Only for /recruiter/operations, Gambar 5 without 'Semua') */}
+              {!isJobSpecificPipeline && (
+                <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200/80 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setScopeFilter("jobs")}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                      scopeFilter === "jobs"
+                        ? "bg-white text-slate-900 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    )}
+                  >
+                    Lowongan Aktif
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 font-medium text-slate-600">
+                      {scopeCounts.jobs}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScopeFilter("pool")}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                      scopeFilter === "pool"
+                        ? "bg-white text-[#7C3AED] shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    )}
+                  >
+                    Talent Pool
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-100/70 font-medium text-purple-700">
+                      {scopeCounts.pool}
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Job Opening Filter (Only when viewing Lowongan Aktif on /recruiter/operations) */}
+            {!isJobSpecificPipeline && scopeFilter === "jobs" && (
+              <div className="flex items-center gap-2 justify-end overflow-x-auto">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <select
+                    value={jobFilter}
+                    onChange={(e) => setJobFilter(e.target.value)}
+                    className="text-xs font-semibold rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden"
+                  >
+                    <option value="all">Semua Lowongan</option>
+                    {availableJobs.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {(searchQuery || jobFilter !== "all") && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setJobFilter("all");
+                    }}
+                    className="h-8 text-xs font-semibold text-slate-500 hover:text-slate-800"
+                  >
+                    Reset Filter
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 1-Click Smart Triage Filter Chips (Strictly No Emojis, Clean SVG Icons) */}
-        <div className="container mx-auto px-4 sm:px-6 pt-1 pb-3">
-          <div className="flex flex-wrap items-center gap-2 bg-white/70 backdrop-blur-xs p-2 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1.5">
-              <Filter className="size-3.5 text-slate-500" />
-              Triage Cepat:
-            </span>
+        {/* 1-Click Smart Triage Filter Chips (Only for active jobs, hidden in Talent Pool) */}
+        {(isJobSpecificPipeline || scopeFilter === "jobs") && (
+          <div className="container mx-auto px-4 sm:px-6 pt-1 pb-3">
+            <div className="flex flex-wrap items-center gap-2 bg-white/70 backdrop-blur-xs p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1.5">
+                <Filter className="size-3.5 text-slate-500" />
+                Triage Cepat:
+              </span>
 
-            {/* Chip: Semua */}
-            <button
-              type="button"
-              onClick={() => setTriageFilter("all")}
-              className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
-                triageFilter === "all"
-                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-              )}
-            >
-              <span>Semua</span>
-              <span
+              {/* Chip: Semua */}
+              <button
+                type="button"
+                onClick={() => setTriageFilter("all")}
                 className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  triageFilter === "all" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"
+                  "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                  triageFilter === "all"
+                    ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                 )}
               >
-                {triageCounts.all}
-              </span>
-            </button>
+                <span>Semua</span>
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    triageFilter === "all" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  {triageCounts.all}
+                </span>
+              </button>
 
-            {/* Chip: Perlu Tindakan SLA */}
-            <button
-              type="button"
-              onClick={() => setTriageFilter("sla")}
-              className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
-                triageFilter === "sla"
-                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                  : "bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100"
-              )}
-            >
-              <Clock className="size-3.5" />
-              <span>Perlu Tindakan SLA</span>
-              <span
+              {/* Chip: Perlu Tindakan SLA */}
+              <button
+                type="button"
+                onClick={() => setTriageFilter("sla")}
                 className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  triageFilter === "sla" ? "bg-amber-700 text-white" : "bg-amber-200/80 text-amber-900"
+                  "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                  triageFilter === "sla"
+                    ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                    : "bg-amber-50/80 text-amber-800 border-amber-200 hover:bg-amber-100"
                 )}
               >
-                {triageCounts.sla}
-              </span>
-            </button>
+                <Clock className="size-3.5" />
+                <span>Perlu Tindakan SLA</span>
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    triageFilter === "sla" ? "bg-amber-700 text-white" : "bg-amber-200/80 text-amber-900"
+                  )}
+                >
+                  {triageCounts.sla}
+                </span>
+              </button>
 
-            {/* Chip: Wawancara Butuh Respon */}
-            <button
-              type="button"
-              onClick={() => setTriageFilter("interview")}
-              className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
-                triageFilter === "interview"
-                  ? "bg-fuchsia-700 text-white border-fuchsia-700 shadow-2xs"
-                  : "bg-fuchsia-50/80 text-fuchsia-800 border-fuchsia-200 hover:bg-fuchsia-100"
-              )}
-            >
-              <CalendarClock className="size-3.5" />
-              <span>Wawancara Butuh Respon</span>
-              <span
+              {/* Chip: Wawancara Butuh Respon */}
+              <button
+                type="button"
+                onClick={() => setTriageFilter("interview")}
                 className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  triageFilter === "interview" ? "bg-fuchsia-800 text-white" : "bg-fuchsia-200/80 text-fuchsia-900"
+                  "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                  triageFilter === "interview"
+                    ? "bg-fuchsia-700 text-white border-fuchsia-700 shadow-2xs"
+                    : "bg-fuchsia-50/80 text-fuchsia-800 border-fuchsia-200 hover:bg-fuchsia-100"
                 )}
               >
-                {triageCounts.interview}
-              </span>
-            </button>
+                <CalendarClock className="size-3.5" />
+                <span>Wawancara Butuh Respon</span>
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    triageFilter === "interview" ? "bg-fuchsia-800 text-white" : "bg-fuchsia-200/80 text-fuchsia-900"
+                  )}
+                >
+                  {triageCounts.interview}
+                </span>
+              </button>
 
-            {/* Chip: Inbound Terkunci */}
-            <button
-              type="button"
-              onClick={() => setTriageFilter("locked")}
-              className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
-                triageFilter === "locked"
-                  ? "bg-purple-700 text-white border-purple-700 shadow-2xs"
-                  : "bg-purple-50/80 text-purple-800 border-purple-200 hover:bg-purple-100"
-              )}
-            >
-              <Lock className="size-3.5" />
-              <span>Inbound Terkunci</span>
-              <span
+              {/* Chip: Inbound Terkunci */}
+              <button
+                type="button"
+                onClick={() => setTriageFilter("locked")}
                 className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  triageFilter === "locked" ? "bg-purple-800 text-white" : "bg-purple-200/80 text-purple-900"
+                  "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer",
+                  triageFilter === "locked"
+                    ? "bg-purple-700 text-white border-purple-700 shadow-2xs"
+                    : "bg-purple-50/80 text-purple-800 border-purple-200 hover:bg-purple-100"
                 )}
               >
-                {triageCounts.locked}
-              </span>
-            </button>
+                <Lock className="size-3.5" />
+                <span>Inbound Terkunci</span>
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    triageFilter === "locked" ? "bg-purple-800 text-white" : "bg-purple-200/80 text-purple-900"
+                  )}
+                >
+                  {triageCounts.locked}
+                </span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main Content Area */}
         <div className="container mx-auto px-4 sm:px-6">
-          {viewMode === "kanban" ? (
+          {!isJobSpecificPipeline && scopeFilter === "pool" ? (
+            /* DEDICATED TALENT POOL TABLE VIEW (TABLE KHUSUS) */
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden animate-in fade-in-50 duration-300">
+              <div className="p-4 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Daftar Talenta di Talent Pool</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Kandidat yang telah dibuka profilnya melalui fitur Sourcing / Cari Talent. Siap ditugaskan ke lowongan aktif kapan saja.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredCandidates.length > 0 &&
+                              filteredCandidates.every((c) => selectedCandidateIds.includes(c.id))
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const visibleIds = filteredCandidates.map((c) => c.id);
+                                setSelectedCandidateIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+                              } else {
+                                const visibleIds = new Set(filteredCandidates.map((c) => c.id));
+                                setSelectedCandidateIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+                              }
+                            }}
+                            className="size-3.5 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED] cursor-pointer"
+                            aria-label="Pilih semua talenta"
+                          />
+                          <span>Talenta</span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-3.5">Domisili &amp; Ekspektasi</th>
+                      <th className="px-4 py-3.5">Keahlian &amp; Evaluasi</th>
+                      <th className="px-4 py-3.5">Waktu Masuk Pool</th>
+                      <th className="px-5 py-3.5 text-right">Tindak Lanjut &amp; Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredCandidates.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                          <div className="max-w-sm mx-auto space-y-2">
+                            <Briefcase className="size-8 text-slate-300 mx-auto" />
+                            <p className="font-semibold text-slate-600">Talent Pool masih kosong</p>
+                            <p className="text-xs text-slate-400">
+                              Gunakan fitur Cari Talent untuk menemukan kandidat terbaik dan buka profil mereka agar masuk ke Talent Pool ini.
+                            </p>
+                            <Button size="sm" asChild className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs rounded-xl mt-2">
+                              <Link href="/recruiter/discover">Cari Talent Sekarang</Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCandidates.map((candidate) => {
+                        const isSelected = selectedCandidateIds.includes(candidate.id);
+                        return (
+                          <tr
+                            key={candidate.id}
+                            onClick={() => {
+                              setSelectedCandidate(candidate);
+                              setDrawerOpen(true);
+                            }}
+                            className={cn(
+                              "hover:bg-slate-50/80 transition-colors cursor-pointer",
+                              isSelected ? "bg-purple-50/40" : ""
+                            )}
+                          >
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              <div className="flex items-center gap-2.5">
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setSelectedCandidateIds((prev) =>
+                                        prev.includes(candidate.id)
+                                          ? prev.filter((id) => id !== candidate.id)
+                                          : [...prev, candidate.id]
+                                      );
+                                    }}
+                                    className="size-3.5 rounded border-slate-300 text-[#7C3AED] focus:ring-[#7C3AED] cursor-pointer"
+                                    aria-label={`Pilih ${candidate.name}`}
+                                  />
+                                </div>
+                                <CandidateAvatar
+                                  initials={candidate.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                  avatarUrl={candidate.unlocked === false ? undefined : candidate.avatarUrl}
+                                  name={candidate.name}
+                                  className="size-9 rounded-xl ring-1 ring-purple-100 shrink-0"
+                                />
+                                <div>
+                                  <p className="font-bold text-slate-900 leading-tight">
+                                    {candidate.unlocked !== false ? candidate.name : maskName(candidate.name)}
+                                  </p>
+                                  <p className="text-xs font-normal text-slate-500 mt-0.5">{candidate.role}</p>
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[#7C3AED] bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5">
+                                    <Sparkles className="size-2.5 text-[#7C3AED]" /> Sourced Talent
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <p className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                                <MapPin className="size-3 text-slate-400" />
+                                {candidate.location}
+                              </p>
+                              {(candidate.expectedSalary || candidate.availability) && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
+                                  {candidate.expectedSalary && (
+                                    <span className="font-semibold text-emerald-700">
+                                      Rp {(candidate.expectedSalary / 1000000).toFixed(0)}jt/bln
+                                    </span>
+                                  )}
+                                  {candidate.expectedSalary && candidate.availability && <span>·</span>}
+                                  {candidate.availability && (
+                                    <span className="text-purple-700 font-medium">{candidate.availability}</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              {(() => {
+                                const cachedScreening = screeningResults ? screeningResults[candidate.id] : undefined;
+                                const isHighQuality = cachedScreening?.insight?.score
+                                  ? cachedScreening.insight.score >= 80
+                                  : (candidate.score ? candidate.score >= 4.0 : true);
+                                
+                                const qualityLabel = isHighQuality ? "Sangat Baik" : "Baik";
+                                const qualityColor = isHighQuality
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-purple-50 text-[#7C3AED] border-purple-200";
+
+                                const candidateSkills = candidate.skills && candidate.skills.length > 0
+                                  ? candidate.skills.slice(0, 3)
+                                  : ["Analisis Data", "Problem Solving", "Kolaborasi Tim"];
+
+                                const evalSummary =
+                                  cachedScreening?.summary?.summary ||
+                                  (candidate.feedback && !candidate.feedback.includes("Skor:") && candidate.feedback.trim().length > 0
+                                    ? candidate.feedback
+                                    : `Portofolio dan riwayat ${candidate.role} terverifikasi dengan kompetensi yang solid.`);
+
+                                return (
+                                  <div className="space-y-1.5 max-w-[280px]">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                          qualityColor
+                                        )}
+                                      >
+                                        {qualityLabel}
+                                      </span>
+                                      {cachedScreening && (
+                                        <span className="text-[10px] text-slate-400 font-medium">
+                                          Screening Tersimpan
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Skills Badges */}
+                                    <div className="flex flex-wrap gap-1">
+                                      {candidateSkills.map((sk) => (
+                                        <span
+                                          key={sk}
+                                          className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium border border-slate-200/80"
+                                        >
+                                          {sk}
+                                        </span>
+                                      ))}
+                                    </div>
+
+                                    {/* Qualitative Summary */}
+                                    <p
+                                      className="text-[11px] text-slate-500 line-clamp-1 leading-snug"
+                                      title={evalSummary}
+                                    >
+                                      {evalSummary}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-600">
+                              <span className="inline-flex items-center gap-1 text-slate-600 text-[11px]">
+                                <Clock className="size-3 text-slate-400" />
+                                {candidate.appliedAt || "Baru saja"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setAssignModalCandidate(candidate);
+                                    setSelectedAssignJobId(availableJobs[0]?.id || "");
+                                  }}
+                                  className="h-7 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-2xs gap-1 px-2.5 rounded-lg"
+                                >
+                                  <Briefcase className="size-3" /> Tugaskan ke Lowongan
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedCandidate(candidate);
+                                    setDrawerOpen(true);
+                                  }}
+                                  className="h-7 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 px-2 rounded-lg"
+                                  title="Lihat Detail Profil"
+                                >
+                                  <Eye className="size-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                  className="h-7 text-xs font-semibold text-[#7C3AED] border-purple-200 hover:bg-purple-50 px-2 rounded-lg"
+                                  title="Kirim Pesan"
+                                >
+                                  <Link href={`/messages?candidateId=${candidate.id}&name=${encodeURIComponent(candidate.name)}`}>
+                                    <MessageSquare className="size-3" />
+                                  </Link>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setDeleteModalCandidate(candidate)}
+                                  className="h-7 text-xs font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-1.5 rounded-lg"
+                                  title="Keluarkan dari Pool"
+                                >
+                                  <UserX className="size-3" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : viewMode === "kanban" && !isJobSpecificPipeline ? (
             /* KANBAN BOARD VIEW */
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
               {STAGES.map((stage) => {
@@ -3459,6 +3695,131 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
           open={shortcutsModalOpen}
           onOpenChange={setShortcutsModalOpen}
         />
+
+        {/* Assign Talent Pool Candidate to Active Job Modal */}
+        <Dialog
+          open={Boolean(assignModalCandidate)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setAssignModalCandidate(null);
+              setSelectedAssignJobId("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <DialogHeader>
+              <div className="size-10 rounded-xl bg-purple-100 text-[#7C3AED] flex items-center justify-center mb-2">
+                <Briefcase className="size-5" />
+              </div>
+              <DialogTitle className="text-base font-bold text-slate-900">
+                Tugaskan Talenta ke Lowongan Kerja
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Pilih lowongan pekerjaan aktif untuk menugaskan{" "}
+                <span className="font-semibold text-slate-800">{assignModalCandidate?.name}</span>. Talenta akan dipindahkan dari Talent Pool ke pipeline aktif lowongan tersebut.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                  Lowongan Pekerjaan Aktif
+                </label>
+                <select
+                  value={selectedAssignJobId}
+                  onChange={(e) => setSelectedAssignJobId(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-800 focus:ring-2 focus:ring-[#7C3AED] focus:outline-hidden font-medium"
+                >
+                  <option value="">Pilih lowongan aktif...</option>
+                  {availableJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setAssignModalCandidate(null);
+                  setSelectedAssignJobId("");
+                }}
+                className="text-xs rounded-xl border-slate-200"
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                disabled={!selectedAssignJobId}
+                onClick={async () => {
+                  if (!assignModalCandidate || !selectedAssignJobId) return;
+                  const targetJob = availableJobs.find((j) => j.id === selectedAssignJobId);
+                  const jobTitle = targetJob ? targetJob.title : "Lowongan Terpilih";
+                  await handleAssignJob(assignModalCandidate.id, selectedAssignJobId, jobTitle);
+                  setAssignModalCandidate(null);
+                  setSelectedAssignJobId("");
+                }}
+                className="text-xs bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs font-semibold"
+              >
+                Tugaskan Sekarang
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete / Remove Talent from Pool Confirmation Modal */}
+        <Dialog
+          open={Boolean(deleteModalCandidate)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteModalCandidate(null);
+          }}
+        >
+          <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <DialogHeader>
+              <div className="size-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center mb-2">
+                <UserX className="size-5" />
+              </div>
+              <DialogTitle className="text-base font-bold text-slate-900">
+                Keluarkan dari Talent Pool?
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Apakah Anda yakin ingin mengeluarkan{" "}
+                <span className="font-semibold text-slate-800">{deleteModalCandidate?.name}</span> dari Talent Pool? Tindakan ini dapat dibatalkan dengan menambahkan kembali talenta di kemudian hari.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteModalCandidate(null)}
+                className="text-xs rounded-xl border-slate-200"
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  if (!deleteModalCandidate) return;
+                  setData((prev) => ({
+                    ...prev,
+                    candidates: prev.candidates.filter((c) => c.id !== deleteModalCandidate.id),
+                  }));
+                  toast.success(`${deleteModalCandidate.name} telah dikeluarkan dari Talent Pool.`);
+                  setDeleteModalCandidate(null);
+                }}
+                className="text-xs rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-2xs font-semibold"
+              >
+                Keluarkan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   );
