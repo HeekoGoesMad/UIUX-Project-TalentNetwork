@@ -455,6 +455,7 @@ export function validateCandidateStageTransition(
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
   const { dbMode, scans, user, reloadBootstrap, tokens, screeningResults } = useApp();
   const isJobSpecificPipeline = Boolean(initialJobId && initialJobId !== "talent-pool");
+  const scansKey = useMemo(() => scans.map((s) => s.candidateId).sort().join(","), [scans]);
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">(() => (isJobSpecificPipeline ? "table" : "kanban"));
@@ -698,7 +699,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     ])
       .then(async ([appRes, candRes, intRes]) => {
         if (!active) return;
-        const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
+        const scannedCandidateIds = new Set(scansKey ? scansKey.split(",") : []);
         let mappedCandidates: Candidate[] = [];
 
         // Parse candidate profiles from Supabase (/api/candidates)
@@ -984,7 +985,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     return () => {
       active = false;
     };
-  }, [dbMode, scans, recruiterName]);
+  }, [dbMode, scansKey, recruiterName]);
 
   // Scope counts for segmented control
   const scopeCounts = useMemo(() => {
@@ -1000,11 +1001,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Smart Triage Counts (respecting current search, scope, and job filters)
   const triageCounts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const base = activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
@@ -1043,11 +1045,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
