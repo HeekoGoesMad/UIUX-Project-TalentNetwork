@@ -3,11 +3,8 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "@/db";
 import { apiError } from "@/lib/api/request-error";
-import packageJson from "../../../../package.json";
-
+const version = process.env.npm_package_version || "0.1.0";
 export const dynamic = "force-dynamic";
-
-const version = packageJson.version;
 
 function uptimeSeconds() {
   return Math.floor(process.uptime());
