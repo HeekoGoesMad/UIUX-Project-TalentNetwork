@@ -136,7 +136,7 @@ function useJobs() {
     }
     setLoading(true);
     setError(null);
-    fetch(`/api/jobs?page=1&limit=${PAGE_LIMIT}`, { cache: "no-store" })
+    fetch(`/api/jobs?page=1&limit=${PAGE_LIMIT}`)
       .then(async (response) => {
         const payload = (await response.json()) as JobsPayload;
         if (!response.ok) throw new Error(payload.error ?? "Job belum dapat dimuat.");
@@ -160,7 +160,7 @@ function useJobs() {
     if (loadingMore || !hasMore) return;
     const next = page + 1;
     setLoadingMore(true);
-    fetch(`/api/jobs?page=${next}&limit=${PAGE_LIMIT}`, { cache: "no-store" })
+    fetch(`/api/jobs?page=${next}&limit=${PAGE_LIMIT}`)
       .then(async (response) => {
         const payload = (await response.json()) as JobsPayload;
         if (!response.ok) throw new Error(payload.error ?? "Job belum dapat dimuat.");
@@ -1161,7 +1161,7 @@ export function JobDetailPage({ jobId }: { jobId: string }) {
       setLoading(false);
       return;
     }
-    fetch(`/api/jobs/${jobId}`, { cache: "no-store" })
+    fetch(`/api/jobs/${jobId}`)
       .then(async (response) => {
         const payload = (await response.json()) as { job?: Job; error?: string };
         if (!response.ok || !payload.job) throw new Error(payload.error ?? "Job tidak ditemukan.");

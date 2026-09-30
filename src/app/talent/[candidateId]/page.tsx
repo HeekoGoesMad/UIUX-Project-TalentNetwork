@@ -520,7 +520,7 @@ export default function TalentProfile() {
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
-    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { cache: "no-store" })
+    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`)
       .then(async (response) => {
         const payload = await response.json() as { candidate?: Candidate };
         setRemoteCandidate(response.ok ? payload.candidate ?? null : null);

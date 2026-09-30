@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -57,9 +58,7 @@ export async function GET() {
   try {
     const data = await getApprovedCampuses();
     return NextResponse.json(data, {
-      headers: {
-        "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
-      },
+      headers: CACHE_HEADERS.PUBLIC_STATIC,
     });
   } catch (error) {
     console.error("Gagal memuat daftar mitra kampus:", error);
@@ -70,9 +69,16 @@ export async function GET() {
         },
       });
     }
-    return NextResponse.json({
-      campuses: ["ITB STIKOM Bali"],
-      partners: [{ id: "itb-stikom", name: "ITB STIKOM Bali", location: "Denpasar, Bali" }],
-    });
+    return NextResponse.json(
+      {
+        campuses: ["ITB STIKOM Bali"],
+        partners: [{ id: "itb-stikom", name: "ITB STIKOM Bali", location: "Denpasar, Bali" }],
+      },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=10, stale-while-revalidate=60",
+        },
+      }
+    );
   }
 }
