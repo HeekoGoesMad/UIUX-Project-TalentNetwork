@@ -21,22 +21,23 @@ export class ConsentService {
     const offset = (page - 1) * limit;
     const isCandidate = user.role === "candidate";
 
-    const candidateProfile = isCandidate
-      ? (
+    const resolvedCandidateProfileId = isCandidate
+      ? opts?.candidateProfileId ??
+        (
           await db
             .select({ id: schema.candidateProfiles.id })
             .from(schema.candidateProfiles)
             .where(eq(schema.candidateProfiles.userId, user.id))
             .limit(1)
-        )[0]
+        )[0]?.id
       : undefined;
 
-    if (isCandidate && !candidateProfile) {
+    if (isCandidate && !resolvedCandidateProfileId) {
       return { requests: [], page, limit, hasMore: false };
     }
 
     const where = isCandidate
-      ? eq(schema.consentRequestItems.candidateProfileId, candidateProfile!.id)
+      ? eq(schema.consentRequestItems.candidateProfileId, resolvedCandidateProfileId!)
       : opts?.candidateProfileId
         ? and(
             eq(schema.consentRequestBatches.organizationId, scope!.membership.organizationId),

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 
-import { schema } from "@/db";
+import { schema, type Database } from "@/db";
 import { getCurrentAppUser, getRecruiterTokenAccount } from "@/lib/api/auth";
 import { syncAuthenticatedUser } from "@/lib/api/sync-user";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +9,34 @@ import { ShortlistService } from "@/lib/services/shortlist";
 import { ConsentService } from "@/lib/services/consent";
 import { distillNotificationContent } from "@/lib/notifications/candidate-formatter";
 import { CACHE_HEADERS } from "@/lib/api/cache";
+
+let cachedApprovedCampuses: { data: string[]; expiresAt: number } | null = null;
+let campusFetchPromise: Promise<string[]> | null = null;
+const CAMPUS_CACHE_TTL_MS = 60_000;
+
+async function getCachedApprovedCampuses(db: Database): Promise<string[]> {
+  const now = Date.now();
+  if (cachedApprovedCampuses && cachedApprovedCampuses.expiresAt > now) {
+    return cachedApprovedCampuses.data;
+  }
+  if (campusFetchPromise) {
+    return campusFetchPromise;
+  }
+  campusFetchPromise = (async () => {
+    try {
+      const rows = await db
+        .select({ name: schema.partnerships.name })
+        .from(schema.partnerships)
+        .where(eq(schema.partnerships.verificationStatus, "approved"));
+      const names = rows.map((p) => p.name);
+      cachedApprovedCampuses = { data: names, expiresAt: Date.now() + CAMPUS_CACHE_TTL_MS };
+      return names;
+    } finally {
+      campusFetchPromise = null;
+    }
+  })();
+  return campusFetchPromise;
+}
 
 export async function GET() {
   try {
@@ -33,25 +61,37 @@ export async function GET() {
     const isCandidate = current.user.role === "candidate";
     const isPartner = current.user.role === "partner";
 
-    // Batch 1: Concurrently load base profile, candidate profile, notifications, organization membership, partnership, and approved partner campuses
-    const [profileRows, candidateProfileRows, notifications, memberRows, partnershipRows, approvedPartnershipRows] = await Promise.all([
+    // Batch 1: Concurrently load base profile, candidate profile, notifications, organization membership + details, partnership, and approved partner campuses
+    const [profileRows, candidateProfileRows, notifications, memberRows, partnershipRows, approvedPartnerCampuses] = await Promise.all([
       current.db.select().from(schema.profiles).where(eq(schema.profiles.userId, current.user.id)).limit(1),
       isCandidate
         ? current.db.select().from(schema.candidateProfiles).where(eq(schema.candidateProfiles.userId, current.user.id)).limit(1)
         : Promise.resolve([]),
       current.db.select().from(schema.notifications).where(eq(schema.notifications.userId, current.user.id)).orderBy(desc(schema.notifications.createdAt)).limit(50),
       isRecruiter
-        ? current.db.select().from(schema.organizationMembers).where(eq(schema.organizationMembers.userId, current.user.id)).limit(1)
+        ? current.db
+            .select({
+              member: schema.organizationMembers,
+              organization: schema.organizations,
+            })
+            .from(schema.organizationMembers)
+            .leftJoin(
+              schema.organizations,
+              eq(schema.organizations.id, schema.organizationMembers.organizationId)
+            )
+            .where(eq(schema.organizationMembers.userId, current.user.id))
+            .limit(1)
         : Promise.resolve([]),
       isPartner
         ? current.db.select().from(schema.partnerships).where(eq(schema.partnerships.userId, current.user.id)).limit(1)
         : Promise.resolve([]),
-      current.db.select({ name: schema.partnerships.name }).from(schema.partnerships).where(eq(schema.partnerships.verificationStatus, "approved")),
+      getCachedApprovedCampuses(current.db),
     ]);
 
     const profile = profileRows[0] ?? null;
     const candidateProfile = candidateProfileRows[0] ?? null;
-    const recruiterMember = memberRows[0] ?? null;
+    const recruiterMember = memberRows[0]?.member ?? null;
+    const organizationFromMember = memberRows[0]?.organization ?? null;
     let partnership = partnershipRows[0] ?? null;
     if (isPartner && !partnership) {
       const partnerName = profile?.displayName || current.user.email?.split("@")[0] || "Mitra Kampus";
@@ -69,10 +109,9 @@ export async function GET() {
       ? { membership: { organizationId: activeOrgId, organizationRole: recruiterMember.role } }
       : null;
 
-    // Batch 2: Concurrently load dependent resources (sections, org details, shortlists, consents, screenings, tokens)
+    // Batch 2: Concurrently load dependent resources (sections, org details if not member, shortlists, consents, screenings, tokens, unlocked candidates)
     const [
       candidateSections,
-      organizationFromMember,
       organizationByCreator,
       shortlistResult,
       consentResult,
@@ -83,17 +122,18 @@ export async function GET() {
       candidateProfile
         ? current.db.select().from(schema.candidateProfileSections).where(eq(schema.candidateProfileSections.candidateProfileId, candidateProfile.id))
         : Promise.resolve([]),
-      resolvedOrgId
-        ? current.db.select().from(schema.organizations).where(eq(schema.organizations.id, resolvedOrgId)).limit(1).then((rows) => rows[0] ?? null)
-        : Promise.resolve(null),
-      (!resolvedOrgId && isRecruiter)
+      (!organizationFromMember && !resolvedOrgId && isRecruiter)
         ? current.db.select().from(schema.organizations).where(eq(schema.organizations.createdBy, current.user.id)).limit(1).then((rows) => rows[0] ?? null)
         : Promise.resolve(null),
       activeOrgId
         ? ShortlistService.list(current.db, activeOrgId)
         : Promise.resolve({ shortlists: [] }),
       (isCandidate || activeOrgId)
-        ? ConsentService.getConsentRequests(current.db, current.user, recruiterScope, { page: 1, limit: 100 })
+        ? ConsentService.getConsentRequests(current.db, current.user, recruiterScope, {
+            page: 1,
+            limit: 100,
+            candidateProfileId: candidateProfile?.id,
+          })
         : Promise.resolve({ requests: [] }),
       activeOrgId
         ? current.db.select({
@@ -106,37 +146,33 @@ export async function GET() {
         ? getRecruiterTokenAccount(current.db, activeOrgId)
         : Promise.resolve({ accountId: null, balance: 0, updatedAt: null }),
       activeOrgId
-        ? Promise.all([
-            current.db
-              .select({ candidateProfileId: schema.screeningRuns.candidateProfileId })
-              .from(schema.screeningRuns)
-              .where(
-                and(
-                  eq(schema.screeningRuns.organizationId, activeOrgId),
-                  or(
-                    eq(schema.screeningRuns.status, "completed"),
-                    eq(schema.screeningRuns.status, "approved")
+        ? current.db
+            .select({ candidateProfileId: schema.screeningRuns.candidateProfileId })
+            .from(schema.screeningRuns)
+            .where(
+              and(
+                eq(schema.screeningRuns.organizationId, activeOrgId),
+                or(
+                  eq(schema.screeningRuns.status, "completed"),
+                  eq(schema.screeningRuns.status, "approved")
+                ),
+                isNotNull(schema.screeningRuns.candidateProfileId)
+              )
+            )
+            .union(
+              current.db
+                .select({ candidateProfileId: schema.applications.candidateProfileId })
+                .from(schema.applications)
+                .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
+                .where(
+                  and(
+                    eq(schema.jobs.organizationId, activeOrgId),
+                    isNotNull(schema.applications.unlockedAt),
+                    isNotNull(schema.applications.candidateProfileId)
                   )
                 )
-              ),
-            current.db
-              .select({ candidateProfileId: schema.applications.candidateProfileId })
-              .from(schema.applications)
-              .innerJoin(schema.jobs, eq(schema.jobs.id, schema.applications.jobId))
-              .where(
-                and(
-                  eq(schema.jobs.organizationId, activeOrgId),
-                  isNotNull(schema.applications.unlockedAt)
-                )
-              ),
-          ]).then(([runs, apps]) =>
-            Array.from(
-              new Set([
-                ...runs.map((r) => r.candidateProfileId).filter(Boolean),
-                ...apps.map((a) => a.candidateProfileId).filter(Boolean),
-              ])
             )
-          )
+            .then((rows) => rows.map((r) => r.candidateProfileId).filter((id): id is string => Boolean(id)))
         : Promise.resolve([]),
     ]);
 
@@ -176,14 +212,18 @@ export async function GET() {
     });
 
     if (toUpdateNotifs.length > 0) {
-      void Promise.all(
-        toUpdateNotifs.map((item) =>
-          current.db
-            .update(schema.notifications)
-            .set({ title: item.title, body: item.body })
-            .where(eq(schema.notifications.id, item.id))
-        )
-      ).catch((err) => console.error("Auto-update bootstrap notifications in DB failed:", err));
+      queueMicrotask(async () => {
+        try {
+          for (const item of toUpdateNotifs) {
+            await current.db
+              .update(schema.notifications)
+              .set({ title: item.title, body: item.body })
+              .where(eq(schema.notifications.id, item.id));
+          }
+        } catch (err) {
+          console.error("Auto-update bootstrap notifications in DB failed:", err);
+        }
+      });
     }
 
     return NextResponse.json({
@@ -219,7 +259,7 @@ export async function GET() {
         completed: Number(screeningSummaryRaw?.completed ?? 0),
       },
       scannedCandidateIds: scannedCandidateIds || [],
-      approvedPartnerCampuses: approvedPartnershipRows.map((p) => p.name),
+      approvedPartnerCampuses,
     }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("Error in /api/app/bootstrap:", err);
