@@ -32,6 +32,8 @@ export function CandidateAvatar({
         <img
           src={avatarUrl!}
           alt={name || initials}
+          width={48}
+          height={48}
           loading="lazy"
           decoding="async"
           onError={() => setImageError(true)}

@@ -338,6 +338,8 @@ export default function ProfilePage() {
                   <img
                     src={p.bannerUrl}
                     alt="Foto Sampul"
+                    width={800}
+                    height={176}
                     loading="lazy"
                     decoding="async"
                     className="h-full w-full object-cover"
@@ -382,6 +384,8 @@ export default function ProfilePage() {
                       <img
                         src={p.avatarUrl}
                         alt={p.fullName || "Profil"}
+                        width={96}
+                        height={96}
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover z-10"
