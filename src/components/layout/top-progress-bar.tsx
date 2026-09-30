@@ -127,7 +127,15 @@ function ProgressBarInner() {
       if (anchor.hasAttribute("download")) return;
 
       const href = anchor.getAttribute("href");
-      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) {
+      if (
+        !href ||
+        href.startsWith("#") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        href.startsWith("javascript:") ||
+        href.startsWith("data:") ||
+        href.startsWith("vbscript:")
+      ) {
         return;
       }
 

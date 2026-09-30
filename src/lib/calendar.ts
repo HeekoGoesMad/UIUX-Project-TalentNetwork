@@ -18,7 +18,11 @@ export function generateIcs(event: CalendarEvent): string {
     return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   };
 
-  const uid = `proofylink-interview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@proofylink.com`;
+  const randomSuffix =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().slice(0, 8)
+      : Date.now().toString(36);
+  const uid = `proofylink-interview-${Date.now()}-${randomSuffix}@proofylink.com`;
   const stamp = formatIcsDate(new Date());
   const startStr = formatIcsDate(startDate);
   const endStr = formatIcsDate(endDate);
