@@ -46,12 +46,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
-import { HrReportModal } from "@/components/recruiter/hr-report-modal";
-import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
-import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import dynamic from "next/dynamic";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateQuickPeek } from "@/components/recruiter/candidate-quick-peek";
-import { KeyboardShortcutsModal } from "@/components/recruiter/keyboard-shortcuts-modal";
+
+const HrReportModal = dynamic(
+  () => import("@/components/recruiter/hr-report-modal").then((m) => m.HrReportModal),
+  { ssr: false }
+);
+const CreateOfferModal = dynamic(
+  () => import("@/components/recruiter/create-offer-modal").then((m) => m.CreateOfferModal),
+  { ssr: false }
+);
+const CandidateDetailDrawer = dynamic(
+  () => import("@/components/recruiter/candidate-detail-drawer").then((m) => m.CandidateDetailDrawer),
+  { ssr: false }
+);
+const KeyboardShortcutsModal = dynamic(
+  () => import("@/components/recruiter/keyboard-shortcuts-modal").then((m) => m.KeyboardShortcutsModal),
+  { ssr: false }
+);
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,

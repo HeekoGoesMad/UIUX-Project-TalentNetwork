@@ -51,14 +51,34 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
-import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
-import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
-import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
-import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
-import { CandidateFloatingChat } from "@/components/recruiter/candidate-floating-chat";
+import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
+
+const InterviewQuestionModal = dynamic(
+  () => import("@/components/recruiter/interview-question-modal").then((m) => m.InterviewQuestionModal),
+  { ssr: false }
+);
+const PromptedOutreachComposer = dynamic(
+  () => import("@/components/recruiter/prompted-outreach-composer").then((m) => m.PromptedOutreachComposer),
+  { ssr: false }
+);
+const ScheduleInterviewModal = dynamic(
+  () => import("@/components/recruiter/schedule-interview-modal").then((m) => m.ScheduleInterviewModal),
+  { ssr: false }
+);
+const CreateOfferModal = dynamic(
+  () => import("@/components/recruiter/create-offer-modal").then((m) => m.CreateOfferModal),
+  { ssr: false }
+);
+const AssignToJobModal = dynamic(
+  () => import("@/components/recruiter/assign-to-job-modal").then((m) => m.AssignToJobModal),
+  { ssr: false }
+);
+const CandidateFloatingChat = dynamic(
+  () => import("@/components/recruiter/candidate-floating-chat").then((m) => m.CandidateFloatingChat),
+  { ssr: false }
+);
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
