@@ -284,7 +284,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!ignore && data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
-          setApprovedPartnerCampuses(data.campuses);
+          const nextCampuses = data.campuses as string[];
+          setApprovedPartnerCampuses((prev) => {
+            if (prev.length === nextCampuses.length && prev.every((c, i) => c === nextCampuses[i])) {
+              return prev;
+            }
+            return nextCampuses;
+          });
         }
       })
       .catch(() => {});
@@ -406,7 +412,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
       if (Array.isArray(payload.approvedPartnerCampuses) && payload.approvedPartnerCampuses.length > 0) {
-        setApprovedPartnerCampuses(payload.approvedPartnerCampuses);
+        const nextCampuses = payload.approvedPartnerCampuses;
+        setApprovedPartnerCampuses((prev) => {
+          if (prev.length === nextCampuses.length && prev.every((c, i) => c === nextCampuses[i])) {
+            return prev;
+          }
+          return nextCampuses;
+        });
       }
 
       if (payload.identity?.role) {
@@ -420,15 +432,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           (role === "partner" ? payload.partnership?.name?.trim() : null) ||
           undefined;
 
-        setUser((current) => ({
-          email: payload.identity?.email ?? current?.email ?? "",
-          name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
-          role,
-          provisioningStatus: status,
-          provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
-          companyName: resolvedCompanyName ?? current?.companyName,
-          hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
-        }));
+        setUser((current) => {
+          const nextEmail = payload.identity?.email ?? current?.email ?? "";
+          const nextName = payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName;
+          const nextReason = payload.identity?.provisioningReason ?? current?.provisioningReason ?? null;
+          const nextCompanyName = resolvedCompanyName ?? current?.companyName;
+          const nextSubmitted = payload.identity?.hasSubmittedOnboarding;
+
+          if (
+            current &&
+            current.email === nextEmail &&
+            current.name === nextName &&
+            current.role === role &&
+            current.provisioningStatus === status &&
+            current.provisioningReason === nextReason &&
+            current.companyName === nextCompanyName &&
+            current.hasSubmittedOnboarding === nextSubmitted
+          ) {
+            return current;
+          }
+
+          return {
+            email: nextEmail,
+            name: nextName,
+            role,
+            provisioningStatus: status,
+            provisioningReason: nextReason,
+            companyName: nextCompanyName,
+            hasSubmittedOnboarding: nextSubmitted,
+          };
+        });
         if (typeof payload.identity?.hasPassword === "boolean") {
           setHasPassword(payload.identity.hasPassword);
         }
@@ -437,12 +470,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setProfile(payload.profile ?? null);
-      setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
-      setNotifications(payload.notifications ?? []);
-      setShortlists(payload.shortlists ?? []);
+      setProfile((prev) => {
+        const next = payload.profile ?? null;
+        if (!prev && !next) return prev;
+        if (
+          prev &&
+          next &&
+          prev.id === next.id &&
+          prev.updatedAt === next.updatedAt &&
+          prev.displayName === next.displayName &&
+          prev.avatarUrl === next.avatarUrl &&
+          prev.phone === next.phone
+        ) {
+          return prev;
+        }
+        return next;
+      });
+      setTokenAccount((prev) => {
+        const next = payload.token ?? { accountId: null, balance: 0, updatedAt: null };
+        if (prev.accountId === next.accountId && prev.balance === next.balance && prev.updatedAt === next.updatedAt) {
+          return prev;
+        }
+        return next;
+      });
+      setNotifications((prev) => {
+        const next = payload.notifications ?? [];
+        if (prev.length === next.length && prev.every((n, i) => n.id === next[i].id && n.readAt === next[i].readAt)) {
+          return prev;
+        }
+        return next;
+      });
+      setShortlists((prev) => {
+        const next = payload.shortlists ?? [];
+        if (prev.length === next.length && prev.every((s, i) => s.id === next[i].id && s.updatedAt === next[i].updatedAt && s.items.length === next[i].items.length)) {
+          return prev;
+        }
+        return next;
+      });
       const consents = payload.consentRequests ?? [];
-      setConsentRequests(consents);
+      setConsentRequests((prev) => {
+        if (prev.length === 0 && consents.length === 0) return prev;
+        return consents;
+      });
       const remoteProfile = remoteCvProfile(payload);
 
       const remoteScannedIds: string[] = Array.isArray(payload.scannedCandidateIds)

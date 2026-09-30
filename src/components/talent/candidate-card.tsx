@@ -288,10 +288,7 @@ export interface CandidateCardProps {
   partnerVerification?: CampusVerification;
 }
 
-/**
- * Connected CandidateCard wrapper with fallback to context when props are omitted.
- */
-export const CandidateCard = memo(function CandidateCard({
+function ConnectedCandidateCard({
   candidate,
   list = false,
   unlocked: propUnlocked,
@@ -315,5 +312,25 @@ export const CandidateCard = memo(function CandidateCard({
       partnerVerification={verif}
     />
   );
+}
+
+export const CandidateCard = memo(function CandidateCard(props: CandidateCardProps) {
+  if (
+    props.unlocked !== undefined &&
+    props.isShortlisted !== undefined &&
+    props.onToggleShortlist !== undefined
+  ) {
+    return (
+      <CandidateCardView
+        candidate={props.candidate}
+        list={props.list}
+        unlocked={props.unlocked}
+        isShortlisted={props.isShortlisted}
+        onToggleShortlist={props.onToggleShortlist}
+        partnerVerification={props.partnerVerification ?? props.candidate.campusVerification}
+      />
+    );
+  }
+  return <ConnectedCandidateCard {...props} />;
 });
 

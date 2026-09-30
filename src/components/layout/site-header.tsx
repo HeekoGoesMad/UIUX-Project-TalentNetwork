@@ -33,6 +33,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+const RECRUITER_FEATURES = [
+  {
+    href: "/recruiter/operations",
+    label: "Pipeline Rekrutmen",
+    desc: "Operasi rekrutmen, screening AI & penawaran",
+    icon: GitBranch,
+  },
+  {
+    href: "/recruiter/jobs",
+    label: "Lowongan Kerja",
+    desc: "Kelola posting lowongan & pelamar masuk",
+    icon: Briefcase,
+  },
+  {
+    href: "/shortlist",
+    label: "Shortlist Talent",
+    desc: "Daftar kandidat potensial tersimpan",
+    icon: Bookmark,
+  },
+] as const;
+
 export function SiteHeader() {
   const { tokens, user, hydrated, notifications, devBypass, logout } = useApp();
   const pathname = usePathname();
@@ -118,29 +139,7 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Clustered recruitment features for minimalist recruiter navigation
-  const recruiterFeatures = [
-    {
-      href: "/recruiter/operations",
-      label: "Pipeline Rekrutmen",
-      desc: "Operasi rekrutmen, screening AI & penawaran",
-      icon: GitBranch,
-    },
-    {
-      href: "/recruiter/jobs",
-      label: "Lowongan Kerja",
-      desc: "Kelola posting lowongan & pelamar masuk",
-      icon: Briefcase,
-    },
-    {
-      href: "/shortlist",
-      label: "Shortlist Talent",
-      desc: "Daftar kandidat potensial tersimpan",
-      icon: Bookmark,
-    },
-  ];
-
-  const isRecruiterFeatureActive = recruiterFeatures.some(
+  const isRecruiterFeatureActive = RECRUITER_FEATURES.some(
     (item) => pathname === item.href || pathname?.startsWith(`${item.href}/`)
   );
 
@@ -275,7 +274,7 @@ export function SiteHeader() {
                 <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Fasilitas &amp; Pipeline Seleksi
                 </div>
-                {recruiterFeatures.map((feat) => {
+                {RECRUITER_FEATURES.map((feat) => {
                   const Icon = feat.icon;
                   const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
                   return (
@@ -505,7 +504,7 @@ export function SiteHeader() {
                   Alur Rekrutmen
                 </p>
                 <div className="flex flex-col gap-1">
-                  {recruiterFeatures.map((feat) => {
+                  {RECRUITER_FEATURES.map((feat) => {
                     const Icon = feat.icon;
                     const isActive = pathname === feat.href || pathname?.startsWith(`${feat.href}/`);
                     return (
