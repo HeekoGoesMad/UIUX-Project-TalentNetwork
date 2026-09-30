@@ -7,6 +7,15 @@ export async function updateSession(request: NextRequest, response: NextResponse
 
   if (!url || !key) return response;
 
+  const pathname = request.nextUrl.pathname;
+
+  // Skip updateSession for API and auth callback routes:
+  // API route handlers authenticate directly and manage their own responses.
+  // Running remote getUser() in middleware on /api/* duplicates external HTTPS auth roundtrips.
+  if (pathname.startsWith("/api/") || pathname.startsWith("/auth/callback")) {
+    return response;
+  }
+
   // If the user has no Supabase auth cookies, skip the external HTTPS network call
   const hasAuthCookie = request.cookies
     .getAll()

@@ -4,19 +4,56 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { currentUserOrError } from "@/lib/billing/access";
 import { writeAuditLog } from "@/lib/audit";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const packageSchema = z.object({ code: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/), name: z.string().trim().min(2).max(120), tokenAmount: z.number().int().positive(), priceMinor: z.number().int().nonnegative(), currency: z.string().trim().length(3), validityDays: z.number().int().positive().nullable().optional() }).strict();
 
+type TokenPackage = typeof schema.tokenPackages.$inferSelect;
+
+let cachedPackages: { data: TokenPackage[]; expiresAt: number } | null = null;
+let fetchPackagesPromise: Promise<TokenPackage[]> | null = null;
+
+const CACHE_TTL_MS = 60_000;
+
+export function invalidateTokenPackagesCache() {
+  cachedPackages = null;
+}
+
+async function getCachedTokenPackages() {
+  const now = Date.now();
+  if (cachedPackages && cachedPackages.expiresAt > now) {
+    return cachedPackages.data;
+  }
+  if (fetchPackagesPromise) {
+    return fetchPackagesPromise;
+  }
+
+  fetchPackagesPromise = (async () => {
+    try {
+      const db = getDb();
+      const packages = await db
+        .select()
+        .from(schema.tokenPackages)
+        .where(eq(schema.tokenPackages.active, true))
+        .orderBy(asc(schema.tokenPackages.priceMinor));
+
+      cachedPackages = { data: packages, expiresAt: Date.now() + CACHE_TTL_MS };
+      return packages;
+    } finally {
+      fetchPackagesPromise = null;
+    }
+  })();
+
+  return fetchPackagesPromise;
+}
+
 export async function GET() {
   try {
-    const db = getDb();
-    const packages = await db.select().from(schema.tokenPackages).where(eq(schema.tokenPackages.active, true)).orderBy(asc(schema.tokenPackages.priceMinor));
+    const packages = await getCachedTokenPackages();
     return NextResponse.json(
       { packages },
       {
-        headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-        },
+        headers: CACHE_HEADERS.PUBLIC_STATIC,
       }
     );
   } catch (error) {
@@ -33,6 +70,7 @@ export async function POST(request: Request) {
     const parsed = packageSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Paket token tidak valid.", details: parsed.error.flatten() }, { status: 400 });
     const [item] = await current.db.insert(schema.tokenPackages).values({ ...parsed.data, currency: parsed.data.currency.toUpperCase(), validityDays: parsed.data.validityDays ?? null }).returning();
+    invalidateTokenPackagesCache();
     await writeAuditLog({ db: current.db, actorUserId: current.user.id, action: "admin.billing.package.created", entityType: "token_package", entityId: item.id, metadata: { code: item.code } });
     return NextResponse.json({ package: item }, { status: 201 });
   } catch (error) {
@@ -40,3 +78,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paket token tidak dapat dibuat." }, { status: 409 });
   }
 }
+

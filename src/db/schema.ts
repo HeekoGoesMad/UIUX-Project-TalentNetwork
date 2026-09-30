@@ -193,7 +193,9 @@ export const profiles = pgTable("profiles", {
   phone: text("phone"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (table) => [
+  index("profiles_display_name_idx").on(table.displayName),
+]);
 
 export const organizations = pgTable("organizations", {
   id: id(),
@@ -391,6 +393,7 @@ export const screeningRuns = pgTable("screening_runs", {
   index("screening_runs_candidate_idx").on(table.candidateProfileId),
   index("screening_runs_consent_item_idx").on(table.consentRequestItemId),
   index("screening_runs_requested_by_idx").on(table.requestedBy),
+  index("screening_runs_organization_status_idx").on(table.organizationId, table.status),
 ]);
 
 export const screeningScores = pgTable("screening_scores", {
@@ -418,7 +421,10 @@ export const notifications = pgTable("notifications", {
   data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
   readAt: timestamp("read_at", { withTimezone: true }),
   createdAt: createdAt(),
-}, (table) => [index("notifications_user_read_created_idx").on(table.userId, table.readAt, table.createdAt)]);
+}, (table) => [
+  index("notifications_user_read_created_idx").on(table.userId, table.readAt, table.createdAt),
+  index("notifications_user_created_idx").on(table.userId, table.createdAt),
+]);
 
 export const conversations = pgTable("conversations", {
   id: id(),
@@ -581,6 +587,7 @@ export const applications = pgTable("applications", {
   index("applications_job_status_idx").on(table.jobId, table.status),
   index("applications_candidate_status_idx").on(table.candidateProfileId, table.status),
   index("applications_job_unlocked_idx").on(table.jobId, table.unlockedAt),
+  index("applications_candidate_updated_idx").on(table.candidateProfileId, table.updatedAt),
 ]);
 
 export const applicationStageHistory = pgTable("application_stage_history", {

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { ShortlistService } from "@/lib/services/shortlist";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
     const result = await ShortlistService.list(current.db, scope.membership.organizationId, { page: paged.data.page, limit: paged.data.limit });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (error) {
     return dbError(error);
   }

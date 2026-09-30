@@ -6,6 +6,7 @@ import { schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 
 import { distillNotificationContent } from "@/lib/notifications/candidate-formatter";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 export async function GET(request: Request) {
   try {
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       ).catch((err) => console.error("Auto-update notifications in DB failed:", err));
     }
 
-    return NextResponse.json({ notifications: distilledList, unreadCount: unread?.value ?? 0 });
+    return NextResponse.json({ notifications: distilledList, unreadCount: unread?.value ?? 0 }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("[GET /api/notifications Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
