@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,10 +22,10 @@ function recruiterAccessError(status: AppUser["recruiterProvisioningStatus"]) {
   };
 }
 
-export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
+const resolveAuthenticatedUser = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return { error: "Autentikasi diperlukan.", status: 401 as const };
+  if (error || !data.user) return null;
 
   const db = getDb();
   let [user] = await db.select().from(schema.users).where(eq(schema.users.authUserId, data.user.id)).limit(1);
@@ -50,12 +51,21 @@ export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
     }
   }
 
-  if (!user) return { error: "Profil pengguna tidak ditemukan.", status: 403 as const };
+  if (!user) return null;
+
+  return { user, db, authUser: data.user };
+});
+
+export async function getCurrentAppUser(options?: { allowPending?: boolean }) {
+  const resolved = await resolveAuthenticatedUser();
+  if (!resolved) return { error: "Autentikasi diperlukan.", status: 401 as const };
+
+  const { user, db, authUser } = resolved;
   if (!options?.allowPending && user.role === "recruiter" && user.recruiterProvisioningStatus !== "active") {
     return recruiterAccessError(user.recruiterProvisioningStatus);
   }
 
-  return { user, db, authUser: data.user };
+  return { user, db, authUser };
 }
 
 export async function requireRoles(
@@ -97,21 +107,27 @@ export type RecruiterMembership = {
   organizationRole: (typeof schema.organizationMembers.$inferSelect)["role"];
 };
 
+const getCachedRecruiterMembership = cache(async (userId: string) => {
+  const db = getDb();
+  const [membership] = await db
+    .select({
+      organizationId: schema.organizationMembers.organizationId,
+      organizationRole: schema.organizationMembers.role,
+    })
+    .from(schema.organizationMembers)
+    .where(eq(schema.organizationMembers.userId, userId))
+    .limit(1);
+  return membership ?? null;
+});
+
 export async function getRecruiterScope(
-  db: Database,
+  _db: Database,
   user: AppUser
 ): Promise<{ membership: RecruiterMembership } | { error: string; status: 403 }> {
   if (user.role !== "recruiter") return { error: "Hanya recruiter yang dapat mengakses data ini.", status: 403 as const };
   if (user.recruiterProvisioningStatus !== "active") return recruiterAccessError(user.recruiterProvisioningStatus);
 
-  const [membership] = await db.select({
-    organizationId: schema.organizationMembers.organizationId,
-    organizationRole: schema.organizationMembers.role,
-  })
-    .from(schema.organizationMembers)
-    .where(eq(schema.organizationMembers.userId, user.id))
-    .limit(1);
-
+  const membership = await getCachedRecruiterMembership(user.id);
   if (!membership) return { error: "Recruiter belum tergabung dalam organisasi.", status: 403 as const };
   return { membership };
 }
