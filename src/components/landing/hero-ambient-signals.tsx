@@ -33,10 +33,15 @@ export function HeroAmbientSignals() {
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    let parentLeft = 0;
+    let parentTop = 0;
+
     const setupDimensions = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
       const rect = parent.getBoundingClientRect();
+      parentLeft = rect.left;
+      parentTop = rect.top;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
       width = rect.width;
@@ -49,6 +54,14 @@ export function HeroAmbientSignals() {
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
+    };
+
+    const updateParentPosition = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+      parentLeft = rect.left;
+      parentTop = rect.top;
     };
 
     const initNodes = () => {
@@ -79,10 +92,8 @@ export function HeroAmbientSignals() {
 
     const parent = canvas.parentElement;
     const handleMouseMove = (e: MouseEvent) => {
-      if (!parent) return;
-      const rect = parent.getBoundingClientRect();
-      mouseX = e.clientX - rect.left;
-      mouseY = e.clientY - rect.top;
+      mouseX = e.clientX - parentLeft;
+      mouseY = e.clientY - parentTop;
     };
 
     const handleMouseLeave = () => {
@@ -95,6 +106,7 @@ export function HeroAmbientSignals() {
       parent.addEventListener("mouseleave", handleMouseLeave, { passive: true });
     }
     window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", updateParentPosition, { passive: true });
 
     // Stop animation when hero scrolls out of view
     const observer = new IntersectionObserver(
@@ -239,6 +251,7 @@ export function HeroAmbientSignals() {
       cancelAnimationFrame(animationFrameId);
       observer.disconnect();
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", updateParentPosition);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (parent) {
         parent.removeEventListener("mousemove", handleMouseMove);
