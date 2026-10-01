@@ -9,7 +9,10 @@ export type Database = PostgresJsDatabase<typeof schema>;
 
 let database: Database | undefined;
 
-const globalForDb = globalThis as unknown as { __talentNetworkDb?: Database };
+const globalForDb = globalThis as unknown as {
+  __talentNetworkDb?: Database;
+  __talentNetworkSql?: postgres.Sql;
+};
 
 export function getDb(): Database {
   if (globalForDb.__talentNetworkDb) return globalForDb.__talentNetworkDb;
@@ -27,15 +30,18 @@ export function getDb(): Database {
     ? Math.max(1, parseInt(process.env.DB_MAX_CONNECTIONS, 10) || 5)
     : 5;
 
-  database = drizzle(
+  const sql =
+    globalForDb.__talentNetworkSql ??
     postgres(connectionString, {
       prepare: false,
       max: maxConnections,
       idle_timeout: 20,
       connect_timeout: 10,
-    }),
-    { schema },
-  );
+      max_lifetime: 1800,
+    });
+  globalForDb.__talentNetworkSql = sql;
+
+  database = drizzle(sql, { schema });
   globalForDb.__talentNetworkDb = database;
   return database;
 }
