@@ -132,57 +132,78 @@ export default function PartnerPendingPage() {
     }
   };
 
-  // Immediate check on mount & live polling
+  // Immediate check on mount & adaptive live polling
   useEffect(() => {
     let active = true;
+    let inFlight = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let currentDelay = 5000;
 
-    const poll = () => {
+    const scheduleNext = (delay: number) => {
+      if (!active) return;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(poll, delay);
+    };
+
+    const poll = async () => {
       if (typeof document !== "undefined" && document.hidden) return;
+      if (inFlight || !active) return;
 
-      fetch("/api/app/bootstrap", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!active || !data) return;
-          if (data.partnership) {
-            setPartnershipData(data.partnership);
+      inFlight = true;
+      try {
+        const r = await fetch("/api/app/bootstrap", { cache: "no-store" });
+        if (!r.ok) throw new Error("Failed");
+        const data = await r.json();
+        if (!active || !data) return;
+
+        if (data.partnership) {
+          setPartnershipData(data.partnership);
+        }
+        if (data.identity?.provisioningStatus) {
+          const next = data.identity.provisioningStatus as ProvisioningStatus;
+          if (next === "active") {
+            active = false;
+            setLocalStatus("active");
+            setProvisioningStatus("active", null);
+            toast.success("Kemitraan Anda telah disetujui oleh tim compliance!");
+            router.push("/partner");
+            return;
           }
-          if (data.identity?.provisioningStatus) {
-            const next = data.identity.provisioningStatus as ProvisioningStatus;
-            if (next === "active") {
-              active = false;
-              setLocalStatus("active");
-              setProvisioningStatus("active", null);
-              toast.success("Kemitraan Anda telah disetujui oleh tim compliance!");
-              router.push("/partner");
-              return;
-            }
-            if (next !== localStatus) {
-              setLocalStatus(next);
-              setProvisioningStatus(next, data.identity.provisioningReason ?? null);
-              if (next === "revision_required") {
-                toast.warning("Pengajuan kemitraan memerlukan perbaikan berkas.");
-              }
+          if (next !== localStatus) {
+            setLocalStatus(next);
+            setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+            if (next === "revision_required") {
+              toast.warning("Pengajuan kemitraan memerlukan perbaikan berkas.");
             }
           }
-        })
-        .catch(() => null);
+        }
+        // Adaptive backoff: 5s -> 10s -> 15s -> 30s max
+        currentDelay = Math.min(currentDelay + 5000, 30000);
+      } catch {
+        currentDelay = Math.min(currentDelay * 1.5, 30000);
+      } finally {
+        inFlight = false;
+        if (active) {
+          scheduleNext(currentDelay);
+        }
+      }
     };
 
     poll();
 
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && !document.hidden && active) {
-        poll();
+        currentDelay = 5000;
+        void poll();
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const interval = setInterval(poll, 7000);
 
     return () => {
       active = false;
+      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(interval);
     };
   }, [localStatus, setProvisioningStatus, router]);
 

@@ -6,16 +6,18 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { TopProgressBar } from "@/components/layout/top-progress-bar";
 import { Toaster } from "sonner";
-import { AccessibilityInitializer } from "@/components/settings/accessibility-settings";
+import { AccessibilityInitializer } from "@/components/settings/accessibility-initializer";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

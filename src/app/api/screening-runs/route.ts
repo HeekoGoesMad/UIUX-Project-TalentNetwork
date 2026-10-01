@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { ScreeningService } from "@/lib/services/screening";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const startSchema = z.object({
   candidateProfileId: z.string().uuid(),
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
     const result = await ScreeningService.getLatestRun(current.db, scope, candidateId.data);
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("[GET /api/screening-runs Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

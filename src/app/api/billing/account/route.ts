@@ -4,6 +4,7 @@ import { z } from "zod";
 import { schema } from "@/db";
 import { billingScope, canManageBilling, currentUserOrError } from "@/lib/billing/access";
 import { writeAuditLog } from "@/lib/audit";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const accountSchema = z.object({ billingOwnerId: z.string().uuid().nullable().optional(), spendLimit: z.number().int().nonnegative().nullable().optional() }).strict();
 
@@ -11,9 +12,9 @@ export async function GET() {
   try {
     const scope = await billingScope(await currentUserOrError());
     if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
-    if (!scope.organizationId) return NextResponse.json({ account: null });
+    if (!scope.organizationId) return NextResponse.json({ account: null }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
     const [account] = await scope.db.select().from(schema.billingAccounts).where(eq(schema.billingAccounts.organizationId, scope.organizationId));
-    return NextResponse.json({ account: account ?? null });
+    return NextResponse.json({ account: account ?? null }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (error) {
     console.error("Billing account fetch failed", error);
     return NextResponse.json({ error: "Data billing belum tersedia." }, { status: 503 });

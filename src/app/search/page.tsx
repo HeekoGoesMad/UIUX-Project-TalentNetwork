@@ -354,7 +354,11 @@ function SearchPageContent() {
   const [filters, setFilters] = useState<Filters>(() => parseFilters(searchParams));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [remoteCandidates, setRemoteCandidates] = useState<Candidate[]>([]);
+  const [remoteTotal, setRemoteTotal] = useState<number | null>(null);
+  const [remoteTotalPages, setRemoteTotalPages] = useState<number | null>(null);
+  const [remoteProvinces, setRemoteProvinces] = useState<string[]>([]);
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [remoteLoading, setRemoteLoading] = useState(false);
 
   const urlQuery = searchParams.toString();
   const syncedQueryRef = useRef(urlQuery);
@@ -387,16 +391,76 @@ function SearchPageContent() {
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
-    // Ceiling: client filters/sorts/paginates over this bounded fetch; move filtering server-side once the catalog exceeds ~50 candidates.
-    void fetch("/api/candidates?limit=50", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json() as { candidates?: Candidate[]; error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "Data kandidat belum dapat dimuat.");
-        setRemoteCandidates(payload.candidates ?? []);
+    const controller = new AbortController();
+
+    const queryParams = new URLSearchParams();
+    queryParams.set("page", String(filters.page));
+    queryParams.set("limit", String(pageSize));
+    if (filters.q.trim()) queryParams.set("q", filters.q.trim());
+    if (filters.sort) queryParams.set("sort", filters.sort);
+    if (filters.locations.length) {
+      filters.locations.forEach((loc) => queryParams.append("locations", loc));
+    }
+    if (filters.talentCategories.length) {
+      filters.talentCategories.forEach((cat) => queryParams.append("cat", cat));
+    }
+    if (filters.careerStatuses.length) {
+      filters.careerStatuses.forEach((cs) => queryParams.append("cs", cs));
+    }
+    if (filters.campusVerifiedOnly) {
+      queryParams.set("campusVerifiedOnly", "true");
+    }
+
+    const timer = setTimeout(() => {
+      setRemoteLoading(true);
+      fetch(`/api/candidates?${queryParams.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
       })
-      .catch(() => setRemoteCandidates([]))
-      .finally(() => setRemoteLoaded(true));
-  }, [dbMode, bootstrapped]);
+        .then(async (response) => {
+          const payload = await response.json() as {
+            candidates?: Candidate[];
+            total?: number;
+            totalPages?: number;
+            provinces?: string[];
+            error?: string;
+          };
+          if (!response.ok) throw new Error(payload.error ?? "Data kandidat belum dapat dimuat.");
+          setRemoteCandidates(payload.candidates ?? []);
+          setRemoteTotal(payload.total ?? (payload.candidates?.length ?? 0));
+          setRemoteTotalPages(payload.totalPages ?? 1);
+          if (payload.provinces && payload.provinces.length > 0) {
+            setRemoteProvinces(payload.provinces);
+          }
+        })
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.name !== "AbortError") {
+            setRemoteCandidates([]);
+            setRemoteTotal(0);
+            setRemoteTotalPages(1);
+          }
+        })
+        .finally(() => {
+          setRemoteLoaded(true);
+          setRemoteLoading(false);
+        });
+    }, filters.q ? 250 : 0);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    dbMode,
+    bootstrapped,
+    filters.page,
+    filters.q,
+    filters.sort,
+    filters.locations,
+    filters.talentCategories,
+    filters.careerStatuses,
+    filters.campusVerifiedOnly,
+  ]);
 
   useEffect(() => {
     const query = filtersToQuery(filters);
@@ -425,21 +489,20 @@ function SearchPageContent() {
     setFilters(parseFilters(new URLSearchParams(urlQuery)));
   }, [urlQuery]);
 
-  const source = dbMode ? remoteCandidates : candidates;
-  // Ekstrak semua provinsi unik dari kandidat untuk filter berbasis provinsi
   const allProvinces = useMemo(() => {
+    if (dbMode && remoteProvinces.length > 0) return remoteProvinces;
     const set = new Set<string>();
-    for (const candidate of source) {
+    for (const candidate of candidates) {
       const prov = getProvinceFromLocation(candidate.location);
       if (prov) set.add(prov);
     }
     return [...set].sort();
-  }, [source]);
+  }, [dbMode, remoteProvinces]);
 
-  // Pre-index lowercase search strings for each candidate once when the source array changes
   const candidateSearchTextMap = useMemo(() => {
+    if (dbMode) return new Map<string, string>();
     const map = new Map<string, string>();
-    for (const c of source) {
+    for (const c of candidates) {
       const prov = getProvinceFromLocation(c.location);
       map.set(
         c.id,
@@ -447,12 +510,13 @@ function SearchPageContent() {
       );
     }
     return map;
-  }, [source]);
+  }, [dbMode]);
 
-  const filtered = useMemo(() => {
+  const mockFiltered = useMemo(() => {
+    if (dbMode) return [];
     const query = filters.q.trim().toLowerCase();
 
-    return source
+    return candidates
       .filter((c) => {
         const qMatch = !query || (candidateSearchTextMap.get(c.id) ?? "").includes(query);
         const catMatch = !filters.talentCategories.length || filters.talentCategories.includes(c.talentCategory);
@@ -474,11 +538,16 @@ function SearchPageContent() {
         }
         return 0;
       });
-  }, [filters, source, candidateSearchTextMap, partnerVerifications]);
+  }, [dbMode, filters, candidateSearchTextMap, partnerVerifications]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(filters.page, totalPages);
-  const results = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const mockTotalPages = Math.max(1, Math.ceil(mockFiltered.length / pageSize));
+  const mockCurrentPage = Math.min(filters.page, mockTotalPages);
+  const mockResults = mockFiltered.slice((mockCurrentPage - 1) * pageSize, mockCurrentPage * pageSize);
+
+  const displayResults = dbMode ? remoteCandidates : mockResults;
+  const totalCandidates = dbMode ? (remoteTotal ?? remoteCandidates.length) : mockFiltered.length;
+  const displayTotalPages = dbMode ? (remoteTotalPages ?? 1) : mockTotalPages;
+  const displayCurrentPage = dbMode ? filters.page : mockCurrentPage;
 
   const activeFilterCount =
     filters.talentCategories.length +
@@ -515,8 +584,8 @@ function SearchPageContent() {
     return <div className="container mx-auto px-4 py-8"><div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700" role="alert">Data kandidat belum dapat dimuat. {databaseError}</div></div>;
   }
 
-  const databaseEmpty = dbMode && remoteLoaded && remoteCandidates.length === 0;
-  const showRemoteLoading = dbMode && !remoteLoaded;
+  const databaseEmpty = dbMode && remoteLoaded && totalCandidates === 0 && !filters.q && activeFilterCount === 0;
+  const showRemoteLoading = dbMode && (!remoteLoaded || remoteLoading);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -526,7 +595,7 @@ function SearchPageContent() {
           <p className="font-mono text-xs uppercase tracking-widest text-slate-500">Jaringan Talent</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#111827]">Temukan sinyal yang tepat.</h1>
           <p className="mt-2 text-muted-foreground" aria-live="polite">
-            {filtered.length} kandidat ditemukan.
+            {totalCandidates} kandidat ditemukan.
           </p>
         </div>
         <div className="flex gap-2">
@@ -664,7 +733,7 @@ function SearchPageContent() {
             />
           ) : showRemoteLoading ? (
             <SearchResultsSkeleton />
-          ) : results.length > 0 ? (
+          ) : displayResults.length > 0 ? (
             <div
               className={
                 filters.view === "grid"
@@ -672,7 +741,7 @@ function SearchPageContent() {
                   : "flex flex-col gap-4"
               }
             >
-              {results.map((candidate) => (
+              {displayResults.map((candidate) => (
                 <CandidateCardView
                   key={candidate.id}
                   candidate={candidate}
@@ -698,12 +767,12 @@ function SearchPageContent() {
           )}
 
           {/* Pagination */}
-          {filtered.length > pageSize && !showRemoteLoading && (
+          {totalCandidates > pageSize && !showRemoteLoading && (
             <nav
               className="mt-8 flex flex-wrap items-center justify-center gap-2"
               aria-label="Halaman hasil pencarian"
             >
-              {getPageItems(totalPages, currentPage).map((item, index) =>
+              {getPageItems(displayTotalPages, displayCurrentPage).map((item, index) =>
                 item === "gap" ? (
                   <span
                     key={`gap-${index}`}
@@ -716,8 +785,8 @@ function SearchPageContent() {
                   <Button
                     key={item}
                     size="sm"
-                    variant={item === currentPage ? "default" : "outline"}
-                    aria-current={item === currentPage ? "page" : undefined}
+                    variant={item === displayCurrentPage ? "default" : "outline"}
+                    aria-current={item === displayCurrentPage ? "page" : undefined}
                     onClick={() => goToPage(item)}
                   >
                     {item}
@@ -745,7 +814,7 @@ function SearchPageContent() {
             locations={allProvinces}
           />
           <Button className="mt-2 w-full" onClick={() => setMobileOpen(false)}>
-            Lihat {filtered.length} kandidat
+            Lihat {totalCandidates} kandidat
           </Button>
         </DialogContent>
       </Dialog>

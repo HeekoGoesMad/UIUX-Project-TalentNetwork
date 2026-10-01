@@ -46,12 +46,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
-import { HrReportModal } from "@/components/recruiter/hr-report-modal";
-import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
-import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import dynamic from "next/dynamic";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateQuickPeek } from "@/components/recruiter/candidate-quick-peek";
-import { KeyboardShortcutsModal } from "@/components/recruiter/keyboard-shortcuts-modal";
+
+const HrReportModal = dynamic(
+  () => import("@/components/recruiter/hr-report-modal").then((m) => m.HrReportModal),
+  { ssr: false }
+);
+const CreateOfferModal = dynamic(
+  () => import("@/components/recruiter/create-offer-modal").then((m) => m.CreateOfferModal),
+  { ssr: false }
+);
+const CandidateDetailDrawer = dynamic(
+  () => import("@/components/recruiter/candidate-detail-drawer").then((m) => m.CandidateDetailDrawer),
+  { ssr: false }
+);
+const KeyboardShortcutsModal = dynamic(
+  () => import("@/components/recruiter/keyboard-shortcuts-modal").then((m) => m.KeyboardShortcutsModal),
+  { ssr: false }
+);
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
@@ -441,6 +455,7 @@ export function validateCandidateStageTransition(
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
   const { dbMode, scans, user, reloadBootstrap, tokens, screeningResults } = useApp();
   const isJobSpecificPipeline = Boolean(initialJobId && initialJobId !== "talent-pool");
+  const scansKey = useMemo(() => scans.map((s) => s.candidateId).sort().join(","), [scans]);
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">(() => (isJobSpecificPipeline ? "table" : "kanban"));
@@ -686,7 +701,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     ])
       .then(async ([appRes, candRes, intRes]) => {
         if (!active) return;
-        const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
+        const scannedCandidateIds = new Set(scansKey ? scansKey.split(",") : []);
         let mappedCandidates: Candidate[] = [];
 
         // Parse candidate profiles from Supabase (/api/candidates)
@@ -972,7 +987,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     return () => {
       active = false;
     };
-  }, [dbMode, scans, recruiterName]);
+  }, [dbMode, scansKey, recruiterName]);
 
   // Scope counts for segmented control
   const scopeCounts = useMemo(() => {
@@ -988,11 +1003,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Smart Triage Counts (respecting current search, scope, and job filters)
   const triageCounts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const base = activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
@@ -1031,11 +1047,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
