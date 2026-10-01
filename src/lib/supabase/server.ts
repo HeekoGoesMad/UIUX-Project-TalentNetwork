@@ -1,10 +1,11 @@
 import "server-only";
 
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export async function createClient(): Promise<SupabaseClient> {
+export const createClient = cache(async (): Promise<SupabaseClient> => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -27,4 +28,5 @@ export async function createClient(): Promise<SupabaseClient> {
       },
     },
   });
-}
+});
+

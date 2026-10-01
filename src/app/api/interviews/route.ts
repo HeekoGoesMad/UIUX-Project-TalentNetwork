@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 import { listInterviewsForOrganization, scheduleInterview } from "@/lib/services/recruiter-hiring";
 
 const createInterviewSchema = z
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
         cancellationMetadata: interview.cancellationMetadata,
       }));
 
-      return NextResponse.json({ interviews });
+      return NextResponse.json({ interviews }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
     }
 
     const scope = await getRecruiterScope(current.db, current.user);
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
       limit,
     });
 
-    return NextResponse.json({ interviews });
+    return NextResponse.json({ interviews }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (error) {
     console.error("List interviews error:", error);
     return NextResponse.json({ error: "Gagal memuat daftar wawancara." }, { status: 500 });

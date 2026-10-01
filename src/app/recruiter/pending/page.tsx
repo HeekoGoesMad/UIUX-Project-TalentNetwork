@@ -92,47 +92,78 @@ export default function RecruiterPendingPage() {
     }
   };
 
-  // Immediate check on mount & live polling every 3s
+  // Immediate check on mount & adaptive live polling
   useEffect(() => {
     let active = true;
+    let inFlight = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let currentDelay = 5000;
 
-    const poll = () => {
+    const scheduleNext = (delay: number) => {
+      if (!active) return;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(poll, delay);
+    };
+
+    const poll = async () => {
       // Pause network requests if the user has navigated away to another tab
       if (typeof document !== "undefined" && document.hidden) return;
+      if (inFlight || !active) return;
 
-      fetch("/api/app/bootstrap", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data: { identity?: { role?: string; provisioningStatus?: ProvisioningStatus; provisioningReason?: string; companyName?: string; hasSubmittedOnboarding?: boolean }; organization?: { name?: string } } | null) => {
-          if (!active) return;
-          if (data?.identity?.role === "recruiter" && data?.identity?.hasSubmittedOnboarding === false) {
+      inFlight = true;
+      try {
+        const r = await fetch("/api/app/bootstrap", { cache: "no-store" });
+        if (!r.ok) throw new Error("Failed");
+        const data = (await r.json()) as {
+          identity?: {
+            role?: string;
+            provisioningStatus?: ProvisioningStatus;
+            provisioningReason?: string;
+            companyName?: string;
+            hasSubmittedOnboarding?: boolean;
+          };
+          organization?: { name?: string };
+        } | null;
+
+        if (!active) return;
+
+        if (data?.identity?.role === "recruiter" && data?.identity?.hasSubmittedOnboarding === false) {
+          active = false;
+          router.replace("/recruiter/onboarding");
+          return;
+        }
+        if (data?.organization?.name) {
+          setLocalCompanyName(data.organization.name);
+        } else if (data?.identity?.companyName) {
+          setLocalCompanyName(data.identity.companyName);
+        }
+        if (data?.identity?.provisioningStatus) {
+          const next = data.identity.provisioningStatus;
+          if (next === "active") {
             active = false;
-            router.replace("/recruiter/onboarding");
+            setLocalStatus("active");
+            setProvisioningStatus("active", null);
+            router.push("/dashboard");
             return;
           }
-          if (data?.organization?.name) {
-            setLocalCompanyName(data.organization.name);
-          } else if (data?.identity?.companyName) {
-            setLocalCompanyName(data.identity.companyName);
-          }
-          if (data?.identity?.provisioningStatus) {
-            const next = data.identity.provisioningStatus;
-            if (next === "active") {
-              active = false;
-              setLocalStatus("active");
-              setProvisioningStatus("active", null);
-              router.push("/dashboard");
-              return;
-            }
-            if (next !== localStatus) {
-              setLocalStatus(next);
-              setProvisioningStatus(next, data.identity.provisioningReason ?? null);
-              if (next === "revision_required") {
-                toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
-              }
+          if (next !== localStatus) {
+            setLocalStatus(next);
+            setProvisioningStatus(next, data.identity.provisioningReason ?? null);
+            if (next === "revision_required") {
+              toast.warning("Dokumen Anda memerlukan revisi. Silakan periksa instruksi.");
             }
           }
-        })
-        .catch(() => null);
+        }
+        // Adaptive backoff: 5s -> 10s -> 15s -> 30s max
+        currentDelay = Math.min(currentDelay + 5000, 30000);
+      } catch {
+        currentDelay = Math.min(currentDelay * 1.5, 30000);
+      } finally {
+        inFlight = false;
+        if (active) {
+          scheduleNext(currentDelay);
+        }
+      }
     };
 
     poll();
@@ -153,22 +184,22 @@ export default function RecruiterPendingPage() {
       } catch {}
     };
 
-    // Immediately poll when the user focuses back on the tab
+    // Immediately poll and reset delay to 5s when the user focuses back on the tab
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && !document.hidden && active) {
-        poll();
+        currentDelay = 5000;
+        void poll();
       }
     };
 
     window.addEventListener("storage", handleStorage);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const interval = setInterval(poll, 10000);
 
     return () => {
       active = false;
+      if (timeoutId) clearTimeout(timeoutId);
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(interval);
     };
   }, [localStatus, setProvisioningStatus, router]);
 

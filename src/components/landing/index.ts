@@ -1,3 +1,4 @@
+export { LandingAuthRedirect } from "./landing-auth-redirect";
 export { HeroSection } from "./hero-section";
 export { MarqueeStatsSection } from "./marquee-stats-section";
 export { FeatureTabsSection } from "./feature-tabs-section";

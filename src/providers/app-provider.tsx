@@ -237,6 +237,18 @@ function parseState(value: string | null): AppState {
 
 const emptySubscribe = () => () => {};
 
+function getInitialSession(): { user: DemoUser | null; companyName?: string } {
+  if (typeof window === "undefined") return { user: null };
+  try {
+    const raw = localStorage.getItem(sessionKey);
+    if (!raw) return { user: null };
+    const parsed = JSON.parse(raw) as DemoUser;
+    return { user: parsed, companyName: parsed?.companyName };
+  } catch {
+    return { user: null };
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const devBypass = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !supabaseConfigured;
@@ -245,16 +257,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return initial;
     return parseState(localStorage.getItem(storageKey));
   });
-  const [user, setUser] = useState<DemoUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    const session = localStorage.getItem(sessionKey);
-    if (!session) return null;
-    try {
-      return JSON.parse(session) as DemoUser;
-    } catch {
-      return null;
-    }
-  });
+  const [initialSession] = useState(() => getInitialSession());
+  const [user, setUser] = useState<DemoUser | null>(initialSession.user);
   const [hasPassword, setHasPassword] = useState<boolean | undefined>(undefined);
   const hydrated = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [bootstrapped, setBootstrapped] = useState(() => !supabaseConfigured);
@@ -265,32 +269,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shortlists, setShortlists] = useState<BootstrapShortlist[]>([]);
   const [consentRequests, setConsentRequests] = useState<Record<string, unknown>[]>([]);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
-  const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(() => {
-    if (typeof window === "undefined") return "ITB STIKOM Bali";
-    const session = localStorage.getItem(sessionKey);
-    if (session) {
-      try {
-        const parsed = JSON.parse(session) as DemoUser;
-        if (parsed.companyName) return parsed.companyName;
-      } catch {}
-    }
-    return "ITB STIKOM Bali";
-  });
+  const [activePartnerInstitution, setActivePartnerInstitution] = useState<string>(
+    () => initialSession.companyName || "ITB STIKOM Bali"
+  );
   const [approvedPartnerCampuses, setApprovedPartnerCampuses] = useState<string[]>(["ITB STIKOM Bali"]);
 
-  useEffect(() => {
-    let ignore = false;
-    fetch("/api/partner/campuses")
+  const campusesPromiseRef = useRef<Promise<string[]> | null>(null);
+  const loadPartnerCampuses = useCallback(async (): Promise<string[]> => {
+    if (campusesPromiseRef.current) return campusesPromiseRef.current;
+    campusesPromiseRef.current = fetch("/api/partner/campuses")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!ignore && data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
-          setApprovedPartnerCampuses(data.campuses);
+        if (data?.campuses && Array.isArray(data.campuses) && data.campuses.length > 0) {
+          const nextCampuses = data.campuses as string[];
+          setApprovedPartnerCampuses((prev) => {
+            if (prev.length === nextCampuses.length && prev.every((c, i) => c === nextCampuses[i])) {
+              return prev;
+            }
+            return nextCampuses;
+          });
+          return nextCampuses;
         }
+        return ["ITB STIKOM Bali"];
       })
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
+      .catch(() => ["ITB STIKOM Bali"]);
+    return campusesPromiseRef.current;
   }, []);
   const screeningStarts = useRef(new Set<string>());
   const screeningRunIds = useRef(new Map<string, string>());
@@ -382,7 +385,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isBootstrapping = useRef(false);
   const loadBootstrap = async () => {
+    if (isBootstrapping.current) return;
+    isBootstrapping.current = true;
     setBootstrapped(false);
     setDatabaseError(null);
     try {
@@ -406,7 +412,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error(payload.error || "Gagal memuat data aplikasi.");
 
       if (Array.isArray(payload.approvedPartnerCampuses) && payload.approvedPartnerCampuses.length > 0) {
-        setApprovedPartnerCampuses(payload.approvedPartnerCampuses);
+        const nextCampuses = payload.approvedPartnerCampuses;
+        setApprovedPartnerCampuses((prev) => {
+          if (prev.length === nextCampuses.length && prev.every((c, i) => c === nextCampuses[i])) {
+            return prev;
+          }
+          return nextCampuses;
+        });
       }
 
       if (payload.identity?.role) {
@@ -420,15 +432,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           (role === "partner" ? payload.partnership?.name?.trim() : null) ||
           undefined;
 
-        setUser((current) => ({
-          email: payload.identity?.email ?? current?.email ?? "",
-          name: payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName,
-          role,
-          provisioningStatus: status,
-          provisioningReason: payload.identity?.provisioningReason ?? current?.provisioningReason ?? null,
-          companyName: resolvedCompanyName ?? current?.companyName,
-          hasSubmittedOnboarding: payload.identity?.hasSubmittedOnboarding,
-        }));
+        setUser((current) => {
+          const nextEmail = payload.identity?.email ?? current?.email ?? "";
+          const nextName = payload.profile?.displayName?.trim() || payload.identity?.name?.trim() || (current?.name && current.name !== current.email?.split("@")[0] ? current.name : null) || resolvedName;
+          const nextReason = payload.identity?.provisioningReason ?? current?.provisioningReason ?? null;
+          const nextCompanyName = resolvedCompanyName ?? current?.companyName;
+          const nextSubmitted = payload.identity?.hasSubmittedOnboarding;
+
+          if (
+            current &&
+            current.email === nextEmail &&
+            current.name === nextName &&
+            current.role === role &&
+            current.provisioningStatus === status &&
+            current.provisioningReason === nextReason &&
+            current.companyName === nextCompanyName &&
+            current.hasSubmittedOnboarding === nextSubmitted
+          ) {
+            return current;
+          }
+
+          return {
+            email: nextEmail,
+            name: nextName,
+            role,
+            provisioningStatus: status,
+            provisioningReason: nextReason,
+            companyName: nextCompanyName,
+            hasSubmittedOnboarding: nextSubmitted,
+          };
+        });
         if (typeof payload.identity?.hasPassword === "boolean") {
           setHasPassword(payload.identity.hasPassword);
         }
@@ -437,12 +470,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setProfile(payload.profile ?? null);
-      setTokenAccount(payload.token ?? { accountId: null, balance: 0, updatedAt: null });
-      setNotifications(payload.notifications ?? []);
-      setShortlists(payload.shortlists ?? []);
+      setProfile((prev) => {
+        const next = payload.profile ?? null;
+        if (!prev && !next) return prev;
+        if (
+          prev &&
+          next &&
+          prev.id === next.id &&
+          prev.updatedAt === next.updatedAt &&
+          prev.displayName === next.displayName &&
+          prev.avatarUrl === next.avatarUrl &&
+          prev.phone === next.phone
+        ) {
+          return prev;
+        }
+        return next;
+      });
+      setTokenAccount((prev) => {
+        const next = payload.token ?? { accountId: null, balance: 0, updatedAt: null };
+        if (prev.accountId === next.accountId && prev.balance === next.balance && prev.updatedAt === next.updatedAt) {
+          return prev;
+        }
+        return next;
+      });
+      setNotifications((prev) => {
+        const next = payload.notifications ?? [];
+        if (prev.length === next.length && prev.every((n, i) => n.id === next[i].id && n.readAt === next[i].readAt)) {
+          return prev;
+        }
+        return next;
+      });
+      setShortlists((prev) => {
+        const next = payload.shortlists ?? [];
+        if (prev.length === next.length && prev.every((s, i) => s.id === next[i].id && s.updatedAt === next[i].updatedAt && s.items.length === next[i].items.length)) {
+          return prev;
+        }
+        return next;
+      });
       const consents = payload.consentRequests ?? [];
-      setConsentRequests(consents);
+      setConsentRequests((prev) => {
+        if (prev.length === 0 && consents.length === 0) return prev;
+        return consents;
+      });
       const remoteProfile = remoteCvProfile(payload);
 
       const remoteScannedIds: string[] = Array.isArray(payload.scannedCandidateIds)
@@ -509,6 +578,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDatabaseError(error instanceof Error ? error.message : "Data database tidak dapat dimuat.");
       toast.error("Gagal menyiapkan workspace", { description: error instanceof Error ? error.message : "Data database tidak dapat dimuat." });
       setBootstrapped(true);
+    } finally {
+      isBootstrapping.current = false;
     }
   };
 
@@ -550,26 +621,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { listener.subscription.unsubscribe(); };
   }, [supabaseConfigured]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [state, hydrated]);
+  const stateRef = useRef(state);
 
   useEffect(() => {
+    stateRef.current = state;
     if (!hydrated) return;
-    if (user) {
-      const sessionData: DemoUser = {
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        provisioningStatus: user.provisioningStatus,
-        provisioningReason: user.provisioningReason,
-        companyName: user.companyName,
-        hasSubmittedOnboarding: user.hasSubmittedOnboarding,
-      };
-      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-    } else {
-      localStorage.removeItem(sessionKey);
+    const flush = () => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(stateRef.current));
+      } catch (err) {
+        console.warn("[AppProvider] Failed to persist state to localStorage:", err);
+      }
+    };
+
+    const timer = setTimeout(flush, 200);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearTimeout(timer);
+      flush();
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [state, hydrated]);
+
+  const lastSavedSession = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (user) {
+        const sessionData: DemoUser = {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          provisioningStatus: user.provisioningStatus,
+          provisioningReason: user.provisioningReason,
+          companyName: user.companyName,
+          hasSubmittedOnboarding: user.hasSubmittedOnboarding,
+        };
+        const serialized = JSON.stringify(sessionData);
+        if (lastSavedSession.current !== serialized) {
+          lastSavedSession.current = serialized;
+          localStorage.setItem(sessionKey, serialized);
+        }
+      } else {
+        if (lastSavedSession.current !== null) {
+          lastSavedSession.current = null;
+          localStorage.removeItem(sessionKey);
+        }
+      }
+    } catch (err) {
+      console.warn("[AppProvider] Failed to persist session to localStorage:", err);
     }
   }, [user, hydrated]);
 
@@ -724,12 +836,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (institutionName?: string | null): boolean => {
       if (!institutionName || !institutionName.trim()) return false;
       const target = institutionName.trim().toLowerCase();
-      return approvedPartnerCampuses.some((c) => {
+      const matched = approvedPartnerCampuses.some((c) => {
         const campus = c.toLowerCase();
         return campus === target || campus.includes(target) || target.includes(campus);
       });
+      if (!matched && approvedPartnerCampuses.length <= 1) {
+        void loadPartnerCampuses();
+      }
+      return matched;
     },
-    [approvedPartnerCampuses]
+    [approvedPartnerCampuses, loadPartnerCampuses]
   );
 
   const recommendCampus = useCallback(async (institution: string, notes?: string): Promise<boolean> => {
@@ -985,8 +1101,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrapUserKey.current = null;
     setUser(null);
     setHasPassword(undefined);
-    localStorage.removeItem(sessionKey);
     try {
+      localStorage.removeItem(sessionKey);
       localStorage.removeItem("proofylink-a11y-prefs");
       if (typeof document !== "undefined") {
         const root = document.documentElement;

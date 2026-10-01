@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 import { createOffer, listOffersForOrganization } from "@/lib/services/recruiter-hiring";
 
 const createOfferSchema = z
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
         };
       });
 
-      return NextResponse.json({ offers });
+      return NextResponse.json({ offers }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
     }
 
     const scope = await getRecruiterScope(current.db, current.user);
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
       applicationId,
     });
 
-    return NextResponse.json({ offers });
+    return NextResponse.json({ offers }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (error) {
     console.error("List offers error:", error);
     return NextResponse.json({ error: "Gagal memuat daftar penawaran." }, { status: 500 });

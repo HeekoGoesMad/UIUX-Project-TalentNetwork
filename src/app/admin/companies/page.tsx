@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -260,8 +260,12 @@ function AdminCompaniesContent() {
     [populateForm]
   );
 
+  const isFetchingRef = useRef(false);
+
   const fetchCompanies = useCallback(
     async (silent = false) => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
       if (!silent) setLoading(true);
       setRefreshing(true);
       try {
@@ -305,6 +309,7 @@ function AdminCompaniesContent() {
           toast.error("Gagal memuat daftar perusahaan.");
         }
       } finally {
+        isFetchingRef.current = false;
         setLoading(false);
         setRefreshing(false);
       }

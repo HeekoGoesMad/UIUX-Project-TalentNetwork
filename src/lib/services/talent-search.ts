@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { schema, type Database } from "@/db";
 import {
   asCareerStatus,
@@ -10,6 +10,7 @@ import {
   type TalentCategory,
 } from "@/types";
 import { inferSectorFromRole } from "@/config/sectors";
+import { getProvinceFromLocation } from "@/lib/locations";
 
 type Section = { candidateProfileId: string; type: string; content: Record<string, unknown> };
 
@@ -128,7 +129,7 @@ export function serializeCandidate(
               "1580489944761-15a19d654956",
               "1519085360753-af0119f7cbe7",
             ][(row.id.charCodeAt(0) + row.id.length) % 8]
-          }?q=80&w=400&auto=format&fit=crop`),
+          }?q=75&w=128&auto=format&fit=crop`),
     bannerUrl:
       (typeof preferences.bannerUrl === "string" && preferences.bannerUrl.trim()
         ? preferences.bannerUrl.trim()
@@ -143,7 +144,7 @@ export function serializeCandidate(
               "1557804506-669a67965ba0",
               "1507679799987-c73779587ccf",
             ][(row.id.charCodeAt(row.id.length - 1) + row.id.length) % 8]
-          }?q=80&w=1600&auto=format&fit=crop`),
+          }?q=75&w=800&auto=format&fit=crop`),
     history: experience.map((item) => ({
       company: item.company,
       role: item.role,
@@ -160,17 +161,77 @@ export type TalentSearchParams = {
   page?: number;
   limit?: number;
   locations?: string[];
-  sort?: "relevance" | "name";
+  sort?: "relevance" | "name" | "experience";
+  talentCategories?: string[];
+  careerStatuses?: string[];
+  campusVerifiedOnly?: boolean;
 };
+
+export type TalentSearchResult = {
+  candidates: Candidate[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  provinces?: string[];
+};
+
+const searchCache = new Map<string, { data: TalentSearchResult; expiresAt: number }>();
+const SEARCH_CACHE_TTL_MS = 15_000;
+
+let cachedProvinces: { data: string[]; expiresAt: number } | null = null;
+const PROVINCES_CACHE_TTL_MS = 60_000;
+
+async function getCachedProvinces(db: Database): Promise<string[]> {
+  const now = Date.now();
+  if (cachedProvinces && cachedProvinces.expiresAt > now) {
+    return cachedProvinces.data;
+  }
+  const rows = await db
+    .selectDistinct({ location: schema.candidateProfiles.location })
+    .from(schema.candidateProfiles)
+    .where(eq(schema.candidateProfiles.isPublished, true));
+  const set = new Set<string>();
+  for (const r of rows) {
+    const prov = getProvinceFromLocation(r.location);
+    if (prov) set.add(prov);
+  }
+  const result = [...set].sort();
+  cachedProvinces = { data: result, expiresAt: now + PROVINCES_CACHE_TTL_MS };
+  return result;
+}
 
 export class TalentSearchService {
   /**
    * Search published candidates with server-side filtering, keyword matching, and pagination.
    */
-  static async search(db: Database, params?: TalentSearchParams) {
+  static async search(db: Database, params?: TalentSearchParams): Promise<TalentSearchResult> {
+    const rawPage = Number(params?.page ?? 1);
+    const rawLimit = Number(params?.limit ?? 24);
+    const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1;
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.floor(rawLimit))) : 24;
+    const offset = (page - 1) * limit;
+    const query = params?.q?.trim();
+
+    const cacheKey = JSON.stringify({
+      q: query ?? "",
+      page,
+      limit,
+      sort: params?.sort ?? "relevance",
+      locations: (params?.locations ?? []).slice().sort(),
+      talentCategories: (params?.talentCategories ?? []).slice().sort(),
+      careerStatuses: (params?.careerStatuses ?? []).slice().sort(),
+      campusVerifiedOnly: Boolean(params?.campusVerifiedOnly),
+    });
+
+    const now = Date.now();
+    const cached = searchCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+
     const conditions: SQL[] = [eq(schema.candidateProfiles.isPublished, true)];
 
-    const query = params?.q?.trim();
     if (query) {
       const searchPattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
       conditions.push(
@@ -195,28 +256,85 @@ export class TalentSearchService {
       conditions.push(or(...locConditions)!);
     }
 
-    const whereClause = and(...conditions);
+    if (params?.talentCategories && params.talentCategories.length > 0) {
+      const includesPublic = params.talentCategories.includes("public");
+      if (includesPublic) {
+        conditions.push(
+          sql`(
+            exists (
+              select 1 from ${schema.candidateProfileSections}
+              where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+                and ${schema.candidateProfileSections.type} = 'preferences'
+                and ${schema.candidateProfileSections.content}->>'talentCategory' in ${params.talentCategories}
+            ) or not exists (
+              select 1 from ${schema.candidateProfileSections}
+              where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+                and ${schema.candidateProfileSections.type} = 'preferences'
+                and ${schema.candidateProfileSections.content}->>'talentCategory' is not null
+            )
+          )`
+        );
+      } else {
+        conditions.push(
+          sql`exists (
+            select 1 from ${schema.candidateProfileSections}
+            where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+              and ${schema.candidateProfileSections.type} = 'preferences'
+              and ${schema.candidateProfileSections.content}->>'talentCategory' in ${params.talentCategories}
+          )`
+        );
+      }
+    }
 
-    // Always paginated: default limit 24, capped at 100 so direct callers can never trigger unbounded scans.
-    const rawPage = Number(params?.page ?? 1);
-    const rawLimit = Number(params?.limit ?? 24);
-    const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1;
-    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.floor(rawLimit))) : 24;
-    const offset = (page - 1) * limit;
+    if (params?.careerStatuses && params.careerStatuses.length > 0) {
+      conditions.push(
+        sql`exists (
+          select 1 from ${schema.candidateProfileSections}
+          where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+            and ${schema.candidateProfileSections.type} = 'preferences'
+            and ${schema.candidateProfileSections.content}->>'careerStatus' in ${params.careerStatuses}
+        )`
+      );
+    }
+
+    if (params?.campusVerifiedOnly) {
+      conditions.push(
+        sql`exists (
+          select 1 from ${schema.candidateProfileSections}
+          where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+            and ${schema.candidateProfileSections.type} = 'preferences'
+            and ${schema.candidateProfileSections.content}->'campusVerification'->>'status' = 'verified'
+        )`
+      );
+    }
+
+    const whereClause = and(...conditions);
 
     let orderBy: SQL;
     if (params?.sort === "name") {
       orderBy = asc(schema.profiles.displayName);
+    } else if (params?.sort === "experience") {
+      orderBy = desc(sql`coalesce((
+        select jsonb_array_length(${schema.candidateProfileSections.content}->'items')
+        from ${schema.candidateProfileSections}
+        where ${schema.candidateProfileSections.candidateProfileId} = ${schema.candidateProfiles.id}
+          and ${schema.candidateProfileSections.type} = 'experience'
+      ), 0)`);
     } else {
       orderBy = desc(schema.candidateProfiles.updatedAt);
     }
 
-    // Run count and paginated slice queries concurrently
-    const countQuery = db
-      .select({ count: count() })
-      .from(schema.candidateProfiles)
-      .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
-      .where(whereClause);
+    // Run count, paginated slice, and provinces queries concurrently
+    const countQuery = query
+      ? db
+          .select({ count: count() })
+          .from(schema.candidateProfiles)
+          .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
+          .where(whereClause)
+      : db
+          .select({ count: count() })
+          .from(schema.candidateProfiles)
+          .where(whereClause);
 
     const sliceQuery = db
       .select({
@@ -238,20 +356,27 @@ export class TalentSearchService {
       .limit(limit)
       .offset(offset);
 
-    const [[totalResult], rows] = await Promise.all([countQuery, sliceQuery]);
+    const [[totalResult], rows, provinces] = await Promise.all([
+      countQuery,
+      sliceQuery,
+      getCachedProvinces(db),
+    ]);
     const total = Number(totalResult?.count ?? 0);
 
     if (rows.length === 0) {
-      return {
+      const emptyResult: TalentSearchResult = {
         candidates: [],
         total,
         page,
         limit,
         totalPages: Math.max(1, Math.ceil(total / limit)),
+        provinces,
       };
+      searchCache.set(cacheKey, { data: emptyResult, expiresAt: now + SEARCH_CACHE_TTL_MS });
+      return emptyResult;
     }
 
-    // Batch query candidate profile sections in a single query
+    // Batch query candidate profile sections in a single query for the paginated slice
     const candidateIds = rows.map((row) => row.id);
     const sections = await db
       .select({
@@ -279,12 +404,22 @@ export class TalentSearchService {
       )
     );
 
-    return {
+    const result: TalentSearchResult = {
       candidates,
       total,
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      provinces,
     };
+
+    if (searchCache.size > 200) {
+      for (const [key, entry] of searchCache.entries()) {
+        if (entry.expiresAt <= now) searchCache.delete(key);
+      }
+    }
+    searchCache.set(cacheKey, { data: result, expiresAt: now + SEARCH_CACHE_TTL_MS });
+
+    return result;
   }
 }

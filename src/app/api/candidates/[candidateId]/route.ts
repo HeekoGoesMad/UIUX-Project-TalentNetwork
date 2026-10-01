@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getCurrentAppUser } from "@/lib/api/auth";
 import { serializeCandidate } from "@/lib/services/talent-search";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ candidateId: string }> }) {
   const { candidateId } = await params;
@@ -45,7 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
     }
 
     const candidate = serializeCandidate(row, sections);
-    return NextResponse.json({ candidate });
+    return NextResponse.json({ candidate }, { headers: CACHE_HEADERS.PUBLIC_DETAIL });
   } catch {
     return NextResponse.json({ error: "Data kandidat belum dapat dimuat." }, { status: 503 });
   }

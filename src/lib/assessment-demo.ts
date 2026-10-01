@@ -12,7 +12,7 @@ const defaultInvitation: DemoInvitation = { id: "demo-invitation-1", templateId:
 
 type Store = { templates: DemoTemplate[]; invitations: DemoInvitation[] };
 function read(): Store { try { const parsed = JSON.parse(localStorage.getItem(key) ?? "null") as Store | null; if (parsed?.templates && parsed.invitations) return parsed; } catch {} return { templates: [defaultTemplate], invitations: [defaultInvitation] }; }
-function write(store: Store) { localStorage.setItem(key, JSON.stringify(store)); return store; }
+function write(store: Store) { try { localStorage.setItem(key, JSON.stringify(store)); } catch {} return store; }
 export function listDemoTemplates() { return read().templates; }
 export function getDemoTemplate(id: string) { return read().templates.find((item) => item.id === id) ?? null; }
 export function saveDemoTemplate(input: Omit<DemoTemplate, "id" | "createdAt" | "updatedAt" | "invitationCount"> & { id?: string }) { const store = read(); const now = new Date().toISOString(); const existing = input.id ? store.templates.find((item) => item.id === input.id) : undefined; const template = { ...input, id: input.id ?? `demo-template-${crypto.randomUUID()}`, createdAt: existing?.createdAt ?? now, updatedAt: now, invitationCount: existing?.invitationCount ?? 0 }; write({ ...store, templates: existing ? store.templates.map((item) => item.id === template.id ? template : item) : [template, ...store.templates] }); return template; }
@@ -23,6 +23,6 @@ export function startDemoAttempt(invitationId: string) { const store = read(); c
 export function saveDemoAnswer(invitationId: string, questionId: string, response: unknown) { const store = read(); const invite = store.invitations.find((item) => item.id === invitationId); if (!invite || invite.status === "submitted") return invite ?? null; const next = { ...invite, answers: { ...(invite.answers ?? {}), [questionId]: response } }; write({ ...store, invitations: store.invitations.map((item) => item.id === invitationId ? next : item) }); return next; }
 export function submitDemoAttempt(invitationId: string) { const store = read(); const invite = store.invitations.find((item) => item.id === invitationId); if (!invite) return null; const next = { ...invite, status: "submitted" as const, submittedAt: new Date().toISOString() }; write({ ...store, invitations: store.invitations.map((item) => item.id === invitationId ? next : item) }); return next; }
 function readReviews(): DemoReview[] { try { return JSON.parse(localStorage.getItem(reviewKey) ?? "[]") as DemoReview[]; } catch { return []; } }
-function writeReviews(reviews: DemoReview[]) { localStorage.setItem(reviewKey, JSON.stringify(reviews)); }
+function writeReviews(reviews: DemoReview[]) { try { localStorage.setItem(reviewKey, JSON.stringify(reviews)); } catch {} }
 export function getDemoReview(attemptId: string) { return readReviews().find((review) => review.attemptId === attemptId) ?? null; }
 export function saveDemoReview(review: DemoReview) { const reviews = readReviews(); writeReviews([review, ...reviews.filter((item) => item.attemptId !== review.attemptId)]); return review; }

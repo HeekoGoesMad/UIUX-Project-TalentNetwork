@@ -236,7 +236,7 @@ body { background: var(--background); color: var(--foreground); font-family: var
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  .animate-fade-in, .animate-fade-up, .animate-scale-in, .animate-shake, .animate-discord-shake, .animate-shimmer, .animate-hero-float, .hero-underline-track, .group:hover .hero-underline-bar, .hero-underline-bar-active, .animate-cursor-enter, .animate-cursor-exit { animation: none !important; }
+  .animate-fade-in, .animate-fade-up, .animate-scale-in, .animate-shake, .animate-discord-shake, .animate-shimmer, .animate-hero-float, .hero-underline-track, .group:hover .hero-underline-bar, .hero-underline-bar-active, .animate-cursor-enter, .animate-cursor-exit, .animate-marquee-left, .animate-marquee-right, .animate-pulse-glow { animation: none !important; }
   .hero-underline-track { transform: scaleX(1) !important; opacity: 1 !important; }
   .group:hover .hero-underline-bar, .hero-underline-bar-active { transform: none !important; }
   .animate-cursor-enter, .animate-cursor-exit { display: none !important; }
