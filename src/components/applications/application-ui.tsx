@@ -191,9 +191,9 @@ export const DEFAULT_DEMO_APPLICATIONS: Application[] = [
     id: "demo-app-004",
     jobId: "demo-job-4",
     status: "offer",
-    source: "self_applied",
+    source: "recruiter_invitation",
     unlockedAt: "2026-09-05T14:00:00.000Z",
-    coverNote: "Pengalaman 5+ tahun dalam merancang solusi e-commerce dan merchant center.",
+    coverNote: "Profil dibuka dan sedang ditinjau langsung oleh tim rekruter melalui Talent Network.",
     submittedAt: "2026-09-01T11:15:00.000Z",
     withdrawnAt: null,
     updatedAt: "2026-09-17T13:45:00.000Z",
@@ -439,12 +439,18 @@ export function useApplications() {
     }
     fetch("/api/applications", { cache: "no-store" })
       .then(async (response) => {
+        if (!response.ok) {
+          if (active) setApplications(demoApplications());
+          return;
+        }
         const payload = await response.json() as { applications?: Application[]; error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "Aplikasi belum dapat dimuat.");
-        if (active) setApplications(payload.applications ?? []);
+        if (active) {
+          const list = payload.applications ?? [];
+          setApplications(list.length > 0 ? list : demoApplications());
+        }
       })
-      .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : "Aplikasi belum dapat dimuat.");
+      .catch(() => {
+        if (active) setApplications(demoApplications());
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -761,12 +767,21 @@ export function CandidateApplicationsPage() {
                               <h2 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
                                 {application.job?.title ?? "Posisi Lamaran"}
                               </h2>
+                              {(application.source === "recruiter_invitation" || application.source === "talent_network") && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary border border-primary/20">
+                                  <Sparkles className="size-2.5" /> Inisiatif Rekruter
+                                </span>
+                              )}
                             </div>
                             <p className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                               <Building2 className="size-3.5 shrink-0" />
                               <span className="font-medium text-foreground">{application.job?.organizationName ?? "Perusahaan Mitra"}</span>
                               <span aria-hidden="true" className="text-border">•</span>
-                              <span>Dikirim {formatDate(application.submittedAt)}</span>
+                              <span>
+                                {application.source === "recruiter_invitation" || application.source === "talent_network"
+                                  ? `Terhubung ${formatDate(application.submittedAt)}`
+                                  : `Dikirim ${formatDate(application.submittedAt)}`}
+                              </span>
                             </p>
                           </div>
 
@@ -1222,6 +1237,31 @@ function getDemoApplicationHistory(app: Application): History[] {
     ];
   }
 
+  if (app.source === "recruiter_invitation" || app.source === "talent_network") {
+    return [
+      {
+        id: `${app.id}-h1`,
+        fromStatus: null,
+        toStatus: "review",
+        reason: "Profil dibuka oleh rekruter melalui Talent Network.",
+        changedBy: "Tim Rekruter",
+        createdAt: app.submittedAt,
+      },
+      ...(app.status !== "review" && app.status !== "new"
+        ? [
+            {
+              id: `${app.id}-h2`,
+              fromStatus: "review" as const,
+              toStatus: app.status,
+              reason: `Perkembangan tahap seleksi diperbarui menjadi ${labels[app.status]}.`,
+              changedBy: "Tim Rekruter",
+              createdAt: app.updatedAt || new Date().toISOString(),
+            },
+          ]
+        : []),
+    ];
+  }
+
   return [
     {
       id: `${app.id}-h1`,
@@ -1293,7 +1333,8 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
   const activeOffer = offers.length > 0 ? offers[offers.length - 1] : null;
 
   useEffect(() => {
-    if (!dbMode) {
+    const isDemoId = applicationId.startsWith("demo-") || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId);
+    if (!dbMode || isDemoId) {
       const item = demoApplications().find((candidateApplication) => candidateApplication.id === applicationId) ?? null;
       setApplication(item);
       if (item) {
@@ -1823,41 +1864,62 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
     }
   }, [application, dbMode, declineInterviewReason, declineTargetInterviewId]);
 
+  const isRecruiterInitiated = useMemo(() => {
+    if (!application) return false;
+    if (
+      application.source === "recruiter_invitation" ||
+      application.source === "talent_network" ||
+      application.source === "recruiter"
+    ) {
+      return true;
+    }
+    return history.some(
+      (h) => typeof h.reason === "string" && h.reason.toLowerCase().includes("talent network")
+    );
+  }, [application, history]);
+
   // Modern human-centric pipeline milestones for candidate visualization
-  const PIPELINE_PHASES = [
-    {
-      key: "submitted",
-      label: "Lamaran Terkirim",
-      desc: "Berkas lamaran diterima di antrean inbound seleksi",
-      statuses: ["new"],
-    },
-    {
-      key: "review",
-      label: "Profil Dibuka & Peninjauan",
-      desc: application?.unlockedAt
-        ? `Profil dibuka rekruter pada ${formatDate(application.unlockedAt)}`
-        : "Menunggu pembukaan profil oleh tim rekruter",
-      statuses: ["shortlisted", "screening", "review", "assessment"],
-    },
-    {
-      key: "interview",
-      label: "Sesi Wawancara",
-      desc: "Diskusi kompetensi peran dan keselarasan tim",
-      statuses: ["interview"],
-    },
-    {
-      key: "offer",
-      label: "Surat Penawaran",
-      desc: "Pembahasan rincian kompensasi & kesepakatan",
-      statuses: ["offer"],
-    },
-    {
-      key: "decision",
-      label: "Keputusan Akhir",
-      desc: "Hasil akhir proses seleksi resmi",
-      statuses: ["hired", "rejected", "offer_declined", "withdrawn"],
-    },
-  ];
+  const PIPELINE_PHASES = useMemo(
+    () => [
+      {
+        key: isRecruiterInitiated ? "talent_scouted" : "submitted",
+        label: isRecruiterInitiated ? "Terhubung via Talent Network" : "Lamaran Terkirim",
+        desc: isRecruiterInitiated
+          ? "Profil Anda dipilih langsung oleh rekruter melalui pencarian Talent Network"
+          : "Berkas lamaran diterima di antrean inbound seleksi",
+        statuses: ["new"],
+      },
+      {
+        key: "review",
+        label: "Profil Dibuka & Peninjauan",
+        desc: application?.unlockedAt
+          ? `Profil dibuka rekruter pada ${formatDate(application.unlockedAt)}`
+          : isRecruiterInitiated
+          ? "Rekruter sedang meninjau detail kualifikasi dan portofolio Anda"
+          : "Menunggu pembukaan profil oleh tim rekruter",
+        statuses: ["shortlisted", "screening", "review", "assessment"],
+      },
+      {
+        key: "interview",
+        label: "Sesi Wawancara",
+        desc: "Diskusi kompetensi peran dan keselarasan tim",
+        statuses: ["interview"],
+      },
+      {
+        key: "offer",
+        label: "Surat Penawaran",
+        desc: "Pembahasan rincian kompensasi & kesepakatan",
+        statuses: ["offer"],
+      },
+      {
+        key: "decision",
+        label: "Keputusan Akhir",
+        desc: "Hasil akhir proses seleksi resmi",
+        statuses: ["hired", "rejected", "offer_declined", "withdrawn"],
+      },
+    ],
+    [application?.unlockedAt, isRecruiterInitiated]
+  );
 
   const currentPhaseIndex = useMemo(() => {
     if (!application) return 0;
@@ -1950,13 +2012,22 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                         {application.job?.title ?? "Posisi Lamaran"}
                       </h1>
                       {statusBadge(application.status)}
+                      {isRecruiterInitiated && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary border border-primary/20">
+                          <Sparkles className="size-3" /> Inisiatif Rekruter • Talent Network
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs sm:text-sm text-muted-foreground">
                       <span className="flex items-center gap-1 font-semibold text-foreground">
                         <Building2 className="size-3.5" /> {application.job?.organizationName ?? "Perusahaan Mitra"}
                       </span>
                       <span aria-hidden="true" className="text-border">•</span>
-                      <span>Dikirim pada {formatDate(application.submittedAt)}</span>
+                      <span>
+                        {isRecruiterInitiated
+                          ? `Terhubung pada ${formatDate(application.submittedAt)}`
+                          : `Dikirim pada ${formatDate(application.submittedAt)}`}
+                      </span>
                       {application.updatedAt && (
                         <>
                           <span aria-hidden="true" className="text-border">•</span>
@@ -1994,6 +2065,8 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                         ? "bg-slate-100 text-slate-600"
                         : application.status === "hired"
                         ? "bg-emerald-100 text-emerald-700"
+                        : isRecruiterInitiated
+                        ? "bg-primary/10 text-primary"
                         : application.unlockedAt
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-purple-100 text-purple-700"
@@ -2003,6 +2076,8 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                       <Building2 className="size-5" />
                     ) : application.status === "hired" ? (
                       <Check className="size-5" />
+                    ) : isRecruiterInitiated ? (
+                      <Sparkles className="size-5" />
                     ) : application.unlockedAt ? (
                       <Unlock className="size-5" />
                     ) : (
@@ -2016,11 +2091,17 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                           ? "Proses Seleksi Selesai (Tidak Lolos)"
                           : application.status === "hired"
                           ? "Selamat! Anda Resmi Diterima (Hired)"
+                          : isRecruiterInitiated
+                          ? "Profil Anda Dipilih Langsung Melalui Talent Network"
                           : application.unlockedAt
                           ? "Profil Lengkap Anda Telah Dibuka Rekruter"
                           : "Lamaran Berada dalam Antrean Seleksi"}
                       </h2>
-                      {application.unlockedAt ? (
+                      {isRecruiterInitiated ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                          <Sparkles className="size-3" /> Talent Sourcing
+                        </span>
+                      ) : application.unlockedAt ? (
                         <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="size-3" /> Akses Terbuka
                         </span>
@@ -2035,6 +2116,8 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                         ? `Terima kasih atas waktu dan partisipasi Anda. Untuk posisi ini, tim rekruter belum dapat melanjutkan proses Anda. Profil Anda tetap tersimpan aktif di ProofyLink Talent Network untuk peluang karir lain yang cocok.`
                         : application.status === "hired"
                         ? `Selamat atas pencapaian Anda! Proses seleksi resmi telah rampung dan tim rekruter siap menyambut Anda.`
+                        : isRecruiterInitiated
+                        ? `Tim rekruter dari ${application.job?.organizationName || "perusahaan"} tertarik dengan profil terverifikasi Anda di Talent Network dan menginisiasi proses seleksi langsung untuk posisi ini.`
                         : application.unlockedAt
                         ? `Tim rekruter dari ${application.job?.organizationName || "perusahaan"} telah membuka profil profesional, CV, dan detail kontak Anda pada ${formatDate(application.unlockedAt)}. Lamaran Anda kini sedang dievaluasi secara mendalam.`
                         : `Lamaran Anda telah diterima oleh ${application.job?.organizationName || "perusahaan"}. Kontak pribadi dan CV lengkap Anda tetap terlindungi hingga tim rekruter membuka profil Anda untuk memulai peninjauan komprehensif.`}
@@ -2058,7 +2141,9 @@ export function CandidateApplicationDetailPage({ applicationId }: { applicationI
                       <Sparkles className="size-4 text-primary" /> Alur Proses Seleksi
                     </h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Perjalanan tahapan rekrutmen Anda bersama {application.job?.organizationName || "perusahaan mitra"}
+                      {isRecruiterInitiated
+                        ? `Perjalanan proses seleksi inisiatif rekruter bersama ${application.job?.organizationName || "perusahaan mitra"}`
+                        : `Perjalanan tahapan rekrutmen Anda bersama ${application.job?.organizationName || "perusahaan mitra"}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

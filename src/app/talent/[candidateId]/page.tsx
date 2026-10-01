@@ -51,14 +51,34 @@ import {
     Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { InterviewQuestionModal } from "@/components/recruiter/interview-question-modal";
-import { PromptedOutreachComposer } from "@/components/recruiter/prompted-outreach-composer";
-import { ScheduleInterviewModal } from "@/components/recruiter/schedule-interview-modal";
-import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
-import { AssignToJobModal } from "@/components/recruiter/assign-to-job-modal";
-import { CandidateFloatingChat } from "@/components/recruiter/candidate-floating-chat";
+import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
+
+const InterviewQuestionModal = dynamic(
+  () => import("@/components/recruiter/interview-question-modal").then((m) => m.InterviewQuestionModal),
+  { ssr: false }
+);
+const PromptedOutreachComposer = dynamic(
+  () => import("@/components/recruiter/prompted-outreach-composer").then((m) => m.PromptedOutreachComposer),
+  { ssr: false }
+);
+const ScheduleInterviewModal = dynamic(
+  () => import("@/components/recruiter/schedule-interview-modal").then((m) => m.ScheduleInterviewModal),
+  { ssr: false }
+);
+const CreateOfferModal = dynamic(
+  () => import("@/components/recruiter/create-offer-modal").then((m) => m.CreateOfferModal),
+  { ssr: false }
+);
+const AssignToJobModal = dynamic(
+  () => import("@/components/recruiter/assign-to-job-modal").then((m) => m.AssignToJobModal),
+  { ssr: false }
+);
+const CandidateFloatingChat = dynamic(
+  () => import("@/components/recruiter/candidate-floating-chat").then((m) => m.CandidateFloatingChat),
+  { ssr: false }
+);
 
 function PersonalityOverview({ personality }: { personality: CandidatePersonality }) {
   return (
@@ -520,7 +540,7 @@ export default function TalentProfile() {
 
   useEffect(() => {
     if (!dbMode || !bootstrapped) return;
-    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { cache: "no-store" })
+    void fetch(`/api/candidates/${encodeURIComponent(candidateId)}`)
       .then(async (response) => {
         const payload = await response.json() as { candidate?: Candidate };
         setRemoteCandidate(response.ok ? payload.candidate ?? null : null);
@@ -701,7 +721,7 @@ export default function TalentProfile() {
 
   const bannerSrc =
     candidate.bannerUrl ||
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop";
+    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=75&w=800&auto=format&fit=crop";
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -715,7 +735,10 @@ export default function TalentProfile() {
           <img
             src={bannerSrc}
             alt={`Banner ${displayName}`}
+            width={896}
+            height={224}
             loading="eager"
+            fetchPriority="high"
             decoding="async"
             className={cn(
               "h-full w-full object-cover transition-all duration-700",

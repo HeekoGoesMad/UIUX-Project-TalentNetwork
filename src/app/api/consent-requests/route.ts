@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
 import { ConsentService } from "@/lib/services/consent";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const requestSchema = z.object({
   candidateProfileIds: z.array(z.string().uuid()).min(1).max(100),
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     if (scope && "error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
     const result = await ConsentService.getConsentRequests(current.db, current.user, scope, { page, limit, candidateProfileId });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("[GET /api/consent-requests Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });

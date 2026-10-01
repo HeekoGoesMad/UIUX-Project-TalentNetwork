@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 
 const jobSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -153,6 +154,31 @@ async function jobRows(
   };
 }
 
+let lastAutoCloseCheck = 0;
+const AUTO_CLOSE_THROTTLE_MS = 5 * 60 * 1000;
+
+function triggerAutoCloseExpiredJobs(db: Awaited<ReturnType<typeof getDb>>) {
+  const now = Date.now();
+  if (now - lastAutoCloseCheck < AUTO_CLOSE_THROTTLE_MS) return;
+  lastAutoCloseCheck = now;
+  queueMicrotask(async () => {
+    try {
+      await db
+        .update(schema.jobs)
+        .set({ status: "closed", closedAt: schema.jobs.expiresAt })
+        .where(
+          and(
+            eq(schema.jobs.status, "published"),
+            isNotNull(schema.jobs.expiresAt),
+            lte(schema.jobs.expiresAt, new Date())
+          )
+        );
+    } catch (e) {
+      console.warn("Failed to auto-close expired jobs:", e);
+    }
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -169,6 +195,9 @@ export async function GET(request: Request) {
     const current = await getCurrentAppUser();
     const db = "error" in current ? getDb() : current.db;
     const recruiter = !("error" in current) && current.user.role === "recruiter";
+
+    // Auto-close any published jobs past their expiration (throttled to at most once per 5 minutes in background)
+    triggerAutoCloseExpiredJobs(db);
 
     let where = recruiter ? undefined : eq(schema.jobs.status, "published");
     if (recruiter) {
@@ -193,7 +222,10 @@ export async function GET(request: Request) {
     }
 
     const { jobs, hasMore } = await jobRows(db, where, { limit, offset });
-    return NextResponse.json({ jobs, page, limit, hasMore });
+    const headers = recruiter
+      ? CACHE_HEADERS.PRIVATE_NO_STORE
+      : CACHE_HEADERS.PUBLIC_PERIODIC;
+    return NextResponse.json({ jobs, page, limit, hasMore }, { headers });
   } catch (error) {
     return dbError(error);
   }
@@ -209,6 +241,7 @@ export async function POST(request: Request) {
     if ("error" in current) return NextResponse.json({ error: current.error }, { status: current.status });
 
     const values = parsed.data;
+    const default30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const [job] = await current.db
       .insert(schema.jobs)
       .values({
@@ -232,7 +265,7 @@ export async function POST(request: Request) {
         qualifications: values.qualifications ?? null,
         benefits: values.benefits,
         vacanciesCount: values.vacanciesCount,
-        expiresAt: values.expiresAt ? new Date(values.expiresAt) : null,
+        expiresAt: values.expiresAt ? new Date(values.expiresAt) : default30Days,
       })
       .returning();
 

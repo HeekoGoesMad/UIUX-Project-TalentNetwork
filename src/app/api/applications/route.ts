@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { schema } from "@/db";
 import { getCurrentAppUser, getRecruiterScope } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 import { createNotificationWithDeliveries, notificationData, systemNotification } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -86,7 +87,7 @@ export async function GET(request: Request) {
       .leftJoin(schema.profiles, eq(schema.profiles.userId, schema.candidateProfiles.userId))
       .where(whereClause).orderBy(desc(schema.applications.updatedAt)).limit(limit + 1).offset(offset);
     const hasMore = rows.length > limit;
-    return NextResponse.json({ applications: (hasMore ? rows.slice(0, limit) : rows).map(formatApplication), page, limit, hasMore });
+    return NextResponse.json({ applications: (hasMore ? rows.slice(0, limit) : rows).map(formatApplication), page, limit, hasMore }, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (error) {
     console.error("Application list failed", error);
     return NextResponse.json({ error: "Aplikasi belum dapat dimuat." }, { status: 503 });

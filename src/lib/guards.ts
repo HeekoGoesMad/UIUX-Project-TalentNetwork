@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { getCurrentAppUser, type AppUser } from "@/lib/api/auth";
 
@@ -27,9 +27,19 @@ type Resolution =
 async function resolveAccess(): Promise<Resolution> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if ((!url || !key) && process.env.NODE_ENV !== "production" && process.env.APP_ENV !== "production") {
+  if (
+    process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
+    ((!url || !key) && process.env.NODE_ENV !== "production" && process.env.APP_ENV !== "production")
+  ) {
     return { kind: "demo" };
   }
+  try {
+    const c = await cookies();
+    const demoRole = c.get("proofylink-demo-session-role")?.value;
+    if (demoRole === "candidate" || demoRole === "recruiter" || demoRole === "partner" || demoRole === "admin") {
+      return { kind: "demo" };
+    }
+  } catch {}
   try {
     const res = await getCurrentAppUser({ allowPending: true });
     if (!("error" in res)) {

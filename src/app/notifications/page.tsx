@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Calendar,
@@ -142,7 +142,7 @@ function getNotificationVisualMeta(title: string, type: string) {
   };
 }
 
-export default function NotificationsPage() {
+function NotificationsContent() {
   const {
     user,
     hydrated,
@@ -783,6 +783,14 @@ export default function NotificationsPage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={<StateMessage text="Menyiapkan notifikasi..." />}>
+      <NotificationsContent />
+    </Suspense>
   );
 }
 

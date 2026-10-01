@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, Suspense } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -195,8 +195,12 @@ function AdminPartnershipsContent() {
     [populateForm]
   );
 
+  const isFetchingRef = useRef(false);
+
   const fetchPartnerships = useCallback(
     async (silent = false) => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
       if (!silent) setLoading(true);
       setRefreshing(true);
       try {
@@ -238,6 +242,7 @@ function AdminPartnershipsContent() {
           toast.error("Gagal memuat daftar partnership.");
         }
       } finally {
+        isFetchingRef.current = false;
         setLoading(false);
         setRefreshing(false);
       }

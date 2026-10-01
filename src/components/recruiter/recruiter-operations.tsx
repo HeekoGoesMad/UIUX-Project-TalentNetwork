@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  Archive,
   ArrowLeft,
   ArrowRight,
   Banknote,
@@ -28,6 +29,7 @@ import {
   Sparkles,
   Table as TableIcon,
   Unlock,
+  Users,
   UserX,
   Workflow,
   X,
@@ -44,12 +46,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApp } from "@/providers/app-provider";
-import { HrReportModal } from "@/components/recruiter/hr-report-modal";
-import { CreateOfferModal } from "@/components/recruiter/create-offer-modal";
-import { CandidateDetailDrawer } from "@/components/recruiter/candidate-detail-drawer";
+import dynamic from "next/dynamic";
 import { CandidateAvatar } from "@/components/talent/avatar";
 import { CandidateQuickPeek } from "@/components/recruiter/candidate-quick-peek";
-import { KeyboardShortcutsModal } from "@/components/recruiter/keyboard-shortcuts-modal";
+
+const HrReportModal = dynamic(
+  () => import("@/components/recruiter/hr-report-modal").then((m) => m.HrReportModal),
+  { ssr: false }
+);
+const CreateOfferModal = dynamic(
+  () => import("@/components/recruiter/create-offer-modal").then((m) => m.CreateOfferModal),
+  { ssr: false }
+);
+const CandidateDetailDrawer = dynamic(
+  () => import("@/components/recruiter/candidate-detail-drawer").then((m) => m.CandidateDetailDrawer),
+  { ssr: false }
+);
+const KeyboardShortcutsModal = dynamic(
+  () => import("@/components/recruiter/keyboard-shortcuts-modal").then((m) => m.KeyboardShortcutsModal),
+  { ssr: false }
+);
 import {
   ScheduleInterviewTransitionModal,
   CancelOfferWarningModal,
@@ -439,6 +455,7 @@ export function validateCandidateStageTransition(
 export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: string } = {}) {
   const { dbMode, scans, user, reloadBootstrap, tokens, screeningResults } = useApp();
   const isJobSpecificPipeline = Boolean(initialJobId && initialJobId !== "talent-pool");
+  const scansKey = useMemo(() => scans.map((s) => s.candidateId).sort().join(","), [scans]);
   const [data, setData] = useState<{ candidates: Candidate[]; interviews: Interview[] }>(() => readInitialState(dbMode));
   const [isDbSyncing, setIsDbSyncing] = useState(() => dbMode && data.candidates.length === 0);
   const [viewMode, setViewMode] = useState<"kanban" | "table">(() => (isJobSpecificPipeline ? "table" : "kanban"));
@@ -446,16 +463,16 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   const [jobFilter, setJobFilter] = useState(() => initialJobId || "all");
   const [scopeFilter, setScopeFilter] = useState<"jobs" | "pool">(() => (initialJobId ? "jobs" : "jobs"));
   const [prevInitialJobId, setPrevInitialJobId] = useState(initialJobId);
-  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string }>>(() => {
+  const [availableJobs, setAvailableJobs] = useState<Array<{ id: string; title: string; status?: string }>>(() => {
     if (typeof window !== "undefined" && !dbMode) {
       try {
         const stored = localStorage.getItem("proofylink-demo-jobs");
         if (stored) {
-          const parsed = JSON.parse(stored) as Array<{ id: string; title: string }>;
+          const parsed = JSON.parse(stored) as Array<{ id: string; title: string; status?: string }>;
           if (Array.isArray(parsed) && parsed.length > 0) {
             return parsed
               .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
-              .map((j) => ({ id: j.id, title: j.title }));
+              .map((j) => ({ id: j.id, title: j.title, status: j.status }));
           }
         }
       } catch {}
@@ -529,11 +546,11 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
     fetch("/api/jobs?limit=100", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((payload: { jobs?: Array<{ id: string; title: string }> } | null) => {
+      .then((payload: { jobs?: Array<{ id: string; title: string; status?: string }> } | null) => {
         if (active && payload?.jobs) {
           const liveJobs = payload.jobs
             .filter((j) => Boolean(j.id && j.title && !j.id.startsWith("job-")))
-            .map((j) => ({ id: j.id, title: j.title }));
+            .map((j) => ({ id: j.id, title: j.title, status: j.status }));
           setAvailableJobs(liveJobs);
         }
       })
@@ -543,13 +560,17 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     if (initialJobId && initialJobId !== "talent-pool") {
       fetch(`/api/jobs/${initialJobId}`, { cache: "no-store" })
         .then((res) => (res.ok ? res.json() : null))
-        .then((payload: { job?: { id: string; title: string } } | null) => {
+        .then((payload: { job?: { id: string; title: string; status?: string } } | null) => {
           if (active && payload?.job?.title) {
             setAvailableJobs((prev) => {
               if (!prev.some((j) => j.id === payload.job!.id)) {
-                return [...prev, { id: payload.job!.id, title: payload.job!.title }];
+                return [...prev, { id: payload.job!.id, title: payload.job!.title, status: payload.job!.status }];
               }
-              return prev;
+              return prev.map((j) =>
+                j.id === payload.job!.id
+                  ? { ...j, title: payload.job!.title, status: payload.job!.status }
+                  : j
+              );
             });
           }
         })
@@ -588,7 +609,9 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
   // Save to demo storage when not in dbMode, or cache DB records in dbMode
   useEffect(() => {
     if (!dbMode) {
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      } catch {}
     } else if (typeof window !== "undefined" && !isDbSyncing) {
       try {
         localStorage.setItem(DB_CACHE_KEY, JSON.stringify(data));
@@ -600,7 +623,12 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     return data.candidates;
   }, [data.candidates]);
 
-  // Resolve current active job title for scoped pipeline views
+  // Resolve current active job and details for scoped pipeline views
+  const currentJob = useMemo(
+    () => (isJobSpecificPipeline ? availableJobs.find((j) => j.id === initialJobId) : null),
+    [isJobSpecificPipeline, availableJobs, initialJobId]
+  );
+
   const currentJobTitle = useMemo(() => {
     const targetId = jobFilter !== "all" ? jobFilter : initialJobId;
     if (!targetId || targetId === "all") return null;
@@ -673,7 +701,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     ])
       .then(async ([appRes, candRes, intRes]) => {
         if (!active) return;
-        const scannedCandidateIds = new Set(scans.map((s) => s.candidateId));
+        const scannedCandidateIds = new Set(scansKey ? scansKey.split(",") : []);
         let mappedCandidates: Candidate[] = [];
 
         // Parse candidate profiles from Supabase (/api/candidates)
@@ -959,7 +987,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     return () => {
       active = false;
     };
-  }, [dbMode, scans, recruiterName]);
+  }, [dbMode, scansKey, recruiterName]);
 
   // Scope counts for segmented control
   const scopeCounts = useMemo(() => {
@@ -975,19 +1003,16 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
   // Smart Triage Counts (respecting current search, scope, and job filters)
   const triageCounts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const base = activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
-        const targetJobTitle = availableJobs.find((j) => j.id === initialJobId)?.title;
-        return (
-          candidate.jobId === initialJobId ||
-          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false)
-        );
+        return candidate.jobId === initialJobId;
       }
 
       const isPool =
@@ -996,12 +1021,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
       if (!matchScope) return false;
 
       if (scopeFilter === "jobs" && jobFilter !== "all") {
-        const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
-        return (
-          candidate.jobId === jobFilter ||
-          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
-          candidate.role === jobFilter
-        );
+        return candidate.jobId === jobFilter;
       }
 
       return true;
@@ -1023,23 +1043,20 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
     const locked = base.filter((c) => c.unlocked === false).length;
 
     return { all, sla, interview, locked };
-  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, availableJobs, data.interviews]);
+  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, data.interviews]);
 
   // Filtered candidates (incorporating search, scope, job, and smart triage filter)
   const filteredCandidates = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return activeCandidates.filter((candidate) => {
       const matchSearch =
-        searchQuery.trim() === "" ||
-        candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        candidate.name.toLowerCase().includes(query) ||
+        candidate.role.toLowerCase().includes(query);
       if (!matchSearch) return false;
 
       if (isJobSpecificPipeline) {
-        const targetJobTitle = availableJobs.find((j) => j.id === initialJobId)?.title;
-        const matchJob =
-          candidate.jobId === initialJobId ||
-          (targetJobTitle ? candidate.jobTitle === targetJobTitle : false);
-        if (!matchJob) return false;
+        if (candidate.jobId !== initialJobId) return false;
       } else {
         const isPool =
           !candidate.jobId || candidate.jobId === "talent-pool" || candidate.jobTitle === "Talent Pool";
@@ -1047,12 +1064,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         if (!matchScope) return false;
 
         if (scopeFilter === "jobs" && jobFilter !== "all") {
-          const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
-          const matchJob =
-            candidate.jobId === jobFilter ||
-            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
-            candidate.role === jobFilter;
-          if (!matchJob) return false;
+          if (candidate.jobId !== jobFilter) return false;
         }
       }
 
@@ -1073,7 +1085,7 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
       return true;
     });
-  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, availableJobs, triageFilter, data.interviews]);
+  }, [activeCandidates, searchQuery, isJobSpecificPipeline, initialJobId, scopeFilter, jobFilter, triageFilter, data.interviews]);
 
   const handleAssignJob = useCallback(
     async (candidateId: string, jobId: string, jobTitle: string) => {
@@ -1537,19 +1549,16 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
 
       const matchScope = scopeFilter === "pool" ? isPool : !isPool;
 
-      const targetJobTitle = availableJobs.find((j) => j.id === jobFilter)?.title;
       const matchJob =
         jobFilter === "all"
           ? true
           : jobFilter === "talent-pool"
           ? isPool
-          : candidate.jobId === jobFilter ||
-            (targetJobTitle ? candidate.jobTitle === targetJobTitle : false) ||
-            candidate.role === jobFilter;
+          : candidate.jobId === jobFilter;
 
       return matchScope && matchJob;
     });
-  }, [activeCandidates, scopeFilter, jobFilter, availableJobs]);
+  }, [activeCandidates, scopeFilter, jobFilter]);
 
   // KPI Metrics reflects candidates currently visible in the active scope/job
   const metrics = useMemo(() => {
@@ -2080,85 +2089,134 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
         <div className="border-b border-slate-200 bg-white sticky top-0 z-20 shadow-2xs">
           <div className="container mx-auto px-4 sm:px-6 py-4">
             {initialJobId ? (
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  {/* Breadcrumb Navigation */}
-                  <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
-                    <Link
-                      href="/recruiter/jobs"
-                      className="hover:text-slate-900 transition-colors flex items-center gap-1 font-medium"
-                    >
-                      <ArrowLeft className="size-3.5 text-slate-400" />
-                      <span>Daftar Lowongan</span>
-                    </Link>
-                    <ChevronRight className="size-3 text-slate-400" />
-                    <Link
-                      href={`/recruiter/jobs/${initialJobId}`}
-                      className="hover:text-slate-900 transition-colors font-medium text-slate-700 max-w-[220px] truncate"
-                      title={currentJobTitle || "Detail Lowongan"}
-                    >
-                      {currentJobTitle || "Detail Lowongan"}
-                    </Link>
-                    <ChevronRight className="size-3 text-slate-400" />
-                    <span className="font-semibold text-[#7C3AED] bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-                      Pipeline Pelamar
-                    </span>
-                  </nav>
+              <div className="space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    {/* Breadcrumb Navigation */}
+                    <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
+                      <Link
+                        href="/recruiter/jobs"
+                        className="hover:text-slate-900 transition-colors flex items-center gap-1 font-medium"
+                      >
+                        <ArrowLeft className="size-3.5 text-slate-400" />
+                        <span>Daftar Lowongan</span>
+                      </Link>
+                      <ChevronRight className="size-3 text-slate-400" />
+                      <Link
+                        href={`/recruiter/jobs/${initialJobId}`}
+                        className="hover:text-slate-900 transition-colors font-medium text-slate-700 max-w-[220px] truncate"
+                        title={currentJobTitle || "Detail Lowongan"}
+                      >
+                        {currentJobTitle || "Detail Lowongan"}
+                      </Link>
+                      <ChevronRight className="size-3 text-slate-400" />
+                      <span className="font-semibold text-[#7C3AED] bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                        Pipeline Pelamar
+                      </span>
+                    </nav>
 
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                      Pipeline: {currentJobTitle || "Lowongan Terpilih"}
-                    </h1>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
-                      <Workflow className="size-3 text-[#7C3AED]" />
-                      Lowongan Khusus
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                        Pipeline: {currentJobTitle || "Lowongan Terpilih"}
+                      </h1>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                        <Workflow className="size-3 text-[#7C3AED]" />
+                        Lowongan Khusus
+                      </span>
+                      {currentJob?.status === "archived" && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded-full">
+                          <Archive className="size-3 text-slate-500" />
+                          Diarsipkan (Batch Lama)
+                        </span>
+                      )}
+                      {currentJob?.status === "closed" && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                          <AlertCircle className="size-3 text-rose-600" />
+                          Ditutup
+                        </span>
+                      )}
+                      {currentJob?.status === "published" && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {currentJob?.status === "archived"
+                        ? "Arsip riwayat kandidat dari lowongan batch lama. Data tersimpan aman dan telah dialihkan ke Talent Pool."
+                        : "Evaluasi pelamar, jadwal wawancara, dan penawaran kerja khusus untuk lowongan ini."}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Evaluasi pelamar, jadwal wawancara, dan penawaran kerja khusus untuk lowongan ini.
-                  </p>
+
+                  {/* View Switcher & Action Buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild
+                      className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                    >
+                      <Link href={`/recruiter/jobs/${initialJobId}`}>
+                        <Eye className="size-3.5 text-slate-500" /> Detail Lowongan
+                      </Link>
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportCsv}
+                      className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
+                    >
+                      <Download className="size-3.5" /> Export
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShortcutsModalOpen(true)}
+                      className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
+                      title="Pintasan Keyboard (Tekan ?)"
+                    >
+                      <Keyboard className="size-3.5" /> Pintasan
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => setReportModalOpen(true)}
+                      className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
+                    >
+                      <BarChart3 className="size-3.5" /> Laporan HR
+                    </Button>
+                  </div>
                 </div>
 
-                {/* View Switcher & Action Buttons */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    asChild
-                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
-                  >
-                    <Link href={`/recruiter/jobs/${initialJobId}`}>
-                      <Eye className="size-3.5 text-slate-500" /> Detail Lowongan
-                    </Link>
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={exportCsv}
-                    className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl gap-1.5"
-                  >
-                    <Download className="size-3.5" /> Export
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShortcutsModalOpen(true)}
-                    className="h-8.5 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50 rounded-xl gap-1.5"
-                    title="Pintasan Keyboard (Tekan ?)"
-                  >
-                    <Keyboard className="size-3.5" /> Pintasan
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    onClick={() => setReportModalOpen(true)}
-                    className="h-8.5 text-xs font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl shadow-2xs gap-1.5"
-                  >
-                    <BarChart3 className="size-3.5" /> Laporan HR
-                  </Button>
-                </div>
+                {/* Archived Job Notice Banner */}
+                {isJobSpecificPipeline && currentJob?.status === "archived" && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-2.5">
+                      <Archive className="size-4 text-slate-500 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-slate-900">Lowongan Ini Berstatus Arsip (Batch Lama).</span>
+                        <span className="text-slate-600 ml-1">
+                          Kandidat di bawah merupakan catatan historis pelamar dari batch sebelumnya. Semua profil kandidat juga telah disimpan dengan aman di Talent Pool organisasi.
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                        className="h-7 text-xs font-semibold bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
+                      >
+                        <Link href={`/recruiter/jobs/${initialJobId}`}>
+                          Lihat Rincian Lowongan
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3146,7 +3204,33 @@ export function RecruiterOperationsPage({ initialJobId }: { initialJobId?: strin
                     {filteredCandidates.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
-                          Tidak ada kandidat yang cocok dengan kriteria filter.
+                          <div className="max-w-md mx-auto space-y-2 py-4">
+                            <Users className="size-8 text-slate-300 mx-auto" />
+                            <p className="font-semibold text-slate-700 text-sm">
+                              {isJobSpecificPipeline
+                                ? "Belum ada pelamar di lowongan ini"
+                                : "Tidak ada kandidat yang cocok"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {isJobSpecificPipeline
+                                ? "Lowongan ini (batch baru) memiliki pipeline awal 0 pelamar. Pelamar yang mendaftar atau diundang akan muncul di sini."
+                                : "Coba ubah kriteria pencarian atau filter yang Anda pilih."}
+                            </p>
+                            {isJobSpecificPipeline && (
+                              <div className="pt-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                  className="h-8 text-xs font-semibold border-purple-200 text-[#7C3AED] hover:bg-purple-50"
+                                >
+                                  <Link href="/shortlist">
+                                    <Sparkles className="size-3.5 mr-1 text-[#7C3AED]" /> Buka Talent Pool &amp; Shortlist
+                                  </Link>
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ) : (

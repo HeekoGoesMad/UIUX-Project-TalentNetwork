@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { and, eq } from "drizzle-orm";
 import { getCurrentAppUser } from "@/lib/api/auth";
+import { CACHE_HEADERS } from "@/lib/api/cache";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/api/rate-limit";
 import { MessagingService } from "@/lib/services/messaging";
 import { schema, type Database } from "@/db";
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: CACHE_HEADERS.PRIVATE_NO_STORE });
   } catch (err) {
     console.error("[GET /api/messages Database Error]:", err);
     return NextResponse.json({ error: "Database tidak tersedia." }, { status: 503 });
