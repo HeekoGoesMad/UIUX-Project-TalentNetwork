@@ -621,54 +621,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { listener.subscription.unsubscribe(); };
   }, [supabaseConfigured]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(state));
-      } catch {}
-    }, 200);
+  const stateRef = useRef(state);
 
-    const handleBeforeUnload = () => {
+  useEffect(() => {
+    stateRef.current = state;
+    if (!hydrated) return;
+    const flush = () => {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(state));
-      } catch {}
+        localStorage.setItem(storageKey, JSON.stringify(stateRef.current));
+      } catch (err) {
+        console.warn("[AppProvider] Failed to persist state to localStorage:", err);
+      }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    const timer = setTimeout(flush, 200);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      flush();
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [state, hydrated]);
 
   const lastSavedSession = useRef<string | null>(null);
   useEffect(() => {
     if (!hydrated) return;
-    if (user) {
-      const sessionData: DemoUser = {
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        provisioningStatus: user.provisioningStatus,
-        provisioningReason: user.provisioningReason,
-        companyName: user.companyName,
-        hasSubmittedOnboarding: user.hasSubmittedOnboarding,
-      };
-      const serialized = JSON.stringify(sessionData);
-      if (lastSavedSession.current !== serialized) {
-        lastSavedSession.current = serialized;
-        try {
+    try {
+      if (user) {
+        const sessionData: DemoUser = {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          provisioningStatus: user.provisioningStatus,
+          provisioningReason: user.provisioningReason,
+          companyName: user.companyName,
+          hasSubmittedOnboarding: user.hasSubmittedOnboarding,
+        };
+        const serialized = JSON.stringify(sessionData);
+        if (lastSavedSession.current !== serialized) {
+          lastSavedSession.current = serialized;
           localStorage.setItem(sessionKey, serialized);
-        } catch {}
-      }
-    } else {
-      if (lastSavedSession.current !== null) {
-        lastSavedSession.current = null;
-        try {
+        }
+      } else {
+        if (lastSavedSession.current !== null) {
+          lastSavedSession.current = null;
           localStorage.removeItem(sessionKey);
-        } catch {}
+        }
       }
+    } catch (err) {
+      console.warn("[AppProvider] Failed to persist session to localStorage:", err);
     }
   }, [user, hydrated]);
 
@@ -1088,8 +1101,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrapUserKey.current = null;
     setUser(null);
     setHasPassword(undefined);
-    localStorage.removeItem(sessionKey);
     try {
+      localStorage.removeItem(sessionKey);
       localStorage.removeItem("proofylink-a11y-prefs");
       if (typeof document !== "undefined") {
         const root = document.documentElement;
